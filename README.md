@@ -42,7 +42,7 @@ O aplicativo atualmente presente no repositório é desenvolvido em **Dart** e *
 | ------------------------------- | -------------------------- |
 | Allan Giovanni Matias Paes      | 25008211                   |
 | Cristian Eduardo Fava           | 25000636                   |
-| Daniela Mikie Kikuchi Gonçalves | Não informado no relatório |
+| Daniela Mikie Kikuchi Gonçalves | 25003068                   |
 | Gustavo Alves de Siqueira Costa | 25001650                   |
 | Sara Fernandes Monteiro         | 25024107                   |
 
