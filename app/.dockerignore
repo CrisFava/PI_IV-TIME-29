@@ -1,0 +1,6 @@
+converge/
+**/target/
+**/.idea/
+**/.git/
+**/.vscode/
+**/*.md
