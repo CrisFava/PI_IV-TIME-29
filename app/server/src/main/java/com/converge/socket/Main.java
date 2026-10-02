@@ -7,15 +7,6 @@ import com.converge.socket.handler.math.MathOperationRequest;
 import java.util.Scanner;
 
 public class Main {
-
-    /**
-     * Função utilitária para concentrar os registros dos handers.
-     * @param server indica qual servidor o handler será registrado.
-     * */
-    private static void registerHandlers(SocketServer server){
-        server.registerHandler(MathOperationRequest.class, new MathOperationHandler());
-    }
-
     public static void main(String[] args) {
         int port = SocketServer.DEFAULT_PORT;
 
@@ -30,7 +21,6 @@ public class Main {
         }
 
         SocketServer server = new SocketServer(port);
-        registerHandlers(server);
 
         // Register custom business handlers
 

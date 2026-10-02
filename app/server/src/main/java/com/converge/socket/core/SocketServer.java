@@ -8,6 +8,8 @@ import com.converge.socket.core.handler.HandlerRegistry;
 import com.converge.socket.core.handler.RequestHandler;
 import com.converge.socket.core.protocol.Message;
 import com.converge.socket.core.protocol.ServerShutdownNotification;
+import com.converge.socket.handler.math.MathOperationHandler;
+import com.converge.socket.handler.math.MathOperationRequest;
 
 import java.io.IOException;
 import java.net.ServerSocket;
@@ -37,6 +39,10 @@ public class SocketServer {
         this.port = port;
         this.clientRegistry = new ClientRegistry();
         this.handlerRegistry = new HandlerRegistry();
+    }
+
+    private void registerHandlers(){
+        this.registerHandler(MathOperationRequest.class, new MathOperationHandler());
     }
 
     /**
@@ -72,6 +78,7 @@ public class SocketServer {
         this.connectionAcceptor = new ConnectionAcceptor(this.serverSocket, this.clientRegistry, this.handlerRegistry);
         this.connectionAcceptor.start();
         this.running = true;
+        this.registerHandlers();
     }
 
     public synchronized void stop() {

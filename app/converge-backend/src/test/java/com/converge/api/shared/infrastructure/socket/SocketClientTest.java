@@ -30,7 +30,6 @@ public class SocketClientTest {
     void setUp() throws Exception {
         testPort = findFreePort();
         server = new SocketServer(testPort);
-        server.registerHandler(MathOperationRequest.class, new MathOperationHandler());
         server.start();
     }
 
