@@ -78,7 +78,6 @@ public class SocketServer {
         this.connectionAcceptor = new ConnectionAcceptor(this.serverSocket, this.clientRegistry, this.handlerRegistry);
         this.connectionAcceptor.start();
         this.running = true;
-        this.registerHandlers();
     }
 
     public synchronized void stop() {

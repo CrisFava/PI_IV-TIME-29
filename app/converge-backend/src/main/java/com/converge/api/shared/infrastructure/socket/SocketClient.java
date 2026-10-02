@@ -16,8 +16,12 @@ import lombok.Getter;
 @Getter
 public class SocketClient implements AutoCloseable {
 
-    public static final String DEFAULT_HOST = "localhost";
-    public static final int DEFAULT_PORT = 3000;
+    public static final String DEFAULT_HOST = System.getenv("SOCKET_SERVER_HOST") != null
+            ? System.getenv("SOCKET_SERVER_HOST")
+            : "localhost";
+    public static final int DEFAULT_PORT = System.getenv("SOCKET_SERVER_PORT") != null
+            ? Integer.parseInt(System.getenv("SOCKET_SERVER_PORT"))
+            : 3000;
 
     private final String host;
     private final int port;

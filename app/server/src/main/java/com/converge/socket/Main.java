@@ -7,6 +7,11 @@ import com.converge.socket.handler.math.MathOperationRequest;
 import java.util.Scanner;
 
 public class Main {
+
+    private static void registerHandlers(SocketServer server){
+        server.registerHandler(MathOperationRequest.class, new MathOperationHandler());
+    }
+    
     public static void main(String[] args) {
         int port = SocketServer.DEFAULT_PORT;
 
@@ -23,7 +28,7 @@ public class Main {
         SocketServer server = new SocketServer(port);
 
         // Register custom business handlers
-
+        registerHandlers(server);
 
         try {
             server.start();
