@@ -1,8 +1,8 @@
-package com.converge.core.client;
+package com.converge.socket.core.client;
 
-import com.converge.core.exception.ServerErrorCode;
-import com.converge.core.exception.ServerException;
-import com.converge.core.protocol.Message;
+import com.converge.socket.core.exception.ServerErrorCode;
+import com.converge.socket.core.exception.ServerException;
+import com.converge.socket.core.protocol.Message;
 
 import java.io.EOFException;
 import java.io.IOException;

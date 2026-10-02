@@ -1,6 +1,6 @@
-package com.converge.core.handler;
+package com.converge.socket.core.handler;
 
-import com.converge.core.protocol.Message;
+import com.converge.socket.core.protocol.Message;
 
 /**
  * Standard interface for business logic handlers.

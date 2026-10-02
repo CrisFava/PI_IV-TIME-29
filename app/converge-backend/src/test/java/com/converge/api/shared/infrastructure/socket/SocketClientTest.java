@@ -1,10 +1,11 @@
 package com.converge.api.shared.infrastructure.socket;
 
-import com.converge.core.SocketServer;
-import com.converge.core.protocol.Message;
-import com.converge.handler.math.MathOperationHandler;
-import com.converge.handler.math.MathOperationRequest;
-import com.converge.handler.math.MathOperationResponse;
+import com.converge.socket.core.SocketServer;
+import com.converge.socket.core.protocol.Message;
+import com.converge.socket.handler.math.MathOperationHandler;
+import com.converge.socket.handler.math.MathOperationRequest;
+import com.converge.socket.handler.math.MathOperationResponse;
+
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;

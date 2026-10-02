@@ -1,7 +1,7 @@
-package com.converge.core.connection;
+package com.converge.socket.core.connection;
 
-import com.converge.core.client.ClientRegistry;
-import com.converge.core.handler.HandlerRegistry;
+import com.converge.socket.core.client.ClientRegistry;
+import com.converge.socket.core.handler.HandlerRegistry;
 
 import java.io.IOException;
 import java.net.ServerSocket;

@@ -1,4 +1,4 @@
-package com.converge.core.exception;
+package com.converge.socket.core.exception;
 
 /**
  * Custom exception class for socket and server operations, wrapping standard ServerErrorCode.

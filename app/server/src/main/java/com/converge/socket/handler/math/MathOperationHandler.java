@@ -1,8 +1,8 @@
-package com.converge.handler.math;
+package com.converge.socket.handler.math;
 
-import com.converge.core.exception.ServerErrorCode;
-import com.converge.core.exception.ServerException;
-import com.converge.core.handler.RequestHandler;
+import com.converge.socket.core.exception.ServerErrorCode;
+import com.converge.socket.core.exception.ServerException;
+import com.converge.socket.core.handler.RequestHandler;
 
 
 // Use ServerException caso for lançar erros para manter a semântica.

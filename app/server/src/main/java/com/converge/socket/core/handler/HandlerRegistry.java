@@ -1,9 +1,9 @@
-package com.converge.core.handler;
+package com.converge.socket.core.handler;
 
-import com.converge.core.exception.ServerErrorCode;
-import com.converge.core.exception.ServerException;
-import com.converge.core.protocol.ErrorResponse;
-import com.converge.core.protocol.Message;
+import com.converge.socket.core.exception.ServerErrorCode;
+import com.converge.socket.core.exception.ServerException;
+import com.converge.socket.core.protocol.ErrorResponse;
+import com.converge.socket.core.protocol.Message;
 
 import java.util.Map;
 import java.util.concurrent.ConcurrentHashMap;

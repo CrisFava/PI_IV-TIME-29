@@ -1,6 +1,6 @@
-package com.converge.core.protocol;
+package com.converge.socket.core.protocol;
 
-import com.converge.core.exception.ServerErrorCode;
+import com.converge.socket.core.exception.ServerErrorCode;
 
 import java.io.Serial;
 

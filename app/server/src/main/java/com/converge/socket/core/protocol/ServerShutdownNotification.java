@@ -1,4 +1,4 @@
-package com.converge.core.protocol;
+package com.converge.socket.core.protocol;
 
 import java.io.Serial;
 

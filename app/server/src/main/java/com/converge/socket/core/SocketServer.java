@@ -1,13 +1,13 @@
-package com.converge.core;
+package com.converge.socket.core;
 
-import com.converge.core.client.ClientRegistry;
-import com.converge.core.connection.ConnectionAcceptor;
-import com.converge.core.exception.ServerErrorCode;
-import com.converge.core.exception.ServerException;
-import com.converge.core.handler.HandlerRegistry;
-import com.converge.core.handler.RequestHandler;
-import com.converge.core.protocol.Message;
-import com.converge.core.protocol.ServerShutdownNotification;
+import com.converge.socket.core.client.ClientRegistry;
+import com.converge.socket.core.connection.ConnectionAcceptor;
+import com.converge.socket.core.exception.ServerErrorCode;
+import com.converge.socket.core.exception.ServerException;
+import com.converge.socket.core.handler.HandlerRegistry;
+import com.converge.socket.core.handler.RequestHandler;
+import com.converge.socket.core.protocol.Message;
+import com.converge.socket.core.protocol.ServerShutdownNotification;
 
 import java.io.IOException;
 import java.net.ServerSocket;

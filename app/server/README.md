@@ -42,10 +42,11 @@ com.converge
 Para adicionar uma nova funcionalidade, o desenvolvedor não precisa alterar o código de infraestrutura de sockets ou gerenciamento de conexões. Basta:
 
 ### 1. Criar o Request e Response (estendendo `Message`)
+
 ```java
 package com.converge.handler.ride;
 
-import com.converge.core.protocol.Message;
+import com.converge.socket.core.protocol.Message;
 
 public class CreateRideRequest extends Message {
     private final String driver;
@@ -60,10 +61,11 @@ public class CreateRideResponse extends Message {
 ```
 
 ### 2. Criar a classe do Handler implementando `RequestHandler` com `execute(request)`
+
 ```java
 package com.converge.handler.ride;
 
-import com.converge.core.handler.RequestHandler;
+import com.converge.socket.core.handler.RequestHandler;
 
 public class CreateRideHandler implements RequestHandler<CreateRideRequest, CreateRideResponse> {
 

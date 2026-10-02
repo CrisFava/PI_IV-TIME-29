@@ -1,4 +1,4 @@
-package com.converge.core.exception;
+package com.converge.socket.core.exception;
 
 
 public enum ServerErrorCode {

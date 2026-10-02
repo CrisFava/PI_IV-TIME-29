@@ -1,10 +1,11 @@
 package com.converge.api.shared.infrastructure.socket;
 
-import com.converge.core.client.ClientConnection;
-import com.converge.core.exception.ServerErrorCode;
-import com.converge.core.exception.ServerException;
-import com.converge.core.protocol.DisconnectRequest;
-import com.converge.core.protocol.Message;
+import com.converge.socket.core.client.ClientConnection;
+import com.converge.socket.core.exception.ServerErrorCode;
+import com.converge.socket.core.exception.ServerException;
+import com.converge.socket.core.protocol.DisconnectRequest;
+import com.converge.socket.core.protocol.Message;
+
 import lombok.Getter;
 
 import java.io.ObjectInputStream;
@@ -13,7 +14,6 @@ import java.net.Socket;
 import lombok.Getter;
 
 @Getter
-
 public class SocketClient implements AutoCloseable {
 
     public static final String DEFAULT_HOST = "localhost";

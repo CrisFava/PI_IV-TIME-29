@@ -1,6 +1,6 @@
-package com.converge.handler.math;
+package com.converge.socket.handler.math;
 
-import com.converge.core.protocol.Message;
+import com.converge.socket.core.protocol.Message;
 
 import java.io.Serial;
 

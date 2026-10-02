@@ -1,11 +1,11 @@
-package com.converge.core.connection;
+package com.converge.socket.core.connection;
 
-import com.converge.core.client.ClientConnection;
-import com.converge.core.client.ClientRegistry;
-import com.converge.core.exception.ServerException;
-import com.converge.core.handler.HandlerRegistry;
-import com.converge.core.protocol.DisconnectRequest;
-import com.converge.core.protocol.Message;
+import com.converge.socket.core.client.ClientConnection;
+import com.converge.socket.core.client.ClientRegistry;
+import com.converge.socket.core.exception.ServerException;
+import com.converge.socket.core.handler.HandlerRegistry;
+import com.converge.socket.core.protocol.DisconnectRequest;
+import com.converge.socket.core.protocol.Message;
 
 import java.io.IOException;
 import java.io.ObjectInputStream;

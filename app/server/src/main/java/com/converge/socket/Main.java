@@ -1,8 +1,8 @@
-package com.converge;
+package com.converge.socket;
 
-import com.converge.core.SocketServer;
-import com.converge.handler.math.MathOperationHandler;
-import com.converge.handler.math.MathOperationRequest;
+import com.converge.socket.core.SocketServer;
+import com.converge.socket.handler.math.MathOperationHandler;
+import com.converge.socket.handler.math.MathOperationRequest;
 
 import java.util.Scanner;
 

@@ -1,6 +1,6 @@
-package com.converge.core.client;
+package com.converge.socket.core.client;
 
-import com.converge.core.protocol.Message;
+import com.converge.socket.core.protocol.Message;
 
 import java.util.ArrayList;
 import java.util.List;
