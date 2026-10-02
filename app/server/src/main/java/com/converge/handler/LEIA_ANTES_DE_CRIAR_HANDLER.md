@@ -21,3 +21,5 @@ Garante estabilidade e compatibilidade:
 - Informa à JVM: "Mesmo que o cliente e o servidor tenham sido compilados em momentos ou máquinas diferentes, essas classes pertencem à mesma versão e são compatíveis".
 - Evita avisos de compilação do Java.
 - Se no futuro você fizer uma mudança drástica na classe e quiser forçar a incompatibilidade com clientes antigos, basta mudar para 2L.
+
+# O módulo `math` está disponível como exemplo para se referenciar.

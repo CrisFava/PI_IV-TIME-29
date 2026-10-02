@@ -14,8 +14,13 @@ public class MathOperationResponse extends Message {
         this.result = result;
     }
 
+    public double getResult() {
+        return result;
+    }
+
     @Override
     public String toString() {
+
         return "MathOperationResponse{result=" + result + "}";
     }
 }
