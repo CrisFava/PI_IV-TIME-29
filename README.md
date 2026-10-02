@@ -38,13 +38,13 @@ O aplicativo atualmente presente no repositório é desenvolvido em **Dart** e *
 
 ## Integrantes
 
-| Integrante                      | RA                         |
-| ------------------------------- | -------------------------- |
-| Allan Giovanni Matias Paes      | 25008211                   |
-| Cristian Eduardo Fava           | 25000636                   |
-| Daniela Mikie Kikuchi Gonçalves | 25003068                   |
-| Gustavo Alves de Siqueira Costa | 25001650                   |
-| Sara Fernandes Monteiro         | 25024107                   |
+| Integrante                      | RA       |
+| ------------------------------- | -------- |
+| Allan Giovanni Matias Paes      | 25008211 |
+| Cristian Eduardo Fava           | 25000636 |
+| Daniela Mikie Kikuchi Gonçalves | 25003068 |
+| Gustavo Alves de Siqueira Costa | 25001650 |
+| Sara Fernandes Monteiro         | 25024107 |
 
 ## Estrutura do projeto
 
@@ -68,7 +68,10 @@ O aplicativo atualmente presente no repositório é desenvolvido em **Dart** e *
 
 ## Como executar o aplicativo
 
-Pré-requisito: ter o [Flutter](https://docs.flutter.dev/get-started/install) instalado e configurado.
+#### Pré-requisitos:
+
+- Ter o [Flutter](https://docs.flutter.dev/get-started/install) instalado e configurado.
+- Ter o [Maven](https://maven.apache.org/download.cgi) na versão 21 & [JDK 21]
 
 ```bash
 cd app/converge

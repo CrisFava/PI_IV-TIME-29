@@ -41,10 +41,6 @@ public class SocketServer {
         this.handlerRegistry = new HandlerRegistry();
     }
 
-    private void registerHandlers(){
-        this.registerHandler(MathOperationRequest.class, new MathOperationHandler());
-    }
-
     /**
      * Registers a business handler for a specific request message class.
      *

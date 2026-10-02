@@ -1,10 +1,4 @@
-# Pure Java Socket Server
-
-Arquitetura modular, legível e desacoplada para servidor puro de sockets TCP em Java 21, inspirada no modelo de sockets com objetos serializados (`continhas`), porém organizada em classes de handlers independentes e pronta para conexões e encerramentos graciosos.
-
----
-
-## 🏗️ Estrutura da Arquitetura
+## Estrutura da Arquitetura
 
 ```text
 com.converge
@@ -37,7 +31,38 @@ com.converge
 
 ---
 
-## 🚀 Como Implementar uma Nova Lógica de Negócio (Handler)
+## Como Rodar o Servidor
+
+### 0. Instalar o artefato (para comunicar com o backend)
+
+```bash
+mvn clean install
+```
+
+### 1. Via IDE (IntelliJ IDEA / VS Code / Eclipse)
+
+- Abra a classe [`com.converge.socket.Main`](src/main/java/com/converge/socket/Main.java) e clique em **Run**.
+
+### 2. Via Linha de Comando (Maven)
+
+```bash
+# Na pasta /server:
+mvn compile
+mvn exec:java -Dexec.mainClass="com.converge.socket.Main"
+
+# Ou especificando uma porta (ex: 3000):
+mvn exec:java -Dexec.mainClass="com.converge.socket.Main" -Dexec.args="3000"
+```
+
+### 3. Comandos Administrativos no Console
+
+Com o servidor rodando, digite no terminal para desligar de forma graciosa:
+
+- `stop`, `exit` ou `desativar`
+
+---
+
+## Como Implementar uma Nova Lógica de Negócio (Handler)
 
 Para adicionar uma nova funcionalidade, o desenvolvedor não precisa alterar o código de infraestrutura de sockets ou gerenciamento de conexões. Basta:
 
@@ -79,6 +104,7 @@ public class CreateRideHandler implements RequestHandler<CreateRideRequest, Crea
 ```
 
 ### 3. Registrar o Handler no Servidor
+
 ```java
 SocketServer server = new SocketServer(3000);
 
@@ -93,9 +119,10 @@ Se o handler retornar um objeto derivado de `Message`, o supervisor envia a resp
 
 ---
 
-## ⚠️ Padrão de Erros (`ServerErrorCode`)
+## Padrão de Erros (`ServerErrorCode`)
 
 O enum [`ServerErrorCode`](file:///E:/PIs/PI_IV_ES_TIME_29/app/server/src/main/java/com/converge/core/exception/ServerErrorCode.java) padroniza os erros tanto interna quanto externamente:
+
 - `DISCONNECTION_ERROR`
 - `CONNECTION_ERROR`
 - `TRANSMISSION_ERROR`
@@ -111,7 +138,7 @@ As respostas de erro enviadas ao cliente são instâncias de [`ErrorResponse`](f
 
 ---
 
-## 🔌 Conexão e Encerramento de Conexões
+## Conexão e Encerramento de Conexões
 
 1. **Conexão**: O cliente conecta ao socket. O [`ConnectionAcceptor`](file:///E:/PIs/PI_IV_ES_TIME_29/app/server/src/main/java/com/converge/core/connection/ConnectionAcceptor.java) aceita e instancia a thread [`ConnectionSupervisor`](file:///E:/PIs/PI_IV_ES_TIME_29/app/server/src/main/java/com/converge/core/connection/ConnectionSupervisor.java), que registra o cliente no [`ClientRegistry`](file:///E:/PIs/PI_IV_ES_TIME_29/app/server/src/main/java/com/converge/core/client/ClientRegistry.java).
 2. **Desconexão Graciosa pelo Cliente**: O cliente envia [`DisconnectRequest`](file:///E:/PIs/PI_IV_ES_TIME_29/app/server/src/main/java/com/converge/core/protocol/DisconnectRequest.java). O supervisor remove o cliente do registro e fecha o socket sem lançar erro de queda.
@@ -120,9 +147,10 @@ As respostas de erro enviadas ao cliente são instâncias de [`ErrorResponse`](f
 
 ---
 
-## 🧪 Testes
+## Testes
 
 Para executar os testes com JUnit 5:
+
 ```bash
 mvn test
 ```
