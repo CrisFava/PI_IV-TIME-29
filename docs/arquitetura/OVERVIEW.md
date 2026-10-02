@@ -6,7 +6,7 @@ Este diretório centraliza a documentação arquitetural do projeto **Converge**
 
 - [Arquitetura Frontend - Feature-Driven Modular Architecture](./frontend/feature_modular_architecture.md)
 - [Arquitetura Backend - Monolito Modular Hexagonal](./backend/modular_hexagonal_monolith.md)
-- [Padrões e Convenções Java](./java)
+- [Arquitetura Servidor Socket Java](./java/server_architecture.md)
 
 ---
 
@@ -71,4 +71,35 @@ com/converge/api/
     ├── config/                                 # Configurações globais
     ├── exception/                              # Tratamento global de exceções (RFC 7807)
     └── infrastructure/                         # Provedores de serviços externos
+```
+
+---
+
+### Servidor de Sockets (Java Puro) — `app/server/src/main/java/com/converge/`
+
+```text
+com/converge/
+├── Main.java                                   # Ponto de entrada e comando de shutdown do servidor
+├── core/
+│   ├── SocketServer.java                       # Gerenciador de ciclo de vida do servidor
+│   ├── client/                                 # Conexão e registro de clientes
+│   │   ├── ClientConnection.java               # Abstração de socket, I/O e Semáforo
+│   │   └── ClientRegistry.java                 # Gerenciamento thread-safe dos clientes ativos
+│   ├── connection/                             # Escuta e supervisão de conexões
+│   │   ├── ConnectionAcceptor.java             # Thread que aceita sockets TCP
+│   │   └── ConnectionSupervisor.java           # Thread que supervisiona cada cliente
+│   ├── exception/
+│   │   ├── ServerErrorCode.java                # Enum de códigos de erro padronizados (DISCONNECTION_ERROR, etc.)
+│   │   └── ServerException.java                # Exceção customizada da camada de sockets
+│   ├── handler/                                # Contrato e despacho de lógica de negócio
+│   │   ├── RequestHandler.java                 # Interface funcional: execute(request)
+│   │   └── HandlerRegistry.java                # Roteador de Request para Handler
+│   └── protocol/                               # Mensagens de protocolo base (Message, ErrorResponse, etc.)
+│       ├── Message.java
+│       ├── DisconnectRequest.java
+│       ├── ServerShutdownNotification.java
+│       └── ErrorResponse.java
+|                              # Tratamento e enum de erros (ServerErrorCode)
+└── handler/                                    # Módulos e regras de negócio da aplicação
+    └── {modulo}/                               # Handlers independentes por domínio
 ```
