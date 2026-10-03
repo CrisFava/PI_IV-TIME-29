@@ -1,5 +1,7 @@
 package com.converge.api.shared.config.startup;
 
+import com.converge.api.shared.infrastructure.socket.SocketClient;
+import com.converge.socket.core.exception.ServerException;
 import jakarta.annotation.PostConstruct;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Component;
@@ -11,7 +13,7 @@ import static com.converge.api.shared.config.customization.Color.*;
 public class Setup {
 
     @PostConstruct
-    public void init(){
+    public void init() throws ServerException {
 
         boolean isLoadedEnvVars = EnvChecker.check();
 
@@ -21,8 +23,5 @@ public class Setup {
         }
 
         log.info("{}Converge API Initialized With Errors.{}", ORANGE, RESET);
-
-
-
     }
 }
