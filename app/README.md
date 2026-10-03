@@ -12,6 +12,7 @@ Repositório contendo o ecossistema do **Converge**, composto por:
 
 - **Java JDK 21** instalado e configurado no `PATH` (ou `JAVA_HOME`).
 - **Maven 3.9+** (ou utilize o wrapper incluído `mvnw` / `mvnw.cmd`).
+- **Flutter SDK 3.13+** e **Dart** (para executar o app móvel).
 - **Docker & Docker Compose** _(opcional, recomendado para subir tudo junto)_.
 
 ---
@@ -98,16 +99,16 @@ A API estará disponível em:
 - **Endpoints HTTP:** `http://localhost:8080`
 - **Documentação Swagger / OpenAPI:** `http://localhost:8080/swagger-ui.html`
 
----
-
 ## 🧪 Como Rodar os Testes
+
+### Testes dos Módulos Java (Backend e Server)
 
 Para executar os testes de todos os módulos de uma vez:
 
 ```powershell
-# Na raiz (/app):
+# Na pasta /app:
 mvn test
-# Ou:
+# Ou usando o wrapper:
 .\mvnw.cmd test
 ```
 
@@ -125,10 +126,3 @@ Se você acabou de clonar o projeto em uma nova máquina e a IDE não reconhecer
    mvn clean install
    ```
 2. Na sua IDE, clique no botão de **Reload / Sync Maven Projects**.
-
-### 2. Erro de SSL ao conectar no MongoDB Atlas (`Received fatal alert: internal_error`)
-
-Verifique se o seu IP atual está liberado no painel do MongoDB Atlas:
-
-- Acesse o painel do Atlas ➔ **Network Access**.
-- Clique em **Add IP Address** ➔ **Add Current IP Address** (ou `0.0.0.0/0` para desenvolvimento).
