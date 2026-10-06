@@ -6,8 +6,8 @@
 
 | Data | Autor | Versão | Comentários |
 | :---: | :---: | ---: | :--- |
-| 29/09/2026 | Time 29 | 1.0.0 | Publicação da versão 1.0.0 — dicionário completo|
-| 29/09/2026 | Time 29 | 1.0.1 | Versão inicial — título, estrutura do documento, citação das entidades e descrições conceituais |
+| 29/09/2026 | Daniela Mikie Kikuchi Gonçalves | 1.0.0 | Publicação da versão 1.0.0|
+| 29/09/2026 | Daniela Mikie Kikuchi Gonçalves | 1.0.1 | Versão inicial — título, estrutura do documento, citação das entidades e descrições conceituais |
 
 ---
 
