@@ -11,13 +11,14 @@
 
 | Coleção | Módulo Dono | Descrição |
 |---|---|---|
-| `usuarios` | usuario | Dados de cadastro, perfil, vínculo acadêmico e configurações |
+| `usuarios` | usuario | Dados de cadastro, perfil, vínculo acadêmico, reputação e selos |
 | `veiculos` | usuario | Veículos cadastrados pelo motorista |
 | `trajetos` | trajeto | Trajetos cadastrados para oferecer ou procurar carona |
 | `caronas` | carona | Viagens confirmadas, participantes, custos e status |
 | `avaliacoes` | avaliacao | Avaliações mútuas após conclusão de viagem |
 | `denuncias` | seguranca | Denúncias entre usuários com motivo e status |
 | `bloqueios` | seguranca | Registros de bloqueio entre usuários |
+| `acordos_recorrentes` | carona | Combinações recorrentes com extrato mensal e controle de cancelamentos tardios |
 | `matchings` | matching | Resultados calculados do algoritmo de compatibilidade |
 | `indicadores` | indicador | Indicadores de mobilidade e sustentabilidade por usuário e período |
 
@@ -47,6 +48,9 @@
   },
   "chavePix": "String | null",
   "frequenciaCobrancaPreferida": "POR_VIAGEM | MENSAL",
+  "inadimplente": "Boolean",
+  "inadimplenteDesde": "ISODate | null",
+  "statusCobranca": "EM_DIA | AVISO_1 | AVISO_2 | AVISO_3 | INADIMPLENTE",
   "reputacao": {
     "motorista": {
       "nivel": "ALTA | MEDIA | BAIXA | null",
@@ -68,7 +72,8 @@
         "viagensConcluidas": "Integer",
         "cancelamentosTardios": "Integer",
         "ausencias": "Integer",
-        "denunciasProcedentes": "Integer"
+        "denunciasProcedentes": "Integer",
+        "pagamentosNaoConfirmados": "Integer"
       },
       "calculadoEm": "ISODate"
     }
@@ -93,6 +98,46 @@
 | `vinculoAcademico.universidade` | Simples | Filtro de matching por universidade |
 | `vinculoAcademico.status` | Simples | Consultas de moderação e verificação |
 | `reputacao.motorista.nivel` | Simples | Consultas de reputação de motoristas |
+
+### Regras de Negócio — Selo de Confiança
+
+O selo é recalculado semanalmente pelo backend com base na janela deslizante de **90 dias**. Os critérios abaixo são os limiares mínimos para concessão — não exigem perfeição, mas exigem consistência.
+
+**Motorista — critérios para ganhar `CONFIANCA`:**
+
+| Critério | Limiar |
+|---|---|
+| Média de avaliação | ≥ 4.2 estrelas |
+| Viagens concluídas na janela | ≥ 10 |
+| Cancelamentos iniciados pelo motorista | ≤ 2 nos últimos 90 dias |
+| Denúncias procedentes | ≤ 1 nos últimos 90 dias |
+
+**Passageiro — critérios para ganhar `CONFIANCA`:**
+
+| Critério | Limiar |
+|---|---|
+| Média de avaliação | ≥ 4.0 estrelas |
+| Viagens concluídas na janela | ≥ 5 |
+| Cancelamentos tardios (< 2h de antecedência) | ≤ 2 nos últimos 90 dias |
+| Ausências | ≤ 1 nos últimos 90 dias |
+| Pagamentos não confirmados pelo motorista | 0 nos últimos 90 dias |
+
+O selo é **removido automaticamente** se o usuário deixar de cumprir qualquer critério no próximo recálculo. É exibido no perfil e nas combinações de matching.
+
+### Regras de Negócio — Inadimplência
+
+O sistema aplica uma **progressão de avisos** antes de bloquear o passageiro. A contagem começa no vencimento do extrato mensal.
+
+| Dia após vencimento | Ação | `statusCobranca` |
+|---|---|---|
+| Dia 5 (vencimento) | Aviso 1 — notificação no app + e-mail | `AVISO_1` |
+| Dia 10 | Aviso 2 — notificação urgente | `AVISO_2` |
+| Dia 15 | Aviso 3 — último aviso | `AVISO_3` |
+| Dia 20 | Bloqueio — suspenso do matching | `INADIMPLENTE` |
+
+- `inadimplente = true` e `statusCobranca = INADIMPLENTE` somente no **dia 20** sem pagamento.
+- Enquanto `INADIMPLENTE`, o usuário não aparece em combinações e não consegue confirmar novas caronas.
+- Ao confirmar o pagamento, `inadimplente = false`, `inadimplenteDesde = null` e `statusCobranca = EM_DIA`.
 
 ---
 
@@ -224,6 +269,12 @@
   "numero": "Integer (sequencial, ex: 42)",
   "motoristaId": "String (ref: usuarios._id)",
   "veiculoId": "String (ref: veiculos._id)",
+  "veiculoSnapshot": {
+    "modelo": "String",
+    "placa": "String",
+    "tipo": "String",
+    "cor": "String"
+  },
   "trajetoMotoristaId": "String (ref: trajetos._id)",
   "origem": {
     "endereco": "String",
@@ -283,6 +334,7 @@
       "desvioGeradoKm": "Double",
       "status": "CONFIRMADO | CANCELADO | AUSENTE | CONCLUIDO",
       "motivoCancelamento": "String | null",
+      "cancelamentoTardio": "Boolean (default: false)",
       "valorMaximo": "Double",
       "valorFinal": "Double | null",
       "statusPagamento": "PENDENTE | AGUARDANDO_CONFIRMACAO | PAGO | NAO_APLICAVEL",
@@ -315,6 +367,8 @@
 - **RF38:** `valorFinal` só é calculado e gravado quando `status = CONCLUIDA`.
 - **RNF20:** A transição de status de vaga e participante deve ser atômica (usando operações MongoDB como `$inc` e `findAndModify`/transações).
 - **RNF22:** `totalBruto / qtdParticipantesEfetivos = valorPorPessoa`. Diferença de centavos vai para o motorista.
+- **Cancelamento tardio:** se o passageiro cancelar com menos de 2h de antecedência, `cancelamentoTardio = true`. A viagem entra no extrato mensal normalmente — ele paga como se tivesse ido. A partir do **3º cancelamento tardio no mesmo mês** (consultado via `acordos_recorrentes.cancelamentosTardiosNoMes`), todos os cancelamentos subsequentes naquele mês são cobrados automaticamente.
+- **Entra passageiro novo:** o valor daquele dia cai para todos. O extrato mensal de cada participante reflete o `valorFinal` real de cada viagem — transparente e auditável.
 
 ---
 
@@ -402,7 +456,64 @@
 
 ---
 
-## 8. Coleção `matchings`
+## 8. Coleção `acordos_recorrentes`
+
+**Módulo:** `modules/carona`
+**Descrição:** Registra a combinação recorrente entre um passageiro e um motorista específico. É criado por **opt-in manual** — o passageiro propõe e o motorista aceita ou recusa. Não é um contrato financeiro formal — é uma preferência mútua que reserva uma vaga prioritária com valor fixado e cobrança mensal consolidada. O valor fixado no acordo **não muda** quando um passageiro avulso entra na viagem — o avulso paga pelo valor calculado normalmente pelo sistema.
+
+```json
+{
+  "_id": "ObjectId (String)",
+  "passageiroId": "String (ref: usuarios._id)",
+  "motoristaId": "String (ref: usuarios._id)",
+  "trajetoMotoristaId": "String (ref: trajetos._id)",
+  "trajetoPassageiroId": "String (ref: trajetos._id)",
+  "statusAcordo": "PROPOSTO | ATIVO | SUSPENSO | ENCERRADO",
+  "propostoPor": "PASSAGEIRO | MOTORISTA",
+  "motivoSuspensao": "INADIMPLENCIA | CANCELAMENTOS_EXCESSIVOS | null",
+  "motivoEncerramento": "String | null",
+  "valorFixadoNoAcordo": "Double",
+  "mesReferencia": "String (ex: '2025-05')",
+  "cancelamentosTardiosNoMes": "Integer",
+  "avisosEnviados": "Integer (0 a 3)",
+  "extratoMes": [
+    {
+      "caronaId": "String (ref: caronas._id)",
+      "dataViagem": "ISODate",
+      "valorCobrado": "Double",
+      "cancelamentoTardio": "Boolean",
+      "statusPagamento": "PENDENTE | PAGO | COBRADO_SEM_PRESENCA"
+    }
+  ],
+  "totalDevidoMes": "Double",
+  "dataLimitePagamento": "ISODate",
+  "criadoEm": "ISODate",
+  "atualizadoEm": "ISODate"
+}
+```
+
+### Índices
+
+| Campo(s) | Tipo | Justificativa |
+|---|---|---|
+| `passageiroId` + `motoristaId` + `mesReferencia` | Composto Único | Um acordo por par por mês |
+| `passageiroId` + `statusAcordo` | Composto | Listar acordos ativos do passageiro |
+| `motoristaId` + `statusAcordo` | Composto | Listar acordos ativos do motorista |
+| `dataLimitePagamento` | Simples | Detectar acordos vencidos para disparar avisos e bloqueio |
+
+### Regras de Negócio
+
+- **Criação:** o acordo é criado com `statusAcordo = PROPOSTO` quando um dos lados propõe. O outro lado precisa aceitar para mudar para `ATIVO`.
+- **Valor fixado:** `valorFixadoNoAcordo` é calculado no momento da criação com base na divisão atual do custo entre motorista e passageiros do acordo. Passageiros avulsos que entram depois **não alteram** esse valor — eles pagam o valor calculado normalmente pelo sistema para aquela viagem. O motorista ganha a vaga extra sem que o acordo seja afetado.
+- **Renegociação:** o motorista pode propor atualização do `valorFixadoNoAcordo` a qualquer momento (ex: combustível subiu). O passageiro aceita ou o acordo é encerrado.
+- **Cancelamentos tardios:** `cancelamentosTardiosNoMes` é incrementado a cada cancelamento com menos de 2h. Até o 2º, não cobra. A partir do 3º, entra no extrato com `statusPagamento = COBRADO_SEM_PRESENCA`.
+- **Extrato:** a cada viagem concluída, um item é adicionado em `extratoMes[]` e `totalDevidoMes` é atualizado.
+- **Avisos progressivos:** `dataLimitePagamento` é o dia 5 do mês seguinte. A partir daí, `avisosEnviados` é incrementado nos dias 5, 10 e 15. No dia 20 sem pagamento, `statusAcordo = SUSPENSO`, `motivoSuspensao = INADIMPLENCIA` e `usuarios.inadimplente = true`.
+- **Novo mês:** um novo documento é criado automaticamente no início de cada mês para pares com acordo `ATIVO`.
+
+---
+
+## 9. Coleção `matchings`
 
 **Módulo:** `modules/matching`
 **Descrição:** Armazena os resultados calculados pelo algoritmo de compatibilidade. Serve de cache dos resultados e base para auditoria do matching. Resultados expiram ou são invalidados quando trajetos são alterados.
@@ -437,7 +548,7 @@
 
 ---
 
-## 9. Coleção `indicadores`
+## 10. Coleção `indicadores`
 
 **Módulo:** `modules/indicador`
 **Descrição:** Indicadores de mobilidade e sustentabilidade agregados por usuário e período. Atualizados ao concluir uma viagem. Períodos pré-calculados para resposta rápida na tela de Dados.
@@ -502,7 +613,7 @@ usuarios (1) ──────────────────── (N) ve
     ├──── (N) caronas (como motorista)
     │          │
     │          │ participantes[] (subdocumento embutido)
-    │          │   └── usuarioId, papel, status, custos individuais
+    │          │   └── usuarioId, papel, status, cancelamentoTardio, custos individuais
     │          │
     │          ▼
     ├──── (N) avaliacoes ──────► (avaliador → avaliado)
@@ -510,6 +621,11 @@ usuarios (1) ──────────────────── (N) ve
     ├──── (N) denuncias ───────► (denunciante → denunciado, ref. caronaId)
     │
     ├──── (N) bloqueios ───────► (usuário → bloqueado)
+    │
+    ├──── (N) acordos_recorrentes ──► (passageiro ↔ motorista, ref. trajetos)
+    │          │
+    │          └── extratoMes[] (subdocumento embutido)
+    │                └── caronaId, valorCobrado, cancelamentoTardio, statusPagamento
     │
     └──── (N) indicadores (por período)
 ```
@@ -525,6 +641,8 @@ usuarios (1) ──────────────────── (N) ve
 | Custos dentro de `caronas` | **Embedded** | Snapshot imutável dos custos da viagem — não deve mudar se o veículo for editado depois. |
 | Veículo referenciado em `trajetos` e `caronas` | **Referência por ID** | Veículo pode ser editado; `caronas` guarda snapshot dos dados relevantes (tipo, placa) no momento da viagem. |
 | Avaliações, denúncias, bloqueios | **Coleção própria** | Volume variável, consultados de forma independente, base de moderação. |
+| `extratoMes[]` dentro de `acordos_recorrentes` | **Embedded** | Máximo de ~31 itens por documento (um por dia do mês); sempre lido junto ao acordo para exibir o extrato. |
+| `acordos_recorrentes` como coleção própria | **Coleção própria** | Ciclo de vida independente da carona — existe por mês, entre um par fixo, com controle próprio de pagamento e cancelamentos. |
 | Série temporal em `indicadores` | **Embedded (array `serie`)** | Número limitado de pontos por documento; sempre lidos em conjunto com os totais. |
 
 ---
@@ -659,5 +777,35 @@ usuarios (1) ──────────────────── (N) ve
 ### `TipoSelo` (usuarios.selos[].tipo)
 | Valor | Descrição |
 |---|---|
-| `CONFIANCA` | Selo exibido no perfil (apenas visual) |
-| `SUSTENTABILIDADE` | Selo exibido no perfil (apenas visual) |
+| `CONFIANCA` | Concedido quando o usuário atinge os critérios de comportamento e avaliação na janela de 90 dias |
+| `SUSTENTABILIDADE` | Concedido com base nos indicadores de impacto ambiental acumulados |
+
+### `StatusAcordoRecorrente` (acordos_recorrentes.statusAcordo)
+| Valor | Descrição |
+|---|---|
+| `PROPOSTO` | Proposta enviada, aguardando aceite do outro lado |
+| `ATIVO` | Acordo aceito e em vigor; vaga prioritária reservada |
+| `SUSPENSO` | Suspenso por inadimplência ou cancelamentos excessivos |
+| `ENCERRADO` | Encerrado por iniciativa de um dos participantes ou por renegociação recusada |
+
+### `MotivoSuspensaoAcordo` (acordos_recorrentes.motivoSuspensao)
+| Valor | Descrição |
+|---|---|
+| `INADIMPLENCIA` | Passageiro não pagou o extrato até o dia 20 após o vencimento (após 3 avisos) |
+| `CANCELAMENTOS_EXCESSIVOS` | Passageiro ultrapassou o limite de cancelamentos tardios no mês |
+
+### `StatusItemExtrato` (acordos_recorrentes.extratoMes[].statusPagamento)
+| Valor | Descrição |
+|---|---|
+| `PENDENTE` | Valor calculado, aguardando pagamento |
+| `PAGO` | Motorista confirmou recebimento |
+| `COBRADO_SEM_PRESENCA` | Cancelamento tardio cobrado mesmo sem a viagem ter ocorrido para o passageiro |
+
+### `StatusCobranca` (usuarios.statusCobranca)
+| Valor | Descrição |
+|---|---|
+| `EM_DIA` | Sem débitos em aberto |
+| `AVISO_1` | Extrato vencido — primeiro aviso enviado (dia 5) |
+| `AVISO_2` | Segundo aviso enviado (dia 10) |
+| `AVISO_3` | Terceiro e último aviso enviado (dia 15) |
+| `INADIMPLENTE` | Bloqueado do matching por falta de pagamento (dia 20) |
