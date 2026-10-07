@@ -36,7 +36,7 @@
   "email": "String",
   "telefone": "String",
   "fotoUrl": "String | null",
-  "tiposParticipacao": ["PASSAGEIRO | MOTORISTA | MOTORISTA_VAN"],
+  "tiposParticipacao": ["PASSAGEIRO | MOTORISTA"],
   "vinculoAcademico": {
     "universidade": "String",
     "curso": "String",
@@ -47,10 +47,37 @@
   },
   "chavePix": "String | null",
   "frequenciaCobrancaPreferida": "POR_VIAGEM | MENSAL",
-  "mediaAvaliacao": "Double",
-  "totalAvaliacoes": "Integer",
-  "totalViagens": "Integer",
-  "totalAusencias": "Integer",
+  "reputacao": {
+    "motorista": {
+      "nivel": "ALTA | MEDIA | BAIXA | null",
+      "mediaEstrelas": "Double",
+      "totalAvaliacoes": "Integer",
+      "janela": {
+        "viagensConcluidas": "Integer",
+        "cancelamentosPeloMotorista": "Integer",
+        "atrasos": "Integer",
+        "denunciasProcedentes": "Integer"
+      },
+      "calculadoEm": "ISODate"
+    },
+    "passageiro": {
+      "nivel": "ALTA | MEDIA | BAIXA | null",
+      "mediaEstrelas": "Double",
+      "totalAvaliacoes": "Integer",
+      "janela": {
+        "viagensConcluidas": "Integer",
+        "cancelamentosTardios": "Integer",
+        "ausencias": "Integer",
+        "denunciasProcedentes": "Integer"
+      },
+      "calculadoEm": "ISODate"
+    }
+  },
+  "selos": [
+    {
+      "tipo": "CONFIANCA | SUSTENTABILIDADE", "concedidoEm": "ISODate"
+    }
+  ],
   "ativo": "Boolean",
   "criadoEm": "ISODate",
   "atualizadoEm": "ISODate"
@@ -65,6 +92,7 @@
 | `firebaseUid` | Único | Chave de autenticação Firebase |
 | `vinculoAcademico.universidade` | Simples | Filtro de matching por universidade |
 | `vinculoAcademico.status` | Simples | Consultas de moderação e verificação |
+| `reputacao.motorista.nivel` | Simples | Consultas de reputação de motoristas |
 
 ---
 
@@ -81,12 +109,16 @@
   "modelo": "String",
   "placa": "String",
   "cor": "String",
-  "tipo": "HATCH | SEDAN | SUV | PICKUP | VAN | OUTRO",
+  "tipo": "HATCH | SEDAN | SUV | PICKUP | VAN | MOTO | OUTRO",
   "capacidadeTotal": "Integer",
-  "fonteEnergia": "GASOLINA | ETANOL | FLEX | DIESEL | ELETRICO | HIBRIDO",
-  "consumoMedio": "Double",
-  "unidadeConsumo": "KM_POR_LITRO | KM_POR_KWH",
-  "precoEnergiaAtual": "Double",
+  "consumos": [
+    {
+      "fonteEnergia": "GASOLINA | ETANOL | DIESEL | ELETRICO",
+      "consumoMedio": "Double",
+      "unidadeConsumo": "KM_POR_LITRO | KM_POR_KWH",
+      "precoEnergiaAtual": "Double"
+    }
+  ],
   "ativo": "Boolean",
   "criadoEm": "ISODate",
   "atualizadoEm": "ISODate"
@@ -98,7 +130,31 @@
 | Campo(s) | Tipo | Justificativa |
 |---|---|---|
 | `usuarioId` | Simples | Buscar todos os veículos de um motorista |
-| `placa` | Único | Integridade — uma placa por cadastro |
+| `usuarioId + placa` | Composto Único | Integridade — uma placa por cadastro |
+
+### Regras de Negócio
+
+- **Moto:** `capacidadeTotal = 1`, validado no service.
+- **Placa:** sempre gravada em maiúsculas, sem hífen e sem espaços.
+- **Limite de consumo médio** (validado no service; fora da faixa retorna erro 400). Valores sugeridos, a calibrar:
+
+| Tipo | Unidade | Mín. | Máx. |
+|---|---|---|---|
+| HATCH / SEDAN | KM_POR_LITRO | 6 | 25 |
+| SUV / PICKUP / VAN | KM_POR_LITRO | 4 | 18 |
+| MOTO | KM_POR_LITRO | 15 | 50 |
+| Carro elétrico | KM_POR_KWH | 3 | 9 |
+| Moto elétrica | KM_POR_KWH | 15 | 40 |
+| OUTRO | qualquer | usar a faixa mais ampla | |
+
+- **Limite de preço da energia** (informado pelo usuário, mesma validação):
+
+| Energia | Mín. | Máx. |
+|---|---|---|
+| Gasolina / etanol / diesel (R$/L) | 3,00 | 12,00 |
+| Eletricidade (R$/kWh) | 0,30 | 3,00 |
+
+- **Itens de `consumos`:** `GASOLINA`, `ETANOL` e `DIESEL` têm 1 item; `ELETRICO` tem 1 item; carro flex tem 2 itens (gasolina e etanol); híbrido tem 1 ou 2. Não pode haver duas entradas da mesma `fonteEnergia` no mesmo veículo.
 
 ---
 
@@ -196,6 +252,9 @@
   "custos": {
     "distanciaRotaKm": "Double",
     "distanciaTotalComDesviosKm": "Double",
+    "fonteEnergiaUsada": "GASOLINA | ETANOL | DIESEL | ELETRICO",
+    "consumoMedioUsado": "Double",
+    "precoEnergiaUsado": "Double",
     "custoEnergia": "Double",
     "pedagio": "Double",
     "estacionamento": "Double",
@@ -270,6 +329,7 @@
   "caronaId": "String (ref: caronas._id)",
   "avaliadorId": "String (ref: usuarios._id)",
   "avaliadoId": "String (ref: usuarios._id)",
+  "papelAvaliado": "MOTORISTA | PASSAGEIRO",
   "nota": "Integer (1 a 5)",
   "comentario": "String | null",
   "criadoEm": "ISODate"
@@ -281,7 +341,7 @@
 | Campo(s) | Tipo | Justificativa |
 |---|---|---|
 | `caronaId` + `avaliadorId` | Composto Único | Impede avaliação duplicada na mesma viagem |
-| `avaliadoId` | Simples | Buscar histórico de avaliações recebidas |
+| `avaliadoId + papelAvaliado` | Composto | Buscar avaliações recebidas por papel (base da reputação) |
 | `avaliadorId` | Simples | Verificar se usuário já avaliou determinada viagem |
 
 ---
@@ -475,8 +535,7 @@ usuarios (1) ──────────────────── (N) ve
 | Valor | Descrição |
 |---|---|
 | `PASSAGEIRO` | Procura vagas em caronas |
-| `MOTORISTA` | Oferece carona com carro próprio |
-| `MOTORISTA_VAN` | Motorista de van com rota fixa e maior capacidade |
+| `MOTORISTA` | Oferece carona com veículo próprio |
 
 ### `StatusVinculo` (usuarios.vinculoAcademico.status)
 | Valor | Descrição |
@@ -494,17 +553,16 @@ usuarios (1) ──────────────────── (N) ve
 | `SUV` | SUV |
 | `PICKUP` | Camionete/Pickup |
 | `VAN` | Van |
+| `MOTO` | Moto |
 | `OUTRO` | Outro tipo |
 
-### `FonteEnergia` (veiculos.fonteEnergia)
+### `FonteEnergia` (veiculos.consumos[].fonteEnergia)
 | Valor | Descrição |
 |---|---|
-| `GASOLINA` | Combustão a gasolina |
-| `ETANOL` | Combustão a etanol |
-| `FLEX` | Flex (gasolina ou etanol) |
-| `DIESEL` | Combustão a diesel |
-| `ELETRICO` | 100% elétrico |
-| `HIBRIDO` | Híbrido (elétrico + combustão) |
+| `GASOLINA` | Gasolina |
+| `ETANOL` | Etanol |
+| `DIESEL` | Diesel |
+| `ELETRICO` | Energia elétrica (km/kWh) |
 
 ### `TipoTrajeto` (trajetos.tipo)
 | Valor | Descrição |
@@ -590,3 +648,16 @@ usuarios (1) ──────────────────── (N) ve
 | `MENSAL` | Dados do mês referência |
 | `SEMESTRAL` | Dados do semestre referência |
 | `TOTAL` | Acumulado histórico total |
+
+### `NivelReputacao` (usuarios.reputacao.*.nivel)
+| Valor | Descrição |
+|---|---|
+| `ALTA` | Boa avaliação e baixa taxa de problemas |
+| `MEDIA` | Desempenho intermediário |
+| `BAIXA` | Avaliação baixa ou alta taxa de problemas |
+
+### `TipoSelo` (usuarios.selos[].tipo)
+| Valor | Descrição |
+|---|---|
+| `CONFIANCA` | Selo exibido no perfil (apenas visual) |
+| `SUSTENTABILIDADE` | Selo exibido no perfil (apenas visual) |
