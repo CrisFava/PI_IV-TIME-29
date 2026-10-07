@@ -12,7 +12,7 @@
 | 07/10/2026 | Sara Monteiro | 1.0.0-alfa4 | Adição dos atributos compostos `reputacao` e `selos` na entidade Usuário |
 | 07/10/2026 | Sara Monteiro | 1.0.0-alfa5 | Reestruturação da entidade Veículo: atributo `consumos` como MC para suportar flex e híbrido |
 | 07/10/2026 | Sara Monteiro | 1.0.0-alfa6 | Adição de `MOTO` em `TipoVeiculo`; validações de faixa de consumo e preço |
-| 08/10/2026 | Daniela Mikie Kikuchi Gonçalves | 1.0.0-alfa7 | Adição da entidade Acordo Recorrente com extrato mensal, valor fixado e fluxo de proposta/aceite; adição de `statusCobranca`, `inadimplente`, `inadimplenteDesde` e critérios do Selo de Confiança com limiares toleráveis na entidade Usuário; adição de `cancelamentoTardio` e `veiculoSnapshot` na entidade Carona |
+| 07/10/2026 | Daniela Mikie Kikuchi Gonçalves | 1.0.0-alfa7 | Adição da entidade Acordo Recorrente com extrato mensal, valor fixado e fluxo de proposta/aceite; adição de `statusCobranca`, `inadimplente`, `inadimplenteDesde` e critérios do Selo de Confiança com limiares toleráveis na entidade Usuário; adição de `cancelamentoTardio` e `veiculoSnapshot` na entidade Carona |
 
 ---
 
