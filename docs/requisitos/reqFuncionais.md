@@ -43,8 +43,8 @@ Os requisitos funcionais descrevem o que o sistema Converge deve fazer.
 | **RF37** | O sistema deve registrar o valor máximo no momento da confirmação da carona e garantir que o valor final cobrado do passageiro não o ultrapasse, mesmo que outros participantes cancelem ou faltem, ou que o custo da viagem seja alterado depois. |
 | **RF38** | O sistema deve calcular o valor final de cada participante apenas ao concluir a viagem, com base nos participantes efetivos, nos desvios e nas despesas informadas. |
 | **RF39** | O sistema deve disponibilizar as informações necessárias para pagamento via PIX entre os participantes (chave PIX do motorista e valor por participante). |
-| **RF40** | O sistema deve permitir que o motorista escolha a frequência de cobrança: por viagem individual ou consolidada mensalmente. |
-| **RF41** | O motorista deve confirmar o recebimento do pagamento de cada participante após a conclusão da viagem, registrando o status como pago ou pendente. |
+| **RF40** | O sistema deve realizar a cobrança sempre por viagem individual, via PIX, inclusive para passageiros com vínculo recorrente. |
+| **RF41** | O sistema deve permitir que o passageiro marque uma viagem como paga e que o motorista confirme o recebimento, registrando o status do pagamento como pendente, aguardando confirmação, pago ou não aplicável. Enquanto estiver aguardando confirmação do motorista, a cobrança não é considerada vencida. |
 | **RF42** | O sistema deve registrar o histórico de viagens realizadas pelo usuário, incluindo data, trajeto e participantes. |
 | **RF43** | O sistema deve permitir que os participantes realizem avaliações mútuas após a conclusão de uma viagem. |
 | **RF44** | O sistema deve permitir a visualização do histórico de avaliações recebidas por um usuário. |
@@ -61,8 +61,17 @@ Os requisitos funcionais descrevem o que o sistema Converge deve fazer.
 | **RF55** | O sistema deve estimar a quantidade de CO₂ potencialmente evitada pelas viagens compartilhadas a partir da energia economizada e do fator de emissão do tipo de energia do veículo. |
 | **RF56** | O sistema deve apresentar a economia financeira do usuário: para o passageiro, o valor pago em comparação ao custo estimado de ir sozinho; para o motorista, o valor recuperado com o rateio. |
 | **RF57** | O sistema deve apresentar o impacto ambiental em equivalências compreensíveis, como a quantidade de árvores necessárias para absorver o CO₂ evitado. |
-| **RF58** | O sistema deve apresentar os indicadores por período (semana, mês, semestre e total), com a evolução histórica em gráfico. |
+| **RF58** | O sistema deve apresentar os indicadores por período (semana, mês e semestre), com a evolução histórica em gráfico. O acumulado histórico total é calculado a partir da soma dos indicadores mensais, não armazenado como período próprio. |
 | **RF59** | O sistema deve disponibilizar os indicadores de mobilidade e sustentabilidade de forma acessível ao usuário. |
 | **RF60** | O sistema deve permitir a visualização de informações relacionadas ao impacto ambiental e econômico das viagens compartilhadas. |
 | **RF61** | O sistema deve exibir a metodologia dos cálculos dos indicadores (fatores de emissão e premissas adotadas), informando que os valores apresentados são estimativas. |
 | **RF62** | O sistema deve permitir a atualização das informações cadastrais do usuário e dos trajetos registrados.|
+| **RF63** | O sistema deve exigir que o motorista cadastre e tenha a CNH verificada (número, categoria, validade e foto do documento) para poder oferecer carona, retirando-o do matching automaticamente quando a CNH estiver vencida. |
+| **RF64** | O sistema deve permitir o estabelecimento de um vínculo recorrente de vaga reservada entre passageiro e motorista, podendo ser proposto por qualquer um dos dois e dependendo do aceite do outro. |
+| **RF65** | O sistema deve reservar automaticamente a vaga do passageiro vinculado nos dias combinados (modelo opt-out), permitindo que ele avise previamente quando não for em um dia específico, liberando a vaga para outros passageiros. |
+| **RF66** | O sistema deve liberar a vaga reservada sem penalidade quando o passageiro avisar com antecedência mínima (até as 20h da véspera); avisos posteriores são tratados como cancelamento tardio. |
+| **RF67** | O sistema deve controlar a inadimplência por viagem com tolerância decrescente conforme o número de viagens vencidas, bloqueando o passageiro do matching ao atingir o limite e só o regularizando quando todas as dívidas vencidas forem pagas. |
+| **RF68** | O sistema deve exibir ao passageiro uma área de pendências de pagamento com as viagens pendentes e seus status. |
+| **RF69** | O sistema deve conceder e revogar automaticamente os selos de confiança e de sustentabilidade com base no comportamento e no impacto ambiental acumulado do usuário, recalculados periodicamente. |
+| **RF70** | O sistema deve registrar o status de cada solicitação de vaga (solicitada, recusada, confirmada), mantendo o registro das recusas para histórico e moderação. |
+| **RF71** | O sistema deve manter uma trilha de auditoria das ações sensíveis da plataforma (confirmação de pagamento, registro de ausência, cancelamentos, bloqueios, resolução de denúncias e verificações), para fins de moderação e suporte. |
