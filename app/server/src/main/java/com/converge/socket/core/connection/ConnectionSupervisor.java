@@ -68,7 +68,7 @@ public class ConnectionSupervisor extends Thread {
                 try {
                     message = clientConnection.receive();
                 } catch (ServerException e) {
-                    // Cliente disconectou ou o socket foi encerrado
+                    // Cliente desconectou ou o socket foi encerrado
                     break;
                 }
 
