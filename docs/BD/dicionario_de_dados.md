@@ -19,6 +19,7 @@
 | 09/10/2026 | Daniela Mikie Kikuchi Gonçalves | 1.1.0 | Coleções de apoio: universidades, notificações e chaves de idempotência |
 | 09/10/2026 | Daniela Mikie Kikuchi Gonçalves | 1.1.1 | Renomeação de `recurring_agreements` → `reserved_seats` |
 | 09/10/2026 | Daniela Mikie Kikuchi Gonçalves | 1.1.2 | Revisão final e padronização de nomes |
+| 11/10/2026 | Sara Monteiro | 1.2.0 | Detalhamento do pagamento PIX: campo `pixKeyType` e enum no Usuário; regras da chave PIX; geração do QR Code "Pix Copia e Cola" estático (sem gateway); confirmação manual pelo motorista |
 
 ---
 
@@ -53,7 +54,8 @@ Usuário é toda pessoa que se cadastra na plataforma Converge. Pode assumir um 
 | `participationRoles` | Elemento de lista enumerada | Sim | Multivalorado (M) | `["PASSENGER"]`, `["DRIVER", "PASSENGER"]` | lista vazia, valor fora do enum | Mínimo 1 valor. Valores: `PASSENGER`, `DRIVER`. Selecionado no onboarding. |
 | `academicRecord` | Dados de vínculo universitário | Sim | Composto (C) | ver tipo especial 3.1 | incompleto, nulo | Obrigatório no cadastro. Contém universidade, curso, matrícula e status da verificação. |
 | `driverLicense` | Dados de habilitação (CNH) | Não | Composto (C) | ver tipo especial 3.13 | — | Obrigatório apenas para quem atua como motorista. Deve estar `VERIFIED` para oferecer carona. Nulo para passageiros. |
-| `pixKey` | Texto | Não | Simples | `(19) 91234-5678`, `cpf@email.com` | vazio com cobrança ativa | Obrigatório para motoristas que desejam cobrar. Exibida na tela de Pagamento via PIX. |
+| `pixKey` | Texto | Não | Simples | `+5519912345678` (PHONE), `ana@email.com` (EMAIL) | vazio para quem oferece carona | Chave PIX do motorista, normalizada ao salvar conforme o `pixKeyType`. Obrigatória para criar trajetos `OFFER` (senão o passageiro não tem para quem pagar). Usada para gerar o QR Code "Pix Copia e Cola". |
+| `pixKeyType` | Elemento de lista enumerada | Não | Simples | `CPF`, `PHONE`, `EMAIL`, `RANDOM` | tipo que não corresponde à chave | Tipo da chave PIX. Necessário porque o formato no payload depende dele (uma chave de 11 dígitos pode ser CPF ou celular). Nulo se não houver chave. |
 | `paymentStanding` | Elemento de lista enumerada | Sim | Simples | `UP_TO_DATE`, `HAS_OVERDUE`, `BLOCKED` | valor fora do enum | Situação de pagamento do passageiro. `UP_TO_DATE` sem dívidas vencidas; `HAS_OVERDUE` com 1-2 viagens vencidas; `BLOCKED` ao atingir o limite. Ver regra de inadimplência decrescente. |
 | `overdueRidesCount` | Número inteiro | Sim | Simples | `0`, `1`, `2`, `3` | negativo | Quantidade de viagens vencidas (não pagas após o prazo de 3 dias). Define o prazo decrescente até o bloqueio. |
 | `isDefaulter` | Booleano | Sim | Simples | `true`, `false` | nulo | `false` por padrão. Muda para `true` quando o passageiro é bloqueado (3 dívidas vencidas ou prazo estourado). Só volta a `false` quando **todas** as viagens vencidas forem pagas. |
@@ -660,7 +662,8 @@ Estrutura composta que representa a CNH do motorista. Opcional — só preenchid
     "verifiedAt": "2025-03-11T10:00:00Z",
     "rejectionReason": null
   },
-  "pixKey": "(19) 91234-5678",
+  "pixKey": "+5519912345678",
+  "pixKeyType": "PHONE",
   "paymentStanding": "UP_TO_DATE",
   "overdueRidesCount": 0,
   "isDefaulter": false,
@@ -826,6 +829,9 @@ Estrutura composta que representa a CNH do motorista. Opcional — só preenchid
       "dropOffLocation": null,
       "detourGeneratedKm": null,
       "status": "COMPLETED",
+      "requestedAt": "2025-05-10T20:00:00Z",
+      "respondedAt": "2025-05-10T20:00:00Z",
+      "rejectionReason": null,
       "cancellationReason": null,
       "lateCancellation": false,
       "estimatedAmount": { "$numberDecimal": "2.51" },
@@ -851,6 +857,9 @@ Estrutura composta que representa a CNH do motorista. Opcional — só preenchid
       },
       "detourGeneratedKm": 2.1,
       "status": "COMPLETED",
+      "requestedAt": "2025-05-11T06:30:00Z",
+      "respondedAt": "2025-05-11T07:00:00Z",
+      "rejectionReason": null,
       "cancellationReason": null,
       "lateCancellation": false,
       "estimatedAmount": { "$numberDecimal": "2.51" },
@@ -1033,3 +1042,13 @@ Estrutura composta que representa a CNH do motorista. Opcional — só preenchid
 | Validar chave de idempotência | `key` | `{ key: 1 }` único | Verificar se a operação já foi processada. |
 | Validar e-mail institucional | `emailDomains` | `{ emailDomains: 1 }` | Verificação acadêmica automática pelo domínio. |
 | Limpeza automática de matchings obsoletos | `expiresAt` | `{ expiresAt: 1 }` TTL | MongoDB remove automaticamente. |
+
+### Pagamento PIX — geração do "Copia e Cola"
+
+No MVP o pagamento usa **QR Code PIX estático** ("Pix Copia e Cola") gerado pelo próprio backend, **sem gateway e sem API externa**. O dinheiro vai direto da conta do passageiro para a do motorista — o Converge nunca toca no dinheiro. Como o banco não devolve confirmação ao servidor, a confirmação de recebimento é **manual** (o motorista marca `paymentConfirmedByDriver`).
+
+- O payload (padrão BR Code do Banco Central, com CRC16) é **montado sob demanda e não armazenado** — é derivado de dados que já existem (`users.pixKey`, `users.name`, `participants[].finalAmount`).
+- **Endpoint:** `GET /rides/{rideId}/payment-qr` devolve a string; o app desenha o QR.
+- **Quando gera:** viagem `COMPLETED` e passageiro com `finalAmount > 0`. Não há QR para `NO_SHOW` nem `NOT_APPLICABLE`.
+- **Autorização:** só participantes da viagem acessam o QR, pois a chave PIX do motorista é dado pessoal.
+- **Vínculo cobrança ↔ viagem:** como o PIX estático não tem txid, o vínculo é feito no banco (`rideId` + participante); o status `PAID` só muda quando o motorista confirma.
