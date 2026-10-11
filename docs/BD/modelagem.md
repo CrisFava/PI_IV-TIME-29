@@ -7,7 +7,7 @@
 > Coordenadas geográficas são armazenadas no formato **GeoJSON `Point`** exigido pelo índice `2dsphere` do MongoDB: `{ "type": "Point", "coordinates": [longitude, latitude] }` — **longitude sempre antes da latitude**.
 > **Datas e horas:** todos os campos `ISODate` são armazenados em **UTC**. Campos de hora recorrente (`departureTime`, `estimatedArrivalTime`) são `String "HH:mm"` interpretados no fuso oficial da aplicação (**America/Sao_Paulo**). Ao combinar uma data concreta com um horário recorrente para gerar `departureDateTime`, a conversão para UTC deve usar explicitamente America/Sao_Paulo — nunca o fuso do servidor.
 > **Chat:** as mensagens entre participantes **não ficam no MongoDB** — vivem no **Firebase Realtime Database**, conforme a arquitetura do projeto (comunicação em tempo real). O MongoDB guarda apenas o identificador da sala de conversa quando necessário (ex.: um `chatRoomId` na viagem para localizar o histórico no Firebase). Por isso não há coleção `messages`/`chat` nesta modelagem.
-> **Pagamento PIX:** no MVP a confirmação de recebimento é **manual** (o motorista marca que recebeu). A verificação automática via gateway de pagamento (QR Code dinâmico + webhook) fica como evolução futura.
+> **Pagamento PIX:** no MVP o pagamento usa **QR Code PIX estático** ("Pix Copia e Cola"), gerado pelo próprio backend, sem gateway e sem API externa. O valor da cobrança vai travado dentro do payload e o dinheiro vai direto da conta do passageiro para a do motorista — o Converge nunca toca no dinheiro. Como o banco não devolve nenhuma confirmação ao servidor, a confirmação de recebimento é **manual** (o motorista marca que recebeu). A verificação automática via gateway (QR Code dinâmico + webhook) fica como evolução futura.
 
 ---
 
@@ -69,6 +69,7 @@
     "rejectionReason": "String | null"
   },
   "pixKey": "String | null",
+  "pixKeyType": "CPF | PHONE | EMAIL | RANDOM | null",
   "paymentStanding": "UP_TO_DATE | HAS_OVERDUE | BLOCKED",
   "overdueRidesCount": "Integer",
   "isDefaulter": "Boolean",
@@ -204,6 +205,13 @@ O objeto `driverLicense` é **opcional** e só se aplica a quem atua como motori
 - **MVP — autodeclaração com documento:** o motorista informa número, categoria e validade da CNH e envia uma foto (`documentUrl`). O vínculo entra em `UNDER_REVIEW` e um moderador aprova (`VERIFIED`) ou recusa (`REJECTED` com `rejectionReason`).
 - **Validade:** quando a data `expiresAt` passa, o status vira `EXPIRED` automaticamente e o motorista é retirado do matching até renovar. Garante que motorista com CNH vencida não dirija pela plataforma.
 - **Evolução futura:** validação automática via API oficial (SERPRO) ou serviço de KYC com biometria (compara selfie com a foto da CNH). Fica fora do MVP por exigir contrato e custo.
+
+### Regras de Negócio — Chave PIX
+
+- **Obrigatória para oferecer carona:** o usuário só pode criar trajetos `OFFER` se `pixKey` estiver preenchida, senão o passageiro chega ao fim da viagem sem ter para quem pagar.
+- **`pixKeyType` é necessário** porque o formato no payload depende do tipo (uma chave de 11 dígitos pode ser CPF ou celular).
+- **Normalização ao salvar:** CPF só com dígitos; `PHONE` no formato `+55DDDNÚMERO` (ex.: `+5511999999999`); `EMAIL` em minúsculas; `RANDOM` como UUID.
+- O backend **não consulta o banco** para validar a chave. Quem faz isso é o app do banco do passageiro, ao ler o QR.
 
 ### Regras de Negócio — Desativação de Conta
 
@@ -454,6 +462,25 @@ Quando `active = false` (conta suspensa ou excluída):
 - Todo pagamento no Converge é **por viagem**, via PIX, incluindo as viagens de passageiros com vínculo recorrente. Não há cobrança mensal consolidada nem valor fixo pré-combinado.
 - A chave PIX do motorista (`users.pixKey`) e o valor de cada participante são exibidos ao fim da viagem. O passageiro paga e o motorista confirma o recebimento (`participants[].paymentConfirmedByDriver`).
 - O prazo para pagar cada viagem é de **3 dias**; depois disso a cobrança vira dívida vencida (ver regra de inadimplência na coleção `users`).
+
+### Geração do PIX Copia e Cola
+
+O backend monta o payload sob demanda (padrão BR Code do Banco Central, CRC16 incluso). **Nada é armazenado**: o payload é derivado de dados que já existem.
+
+| Campo do payload | Origem |
+|---|---|
+| Chave PIX (campo 26) | `users.pixKey` do motorista, normalizada |
+| Valor (campo 54) | `participants[].finalAmount` do passageiro, com 2 casas decimais |
+| Nome do recebedor (campo 59) | `users.name` do motorista, sem acento, maiúsculas, máx. 25 caracteres |
+| Cidade (campo 60) | Valor fixo ou cidade da origem da rota, máx. 15 caracteres |
+| Identificador (campo 62) | `***` (PIX estático não tem txid útil) |
+
+- **Endpoint:** `GET /rides/{rideId}/payment-qr` devolve a string; o app desenha o QR e oferece o botão de copiar.
+- **Quando gera:** viagem `COMPLETED` e passageiro com `finalAmount > 0`. Para `NO_SHOW` e `NOT_APPLICABLE` não há cobrança, logo não há QR.
+- **Autorização:** só participantes da viagem (`CONFIRMED` ou `COMPLETED`) acessam, porque a chave PIX do motorista é dado pessoal.
+- **Valor travado:** o app do banco exibe o valor fixo e o passageiro não consegue alterá-lo.
+- **Vínculo cobrança ↔ viagem:** como o PIX estático não devolve txid, o vínculo é feito pelo banco de dados (`rideId` + participante), e o `PAID` só acontece quando o motorista confirma.
+- **Validação:** o formato foi testado escaneando um payload real no app de um banco; um teste unitário fixa o CRC16 para evitar regressão.
 
 ### Vínculo recorrente (vaga reservada)
 
@@ -1110,3 +1137,11 @@ Formato geoespacial padrão do MongoDB para o índice `2dsphere`.
 | `PAYMENT_CONFIRMED` | Motorista confirmou recebimento |
 | `SEAT_RELEASED` | Vaga reservada foi liberada (passageiro recorrente não vai) |
 | `GENERIC` | Aviso geral da plataforma |
+
+### `PixKeyType` (users.pixKeyType)
+| Valor | Descrição |
+|---|---|
+| `CPF` | CPF, somente dígitos |
+| `PHONE` | Celular, formato +55DDDNÚMERO |
+| `EMAIL` | E-mail, em minúsculas |
+| `RANDOM` | Chave aleatória (UUID) |

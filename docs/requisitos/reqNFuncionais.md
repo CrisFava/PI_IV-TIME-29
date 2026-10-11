@@ -7,7 +7,7 @@ Os requisitos não funcionais descrevem como o sistema deve se comportar — qua
 | ID | Requisito |
 |---|---|
 | **RNF01** | O sistema deve proteger informações pessoais e acadêmicas dos usuários contra acesso não autorizado, garantindo que cada usuário acesse apenas seus próprios dados privados. |
-| **RNF02** | O sistema deve impedir que um usuário consulte ou altere informações privadas de outro usuário sem a devida autorização. |
+| **RNF02** | O sistema deve impedir que um usuário consulte ou altere informações privadas de outro usuário sem a devida autorização. A chave PIX do motorista só pode ser exposta a participantes da viagem correspondente. |
 | **RNF03** | As credenciais dos usuários não devem ser armazenadas como texto puro; tokens e dados sensíveis devem ser gerenciados exclusivamente pelo provedor de autenticação (Firebase Auth). |
 | **RNF04** | O sistema deve possuir mecanismos de autenticação (Firebase Auth como provedor de identidade, verificando tokens via `FirebaseAuthService`) e autorização (Spring Security) para restringir funcionalidades e dados conforme o perfil do usuário. |
 | **RNF05** | O sistema deve validar os dados recebidos via API antes de processá-los ou armazená-los, utilizando Bean Validation (`jakarta.validation`) nos DTOs de entrada do backend. |
@@ -18,7 +18,7 @@ Os requisitos não funcionais descrevem como o sistema deve se comportar — qua
 | **RNF10** | O backend deve registrar erros e eventos relevantes em logs estruturados para permitir diagnóstico e manutenção da aplicação. |
 | **RNF11** | As principais regras de negócio do backend (casos de uso) devem possuir testes unitários automatizados com JUnit. |
 | **RNF12** | O módulo de matching deve possuir testes unitários que cubram cenários de compatibilidade e incompatibilidade de trajetos. |
-| **RNF13** | O módulo de cálculo e rateio de custos deve possuir testes unitários que validem os valores calculados e o comportamento esperado. |
+| **RNF13** | O módulo de cálculo e rateio de custos deve possuir testes unitários que validem os valores calculados, o comportamento esperado e a geração do código PIX, incluindo o cálculo do CRC16 do payload. |
 | **RNF14** | O projeto Flutter deve possuir testes automatizados das funcionalidades relevantes utilizando Flutter Test. |
 | **RNF15** | O projeto deve permitir a execução dos testes automatizados de forma isolada durante o desenvolvimento e no processo de validação. |
 | **RNF16** | O sistema deve ser capaz de processar múltiplas requisições simultâneas de usuários sem degradar o funcionamento das funcionalidades principais. |
@@ -67,3 +67,4 @@ As restrições tecnológicas são decisões de projeto fixadas pela equipe — 
 | **RT18** | O sistema deve utilizar **Firebase Storage** para armazenamento de arquivos (fotos de perfil e documentos de verificação universitária), ativado via `app.storage.provider=firebase` no `application.yaml`. |
 | **RT19** | O sistema deve utilizar **Firebase Realtime Database** para as funcionalidades de chat entre participantes de carona, garantindo comunicação em tempo real. |
 | **RT20** | O mecanismo de matching deve ser implementado como módulo integrado ao backend Spring Boot, respeitando a arquitetura de Monólito Modular definida no projeto. |
+| **RT21** | No MVP, o código PIX deve ser gerado pelo próprio backend segundo o padrão BR Code do Banco Central (QR Code estático), sem dependência de gateway de pagamento ou API externa. A confirmação de recebimento é manual, e a verificação automática via gateway fica como evolução futura.|
