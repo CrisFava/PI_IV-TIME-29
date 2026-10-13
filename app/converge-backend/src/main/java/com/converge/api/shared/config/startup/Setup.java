@@ -22,6 +22,6 @@ public class Setup {
             return;
         }
 
-        log.info("{}Converge API Initialized With Errors.{}", ORANGE, RESET);
+        log.warn("{}Converge API Initialized With Errors.{}", ORANGE, RESET);
     }
 }

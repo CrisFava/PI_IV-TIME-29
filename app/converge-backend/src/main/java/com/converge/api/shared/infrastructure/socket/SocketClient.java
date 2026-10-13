@@ -77,9 +77,9 @@ public class SocketClient implements AutoCloseable {
             if (!this.connection.isClosed()) {
                 try {
                     this.connection.send(new DisconnectRequest("Client closing"));
-                } catch (Exception ignored) {
+                } finally{
+                    this.connection.close();
                 }
-                this.connection.close();
             }
         } catch (Exception ignored) {
         }

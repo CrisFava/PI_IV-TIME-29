@@ -14,11 +14,6 @@ import com.converge.socket.handler.math.MathOperationRequest;
 import java.io.IOException;
 import java.net.ServerSocket;
 
-/**
- * Main Pure Java Socket Server coordinator.
- * Direct evolution of 'Servidor' in the reference design.
- * Manages socket lifecycle, connection acceptance, handler registration, and graceful shutdown.
- */
 public class SocketServer {
 
     public static final int DEFAULT_PORT = 3000;
@@ -41,15 +36,7 @@ public class SocketServer {
         this.handlerRegistry = new HandlerRegistry();
     }
 
-    /**
-     * Registers a business handler for a specific request message class.
-     *
-     * @param requestClass the class of the request
-     * @param handler the handler implementation with execute(request)
-     * @param <T> request message type
-     * @param <R> response message type
-     * @return this SocketServer instance for chaining
-     */
+
     public <T extends Message, R extends Message> SocketServer registerHandler(
             Class<T> requestClass, RequestHandler<T, R> handler) {
         this.handlerRegistry.register(requestClass, handler);
