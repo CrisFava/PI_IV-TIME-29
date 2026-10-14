@@ -2,6 +2,7 @@ package com.converge.api.modules.user.domain.model.user;
 
 import com.converge.api.modules.user.domain.enums.user.ParticipationRole;
 import com.converge.api.modules.user.domain.enums.user.PaymentStanding;
+import com.converge.api.modules.user.domain.enums.user.PixKeyType;
 import com.converge.api.modules.user.domain.model.user.subtypes.AcademicRecord;
 import com.converge.api.modules.user.domain.model.user.subtypes.DriverLicense;
 import com.converge.api.modules.user.domain.model.user.subtypes.Reputation;
@@ -81,6 +82,9 @@ public class User {
     @Nullable
     @Setter
     private String pixKey;
+
+    @Nullable
+    private PixKeyType pixKeyType;
 
     @NotNull
     @Setter
