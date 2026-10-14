@@ -22,7 +22,8 @@ public class UserMapper {
                 dto.participationRoles(),
                 dto.academicRecord(),
                 dto.driverLicense(),
-                dto.pixKey()
+                dto.pixKey(),
+                dto.pixKeyType()
         );
     }
 
@@ -43,6 +44,7 @@ public class UserMapper {
                 user.getAcademicRecord(),
                 user.getDriverLicense(),
                 user.getPixKey(),
+                user.getPixKeyType(),
                 user.getPaymentStanding(),
                 user.getOverdueRidesCount(),
                 user.isDefaulter(),

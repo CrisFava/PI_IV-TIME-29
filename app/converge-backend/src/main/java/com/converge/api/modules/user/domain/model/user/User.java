@@ -2,11 +2,12 @@ package com.converge.api.modules.user.domain.model.user;
 
 import com.converge.api.modules.user.domain.enums.user.ParticipationRole;
 import com.converge.api.modules.user.domain.enums.user.PaymentStanding;
+import com.converge.api.modules.user.domain.enums.user.PixKeyType;
 import com.converge.api.modules.user.domain.model.user.subtypes.AcademicRecord;
 import com.converge.api.modules.user.domain.model.user.subtypes.DriverLicense;
 import com.converge.api.modules.user.domain.model.user.subtypes.Reputation;
 import com.converge.api.modules.user.domain.model.user.subtypes.UserBadge;
-import com.mongodb.lang.Nullable;
+import jakarta.annotation.Nullable;
 import jakarta.validation.Valid;
 import jakarta.validation.constraints.Email;
 import jakarta.validation.constraints.NotBlank;
@@ -14,10 +15,7 @@ import jakarta.validation.constraints.NotEmpty;
 import jakarta.validation.constraints.NotNull;
 import jakarta.validation.constraints.PositiveOrZero;
 import jakarta.validation.constraints.Size;
-import lombok.EqualsAndHashCode;
-import lombok.Getter;
-import lombok.NoArgsConstructor;
-import lombok.Setter;
+import lombok.*;
 import org.bson.types.ObjectId;
 import org.springframework.data.annotation.CreatedDate;
 import org.springframework.data.annotation.Id;
@@ -28,13 +26,15 @@ import org.springframework.data.mongodb.core.mapping.Document;
 import org.springframework.data.mongodb.core.mapping.Field;
 
 import java.time.LocalDateTime;
-import java.util.HashSet;
-import java.util.Set;
+import java.util.*;
+
+import static com.converge.api.modules.user.domain.enums.user.ParticipationRole.DRIVER;
+import static com.converge.api.modules.user.domain.enums.user.ParticipationRole.PASSENGER;
 
 @Document(collection = "users")
-@NoArgsConstructor
+@NoArgsConstructor(access = AccessLevel.PROTECTED)
 @Getter
-@EqualsAndHashCode
+@EqualsAndHashCode(onlyExplicitlyIncluded = true)
 @CompoundIndex(
         name = "unique_institutional_email",
         def = "{'academicRecord.institutionalEmail': 1}",
@@ -43,10 +43,12 @@ import java.util.Set;
 )
 public class User {
     @Id
+    @EqualsAndHashCode.Include
     private ObjectId id;
 
     @NotBlank
     @Indexed(unique = true)
+    @EqualsAndHashCode.Include
     private String firebaseUid;
 
     @NotBlank
@@ -55,6 +57,7 @@ public class User {
 
     @NotBlank
     @Email
+    @Setter
     @Indexed(unique = true)
     private String email;
 
@@ -82,6 +85,10 @@ public class User {
     @Setter
     private String pixKey;
 
+    @Nullable
+    @Setter
+    private PixKeyType pixKeyType;
+
     @NotNull
     @Setter
     private PaymentStanding paymentStanding = PaymentStanding.UP_TO_DATE;
@@ -100,7 +107,7 @@ public class User {
 
     @Valid
     @Setter
-    private Reputation reputation;
+    private Reputation reputation = Reputation.defaultInitial();
 
     private final Set<@Valid UserBadge> badges = new HashSet<>();
 
@@ -118,31 +125,32 @@ public class User {
             String name,
             String email,
             String phone,
-            @Nullable
-            String photoUrl,
+            @Nullable String photoUrl,
             Set<ParticipationRole> participationRoles,
             AcademicRecord academicRecord,
-            @Nullable
-            DriverLicense driverLicense,
+            @Nullable DriverLicense driverLicense,
 
-            @Nullable
-            String pixKey
+            @Nullable String pixKey,
+
+            @Nullable PixKeyType pixKeyType
+
     ) {
+        this.initRoleSet(participationRoles);
+
         this.firebaseUid = firebaseUid;
         this.name = name;
         this.email = email;
         this.phone = phone;
         this.photoUrl = photoUrl;
-        if (participationRoles != null) {
-            this.participationRoles.addAll(participationRoles);
-        }
         this.academicRecord = academicRecord;
-        this.driverLicense = driverLicense;
+
         this.pixKey = pixKey;
-        this.overdueRidesCount = 0;
-        this.isDefaulter = false;
-        this.reputation = Reputation.defaultInitial();
-        this.active = true;
+        this.pixKeyType = pixKeyType;
+        this.driverLicense = driverLicense;
+
+        if (participationRoles.contains(DRIVER)){
+            this.validateDriverRequirements();
+        }
     }
 
     public User(
@@ -153,7 +161,8 @@ public class User {
             Set<ParticipationRole> participationRoles,
             AcademicRecord academicRecord
     ) {
-        this(firebaseUid,
+        this(
+                firebaseUid,
                 name,
                 email,
                 phone,
@@ -161,12 +170,8 @@ public class User {
                 participationRoles,
                 academicRecord,
                 null,
+                null,
                 null);
-    }
-
-
-    public void setEmail(@Email String email){
-        this.email = email;
     }
 
     public void addBadge(UserBadge badge) {
@@ -186,10 +191,51 @@ public class User {
     }
 
     public void addRole(ParticipationRole role) {
+        if (role == null) return;
+        if (role == DRIVER){
+            this.validateDriverRequirements();
+        }
+
         this.participationRoles.add(role);
     }
 
     public void removeRole(ParticipationRole role) {
+        if (role == PASSENGER) return;
         this.participationRoles.remove(role);
+    }
+
+    public Set<ParticipationRole> getParticipationRoles() {
+        return Collections.unmodifiableSet(this.participationRoles);
+    }
+
+    public Set<UserBadge> getBadges() {
+        return Collections.unmodifiableSet(this.badges);
+    }
+
+    private void initRoleSet(@Nullable Set<ParticipationRole> roles){
+        this.participationRoles.add(PASSENGER);
+
+        if (roles != null){
+            this.participationRoles.addAll(roles);
+        }
+    }
+
+    private void validateDriverRequirements(){
+
+        List<String> errors = new ArrayList<>(2);
+
+        if (this.pixKey == null || this.pixKey.isBlank() || this.pixKeyType == null) {
+            errors.add("- must have pix key settings defined");
+        }
+
+        if (this.driverLicense == null) {
+            errors.add("- must have a driver license");
+        }
+
+        if (!errors.isEmpty()) {
+            throw new IllegalArgumentException(
+                    "User is driver and has the following errors:\n" + String.join("\n", errors)
+            );
+        }
     }
 }

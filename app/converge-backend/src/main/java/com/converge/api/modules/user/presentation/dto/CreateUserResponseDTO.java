@@ -2,6 +2,7 @@ package com.converge.api.modules.user.presentation.dto;
 
 import com.converge.api.modules.user.domain.enums.user.ParticipationRole;
 import com.converge.api.modules.user.domain.enums.user.PaymentStanding;
+import com.converge.api.modules.user.domain.enums.user.PixKeyType;
 import com.converge.api.modules.user.domain.model.user.subtypes.AcademicRecord;
 import com.converge.api.modules.user.domain.model.user.subtypes.DriverLicense;
 import com.converge.api.modules.user.domain.model.user.subtypes.Reputation;
@@ -21,6 +22,7 @@ public record CreateUserResponseDTO(
         AcademicRecord academicRecord,
         DriverLicense driverLicense,
         String pixKey,
+        PixKeyType pixKeyType,
         PaymentStanding paymentStanding,
         short overdueRidesCount,
         boolean isDefaulter,
