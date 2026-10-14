@@ -26,17 +26,15 @@ import org.springframework.data.mongodb.core.mapping.Document;
 import org.springframework.data.mongodb.core.mapping.Field;
 
 import java.time.LocalDateTime;
-import java.util.HashSet;
-import java.util.Set;
+import java.util.*;
 
 import static com.converge.api.modules.user.domain.enums.user.ParticipationRole.DRIVER;
 import static com.converge.api.modules.user.domain.enums.user.ParticipationRole.PASSENGER;
 
 @Document(collection = "users")
-@NoArgsConstructor
-@AllArgsConstructor
+@NoArgsConstructor(access = AccessLevel.PROTECTED)
 @Getter
-@EqualsAndHashCode
+@EqualsAndHashCode(onlyExplicitlyIncluded = true)
 @CompoundIndex(
         name = "unique_institutional_email",
         def = "{'academicRecord.institutionalEmail': 1}",
@@ -45,10 +43,12 @@ import static com.converge.api.modules.user.domain.enums.user.ParticipationRole.
 )
 public class User {
     @Id
+    @EqualsAndHashCode.Include
     private ObjectId id;
 
     @NotBlank
     @Indexed(unique = true)
+    @EqualsAndHashCode.Include
     private String firebaseUid;
 
     @NotBlank
@@ -86,6 +86,7 @@ public class User {
     private String pixKey;
 
     @Nullable
+    @Setter
     private PixKeyType pixKeyType;
 
     @NotNull
@@ -106,7 +107,7 @@ public class User {
 
     @Valid
     @Setter
-    private Reputation reputation;
+    private Reputation reputation = Reputation.defaultInitial();
 
     private final Set<@Valid UserBadge> badges = new HashSet<>();
 
@@ -134,32 +135,22 @@ public class User {
             @Nullable PixKeyType pixKeyType
 
     ) {
+        this.initRoleSet(participationRoles);
+
         this.firebaseUid = firebaseUid;
         this.name = name;
         this.email = email;
         this.phone = phone;
         this.photoUrl = photoUrl;
-
-        this.initRoleSet(participationRoles);
-
         this.academicRecord = academicRecord;
-        this.driverLicense = driverLicense;
-
-        if (
-                this.participationRoles.contains(DRIVER) &&
-                        (pixKey == null || pixKey.isBlank() || pixKeyType == null)
-        ){
-            // TODO: THROW THE ERROR AND TREAT IT
-            return;
-        }
 
         this.pixKey = pixKey;
         this.pixKeyType = pixKeyType;
+        this.driverLicense = driverLicense;
 
-        this.overdueRidesCount = 0;
-        this.isDefaulter = false;
-        this.reputation = Reputation.defaultInitial();
-        this.active = true;
+        if (participationRoles.contains(DRIVER)){
+            this.validateDriverRequirements();
+        }
     }
 
     public User(
@@ -200,11 +191,25 @@ public class User {
     }
 
     public void addRole(ParticipationRole role) {
+        if (role == null) return;
+        if (role == DRIVER){
+            this.validateDriverRequirements();
+        }
+
         this.participationRoles.add(role);
     }
 
     public void removeRole(ParticipationRole role) {
+        if (role == PASSENGER) return;
         this.participationRoles.remove(role);
+    }
+
+    public Set<ParticipationRole> getParticipationRoles() {
+        return Collections.unmodifiableSet(this.participationRoles);
+    }
+
+    public Set<UserBadge> getBadges() {
+        return Collections.unmodifiableSet(this.badges);
     }
 
     private void initRoleSet(@Nullable Set<ParticipationRole> roles){
@@ -212,6 +217,25 @@ public class User {
 
         if (roles != null){
             this.participationRoles.addAll(roles);
+        }
+    }
+
+    private void validateDriverRequirements(){
+
+        List<String> errors = new ArrayList<>(2);
+
+        if (this.pixKey == null || this.pixKey.isBlank() || this.pixKeyType == null) {
+            errors.add("- must have pix key settings defined");
+        }
+
+        if (this.driverLicense == null) {
+            errors.add("- must have a driver license");
+        }
+
+        if (!errors.isEmpty()) {
+            throw new IllegalArgumentException(
+                    "User is driver and has the following errors:\n" + String.join("\n", errors)
+            );
         }
     }
 }
