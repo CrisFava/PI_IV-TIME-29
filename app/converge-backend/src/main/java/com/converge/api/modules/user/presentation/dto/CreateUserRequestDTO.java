@@ -1,8 +1,10 @@
 package com.converge.api.modules.user.presentation.dto;
 
 import com.converge.api.modules.user.domain.enums.user.ParticipationRole;
+import com.converge.api.modules.user.domain.enums.user.PixKeyType;
 import com.converge.api.modules.user.domain.model.user.subtypes.AcademicRecord;
 import com.converge.api.modules.user.domain.model.user.subtypes.DriverLicense;
+import jakarta.annotation.Nullable;
 import jakarta.validation.Valid;
 import jakarta.validation.constraints.Email;
 import jakarta.validation.constraints.NotBlank;
@@ -27,6 +29,7 @@ public record CreateUserRequestDTO(
         @NotBlank(message = "Telefone é obrigatório")
         String phone,
 
+        @Nullable
         String photoUrl,
 
         @NotEmpty(message = "Ao menos um papel de participação deve ser informado (PASSENGER ou DRIVER)")
@@ -39,6 +42,10 @@ public record CreateUserRequestDTO(
         @Valid
         DriverLicense driverLicense,
 
-        String pixKey
+        @Nullable
+        String pixKey,
+
+        @Nullable
+        PixKeyType pixKeyType
 ) {
 }
