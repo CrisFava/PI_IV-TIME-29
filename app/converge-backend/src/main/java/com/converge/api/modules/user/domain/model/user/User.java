@@ -7,6 +7,9 @@ import com.converge.api.modules.user.domain.model.user.subtypes.AcademicRecord;
 import com.converge.api.modules.user.domain.model.user.subtypes.DriverLicense;
 import com.converge.api.modules.user.domain.model.user.subtypes.Reputation;
 import com.converge.api.modules.user.domain.model.user.subtypes.UserBadge;
+import com.converge.api.shared.exception.ApplicationException;
+import com.converge.api.shared.exception.ErrorCode;
+import com.converge.api.shared.exception.ErrorResponse;
 import jakarta.annotation.Nullable;
 import jakarta.validation.Valid;
 import jakarta.validation.constraints.Email;
@@ -222,20 +225,21 @@ public class User {
 
     private void validateDriverRequirements(){
 
-        List<String> errors = new ArrayList<>(2);
+        List<String> fields = new ArrayList<>(2);
 
         if (this.pixKey == null || this.pixKey.isBlank() || this.pixKeyType == null) {
-            errors.add("- must have pix key settings defined");
+            fields.addAll(List.of("pixKey", "pixKeyType"));
         }
 
         if (this.driverLicense == null) {
-            errors.add("- must have a driver license");
+            fields.add("driverLicense");
         }
 
-        if (!errors.isEmpty()) {
-            throw new IllegalArgumentException(
-                    "User is driver and has the following errors:\n" + String.join("\n", errors)
-            );
+        if (!fields.isEmpty()){
+            String message = "Driver requirements not met. Ensure the driver has a " +
+                    "valid driver's license and properly configured PIX information.";
+
+            throw new ApplicationException(ErrorCode.BAD_REQUEST, message, Set.copyOf(fields));
         }
     }
 }
