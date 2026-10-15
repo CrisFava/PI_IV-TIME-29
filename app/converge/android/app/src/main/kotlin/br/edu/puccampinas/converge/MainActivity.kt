@@ -1,4 +1,4 @@
-package com.example.converge
+package br.edu.puccampinas.converge
 
 import io.flutter.embedding.android.FlutterActivity
 
