@@ -57,30 +57,34 @@ public class FirebaseTokenAuthenticationFilter extends OncePerRequestFilter {
     }
 
     private AuthenticatedUser parseToken(String token) {
+
+        String[] parts = token.split("\\.");
+        if (parts.length != 3) {
+            return null;
+        }
+
         try {
-            String[] parts = token.split("\\.");
-            if (parts.length == 3) {
-                byte[] decodedBytes = Base64.getUrlDecoder().decode(parts[1]);
-                String payloadJson = new String(decodedBytes, StandardCharsets.UTF_8);
-                JsonNode payload = objectMapper.readTree(payloadJson);
+            byte[] decodedBytes = Base64.getUrlDecoder().decode(parts[1]);
+            String payloadJson = new String(decodedBytes, StandardCharsets.UTF_8);
+            JsonNode payload = objectMapper.readTree(payloadJson);
 
-                if (payload.hasNonNull("exp")) {
-                    long exp = payload.get("exp").asLong();
-                    if (Instant.now().getEpochSecond() >= exp) {
-                        log.debug("Firebase ID token expired at {}", exp);
-                        return null;
-                    }
-                }
-
-                String uid = payload.hasNonNull("user_id")
-                        ? payload.get("user_id").asString()
-                        : (payload.hasNonNull("sub") ? payload.get("sub").asString() : null);
-                String email = payload.hasNonNull("email") ? payload.get("email").asString() : null;
-
-                if (uid != null && !uid.isBlank()) {
-                    return new AuthenticatedUser(uid, email);
+            if (payload.hasNonNull("exp")) {
+                long exp = payload.get("exp").asLong();
+                if (Instant.now().getEpochSecond() >= exp) {
+                    log.debug("Firebase ID token expired at {}", exp);
+                    return null;
                 }
             }
+
+            String uid = payload.hasNonNull("user_id")
+                    ? payload.get("user_id").asString()
+                    : (payload.hasNonNull("sub") ? payload.get("sub").asString() : null);
+            String email = payload.hasNonNull("email") ? payload.get("email").asString() : null;
+
+            if (uid != null && !uid.isBlank()) {
+                return new AuthenticatedUser(uid, email);
+            }
+
         } catch (Exception e) {
             log.debug("Failed to parse Bearer token: {}", e.getMessage());
         }

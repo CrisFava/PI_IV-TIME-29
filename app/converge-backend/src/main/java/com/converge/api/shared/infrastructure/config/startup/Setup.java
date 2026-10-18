@@ -36,10 +36,8 @@ public class Setup {
         }
 
         log.warn("{}Converge API Initialized With Errors.{}", ORANGE, RESET);
-
-
     }
-    
+
     private boolean socketRunning()  {
         if (Setup.ONLY_BACKEND) return true;
 

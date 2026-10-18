@@ -1,13 +1,19 @@
+import 'package:converge/features/auth/presentation/widgets/action_button.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 
 import '../../../../app_routes.dart';
-import '../../../../core/utils/phone_input_formatter.dart';
 import '../../../../core/utils/validators.dart';
 import '../../state/auth_action_controller.dart';
 import '../../state/inputs/profile_input.dart';
 import '../../state/inputs/register_input.dart';
+import '../widgets/onboarding_design_tokens.dart';
+import '../widgets/register_shell_header.dart';
+import '../widgets/register_step_academic_security.dart';
+import '../widgets/register_step_email.dart';
+import '../widgets/register_step_profile.dart';
+import '../widgets/register_sticky_footer.dart';
 
 class RegisterPage extends ConsumerStatefulWidget {
   const RegisterPage({super.key});
@@ -17,31 +23,179 @@ class RegisterPage extends ConsumerStatefulWidget {
 }
 
 class _RegisterPageState extends ConsumerState<RegisterPage> {
+  static const Map<String, String> _knownUniversityDomains = {
+    'puccampinas.edu.br': 'PUC-Campinas',
+    'puc-campinas.edu.br': 'PUC-Campinas',
+    'unicamp.br': 'UNICAMP',
+    'dac.unicamp.br': 'UNICAMP',
+    'usp.br': 'USP',
+    'unesp.br': 'UNESP',
+    'mackenzie.br': 'Mackenzie',
+  };
+
   final _formKey = GlobalKey<FormState>();
-  final _nameController = TextEditingController();
+
+  // Estado único centralizado para as 3 etapas
   final _emailController = TextEditingController();
-  final _passwordController = TextEditingController();
-  final _confirmPasswordController = TextEditingController();
+  final _nameController = TextEditingController();
   final _phoneController = TextEditingController();
-  final _universityController = TextEditingController(text: 'PUC-Campinas');
+  final _universityController = TextEditingController();
   final _courseController = TextEditingController();
   final _enrollmentController = TextEditingController();
+  final _passwordController = TextEditingController();
+
+  final _emailFocusNode = FocusNode();
+  final _nameFocusNode = FocusNode();
+  final _phoneFocusNode = FocusNode();
+  final _universityFocusNode = FocusNode();
+  final _courseFocusNode = FocusNode();
+  final _enrollmentFocusNode = FocusNode();
+  final _passwordFocusNode = FocusNode();
+
+  int _currentStep = 1;
+  bool _isMovingForward = true;
+  bool _obscurePassword = true;
+  String? _autoDetectedUniversity;
+
+  @override
+  void initState() {
+    super.initState();
+    _emailController.addListener(_onEmailChanged);
+    _nameController.addListener(_onFormChanged);
+    _phoneController.addListener(_onFormChanged);
+    _universityController.addListener(_onFormChanged);
+    _courseController.addListener(_onFormChanged);
+    _enrollmentController.addListener(_onFormChanged);
+    _passwordController.addListener(_onFormChanged);
+  }
 
   @override
   void dispose() {
-    _nameController.dispose();
     _emailController.dispose();
-    _passwordController.dispose();
-    _confirmPasswordController.dispose();
+    _nameController.dispose();
     _phoneController.dispose();
     _universityController.dispose();
     _courseController.dispose();
     _enrollmentController.dispose();
+    _passwordController.dispose();
+
+    _emailFocusNode.dispose();
+    _nameFocusNode.dispose();
+    _phoneFocusNode.dispose();
+    _universityFocusNode.dispose();
+    _courseFocusNode.dispose();
+    _enrollmentFocusNode.dispose();
+    _passwordFocusNode.dispose();
     super.dispose();
   }
 
+  void _onFormChanged() {
+    if (mounted) setState(() {});
+  }
+
+  void _onEmailChanged() {
+    final email = _emailController.text.trim().toLowerCase();
+    String? detected;
+    final atIndex = email.indexOf('@');
+    if (atIndex != -1 && atIndex < email.length - 1) {
+      final domain = email.substring(atIndex + 1);
+      for (final entry in _knownUniversityDomains.entries) {
+        if (domain == entry.key || domain.endsWith('.${entry.key}')) {
+          detected = entry.value;
+          break;
+        }
+      }
+    }
+
+    if (detected != null) {
+      final currentUni = _universityController.text.trim();
+      if (currentUni.isEmpty || currentUni == _autoDetectedUniversity) {
+        _universityController.text = detected;
+      }
+      _autoDetectedUniversity = detected;
+    } else if (_autoDetectedUniversity != null) {
+      if (_universityController.text.trim() == _autoDetectedUniversity) {
+        _universityController.clear();
+      }
+      _autoDetectedUniversity = null;
+    }
+
+    if (mounted) setState(() {});
+  }
+
+  void _handleDomainChipSelected(String domain) {
+    final text = _emailController.text.trim();
+    final atIndex = text.indexOf('@');
+    final localPart = atIndex != -1 ? text.substring(0, atIndex) : text;
+    final updated = '$localPart$domain';
+
+    _emailController.value = TextEditingValue(
+      text: updated,
+      selection: TextSelection.collapsed(
+        offset: localPart.isEmpty ? 0 : updated.length,
+      ),
+    );
+    _emailFocusNode.requestFocus();
+  }
+
+  bool get _isUniversityIdentifiedByEmail =>
+      _autoDetectedUniversity != null &&
+      _universityController.text.trim().toLowerCase() ==
+          _autoDetectedUniversity!.toLowerCase();
+
+  bool get _isStep1Valid => Validators.email(_emailController.text) == null;
+
+  bool get _isStep2Valid =>
+      Validators.name(_nameController.text) == null &&
+      Validators.phone(_phoneController.text) == null;
+
+  bool get _isStep3Valid =>
+      Validators.required(_universityController.text, field: 'Universidade') ==
+          null &&
+      Validators.required(_courseController.text, field: 'Curso') == null &&
+      Validators.required(_enrollmentController.text, field: 'Matrícula') ==
+          null &&
+      RegisterStepAcademicSecurity.isPasswordStrong(_passwordController.text);
+
+  bool get _isCurrentStepValid => switch (_currentStep) {
+    1 => _isStep1Valid,
+    2 => _isStep2Valid,
+    3 => _isStep3Valid,
+    _ => false,
+  };
+
+  void _handleBack() {
+    if (ref.read(authActionProvider).isLoading) return;
+    if (_currentStep > 1) {
+      setState(() {
+        _isMovingForward = false;
+        _currentStep--;
+      });
+    } else {
+      context.go(AppRoutes.login);
+    }
+  }
+
+  Future<void> _handleNextOrSubmit() async {
+    if (ref.read(authActionProvider).isLoading) return;
+    if (!_isCurrentStepValid) {
+      _formKey.currentState?.validate();
+      return;
+    }
+
+    if (_currentStep < 3) {
+      setState(() {
+        _isMovingForward = true;
+        _currentStep++;
+      });
+      return;
+    }
+
+    await _submit();
+  }
+
   Future<void> _submit() async {
-    if (!_formKey.currentState!.validate()) return;
+    if (!_isStep3Valid) return;
 
     final input = RegisterInput(
       email: _emailController.text.trim(),
@@ -58,309 +212,157 @@ class _RegisterPageState extends ConsumerState<RegisterPage> {
     await ref.read(authActionProvider.notifier).register(input);
   }
 
+  Widget _buildStepContent(bool isLoading) {
+    return switch (_currentStep) {
+      1 => RegisterStepEmail(
+        key: const ValueKey<int>(1),
+        emailController: _emailController,
+        emailFocusNode: _emailFocusNode,
+        isLoading: isLoading,
+        onDomainChipSelected: _handleDomainChipSelected,
+        onSubmitStep: _handleNextOrSubmit,
+      ),
+      2 => RegisterStepProfile(
+        key: const ValueKey<int>(2),
+        nameController: _nameController,
+        phoneController: _phoneController,
+        nameFocusNode: _nameFocusNode,
+        phoneFocusNode: _phoneFocusNode,
+        isLoading: isLoading,
+        onSubmitStep: _handleNextOrSubmit,
+      ),
+      _ => RegisterStepAcademicSecurity(
+        key: const ValueKey<int>(3),
+        universityController: _universityController,
+        courseController: _courseController,
+        enrollmentController: _enrollmentController,
+        passwordController: _passwordController,
+        universityFocusNode: _universityFocusNode,
+        courseFocusNode: _courseFocusNode,
+        enrollmentFocusNode: _enrollmentFocusNode,
+        passwordFocusNode: _passwordFocusNode,
+        isUniversityIdentifiedByEmail: _isUniversityIdentifiedByEmail,
+        obscurePassword: _obscurePassword,
+        isLoading: isLoading,
+        onTogglePasswordVisibility: () {
+          setState(() {
+            _obscurePassword = !_obscurePassword;
+          });
+        },
+        onSubmitStep: _handleNextOrSubmit,
+      ),
+    };
+  }
+
   @override
   Widget build(BuildContext context) {
     final actionState = ref.watch(authActionProvider);
     final isLoading = actionState.isLoading;
 
-    return Scaffold(
-      backgroundColor: Colors.white,
-      appBar: AppBar(
-        backgroundColor: Colors.white,
-        surfaceTintColor: Colors.white,
-        leading: IconButton(
-          icon: const Icon(Icons.arrow_back),
-          onPressed: isLoading ? null : () => context.go(AppRoutes.login),
-        ),
-        title: const Text(
-          'Criar conta',
-          style: TextStyle(fontWeight: FontWeight.w700),
-        ),
-      ),
-      body: SafeArea(
-        child: Center(
-          child: SingleChildScrollView(
-            padding: const EdgeInsets.all(24),
-            child: ConstrainedBox(
-              constraints: const BoxConstraints(maxWidth: 440),
-              child: Form(
-                key: _formKey,
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.stretch,
-                  children: [
-                    if (actionState.hasError) ...[
-                      Container(
-                        padding: const EdgeInsets.all(12),
-                        decoration: BoxDecoration(
-                          color: const Color(0xFFFEF2F2),
-                          borderRadius: BorderRadius.circular(12),
-                          border: Border.all(color: const Color(0xFFFECACA)),
-                        ),
-                        child: Text(
-                          authErrorMessage(actionState.error!),
-                          style: const TextStyle(
-                            color: Color(0xFFB91C1C),
-                            fontSize: 14,
-                          ),
-                        ),
-                      ),
-                      const SizedBox(height: 16),
-                    ],
-                    const Text(
-                      'DADOS BÁSICOS',
-                      style: TextStyle(
-                        fontSize: 13,
-                        fontWeight: FontWeight.w700,
-                        letterSpacing: 0.6,
-                      ),
-                    ),
-                    const SizedBox(height: 14),
-                    const Text(
-                      'Nome completo',
-                      style: TextStyle(fontWeight: FontWeight.w600),
-                    ),
-                    const SizedBox(height: 6),
-                    TextFormField(
-                      controller: _nameController,
-                      enabled: !isLoading,
-                      textInputAction: TextInputAction.next,
-                      validator: Validators.name,
-                      decoration: InputDecoration(
-                        hintText: 'Ex.: Ana Souza',
-                        border: OutlineInputBorder(
-                          borderRadius: BorderRadius.circular(12),
-                        ),
-                      ),
-                    ),
-                    const SizedBox(height: 14),
-                    const Text(
-                      'E-mail',
-                      style: TextStyle(fontWeight: FontWeight.w600),
-                    ),
-                    const SizedBox(height: 6),
-                    TextFormField(
-                      controller: _emailController,
-                      enabled: !isLoading,
-                      keyboardType: TextInputType.emailAddress,
-                      textInputAction: TextInputAction.next,
-                      validator: Validators.email,
-                      decoration: InputDecoration(
-                        hintText: 'ana@universidade.edu',
-                        border: OutlineInputBorder(
-                          borderRadius: BorderRadius.circular(12),
-                        ),
-                      ),
-                    ),
-                    const SizedBox(height: 14),
-                    Row(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        Expanded(
-                          child: Column(
-                            crossAxisAlignment: CrossAxisAlignment.start,
-                            children: [
-                              const Text(
-                                'Senha',
-                                style: TextStyle(fontWeight: FontWeight.w600),
-                              ),
-                              const SizedBox(height: 6),
-                              TextFormField(
-                                controller: _passwordController,
-                                enabled: !isLoading,
-                                obscureText: true,
-                                textInputAction: TextInputAction.next,
-                                validator: Validators.password,
-                                decoration: InputDecoration(
-                                  hintText: '••••••',
-                                  border: OutlineInputBorder(
-                                    borderRadius: BorderRadius.circular(12),
+    return PopScope(
+      canPop: false,
+      onPopInvokedWithResult: (didPop, _) {
+        if (!didPop) _handleBack();
+      },
+      child: Scaffold(
+        backgroundColor: OnboardingDesignTokens.background,
+        resizeToAvoidBottomInset: true,
+        body: SafeArea(
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.stretch,
+            children: [
+              RegisterShellHeader(
+                currentStep: _currentStep,
+                totalSteps: 3,
+                onBack: isLoading ? null : _handleBack,
+              ),
+              Expanded(
+                child: Center(
+                  child: ConstrainedBox(
+                    constraints: const BoxConstraints(maxWidth: 440),
+                    child: Form(
+                      key: _formKey,
+                      child: SingleChildScrollView(
+                        padding: const EdgeInsets.fromLTRB(24, 28, 24, 24),
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.stretch,
+                          children: [
+                            if (actionState.hasError) ...[
+                              Container(
+                                padding: const EdgeInsets.all(12),
+                                decoration: BoxDecoration(
+                                  color: const Color(0xFFFEF2F2),
+                                  borderRadius: BorderRadius.circular(12),
+                                  border: Border.all(
+                                    color: const Color(0xFFFECACA),
+                                  ),
+                                ),
+                                child: Text(
+                                  authErrorMessage(actionState.error!),
+                                  style: const TextStyle(
+                                    color: Color(0xFFB91C1C),
+                                    fontSize: 14,
                                   ),
                                 ),
                               ),
+                              const SizedBox(height: 20),
                             ],
-                          ),
-                        ),
-                        const SizedBox(width: 12),
-                        Expanded(
-                          child: Column(
-                            crossAxisAlignment: CrossAxisAlignment.start,
-                            children: [
-                              const Text(
-                                'Confirmar senha',
-                                style: TextStyle(fontWeight: FontWeight.w600),
+                            ClipRect(
+                              child: AnimatedSwitcher(
+                                duration: const Duration(milliseconds: 250),
+                                switchInCurve: Curves.easeOut,
+                                switchOutCurve: Curves.easeOut,
+                                layoutBuilder:
+                                    (currentChild, previousChildren) {
+                                      return Stack(
+                                        alignment: Alignment.topLeft,
+                                        children: <Widget>[
+                                          ...previousChildren,
+                                          ?currentChild,
+                                        ],
+                                      );
+                                    },
+                                transitionBuilder: (child, animation) {
+                                  final isIncoming =
+                                      child.key == ValueKey<int>(_currentStep);
+                                  final beginOffset = _isMovingForward
+                                      ? (isIncoming
+                                            ? const Offset(1.0, 0.0)
+                                            : const Offset(-1.0, 0.0))
+                                      : (isIncoming
+                                            ? const Offset(-1.0, 0.0)
+                                            : const Offset(1.0, 0.0));
+
+                                  return SlideTransition(
+                                    position: Tween<Offset>(
+                                      begin: beginOffset,
+                                      end: Offset.zero,
+                                    ).animate(animation),
+                                    child: FadeTransition(
+                                      opacity: animation,
+                                      child: child,
+                                    ),
+                                  );
+                                },
+                                child: _buildStepContent(isLoading),
                               ),
-                              const SizedBox(height: 6),
-                              TextFormField(
-                                controller: _confirmPasswordController,
-                                enabled: !isLoading,
-                                obscureText: true,
-                                textInputAction: TextInputAction.next,
-                                validator: (v) => Validators.confirmPassword(
-                                  v,
-                                  _passwordController.text,
-                                ),
-                                decoration: InputDecoration(
-                                  hintText: '••••••',
-                                  border: OutlineInputBorder(
-                                    borderRadius: BorderRadius.circular(12),
-                                  ),
-                                ),
-                              ),
-                            ],
-                          ),
-                        ),
-                      ],
-                    ),
-                    const SizedBox(height: 14),
-                    const Text(
-                      'Telefone',
-                      style: TextStyle(fontWeight: FontWeight.w600),
-                    ),
-                    const SizedBox(height: 6),
-                    TextFormField(
-                      controller: _phoneController,
-                      enabled: !isLoading,
-                      keyboardType: TextInputType.phone,
-                      textInputAction: TextInputAction.next,
-                      inputFormatters: const [PhoneInputFormatter()],
-                      validator: Validators.phone,
-                      decoration: InputDecoration(
-                        hintText: '(00) 90000-0000',
-                        border: OutlineInputBorder(
-                          borderRadius: BorderRadius.circular(12),
+                            ),
+                          ],
                         ),
                       ),
                     ),
-                    const SizedBox(height: 22),
-                    const Text(
-                      'VÍNCULO ACADÊMICO',
-                      style: TextStyle(
-                        fontSize: 13,
-                        fontWeight: FontWeight.w700,
-                        letterSpacing: 0.6,
-                      ),
-                    ),
-                    const SizedBox(height: 14),
-                    const Text(
-                      'Universidade',
-                      style: TextStyle(fontWeight: FontWeight.w600),
-                    ),
-                    const SizedBox(height: 6),
-                    TextFormField(
-                      controller: _universityController,
-                      enabled: !isLoading,
-                      textInputAction: TextInputAction.next,
-                      validator: (v) =>
-                          Validators.required(v, field: 'Universidade'),
-                      decoration: InputDecoration(
-                        hintText: 'PUC-Campinas',
-                        border: OutlineInputBorder(
-                          borderRadius: BorderRadius.circular(12),
-                        ),
-                      ),
-                    ),
-                    const SizedBox(height: 14),
-                    Row(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        Expanded(
-                          child: Column(
-                            crossAxisAlignment: CrossAxisAlignment.start,
-                            children: [
-                              const Text(
-                                'Curso',
-                                style: TextStyle(fontWeight: FontWeight.w600),
-                              ),
-                              const SizedBox(height: 6),
-                              TextFormField(
-                                controller: _courseController,
-                                enabled: !isLoading,
-                                textInputAction: TextInputAction.next,
-                                validator: (v) =>
-                                    Validators.required(v, field: 'Curso'),
-                                decoration: InputDecoration(
-                                  hintText: 'Eng. Software',
-                                  border: OutlineInputBorder(
-                                    borderRadius: BorderRadius.circular(12),
-                                  ),
-                                ),
-                              ),
-                            ],
-                          ),
-                        ),
-                        const SizedBox(width: 12),
-                        Expanded(
-                          child: Column(
-                            crossAxisAlignment: CrossAxisAlignment.start,
-                            children: [
-                              const Text(
-                                'Matrícula',
-                                style: TextStyle(fontWeight: FontWeight.w600),
-                              ),
-                              const SizedBox(height: 6),
-                              TextFormField(
-                                controller: _enrollmentController,
-                                enabled: !isLoading,
-                                textInputAction: TextInputAction.done,
-                                onFieldSubmitted: (_) => _submit(),
-                                validator: (v) =>
-                                    Validators.required(v, field: 'Matrícula'),
-                                decoration: InputDecoration(
-                                  hintText: '2024-00123',
-                                  border: OutlineInputBorder(
-                                    borderRadius: BorderRadius.circular(12),
-                                  ),
-                                ),
-                              ),
-                            ],
-                          ),
-                        ),
-                      ],
-                    ),
-                    const SizedBox(height: 24),
-                    SizedBox(
-                      height: 52,
-                      child: FilledButton(
-                        style: FilledButton.styleFrom(
-                          backgroundColor: const Color(0xFF14171A),
-                          foregroundColor: Colors.white,
-                          shape: RoundedRectangleBorder(
-                            borderRadius: BorderRadius.circular(14),
-                          ),
-                        ),
-                        onPressed: isLoading ? null : _submit,
-                        child: isLoading
-                            ? const SizedBox(
-                                width: 22,
-                                height: 22,
-                                child: CircularProgressIndicator(
-                                  strokeWidth: 2,
-                                  color: Colors.white,
-                                ),
-                              )
-                            : const Text(
-                                'Continuar →',
-                                style: TextStyle(
-                                  fontSize: 16,
-                                  fontWeight: FontWeight.w600,
-                                ),
-                              ),
-                      ),
-                    ),
-                    const SizedBox(height: 12),
-                    TextButton(
-                      onPressed: isLoading
-                          ? null
-                          : () => context.go(AppRoutes.login),
-                      child: const Text(
-                        'Já tem conta? Fazer login',
-                        style: TextStyle(color: Color(0xFF374151)),
-                      ),
-                    ),
-                  ],
+                  ),
                 ),
               ),
-            ),
+              RegisterStickyFooter(
+                label: _currentStep < 3 ? buildActionButtonLabel('Continuar') : 'Criar Conta',
+                isEnabled: _isCurrentStepValid,
+                isLoading: isLoading,
+                showLoginPrompt: _currentStep == 1,
+                onPrimaryPressed: _handleNextOrSubmit,
+                onLoginPressed: () => context.go(AppRoutes.login),
+              ),
+            ],
           ),
         ),
       ),
