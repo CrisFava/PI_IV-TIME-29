@@ -1,8 +1,8 @@
-package com.converge.api.shared.config.startup;
+package com.converge.api.shared.infrastructure.config.startup;
 
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Component;
-import static com.converge.api.shared.config.customization.Color.*;
+import static com.converge.api.shared.infrastructure.config.customization.Color.*;
 
 @Slf4j
 @Component

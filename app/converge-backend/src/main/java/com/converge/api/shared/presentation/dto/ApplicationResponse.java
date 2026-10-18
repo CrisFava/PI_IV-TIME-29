@@ -1,6 +1,6 @@
 package com.converge.api.shared.presentation.dto;
 
-import com.converge.api.shared.exception.ErrorResponse;
+import com.converge.api.shared.infrastructure.exception.ErrorResponse;
 import jakarta.annotation.Nullable;
 
 import java.time.Instant;

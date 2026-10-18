@@ -1,11 +1,12 @@
 package com.converge.api.modules.user.presentation.mapper;
 
+import com.converge.api.modules.user.application.mapper.UserMapper;
 import com.converge.api.modules.user.domain.enums.user.ParticipationRole;
 import com.converge.api.modules.user.domain.enums.user.PaymentStanding;
 import com.converge.api.modules.user.domain.model.user.User;
 import com.converge.api.modules.user.domain.model.user.subtypes.AcademicRecord;
-import com.converge.api.modules.user.presentation.dto.CreateUserRequestDTO;
-import com.converge.api.modules.user.presentation.dto.CreateUserResponseDTO;
+import com.converge.api.modules.user.application.dto.CreateUserRequestDTO;
+import com.converge.api.modules.user.application.dto.CreateUserResponseDTO;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 

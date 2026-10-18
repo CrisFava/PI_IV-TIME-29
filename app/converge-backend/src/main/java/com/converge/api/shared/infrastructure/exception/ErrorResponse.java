@@ -1,4 +1,4 @@
-package com.converge.api.shared.exception;
+package com.converge.api.shared.infrastructure.exception;
 
 
 import java.util.Set;

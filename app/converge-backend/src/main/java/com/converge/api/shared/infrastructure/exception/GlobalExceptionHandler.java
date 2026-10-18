@@ -1,4 +1,4 @@
-package com.converge.api.shared.exception;
+package com.converge.api.shared.infrastructure.exception;
 
 import com.converge.api.shared.presentation.dto.ApplicationResponse;
 import org.springframework.dao.DuplicateKeyException;

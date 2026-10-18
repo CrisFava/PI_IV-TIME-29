@@ -1,4 +1,4 @@
-package com.converge.api.shared.config.mongo;
+package com.converge.api.shared.infrastructure.config.mongo;
 
 import org.springframework.context.annotation.Configuration;
 import org.springframework.data.mongodb.config.EnableMongoAuditing;

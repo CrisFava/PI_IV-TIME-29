@@ -1,4 +1,4 @@
-package com.converge.api.shared.config.customization;
+package com.converge.api.shared.infrastructure.config.customization;
 
 public enum Color {
     GREEN("\u001B[32m"),

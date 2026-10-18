@@ -1,4 +1,4 @@
-package com.converge.api.shared.config.auth;
+package com.converge.api.shared.infrastructure.config.auth;
 
 import tools.jackson.databind.JsonNode;
 import tools.jackson.databind.ObjectMapper;

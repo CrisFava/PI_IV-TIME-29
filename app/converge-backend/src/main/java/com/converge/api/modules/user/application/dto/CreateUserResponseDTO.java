@@ -1,4 +1,4 @@
-package com.converge.api.modules.user.presentation.dto;
+package com.converge.api.modules.user.application.dto;
 
 import com.converge.api.modules.user.domain.enums.user.ParticipationRole;
 import com.converge.api.modules.user.domain.enums.user.PaymentStanding;

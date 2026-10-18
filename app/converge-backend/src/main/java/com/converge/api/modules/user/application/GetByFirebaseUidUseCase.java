@@ -2,11 +2,10 @@ package com.converge.api.modules.user.application;
 
 import com.converge.api.modules.user.domain.model.user.User;
 import com.converge.api.modules.user.domain.repository.UserRepository;
-import com.converge.api.modules.user.presentation.dto.CreateUserResponseDTO;
-import com.converge.api.modules.user.presentation.mapper.UserMapper;
-import com.converge.api.shared.exception.ApplicationException;
-import com.converge.api.shared.exception.ErrorCode;
-import com.converge.api.shared.presentation.UseCase;
+import com.converge.api.modules.user.application.mapper.UserMapper;
+import com.converge.api.shared.infrastructure.exception.ApplicationException;
+import com.converge.api.shared.infrastructure.exception.ErrorCode;
+import com.converge.api.shared.application.UseCase;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
 

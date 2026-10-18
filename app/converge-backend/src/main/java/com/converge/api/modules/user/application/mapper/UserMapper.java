@@ -1,8 +1,8 @@
-package com.converge.api.modules.user.presentation.mapper;
+package com.converge.api.modules.user.application.mapper;
 
 import com.converge.api.modules.user.domain.model.user.User;
-import com.converge.api.modules.user.presentation.dto.CreateUserRequestDTO;
-import com.converge.api.modules.user.presentation.dto.CreateUserResponseDTO;
+import com.converge.api.modules.user.application.dto.CreateUserRequestDTO;
+import com.converge.api.modules.user.application.dto.CreateUserResponseDTO;
 import org.springframework.stereotype.Component;
 
 @Component
