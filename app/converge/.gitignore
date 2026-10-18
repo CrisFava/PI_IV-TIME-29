@@ -49,6 +49,6 @@ app.*.map.json
 
 # Firebase tokens
 /ios/Runner/GoogleService-Info.plist
-/android/google-services.json
+/android/app/google-services.json
 
 /graphify-out
