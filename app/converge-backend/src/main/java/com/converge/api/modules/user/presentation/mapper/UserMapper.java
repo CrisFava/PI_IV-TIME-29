@@ -27,7 +27,7 @@ public class UserMapper {
         );
     }
 
-    public CreateUserResponseDTO toResponseDTO(User user) {
+    public CreateUserResponseDTO toResponse(User user) {
         if (user == null) {
             // TODO: Throw and Treat the error
             return null;

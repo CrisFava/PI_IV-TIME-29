@@ -6,7 +6,6 @@ import com.converge.api.modules.user.domain.model.user.User;
 import com.converge.api.modules.user.domain.model.user.subtypes.AcademicRecord;
 import com.converge.api.modules.user.presentation.dto.CreateUserRequestDTO;
 import com.converge.api.modules.user.presentation.dto.CreateUserResponseDTO;
-import org.bson.types.ObjectId;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 
@@ -37,6 +36,7 @@ class UserMapperTest {
                 "https://storage.firebase.com/foto.jpg",
                 Set.of(ParticipationRole.PASSENGER),
                 academicRecord,
+                null,
                 null,
                 null
         );
@@ -76,7 +76,7 @@ class UserMapperTest {
                 academicRecord
         );
 
-        CreateUserResponseDTO responseDTO = mapper.toResponseDTO(user);
+        CreateUserResponseDTO responseDTO = mapper.toResponse(user);
 
         assertThat(responseDTO).isNotNull();
         assertEquals("uid-firebase-999", responseDTO.firebaseUid());
