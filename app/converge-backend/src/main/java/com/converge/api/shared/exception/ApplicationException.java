@@ -22,6 +22,5 @@ public class ApplicationException extends RuntimeException {
     public ApplicationException(ErrorCode code, String message, Set<String> fields){
         super(message);
         this.error = new ErrorResponse(code, message, fields);
-
     }
 }

@@ -34,7 +34,7 @@ public class SocketClient implements AutoCloseable {
         try {
             this.socket = new Socket(this.host, this.port);
 
-            // Transmissor deve dar flush primeiro para enviar o header de serialização
+            // Transmissor deve dar flush primeiro pra enviar o header
             ObjectOutputStream transmitter = new ObjectOutputStream(this.socket.getOutputStream());
             transmitter.flush();
             ObjectInputStream receiver = new ObjectInputStream(this.socket.getInputStream());
