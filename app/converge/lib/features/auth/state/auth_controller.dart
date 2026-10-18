@@ -1,6 +1,6 @@
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
-import '../../../core/network/problem_details.dart';
+import '../../../core/network/api_exception.dart';
 import '../../../core/services/auth/auth_providers.dart';
 import '../../../core/services/auth/auth_service.dart';
 import '../data/models/user_model.dart';
@@ -93,7 +93,7 @@ class AuthController extends AsyncNotifier<AuthSession> {
   Future<AuthSession> _loadSession(AuthUser user) async {
     try {
       return Authenticated(await _repository.fetchCurrentUser());
-    } on ProblemDetailsException catch (e) {
+    } on ApiException catch (e) {
       if (e.isNotFound) return ProfileIncomplete(user);
       rethrow;
     }
@@ -113,10 +113,10 @@ class AuthController extends AsyncNotifier<AuthSession> {
         profile.toRequest(firebaseUid: user.uid, email: email),
       );
       state = AsyncData(Authenticated(created));
-    } on ProblemDetailsException catch (e) {
+    } on ApiException catch (e) {
       // 409 pode significar que uma tentativa anterior (ex.: timeout) já
       // criou o cadastro. Se o perfil existir, a sessão está completa.
-      if (e.status == 409) {
+      if (e.isConflict) {
         final existing = await _tryFetchCurrentUser();
         if (existing != null) {
           state = AsyncData(Authenticated(existing));
@@ -131,7 +131,7 @@ class AuthController extends AsyncNotifier<AuthSession> {
   Future<UserModel?> _tryFetchCurrentUser() async {
     try {
       return await _repository.fetchCurrentUser();
-    } on ProblemDetailsException {
+    } on ApiException {
       return null;
     }
   }

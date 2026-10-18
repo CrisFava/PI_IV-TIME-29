@@ -1,4 +1,4 @@
-import 'package:converge/core/network/problem_details.dart';
+import 'package:converge/core/network/api_exception.dart';
 import 'package:converge/core/services/auth/auth_providers.dart';
 import 'package:converge/features/auth/data/repository/auth_repository_impl.dart';
 import 'package:converge/features/auth/state/auth_action_controller.dart';
@@ -127,7 +127,7 @@ void main() {
     );
 
     test('backend fora do ar: desloga do Firebase', () async {
-      repository.fetchError = ProblemDetailsException.network();
+      repository.fetchError = ApiException.network();
       final container = createContainer();
       await container.read(authControllerProvider.future);
 
@@ -135,7 +135,7 @@ void main() {
         container
             .read(authControllerProvider.notifier)
             .signIn(email: 'ana@puc.edu.br', password: '123456'),
-        throwsA(isA<ProblemDetailsException>()),
+        throwsA(isA<ApiException>()),
       );
       expect(auth.signOutCalls, 1);
       expect(auth.currentUser, isNull);
@@ -173,7 +173,9 @@ void main() {
     test(
       'falha no backend: mantém a conta e vai para ProfileIncomplete',
       () async {
-        repository.createError = ProblemDetailsException.fromJson({
+        repository.createError = ApiException.fromResponse({
+          'success': false,
+          'data': null,
           'error': {
             'code': 'BAD_REQUEST',
             'message': 'Telefone inválido',
@@ -193,7 +195,7 @@ void main() {
                   profile: _profile,
                 ),
               ),
-          throwsA(isA<ProblemDetailsException>()),
+          throwsA(isA<ApiException>()),
         );
         expect(
           container.read(authControllerProvider).value,
@@ -215,7 +217,7 @@ void main() {
     test(
       '409 com perfil já existente (retry após timeout): autentica',
       () async {
-        repository.createError = ProblemDetailsException.fromStatus(409);
+        repository.createError = ApiException.fromStatus(409);
         repository.stored = fakeUser();
         final container = createContainer();
         await container.read(authControllerProvider.future);

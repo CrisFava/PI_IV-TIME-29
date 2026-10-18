@@ -1,32 +1,24 @@
-import 'problem_details.dart';
+import 'api_exception.dart';
 
-/// Extrai o `data` do envelope `ApplicationResponse` do backend.
+/// Extrai o `data` do envelope `ApplicationResponse` do backend:
+/// `{ success, data, error, timestamp }`.
 ///
-/// Respostas fora do envelope são devolvidas como estão, para tolerar
-/// endpoints que respondam o objeto direto.
+/// Lança [ApiException] se `success` for `false` ou se o corpo não estiver
+/// no formato esperado.
 T unwrapApiResponse<T>(
   Object? body,
-  T Function(Map<String, dynamic> json) fromJson,
-) {
-  if (body is! Map<String, dynamic>) {
-    throw const ProblemDetailsException(
-      title: 'Resposta inválida',
-      detail: 'O servidor respondeu em um formato inesperado.',
-      status: 500,
-    );
+  T Function(Map<String, dynamic> json) fromJson, {
+  int status = 200,
+}) {
+  if (body is! Map<String, dynamic> || body['success'] is! bool) {
+    throw ApiException.fromStatus(500);
   }
 
-  if (body.containsKey('success') && body.containsKey('data')) {
-    final data = body['data'];
-    if (data is! Map<String, dynamic>) {
-      throw const ProblemDetailsException(
-        title: 'Resposta inválida',
-        detail: 'O servidor respondeu sem os dados esperados.',
-        status: 500,
-      );
-    }
-    return fromJson(data);
+  if (body['success'] != true) {
+    throw ApiException.fromResponse(body, status: status);
   }
 
-  return fromJson(body);
+  final data = body['data'];
+  if (data is! Map<String, dynamic>) throw ApiException.fromStatus(500);
+  return fromJson(data);
 }

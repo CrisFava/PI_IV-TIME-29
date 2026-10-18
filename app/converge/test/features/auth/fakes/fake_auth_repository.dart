@@ -1,14 +1,14 @@
 import 'fake_user.dart';
 
-import 'package:converge/core/network/problem_details.dart';
+import 'package:converge/core/network/api_exception.dart';
 import 'package:converge/features/auth/data/models/create_user_request.dart';
 import 'package:converge/features/auth/data/models/user_model.dart';
 import 'package:converge/features/auth/data/repository/auth_repository.dart';
 
 class FakeAuthRepository implements AuthRepository {
   UserModel? stored;
-  ProblemDetailsException? fetchError;
-  ProblemDetailsException? createError;
+  ApiException? fetchError;
+  ApiException? createError;
   final List<CreateUserRequest> created = [];
 
   FakeAuthRepository({this.stored});
@@ -18,7 +18,7 @@ class FakeAuthRepository implements AuthRepository {
     final error = fetchError;
     if (error != null) throw error;
     final user = stored;
-    if (user == null) throw ProblemDetailsException.fromStatus(404);
+    if (user == null) throw ApiException.fromStatus(404);
     return user;
   }
 

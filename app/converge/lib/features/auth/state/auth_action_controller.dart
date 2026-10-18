@@ -1,6 +1,6 @@
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
-import '../../../core/network/problem_details.dart';
+import '../../../core/network/api_exception.dart';
 import '../../../core/services/auth/auth_exception.dart';
 import 'auth_controller.dart';
 import 'inputs/profile_input.dart';
@@ -50,6 +50,6 @@ class AuthActionController extends Notifier<AsyncValue<void>> {
 /// Mensagem amigável para qualquer erro vindo das ações de autenticação.
 String authErrorMessage(Object error) => switch (error) {
   AuthException(:final message) => message,
-  ProblemDetailsException(:final detail) => detail,
+  ApiException(:final message) => message,
   _ => 'Algo deu errado. Tente novamente.',
 };

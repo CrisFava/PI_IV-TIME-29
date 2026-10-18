@@ -1,27 +1,25 @@
 import 'package:dio/dio.dart';
 
-import '../problem_details.dart';
+import '../api_exception.dart';
 
-/// Converte qualquer falha HTTP em [ProblemDetailsException], disponível em
-/// `DioException.error`. Use [ProblemDetailsX.toProblem] para extrair.
+/// Converte qualquer falha HTTP em [ApiException], disponível em
+/// `DioException.error`. Use [ApiExceptionX.toApiException] para extrair.
 class ErrorInterceptor extends Interceptor {
   @override
   void onError(DioException err, ErrorInterceptorHandler handler) {
-    handler.next(err.copyWith(error: _toProblem(err)));
+    handler.next(err.copyWith(error: _toApiException(err)));
   }
 
-  ProblemDetailsException _toProblem(DioException err) {
+  ApiException _toApiException(DioException err) {
     final existing = err.error;
-    if (existing is ProblemDetailsException) return existing;
+    if (existing is ApiException) return existing;
 
     final response = err.response;
-    if (response == null) return ProblemDetailsException.network();
+    if (response == null) return ApiException.network();
 
-    final status = response.statusCode ?? 500;
-    final body = response.data;
-    if (body is Map<String, dynamic>) {
-      return ProblemDetailsException.fromJson(body, status: status);
-    }
-    return ProblemDetailsException.fromStatus(status);
+    return ApiException.fromResponse(
+      response.data,
+      status: response.statusCode ?? 500,
+    );
   }
 }
