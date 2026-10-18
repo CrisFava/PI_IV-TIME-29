@@ -1,6 +1,8 @@
 package com.converge.api.shared.infrastructure.exception;
 
 
+import com.converge.api.shared.presentation.exception.ErrorCode;
+
 import java.util.Set;
 
 public record ErrorResponse(

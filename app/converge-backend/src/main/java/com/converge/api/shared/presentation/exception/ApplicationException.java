@@ -1,5 +1,6 @@
-package com.converge.api.shared.infrastructure.exception;
+package com.converge.api.shared.presentation.exception;
 
+import com.converge.api.shared.infrastructure.exception.ErrorResponse;
 import lombok.Getter;
 
 import java.util.Set;
@@ -8,11 +9,6 @@ import java.util.Set;
 public class ApplicationException extends RuntimeException {
 
     private final ErrorResponse error;
-
-    public ApplicationException(ErrorResponse details) {
-        super(details.message());
-        this.error = details;
-    }
 
     public ApplicationException(ErrorCode code,  String message){
         super(message);

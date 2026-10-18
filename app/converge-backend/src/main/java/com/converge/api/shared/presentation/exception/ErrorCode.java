@@ -1,4 +1,4 @@
-package com.converge.api.shared.infrastructure.exception;
+package com.converge.api.shared.presentation.exception;
 
 import lombok.Getter;
 import org.springframework.http.HttpStatus;

@@ -1,6 +1,6 @@
 package com.converge.api.shared.infrastructure.config.auth;
 
-import com.converge.api.shared.infrastructure.exception.ErrorCode;
+import com.converge.api.shared.presentation.exception.ErrorCode;
 import com.converge.api.shared.infrastructure.exception.ErrorResponse;
 import com.converge.api.shared.presentation.dto.ApplicationResponse;
 import tools.jackson.databind.ObjectMapper;

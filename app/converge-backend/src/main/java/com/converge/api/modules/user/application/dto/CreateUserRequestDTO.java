@@ -3,7 +3,7 @@ package com.converge.api.modules.user.application.dto;
 import com.converge.api.modules.user.domain.enums.user.ParticipationRole;
 import com.converge.api.modules.user.domain.enums.user.PixKeyType;
 import com.converge.api.modules.user.domain.model.user.subtypes.AcademicRecord;
-import com.converge.api.modules.user.domain.model.user.subtypes.DriverLicense;
+import com.converge.api.modules.user.domain.model.user.subtypes.driver.DriverLicense;
 import jakarta.annotation.Nullable;
 import jakarta.validation.Valid;
 import jakarta.validation.constraints.Email;

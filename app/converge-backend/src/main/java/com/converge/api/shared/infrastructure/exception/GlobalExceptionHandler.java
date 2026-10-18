@@ -1,6 +1,8 @@
 package com.converge.api.shared.infrastructure.exception;
 
 import com.converge.api.shared.presentation.dto.ApplicationResponse;
+import com.converge.api.shared.presentation.exception.ApplicationException;
+import com.converge.api.shared.presentation.exception.ErrorCode;
 import org.springframework.dao.DuplicateKeyException;
 import org.springframework.http.ResponseEntity;
 import org.springframework.validation.FieldError;

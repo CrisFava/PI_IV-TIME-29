@@ -1,4 +1,4 @@
-package com.converge.api.modules.user.domain.model.user.subtypes;
+package com.converge.api.modules.user.domain.model.user.subtypes.driver;
 
 import com.converge.api.modules.user.domain.enums.user.DriverLicenseCategory;
 import com.converge.api.modules.user.domain.enums.user.VerificationStatus;
