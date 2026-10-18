@@ -1,12 +1,14 @@
 package com.converge.api.modules.user.application;
 
 import com.converge.api.modules.user.domain.model.user.User;
+import com.converge.api.modules.user.domain.model.user.subtypes.AcademicRecord;
 import com.converge.api.modules.user.domain.repository.UserRepository;
 import com.converge.api.modules.user.application.dto.CreateUserRequestDTO;
 import com.converge.api.modules.user.application.mapper.UserMapper;
 import com.converge.api.shared.presentation.exception.ApplicationException;
 import com.converge.api.shared.presentation.exception.ErrorCode;
 import com.converge.api.shared.application.UseCase;
+import jakarta.validation.constraints.NotBlank;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
 
@@ -21,34 +23,43 @@ public class CreateUserUseCase implements UseCase<CreateUserRequestDTO, User> {
 
     @Override
     public User execute(CreateUserRequestDTO request) {
-        if (userRepository.existsByFirebaseUid(request.firebaseUid())) {
+        validateFirebaseUid(request.firebaseUid());
+        validateEmail(request.email());
+        validateAcademicRecord(request.academicRecord());
+
+        User user = userMapper.toEntity(request);
+        return userRepository.save(user);
+    }
+
+    private void validateFirebaseUid(String firebaseUid){
+        if (userRepository.existsByFirebaseUid(firebaseUid)) {
             throw new ApplicationException(
-                    ErrorCode.EMAIL_ALREADY_EXISTS,
+                    ErrorCode.USER_ALREADY_EXISTS,
                     "Usuário já possui cadastro.",
                     Set.of("firebaseUid")
             );
         }
+    }
 
-        if (userRepository.existsByEmail(request.email())) {
+    private void validateEmail(String email){
+        if (userRepository.existsByEmail(email)) {
             throw new ApplicationException(
-                    ErrorCode.EMAIL_ALREADY_EXISTS,
+                    ErrorCode.USER_ALREADY_EXISTS,
                     "Já existe um usuário cadastrado com este e-mail.",
                     Set.of("email")
             );
         }
+    }
 
-        if (request.academicRecord() != null
-                && request.academicRecord().institutionalEmail() != null
-                && userRepository.existsByAcademicRecordInstitutionalEmail(
-                request.academicRecord().institutionalEmail())) {
+    private void validateAcademicRecord(@NotBlank AcademicRecord academicRecord){
+        String email = academicRecord.institutionalEmail();
+
+        if (email != null && !email.isBlank() && userRepository.existsByAcademicRecordInstitutionalEmail(email)) {
             throw new ApplicationException(
-                    ErrorCode.EMAIL_ALREADY_EXISTS,
+                    ErrorCode.USER_ALREADY_EXISTS,
                     "Já existe um usuário cadastrado com este e-mail institucional.",
                     Set.of("academicRecord.institutionalEmail")
             );
         }
-
-        User user = userMapper.toEntity(request);
-        return userRepository.save(user);
     }
 }

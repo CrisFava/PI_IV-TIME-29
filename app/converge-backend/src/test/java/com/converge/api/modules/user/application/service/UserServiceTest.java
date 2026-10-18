@@ -89,7 +89,7 @@ class UserServiceTest {
                 ApplicationException.class,
                 () -> createUserUseCase.execute(request)
         );
-        assertThat(ex.getError().code()).isEqualTo(ErrorCode.EMAIL_ALREADY_EXISTS);
+        assertThat(ex.getError().code()).isEqualTo(ErrorCode.USER_ALREADY_EXISTS);
     }
 
     @Test

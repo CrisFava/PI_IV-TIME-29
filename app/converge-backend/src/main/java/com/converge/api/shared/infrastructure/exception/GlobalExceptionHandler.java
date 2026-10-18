@@ -56,12 +56,12 @@ public class GlobalExceptionHandler {
             DuplicateKeyException ex
     ) {
         ErrorResponse error = new ErrorResponse(
-                ErrorCode.EMAIL_ALREADY_EXISTS,
+                ErrorCode.USER_ALREADY_EXISTS,
                 "Já existe um usuário cadastrado com estes dados."
         );
 
         return ResponseEntity
-                .status(ErrorCode.EMAIL_ALREADY_EXISTS.getStatus())
+                .status(ErrorCode.USER_ALREADY_EXISTS.getStatus())
                 .body(ApplicationResponse.failure(error));
     }
 }
