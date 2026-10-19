@@ -2,10 +2,16 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 
+import 'app_routes.dart';
+import 'features/auth/presentation/pages/complete_profile_page.dart';
+import 'features/auth/presentation/pages/forgot_password_page.dart';
+import 'features/auth/presentation/pages/home_page.dart';
+import 'features/auth/presentation/pages/login_page.dart';
+import 'features/auth/presentation/pages/register_page.dart';
+import 'features/auth/presentation/pages/splash_page.dart';
+import 'features/auth/presentation/pages/welcome_page.dart';
 import 'features/auth/state/auth_controller.dart';
 import 'features/auth/state/session/auth_session.dart';
-import 'app_routes.dart';
-import 'core/widgets/placeholder_page.dart';
 
 /// Decide para onde o usuário deve ir conforme a sessão. Retorna `null` para manter a rota atual
 String? authRedirect(AsyncValue<AuthSession> session, String location) {
@@ -45,34 +51,33 @@ final appRouterProvider = Provider<GoRouter>((ref) {
     redirect: (context, state) =>
         authRedirect(session.value, state.matchedLocation),
     routes: [
-      // TODO(ui): trocar os placeholders pelas telas de docs/Telas.
       GoRoute(
         path: AppRoutes.splash,
-        builder: (_, _) => const PlaceholderPage('Splash'),
+        builder: (_, _) => const SplashPage(),
       ),
       GoRoute(
         path: AppRoutes.welcome,
-        builder: (_, _) => const PlaceholderPage('Welcome'),
+        builder: (_, _) => const WelcomePage(),
       ),
       GoRoute(
         path: AppRoutes.login,
-        builder: (_, _) => const PlaceholderPage('Login'),
+        builder: (_, _) => const LoginPage(),
       ),
       GoRoute(
         path: AppRoutes.register,
-        builder: (_, _) => const PlaceholderPage('Criar conta'),
+        builder: (_, _) => const RegisterPage(),
       ),
       GoRoute(
         path: AppRoutes.forgotPassword,
-        builder: (_, _) => const PlaceholderPage('Esqueci minha senha'),
+        builder: (_, _) => const ForgotPasswordPage(),
       ),
       GoRoute(
         path: AppRoutes.completeProfile,
-        builder: (_, _) => const PlaceholderPage('Completar cadastro'),
+        builder: (_, _) => const CompleteProfilePage(),
       ),
       GoRoute(
         path: AppRoutes.home,
-        builder: (_, _) => const PlaceholderPage('Home'),
+        builder: (_, _) => const HomePage(),
       ),
     ],
   );

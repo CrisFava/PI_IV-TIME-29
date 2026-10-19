@@ -1,8 +1,7 @@
 abstract class AppConfig {
   static const String appName = 'Converge';
 
-  /// Sobrescreva com `--dart-define=API_BASE_URL=...`.
-  /// No emulador Android, use `http://10.0.2.2:8080/api/v1` para alcançar o host.
+  /// Conecta estritamente ao `http://localhost:8080/api/v1` por padrão.
   static const String apiBaseUrl = String.fromEnvironment(
     'API_BASE_URL',
     defaultValue: 'http://localhost:8080/api/v1',

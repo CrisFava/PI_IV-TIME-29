@@ -2,10 +2,11 @@ package com.converge.api.modules.user.domain.model.user;
 
 import com.converge.api.modules.user.domain.enums.user.DriverLicenseCategory;
 import com.converge.api.modules.user.domain.enums.user.ParticipationRole;
+import com.converge.api.modules.user.domain.enums.user.PixKeyType;
 import com.converge.api.modules.user.domain.enums.user.VerificationMethod;
 import com.converge.api.modules.user.domain.enums.user.VerificationStatus;
 import com.converge.api.modules.user.domain.model.user.subtypes.AcademicRecord;
-import com.converge.api.modules.user.domain.model.user.subtypes.DriverLicense;
+import com.converge.api.modules.user.domain.model.user.subtypes.driver.DriverLicense;
 import jakarta.validation.ConstraintViolation;
 import jakarta.validation.Validation;
 import jakarta.validation.Validator;
@@ -55,6 +56,7 @@ class UserValidationTest {
                 "https://storage.firebase.com/foto.jpg",
                 Set.of(ParticipationRole.PASSENGER),
                 createValidAcademicRecord(),
+                null,
                 null,
                 null
         );
@@ -208,7 +210,8 @@ class UserValidationTest {
                 Set.of(ParticipationRole.DRIVER),
                 createValidAcademicRecord(),
                 expiredLicense,
-                null
+                "ana@puc-campinas.edu.br",
+                PixKeyType.EMAIL
         );
 
         Set<ConstraintViolation<User>> violations = validator.validate(user);
@@ -238,7 +241,8 @@ class UserValidationTest {
                 Set.of(ParticipationRole.DRIVER),
                 createValidAcademicRecord(),
                 futureVerifiedLicense,
-                null
+                "ana@puc-campinas.edu.br",
+                PixKeyType.EMAIL
         );
 
         Set<ConstraintViolation<User>> violations = validator.validate(user);

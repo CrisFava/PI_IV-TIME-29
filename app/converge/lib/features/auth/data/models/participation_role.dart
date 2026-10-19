@@ -1,4 +1,3 @@
-/// Espelha `ParticipationRole` do backend.
 enum ParticipationRole {
   passenger,
   driver;
