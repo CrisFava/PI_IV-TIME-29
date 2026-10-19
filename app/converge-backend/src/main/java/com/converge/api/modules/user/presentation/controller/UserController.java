@@ -1,11 +1,11 @@
 package com.converge.api.modules.user.presentation.controller;
 
 import com.converge.api.modules.user.application.CreateUserUseCase;
-import com.converge.api.modules.user.application.GetByFirebaseUidUseCase;
 import com.converge.api.modules.user.domain.model.user.User;
 import com.converge.api.modules.user.application.dto.CreateUserRequestDTO;
 import com.converge.api.modules.user.application.dto.CreateUserResponseDTO;
 import com.converge.api.modules.user.application.mapper.UserMapper;
+import com.converge.api.shared.application.UserUtils;
 import com.converge.api.shared.infrastructure.config.auth.AuthenticatedUser;
 import com.converge.api.shared.presentation.exception.ApplicationException;
 import com.converge.api.shared.presentation.exception.ErrorCode;
@@ -27,7 +27,7 @@ import org.springframework.web.bind.annotation.RestController;
 public class UserController {
 
     private final CreateUserUseCase createUser;
-    private final GetByFirebaseUidUseCase getByFirebaseUid;
+    private final UserUtils userUtils;
     private final UserMapper mapper;
 
     @PostMapping
@@ -51,7 +51,7 @@ public class UserController {
             );
         }
 
-        User user = getByFirebaseUid.execute(principal.uid());
+        User user = userUtils.getCurrentUser(principal);
         return ResponseEntity.ok(ApplicationResponse.success(mapper.toResponse(user)));
     }
 }
