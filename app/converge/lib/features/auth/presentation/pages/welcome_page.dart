@@ -23,25 +23,11 @@ class WelcomePage extends StatelessWidget {
                   Column(
                     mainAxisSize: MainAxisSize.min,
                     children: [
-                      Container(
-                        width: 88,
-                        height: 88,
-                        decoration: BoxDecoration(
-                          border: Border.all(
-                            color: const Color(0xFF14171A),
-                            width: 2,
-                          ),
-                          borderRadius: BorderRadius.circular(22),
-                        ),
-                        alignment: Alignment.center,
-                        child: const Text(
-                          'U',
-                          style: TextStyle(
-                            fontSize: 40,
-                            fontWeight: FontWeight.w800,
-                            color: Color(0xFF14171A),
-                          ),
-                        ),
+                      Image.asset(
+                        'assets/icon.png',
+                        width: 96,
+                        height: 96,
+                        fit: BoxFit.contain,
                       ),
                       const SizedBox(height: 24),
                       const Text(

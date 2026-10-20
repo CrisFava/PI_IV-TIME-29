@@ -18,9 +18,21 @@ class HomePage extends ConsumerWidget {
       appBar: AppBar(
         backgroundColor: Colors.white,
         surfaceTintColor: Colors.white,
-        title: const Text(
-          'Converge',
-          style: TextStyle(fontWeight: FontWeight.w700),
+        title: Row(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Image.asset(
+              'assets/icon.png',
+              width: 28,
+              height: 28,
+              fit: BoxFit.contain,
+            ),
+            const SizedBox(width: 8),
+            const Text(
+              'Converge',
+              style: TextStyle(fontWeight: FontWeight.w700),
+            ),
+          ],
         ),
         actions: [
           TextButton.icon(

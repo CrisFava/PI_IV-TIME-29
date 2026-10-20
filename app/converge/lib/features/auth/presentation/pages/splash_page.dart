@@ -7,6 +7,21 @@ import '../../state/auth_controller.dart';
 class SplashPage extends ConsumerWidget {
   const SplashPage({super.key});
 
+  Widget _buildSplashContent() {
+    return Column(
+      mainAxisSize: MainAxisSize.min,
+      children: [
+        Image.asset(
+          'assets/converge_logo_1.png',
+          width: 180,
+          fit: BoxFit.contain,
+        ),
+        const SizedBox(height: 32),
+        const CircularProgressIndicator(),
+      ],
+    );
+  }
+
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     final session = ref.watch(authControllerProvider);
@@ -17,11 +32,17 @@ class SplashPage extends ConsumerWidget {
         child: Padding(
           padding: const EdgeInsets.all(24),
           child: session.when(
-            data: (_) => const CircularProgressIndicator(),
-            loading: () => const CircularProgressIndicator(),
+            data: (_) => _buildSplashContent(),
+            loading: () => _buildSplashContent(),
             error: (err, _) => Column(
               mainAxisSize: MainAxisSize.min,
               children: [
+                Image.asset(
+                  'assets/icon.png',
+                  width: 120,
+                  fit: BoxFit.contain,
+                ),
+                const SizedBox(height: 24),
                 const Icon(Icons.error_outline, size: 48, color: Colors.red),
                 const SizedBox(height: 16),
                 Text(

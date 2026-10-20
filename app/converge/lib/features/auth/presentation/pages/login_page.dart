@@ -114,11 +114,7 @@ class _LoginPageState extends ConsumerState<LoginPage> {
                                 borderRadius: BorderRadius.circular(12),
                               ),
                               alignment: Alignment.center,
-                              child: const Icon(
-                                Icons.alt_route_rounded,
-                                color: Colors.white,
-                                size: 26,
-                              ),
+                              child: Image.asset('assets/icon.png')
                             ),
                           ),
                           const SizedBox(height: 20),
