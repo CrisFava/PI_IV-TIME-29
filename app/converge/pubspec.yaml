@@ -46,3 +46,4 @@ flutter:
   uses-material-design: true
   assets:
     - assets/icon.png
+    - assets/converge_logo_1.png

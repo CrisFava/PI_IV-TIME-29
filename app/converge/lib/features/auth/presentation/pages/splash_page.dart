@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
+import '../../../../core/config/styles.dart';
 import '../../state/auth_action_controller.dart';
 import '../../state/auth_controller.dart';
 
@@ -17,7 +18,10 @@ class SplashPage extends ConsumerWidget {
           fit: BoxFit.contain,
         ),
         const SizedBox(height: 32),
-        const CircularProgressIndicator(),
+        const CircularProgressIndicator(
+          color: AppColors.primary,
+          strokeWidth: 2.8,
+        ),
       ],
     );
   }
