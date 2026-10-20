@@ -1,13 +1,13 @@
 package com.converge.api.modules.user.application.service;
 
 import com.converge.api.modules.user.application.CreateUserUseCase;
-import com.converge.api.modules.user.application.GetByFirebaseUidUseCase;
 import com.converge.api.modules.user.domain.enums.user.ParticipationRole;
 import com.converge.api.modules.user.domain.model.user.User;
 import com.converge.api.modules.user.domain.model.user.subtypes.AcademicRecord;
 import com.converge.api.modules.user.domain.repository.UserRepository;
 import com.converge.api.modules.user.application.dto.CreateUserRequestDTO;
 import com.converge.api.modules.user.application.mapper.UserMapper;
+import com.converge.api.shared.application.UserUtils;
 import com.converge.api.shared.presentation.exception.ApplicationException;
 import com.converge.api.shared.presentation.exception.ErrorCode;
 import org.junit.jupiter.api.BeforeEach;
@@ -32,13 +32,13 @@ class UserServiceTest {
     private UserRepository userRepository;
 
     private CreateUserUseCase createUserUseCase;
-    private GetByFirebaseUidUseCase getByFirebaseUidUseCase;
+    private UserUtils userUtils;
 
     @BeforeEach
     void setUp() {
         UserMapper mapper = new UserMapper();
         createUserUseCase = new CreateUserUseCase(userRepository, mapper);
-        getByFirebaseUidUseCase = new GetByFirebaseUidUseCase(userRepository, mapper);
+        userUtils = new UserUtils(userRepository);
     }
 
     private CreateUserRequestDTO validRequest() {
@@ -99,7 +99,7 @@ class UserServiceTest {
         User user = new UserMapper().toEntity(request);
         when(userRepository.findByFirebaseUid("uid-123")).thenReturn(Optional.of(user));
 
-        User response = getByFirebaseUidUseCase.execute("uid-123");
+        User response = userUtils.getCurrentUser("uid-123");
 
         assertThat(response.getFirebaseUid()).isEqualTo("uid-123");
         assertThat(response.getEmail()).isEqualTo("ana@puc-campinas.edu.br");
@@ -112,7 +112,7 @@ class UserServiceTest {
 
         ApplicationException ex = assertThrows(
                 ApplicationException.class,
-                () -> getByFirebaseUidUseCase.execute("uid-inexistente")
+                () -> userUtils.getCurrentUser("uid-inexistente")
         );
         assertThat(ex.getError().code()).isEqualTo(ErrorCode.USER_NOT_FOUND);
     }
