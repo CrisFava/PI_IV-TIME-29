@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 
+import '../../../../core/config/styles.dart';
 import 'onboarding_design_tokens.dart';
 
 /// Footer fixo (Sticky CTA) ancorado acima do teclado virtual:
@@ -57,7 +58,7 @@ class RegisterStickyFooter extends StatelessWidget {
       decoration: const BoxDecoration(
         color: OnboardingDesignTokens.background,
         border: Border(
-          top: BorderSide(color: Color(0xFFF2F2F2), width: 1),
+          top: BorderSide(color: AppColors.footerBorder, width: 1),
         ),
       ),
       padding: const EdgeInsets.fromLTRB(24, 12, 24, 16),

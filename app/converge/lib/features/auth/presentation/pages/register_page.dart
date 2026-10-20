@@ -4,6 +4,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 
 import '../../../../app_routes.dart';
+import '../../../../core/config/styles.dart';
 import '../../../../core/utils/validators.dart';
 import '../../state/auth_action_controller.dart';
 import '../../state/inputs/profile_input.dart';
@@ -291,16 +292,16 @@ class _RegisterPageState extends ConsumerState<RegisterPage> {
                               Container(
                                 padding: const EdgeInsets.all(12),
                                 decoration: BoxDecoration(
-                                  color: const Color(0xFFFEF2F2),
+                                  color: AppColors.errorBackground,
                                   borderRadius: BorderRadius.circular(12),
                                   border: Border.all(
-                                    color: const Color(0xFFFECACA),
+                                    color: AppColors.errorBorder,
                                   ),
                                 ),
                                 child: Text(
                                   authErrorMessage(actionState.error!),
                                   style: const TextStyle(
-                                    color: Color(0xFFB91C1C),
+                                    color: AppColors.errorText,
                                     fontSize: 14,
                                   ),
                                 ),

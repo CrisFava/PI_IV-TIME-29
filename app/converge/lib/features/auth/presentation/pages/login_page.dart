@@ -3,6 +3,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 
 import '../../../../app_routes.dart';
+import '../../../../core/config/styles.dart';
 import '../../../../core/utils/validators.dart';
 import '../../state/auth_action_controller.dart';
 
@@ -46,27 +47,27 @@ class _LoginPageState extends ConsumerState<LoginPage> {
       hintStyle: const TextStyle(
         fontSize: 15,
         fontWeight: FontWeight.w400,
-        color: Color(0xFF94A3B8),
+        color: AppColors.textMuted,
       ),
       filled: true,
-      fillColor: const Color(0xFFF8FAFC),
+      fillColor: AppColors.inputBackground,
       contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 15),
       suffixIcon: suffixIcon,
       enabledBorder: OutlineInputBorder(
         borderRadius: borderRadius,
-        borderSide: const BorderSide(color: Color(0xFFE2E8F0), width: 1),
+        borderSide: const BorderSide(color: AppColors.borderSubtle, width: 1),
       ),
       focusedBorder: OutlineInputBorder(
         borderRadius: borderRadius,
-        borderSide: const BorderSide(color: Color(0xFF111111), width: 1.5),
+        borderSide: const BorderSide(color: AppColors.primary, width: 1.5),
       ),
       errorBorder: OutlineInputBorder(
         borderRadius: borderRadius,
-        borderSide: const BorderSide(color: Color(0xFFDC2626), width: 1),
+        borderSide: const BorderSide(color: AppColors.error, width: 1),
       ),
       focusedErrorBorder: OutlineInputBorder(
         borderRadius: borderRadius,
-        borderSide: const BorderSide(color: Color(0xFFDC2626), width: 1.5),
+        borderSide: const BorderSide(color: AppColors.error, width: 1.5),
       ),
     );
   }
@@ -77,10 +78,10 @@ class _LoginPageState extends ConsumerState<LoginPage> {
     final isLoading = actionState.isLoading;
 
     return Scaffold(
-      backgroundColor: Colors.white,
+      backgroundColor: AppColors.cardBackground,
       appBar: AppBar(
-        backgroundColor: Colors.white,
-        surfaceTintColor: Colors.white,
+        backgroundColor: AppColors.cardBackground,
+        surfaceTintColor: AppColors.cardBackground,
         elevation: 0,
         toolbarHeight: 0, // Sem texto "Login" isolado na AppBar
       ),
@@ -110,11 +111,11 @@ class _LoginPageState extends ConsumerState<LoginPage> {
                               width: 48,
                               height: 48,
                               decoration: BoxDecoration(
-                                color: const Color(0xFF111111),
+                                color: AppColors.primary,
                                 borderRadius: BorderRadius.circular(12),
                               ),
                               alignment: Alignment.center,
-                              child: Image.asset('assets/icon.png')
+                              child: Image.asset('assets/icon.png'),
                             ),
                           ),
                           const SizedBox(height: 20),
@@ -123,7 +124,7 @@ class _LoginPageState extends ConsumerState<LoginPage> {
                             style: TextStyle(
                               fontSize: 26,
                               fontWeight: FontWeight.w700,
-                              color: Color(0xFF111111),
+                              color: AppColors.primary,
                               letterSpacing: -0.5,
                               height: 1.2,
                             ),
@@ -134,7 +135,7 @@ class _LoginPageState extends ConsumerState<LoginPage> {
                             style: TextStyle(
                               fontSize: 15,
                               fontWeight: FontWeight.w400,
-                              color: Color(0xFF666666),
+                              color: AppColors.textMedium,
                               height: 1.4,
                             ),
                           ),
@@ -143,16 +144,16 @@ class _LoginPageState extends ConsumerState<LoginPage> {
                             Container(
                               padding: const EdgeInsets.all(12),
                               decoration: BoxDecoration(
-                                color: const Color(0xFFFEF2F2),
+                                color: AppColors.errorBackground,
                                 borderRadius: BorderRadius.circular(12),
                                 border: Border.all(
-                                  color: const Color(0xFFFECACA),
+                                  color: AppColors.errorBorder,
                                 ),
                               ),
                               child: Text(
                                 authErrorMessage(actionState.error!),
                                 style: const TextStyle(
-                                  color: Color(0xFFB91C1C),
+                                  color: AppColors.errorText,
                                   fontSize: 14,
                                 ),
                               ),
@@ -165,7 +166,7 @@ class _LoginPageState extends ConsumerState<LoginPage> {
                             style: TextStyle(
                               fontSize: 14,
                               fontWeight: FontWeight.w500,
-                              color: Color(0xFF111111),
+                              color: AppColors.primary,
                             ),
                           ),
                           const SizedBox(height: 8),
@@ -177,7 +178,7 @@ class _LoginPageState extends ConsumerState<LoginPage> {
                             validator: Validators.email,
                             style: const TextStyle(
                               fontSize: 15,
-                              color: Color(0xFF111111),
+                              color: AppColors.primary,
                             ),
                             decoration: _buildInputDecoration(
                               hintText: 'nome@universidade.edu',
@@ -192,7 +193,7 @@ class _LoginPageState extends ConsumerState<LoginPage> {
                                 style: TextStyle(
                                   fontSize: 14,
                                   fontWeight: FontWeight.w500,
-                                  color: Color(0xFF111111),
+                                  color: AppColors.primary,
                                 ),
                               ),
                               GestureDetector(
@@ -211,7 +212,7 @@ class _LoginPageState extends ConsumerState<LoginPage> {
                                     style: TextStyle(
                                       fontSize: 13,
                                       fontWeight: FontWeight.w500,
-                                      color: Color(0xFF444444),
+                                      color: AppColors.textDark,
                                     ),
                                   ),
                                 ),
@@ -228,7 +229,7 @@ class _LoginPageState extends ConsumerState<LoginPage> {
                             validator: Validators.password,
                             style: const TextStyle(
                               fontSize: 15,
-                              color: Color(0xFF111111),
+                              color: AppColors.primary,
                             ),
                             decoration: _buildInputDecoration(
                               hintText: '••••••',
@@ -237,7 +238,7 @@ class _LoginPageState extends ConsumerState<LoginPage> {
                                   _obscurePassword
                                       ? Icons.visibility_outlined
                                       : Icons.visibility_off_outlined,
-                                  color: const Color(0xFF666666),
+                                  color: AppColors.textMedium,
                                   size: 20,
                                 ),
                                 onPressed: () {
@@ -254,8 +255,8 @@ class _LoginPageState extends ConsumerState<LoginPage> {
                             height: 52,
                             child: FilledButton(
                               style: FilledButton.styleFrom(
-                                backgroundColor: const Color(0xFF111111),
-                                foregroundColor: Colors.white,
+                                backgroundColor: AppColors.primary,
+                                foregroundColor: AppColors.textLight,
                                 elevation: 0,
                                 shape: RoundedRectangleBorder(
                                   borderRadius: BorderRadius.circular(14),
@@ -268,7 +269,7 @@ class _LoginPageState extends ConsumerState<LoginPage> {
                                       height: 22,
                                       child: CircularProgressIndicator(
                                         strokeWidth: 2,
-                                        color: Colors.white,
+                                        color: AppColors.textLight,
                                       ),
                                     )
                                   : const Text(
@@ -283,16 +284,16 @@ class _LoginPageState extends ConsumerState<LoginPage> {
                           const Spacer(),
                           const SizedBox(height: 32),
                           // Divisor com "Ainda não faz parte?"
-                          Row(
+                          const Row(
                             children: [
-                              const Expanded(
+                              Expanded(
                                 child: Divider(
-                                  color: Color(0xFFE2E8F0),
+                                  color: AppColors.borderSubtle,
                                   thickness: 1,
                                 ),
                               ),
                               Padding(
-                                padding: const EdgeInsets.symmetric(
+                                padding: EdgeInsets.symmetric(
                                   horizontal: 14,
                                 ),
                                 child: Text(
@@ -300,13 +301,13 @@ class _LoginPageState extends ConsumerState<LoginPage> {
                                   style: TextStyle(
                                     fontSize: 13,
                                     fontWeight: FontWeight.w400,
-                                    color: Colors.grey.shade600,
+                                    color: AppColors.textMedium,
                                   ),
                                 ),
                               ),
-                              const Expanded(
+                              Expanded(
                                 child: Divider(
-                                  color: Color(0xFFE2E8F0),
+                                  color: AppColors.borderSubtle,
                                   thickness: 1,
                                 ),
                               ),
@@ -317,8 +318,8 @@ class _LoginPageState extends ConsumerState<LoginPage> {
                             height: 50,
                             child: FilledButton(
                               style: FilledButton.styleFrom(
-                                backgroundColor: const Color(0xFFF3F4F6),
-                                foregroundColor: const Color(0xFF111111),
+                                backgroundColor: AppColors.buttonSecondary,
+                                foregroundColor: AppColors.primary,
                                 elevation: 0,
                                 shape: RoundedRectangleBorder(
                                   borderRadius: BorderRadius.circular(14),
@@ -332,7 +333,7 @@ class _LoginPageState extends ConsumerState<LoginPage> {
                                 style: TextStyle(
                                   fontSize: 15,
                                   fontWeight: FontWeight.w600,
-                                  color: Color(0xFF111111),
+                                  color: AppColors.primary,
                                 ),
                               ),
                             ),

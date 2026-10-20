@@ -1,19 +1,21 @@
 import 'package:flutter/material.dart';
 
+import '../../../../core/config/styles.dart';
+
 /// Tokens visuais do Design System para o fluxo de Onboarding / Sign Up.
 abstract final class OnboardingDesignTokens {
-  static const Color background = Color(0xFFFFFFFF);
-  static const Color primary = Color(0xFF111111);
-  static const Color subtitle = Color(0xFF666666);
-  static const Color microCopy = Color(0xFF777777);
-  static const Color inputBorder = Color(0xFFCCCCCC);
-  static const Color inputFocusBorder = Color(0xFF111111);
-  static const Color progressTrack = Color(0xFFEEEEEE);
-  static const Color chipBackground = Color(0xFFF5F5F5);
-  static const Color chipBorder = Color(0xFFE0E0E0);
-  static const Color successGreen = Color(0xFF15803D);
-  static const Color successBackground = Color(0xFFECFDF5);
-  static const Color successBorder = Color(0xFFA7F3D0);
+  static const Color background = AppColors.cardBackground;
+  static const Color primary = AppColors.primary;
+  static const Color subtitle = AppColors.textMedium;
+  static const Color microCopy = AppColors.textBodySecondary;
+  static const Color inputBorder = AppColors.borderMedium;
+  static const Color inputFocusBorder = AppColors.primary;
+  static const Color progressTrack = AppColors.progressTrack;
+  static const Color chipBackground = AppColors.chipBackground;
+  static const Color chipBorder = AppColors.chipBorder;
+  static const Color successGreen = AppColors.success;
+  static const Color successBackground = AppColors.successBackground;
+  static const Color successBorder = AppColors.successBorder;
 
   static const String fontFamily = 'Inter';
   static const List<String> fontFamilyFallback = [
@@ -63,7 +65,7 @@ abstract final class OnboardingDesignTokens {
     fontFamilyFallback: fontFamilyFallback,
     fontSize: 15,
     fontWeight: FontWeight.w400,
-    color: Color(0xFF999999),
+    color: AppColors.textPlaceholder,
   );
 
   static const TextStyle microCopyStyle = TextStyle(
@@ -94,7 +96,7 @@ abstract final class OnboardingDesignTokens {
       ),
       disabledBorder: OutlineInputBorder(
         borderRadius: borderRadius,
-        borderSide: const BorderSide(color: Color(0xFFE5E5E5), width: 1),
+        borderSide: const BorderSide(color: AppColors.borderLight, width: 1),
       ),
       focusedBorder: OutlineInputBorder(
         borderRadius: borderRadius,
@@ -102,11 +104,11 @@ abstract final class OnboardingDesignTokens {
       ),
       errorBorder: OutlineInputBorder(
         borderRadius: borderRadius,
-        borderSide: const BorderSide(color: Color(0xFFDC2626), width: 1),
+        borderSide: const BorderSide(color: AppColors.error, width: 1),
       ),
       focusedErrorBorder: OutlineInputBorder(
         borderRadius: borderRadius,
-        borderSide: const BorderSide(color: Color(0xFFDC2626), width: 1.5),
+        borderSide: const BorderSide(color: AppColors.error, width: 1.5),
       ),
     );
   }

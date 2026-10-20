@@ -3,6 +3,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 
 import '../../../../app_routes.dart';
+import '../../../../core/config/styles.dart';
 import '../../../../core/utils/validators.dart';
 import '../../state/auth_action_controller.dart';
 
@@ -40,10 +41,10 @@ class _ForgotPasswordPageState extends ConsumerState<ForgotPasswordPage> {
     final isLoading = actionState.isLoading;
 
     return Scaffold(
-      backgroundColor: Colors.white,
+      backgroundColor: AppColors.cardBackground,
       appBar: AppBar(
-        backgroundColor: Colors.white,
-        surfaceTintColor: Colors.white,
+        backgroundColor: AppColors.cardBackground,
+        surfaceTintColor: AppColors.cardBackground,
         leading: IconButton(
           icon: const Icon(Icons.arrow_back),
           onPressed: () => context.go(AppRoutes.login),
@@ -66,20 +67,20 @@ class _ForgotPasswordPageState extends ConsumerState<ForgotPasswordPage> {
                   children: [
                     const Text(
                       'Informe seu e-mail para receber o link de redefinição de senha.',
-                      style: TextStyle(color: Color(0xFF6B7280)),
+                      style: TextStyle(color: AppColors.textBodySecondary),
                     ),
                     const SizedBox(height: 20),
                     if (_sent) ...[
                       Container(
                         padding: const EdgeInsets.all(12),
                         decoration: BoxDecoration(
-                          color: const Color(0xFFF0FDF4),
+                          color: AppColors.successBackground,
                           borderRadius: BorderRadius.circular(12),
-                          border: Border.all(color: const Color(0xFFBBF7D0)),
+                          border: Border.all(color: AppColors.successBorder),
                         ),
                         child: const Text(
                           'E-mail de recuperação enviado! Verifique sua caixa de entrada.',
-                          style: TextStyle(color: Color(0xFF15803D)),
+                          style: TextStyle(color: AppColors.success),
                         ),
                       ),
                       const SizedBox(height: 16),
@@ -88,13 +89,13 @@ class _ForgotPasswordPageState extends ConsumerState<ForgotPasswordPage> {
                       Container(
                         padding: const EdgeInsets.all(12),
                         decoration: BoxDecoration(
-                          color: const Color(0xFFFEF2F2),
+                          color: AppColors.errorBackground,
                           borderRadius: BorderRadius.circular(12),
-                          border: Border.all(color: const Color(0xFFFECACA)),
+                          border: Border.all(color: AppColors.errorBorder),
                         ),
                         child: Text(
                           authErrorMessage(actionState.error!),
-                          style: const TextStyle(color: Color(0xFFB91C1C)),
+                          style: const TextStyle(color: AppColors.errorText),
                         ),
                       ),
                       const SizedBox(height: 16),
@@ -121,8 +122,8 @@ class _ForgotPasswordPageState extends ConsumerState<ForgotPasswordPage> {
                       height: 52,
                       child: FilledButton(
                         style: FilledButton.styleFrom(
-                          backgroundColor: const Color(0xFF14171A),
-                          foregroundColor: Colors.white,
+                          backgroundColor: AppColors.primaryDark,
+                          foregroundColor: AppColors.textLight,
                           shape: RoundedRectangleBorder(
                             borderRadius: BorderRadius.circular(14),
                           ),
@@ -134,7 +135,7 @@ class _ForgotPasswordPageState extends ConsumerState<ForgotPasswordPage> {
                                 height: 22,
                                 child: CircularProgressIndicator(
                                   strokeWidth: 2,
-                                  color: Colors.white,
+                                  color: AppColors.textLight,
                                 ),
                               )
                             : const Text('Enviar link de recuperação'),
