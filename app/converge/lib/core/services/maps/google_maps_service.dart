@@ -63,8 +63,7 @@ class GoogleMapsService {
   static Dio get _dio => testDio ?? _defaultDio;
 
   static const String apiKey = String.fromEnvironment(
-    'GOOGLE_MAPS_API_KEY',
-    defaultValue: 'AIzaSyDZP3KH4_S5qip43ggQ3IYHaUFwqC4rlnA',
+    'GOOGLE_MAPS_API_KEY'
   );
 
   /// Busca a rota viária de carro seguindo as ruas da cidade via Google Routes API (v2).
