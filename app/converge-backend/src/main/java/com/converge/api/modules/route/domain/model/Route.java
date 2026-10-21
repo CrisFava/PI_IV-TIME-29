@@ -130,7 +130,7 @@ public class Route {
     }
 
     private void validateOfferRequirements() {
-        List<String> fields = new ArrayList<>(2);
+        List<String> fields = new ArrayList<>(3);
 
         if (this.maxDetourKm == null || this.maxDetourKm <= 0) {
             fields.add("maxDetourKm");
@@ -140,9 +140,13 @@ public class Route {
             fields.add("totalSeats");
         }
 
+        if (this.vehicleId == null || this.vehicleId.isBlank()) {
+            fields.add("vehicleId");
+        }
+
         if (!fields.isEmpty()) {
-            String message = "Offer requirements not met. Ensure maxDetourKm and totalSeats " +
-                    "are provided and greater than zero.";
+            String message = "Offer requirements not met. Ensure vehicleId is provided and maxDetourKm and totalSeats are greater than zero.";
+
 
             throw new ApplicationException(ErrorCode.BAD_REQUEST, message, Set.copyOf(fields));
         }

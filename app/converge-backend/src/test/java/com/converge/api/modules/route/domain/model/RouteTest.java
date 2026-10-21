@@ -28,7 +28,11 @@ class RouteTest {
     );
 
     private Route offer(Double maxDetourKm, Integer totalSeats) {
-        return new Route("user-123", null, RouteType.OFFER, HOME, PUC, "07:00", "07:40", WEEKDAYS, maxDetourKm, totalSeats);
+        return offer("vehicle-456", maxDetourKm, totalSeats);
+    }
+
+    private Route offer(String vehicleId, Double maxDetourKm, Integer totalSeats) {
+        return new Route("user-123", vehicleId, RouteType.OFFER, HOME, PUC, "07:00", "07:40", WEEKDAYS, maxDetourKm, totalSeats);
     }
 
     @Test
@@ -63,6 +67,18 @@ class RouteTest {
 
         assertThat(ex.getError().code()).isEqualTo(ErrorCode.BAD_REQUEST);
         assertThat(ex.getError().fields()).containsExactly("totalSeats");
+    }
+
+    @Test
+    @DisplayName("Deve lançar BAD_REQUEST quando oferta não tiver vehicleId")
+    void shouldRejectOfferWithoutVehicle() {
+        ApplicationException ex = assertThrows(
+                ApplicationException.class,
+                () -> offer(" ", 2.0, 3)
+        );
+
+        assertThat(ex.getError().code()).isEqualTo(ErrorCode.BAD_REQUEST);
+        assertThat(ex.getError().fields()).containsExactly("vehicleId");
     }
 
     @Test
