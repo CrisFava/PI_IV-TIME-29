@@ -232,14 +232,3 @@ class HomeRideActionModal extends StatelessWidget {
     );
   }
 }
-
-
-
-
-
-
-
-
-
-
-
