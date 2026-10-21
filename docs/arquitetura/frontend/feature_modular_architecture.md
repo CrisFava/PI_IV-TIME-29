@@ -2,15 +2,15 @@
 
 ## 1. Visão Geral
 
-Este documento descreve a arquitetura oficial do aplicativo móvel **Converge**, desenvolvido em **Flutter/Dart**. A arquitetura adota o padrão **Feature-Driven (Feature-First)** combinado a princípios de **Clean Architecture**, desenhada especificamente para manter simetria arquitetural direta com o backend do projeto (Monólito Modular Hexagonal com Spring  Boot).
+Este documento descreve a arquitetura oficial do aplicativo móvel **Converge**, desenvolvido em **Flutter/Dart**. A arquitetura adota o padrão **Feature-Driven (Feature-First)** combinado a princípios de **Clean Architecture**, desenhada especificamente para manter simetria arquitetural direta com o backend do projeto (Monólito Modular Hexagonal com Spring Boot).
 
 ### Princípios Norteadores:
 
 - **Simetria Arquitetural com o Backend:** Assim como o backend é dividido em `shared/` e `modules/`, o frontend é particionado em `core/` (recursos globais e transversais) e `features/` (módulos verticais de negócio).
 - **Alta Coesão e Baixo Acoplamento:** Cada funcionalidade de negócio (carona, autenticação, usuário) encapsula sua própria camada de dados, regras de apresentação e componentes de interface.
-- **Resiliência e Idempotência de Rede:** Estrutura de comunicação HTTP via interceptors que injetam chaves de idempotência (`Idempotency-Key`) em mutações críticas e realizam o tratamento uniforme do padrão **RFC 7807 (Problem Details)** emitido pelo Spring Boot.
-- **Design System Coeso:** Centralização de temas, tipografias, paleta de cores e componentes visuais base em `core/widgets/` e `core/theme/`.
-- **Previsibilidade de Estado:** Separação estrita entre a camada de apresentação pura (Widgets/Pages) e os controladores de estado/regras de tela.
+- **Resiliência e Idempotência de Rede:** Estrutura de comunicação HTTP via interceptors que injetam chaves de idempotência (`Idempotency-Key`) em mutações críticas e realizam o tratamento uniforme do envelope de resposta da API (`ApplicationResponse`) mapeado para exceções de negócio tipadas (`ApiException` e `ApiErrorCode`).
+- **Design System Centralizado e Monocromático:** Centralização estrita de paleta de cores, tipografia, temas e componentes visuais base em `core/config/styles.dart` (`AppColors`), `core/widgets/` e `core/theme/`. É terminantemente proibido o uso de cores hardcoded no aplicativo.
+- **Previsibilidade de Estado:** Separação estrita entre a camada de apresentação pura (Widgets/Pages) e os controladores de estado/regras de tela (Riverpod / Notifiers / Cubits).
 
 ---
 
@@ -20,38 +20,35 @@ A base de código da aplicação reside em `app/converge/lib` e é organizada da
 
 ```text
 lib/
-├── core/                           # Equivalente ao "shared" do backend (transversal)
-│   ├── config/                     # Configurações de ambiente (URLs, chaves de API, variáveis)
-│   ├── network/                    # Cliente HTTP (Dio), interceptors (Auth, Idempotency, RFC 7807)
-│   ├── services/                   # Integrações externas e nativas (Firebase Auth, Maps, Geolocation)
-│   ├── theme/                      # Cores, tipografia, temas claros/escuros (Material 3)
-│   ├── utils/                      # Formatadores (moeda, data, km) e validadores (email acadêmico, telefone)
-│   └── widgets/                    # Componentes visuais globais (AppButton, AppTextField, Loadings genéricos)
+├── core/                           # Recursos globais e transversais (compartilhados)
+│   ├── config/                     # Configurações de ambiente (app_config.dart) e Design Tokens (styles.dart / AppColors)
+│   ├── network/                    # Cliente HTTP (Dio), interceptors (Auth, Idempotency, Error), ApiException e ApiResponse
+│   ├── services/                   # Integrações externas e nativas (Firebase Auth, Maps, Geolocation, Storage)
+│   ├── theme/                      # Configurações de ThemeData Material 3
+│   ├── utils/                      # Formatadores (telefone, moeda, data) e validadores (Validators)
+│   └── widgets/                    # Componentes visuais globais (RideDockNavigation, AppButton, AppTextField, etc.)
 │
-├── features/                       # Equivalente ao "modules" do backend (Bounded Contexts)
-│   ├── auth/                       # Funcionalidade de Login, Cadastro e Recuperação de Senha
+├── features/                       # Módulos verticais de negócio (Bounded Contexts)
+│   ├── auth/                       # Autenticação, Onboarding, Login, Registro, Recuperação de Senha
 │   │   ├── data/                   # Comunicação e Modelagem
-│   │   │   ├── models/             # DTOs/Modelos de dados (json_serializable/freezed)
-│   │   │   └── repository/         # Chamadas de autenticação (AuthRepository)
-│   │   ├── state/                  # Gerenciamento de estado (AuthController / AuthCubit)
-│   │   └── presentation/           # Telas e widgets visuais específicos de autenticação
+│   │   │   ├── models/             # DTOs/Modelos de dados
+│   │   │   └── repository/         # Chamadas de autenticação e sessão (AuthRepository)
+│   │   ├── state/                  # Gerenciamento de estado (AuthController, AuthActionController)
+│   │   └── presentation/           # Telas (LoginPage, RegisterPage, HomePage) e componentes locais
 │   │
 │   ├── carona/                     # Funcionalidade central de Caronas
-│   │   ├── data/                   # Comunicação e Modelagem
-│   │   │   ├── models/             # DTOs espelhando a API (CaronaModel, CriarCaronaRequest)
-│   │   │   └── repository/         # Métodos de comunicação HTTP (CaronaRepository)
-│   │   ├── state/                  # Gerenciamento de Estado e Regras de Tela (CaronaController)
-│   │   └── presentation/           # Interface Visual (UI)
-│   │       ├── pages/              # Telas de rotas (BuscarCaronaPage, DetalhesCaronaPage, OferecerCaronaPage)
-│   │       └── widgets/            # Componentes visuais exclusivos de carona (CardCarona, FiltroCaronaSheet)
+│   │   ├── data/                   # Modelos e repositórios de dados (CaronaModel, CaronaRepository)
+│   │   ├── state/                  # Gerenciamento de estado e regras de tela (CaronaController)
+│   │   └── presentation/           # Interface visual (BuscarCaronaPage, DetalhesCaronaPage, widgets)
 │   │
-│   └── usuario/                    # Funcionalidade de Perfil, Avaliações e Dados Acadêmicos
+│   └── usuario/                    # Perfil, Avaliações e Vínculo Acadêmico
 │       ├── data/
 │       ├── state/
 │       └── presentation/
 │
+├── app_routes.dart                 # Declaração centralizada de rotas e paths de navegação (GoRouter)
 ├── app_widget.dart                 # Configuração do MaterialApp, temas, rotas e providers globais
-└── main.dart                       # Ponto de entrada (Bootstrap, Inicialização do Firebase, Injeção)
+└── main.dart                       # Ponto de entrada (Bootstrap, Inicialização de serviços, Injeção)
 ```
 
 ---
@@ -60,12 +57,12 @@ lib/
 
 O diretório `core/` fornece serviços essenciais compartilhados por todas as features. Nenhuma classe de `core/` deve depender diretamente de classes localizadas em `features/`.
 
-### 3.1. Configurações de Ambiente (`core/config/`)
+### 3.1. Configurações e Cores Centrais (`core/config/`)
 
-Armazena parâmetros de ambiente e constantes operacionais:
+Centraliza constantes de ambiente e tokens de cores da aplicação:
 
+#### `AppConfig` (`core/config/app_config.dart`):
 ```dart
-// core/config/app_config.dart
 abstract class AppConfig {
   static const String appName = 'Converge';
   static const String apiBaseUrl = String.fromEnvironment(
@@ -77,91 +74,246 @@ abstract class AppConfig {
 }
 ```
 
-### 3.2. Camada de Rede & Interceptors (`core/network/`)
-
-A comunicação com o backend Spring Boot é realizada via `Dio`. A camada de rede incorpora três interceptores essenciais:
-
-#### 1. Injeção de Autenticação (`AuthInterceptor`)
-
-Obtém o token JWT/Firebase do usuário logado e injeta automaticamente no header `Authorization: Bearer <token>`.
-
-#### 2. Idempotência em Operações de Mutação (`IdempotencyInterceptor`)
-
-Gera um UUID v4 e injeta no cabeçalho `Idempotency-Key` para métodos com efeito colateral (`POST`, `PUT`, `PATCH`). Se uma requisição de criação de carona falhar por timeout em conexão móvel e for reenviada, o backend identificará a mesma chave e evitará duplicação no MongoDB.
+#### `AppColors` (`core/config/styles.dart`):
+Todo o app segue uma paleta monocromática elegante com cores semânticas bem definidas para feedback (erro e sucesso). **Todas as cores devem vir exclusivamente desta classe**:
 
 ```dart
-// core/network/interceptors/idempotency_interceptor.dart
-import 'package:dio/dio.dart';
-import 'package:uuid/uuid.dart';
+abstract final class AppColors {
+  // Primárias e Superfícies Escuras
+  static const Color primary = Color(0xFF111111);
+  static const Color primaryDark = Color(0xFF14171A);
+  static const Color dockBackground = Color(0xFF111111);
+  static const Color carButtonResting = Color(0xFF14171A);
+  static const Color carButtonDepressed = Color(0xFF1E232A);
 
-class IdempotencyInterceptor extends Interceptor {
-  final Uuid _uuid = const Uuid();
+  // Fundos e Superfícies Claras
+  static const Color scaffoldBackground = Color(0xFFF8FAFC);
+  static const Color cardBackground = Color(0xFFFFFFFF);
+  static const Color cardSecondary = Color(0xFFF8FAFC);
+  static const Color neutralLight = Color(0xFFF1F5F9);
+  static const Color inputBackground = Color(0xFFF8FAFC);
+  static const Color buttonSecondary = Color(0xFFF3F4F6);
+  static const Color chipBackground = Color(0xFFF5F5F5);
 
-  @override
-  void onRequest(RequestOptions options, RequestInterceptorHandler handler) {
-    if (['POST', 'PUT', 'PATCH'].contains(options.method.toUpperCase())) {
-      options.headers.putIfAbsent('Idempotency-Key', () => _uuid.v4());
-    }
-    handler.next(options);
-  }
+  // Bordas e Divisores
+  static const Color borderSubtle = Color(0xFFE2E8F0);
+  static const Color borderCardPressed = Color(0xFF111111);
+  static const Color borderMedium = Color(0xFFCCCCCC);
+  static const Color borderLight = Color(0xFFE5E5E5);
+  static const Color footerBorder = Color(0xFFF2F2F2);
+  static const Color chipBorder = Color(0xFFE0E0E0);
+  static const Color routeLine = Color(0xFFCBD5E1);
+  static const Color progressTrack = Color(0xFFEEEEEE);
+
+  // Tipografia e Ícones
+  static const Color textPrimary = Color(0xFF111111);
+  static const Color textDark = Color(0xFF444444);
+  static const Color textMedium = Color(0xFF666666);
+  static const Color textSecondary = Color(0xFF64748B);
+  static const Color textBodySecondary = Color(0xFF6B7280);
+  static const Color textMuted = Color(0xFF94A3B8);
+  static const Color textPlaceholder = Color(0xFF999999);
+  static const Color textLight = Colors.white;
+  static const Color iconMuted = Color(0xFF9CA3AF);
+
+  // Estados e Feedback (Erro & Sucesso)
+  static const Color error = Color(0xFFDC2626);
+  static const Color errorBackground = Color(0xFFFEF2F2);
+  static const Color errorBorder = Color(0xFFFECACA);
+  static const Color errorText = Color(0xFFB91C1C);
+
+  static const Color success = Color(0xFF15803D);
+  static const Color successBackground = Color(0xFFF0FDF4);
+  static const Color successBorder = Color(0xFFBBF7D0);
+
+  // Itens de Navegação (Dock)
+  static const Color dockItemActive = Colors.white;
+  static const Color dockItemInactive = Color(0x70FFFFFF);
+  static const Color dockIndicatorDot = Colors.white;
+
+  // Barreira Translúcida
+  static final Color barrier = Colors.black.withValues(alpha: 0.28);
 }
 ```
 
-#### 3. Tratamento de Erros RFC 7807 Problem Details (`ErrorInterceptor`)
+---
 
-O backend Converge expõe erros padronizados segundo a **RFC 7807**. O cliente converte a resposta HTTP em exceções de negócio tipadas:
+### 3.2. Camada de Rede, Envelope de Resposta e Tratamento de Erros (`core/network/`)
 
+A comunicação com o backend é orquestrada via `Dio`. A camada de rede incorpora três interceptores essenciais e um modelo padronizado de resposta e erros.
+
+#### 1. Injeção de Autenticação (`AuthInterceptor`)
+Injeta automaticamente o token Bearer no cabeçalho `Authorization: Bearer <token>` e renova sessões quando necessário.
+
+#### 2. Idempotência em Operações de Mutação (`IdempotencyInterceptor`)
+Gera e injeta uma chave única `Idempotency-Key` (UUID v4) para métodos `POST`, `PUT` e `PATCH`.
+
+#### 3. Envelope da API e Tratamento de Exceções (`ApplicationResponse` & `ApiException`)
+
+O backend do Converge responde requisições com o envelope padronizado:
+```json
+{
+  "success": true,
+  "data": { ... },
+  "error": null,
+  "timestamp": "2026-10-20T18:00:00Z"
+}
+```
+
+Em cenários de falha, o envelope retorna `success: false` acompanhado dos detalhes do erro:
+```json
+{
+  "success": false,
+  "data": null,
+  "error": {
+    "code": "EMAIL_ALREADY_EXISTS",
+    "message": "Este e-mail institucional já está cadastrado.",
+    "fields": ["email"]
+  },
+  "timestamp": "2026-10-20T18:00:00Z"
+}
+```
+
+##### Enum de Códigos de Erro (`core/network/api_error_code.dart`):
 ```dart
-// core/network/problem_details.dart
-class ProblemDetailsException implements Exception {
-  final String title;
-  final String detail;
-  final int status;
-  final String? code;
-  final Map<String, dynamic>? errors;
+enum ApiErrorCode {
+  badRequest('BAD_REQUEST'),
+  userNotFound('USER_NOT_FOUND'),
+  emailAlreadyExists('EMAIL_ALREADY_EXISTS'),
+  invalidCredentials('INVALID_CREDENTIALS'),
+  notAllowed('NOT_ALLOWED'),
+  network('NETWORK'),
+  unknown('UNKNOWN');
 
-  ProblemDetailsException({
-    required this.title,
-    required this.detail,
+  final String value;
+  const ApiErrorCode(this.value);
+
+  static ApiErrorCode fromValue(Object? value) =>
+      values.firstWhere((code) => code.value == value, orElse: () => unknown);
+}
+```
+
+##### Classe de Exceção da API (`core/network/api_exception.dart`):
+```dart
+class ApiException implements Exception {
+  final ApiErrorCode code;
+  final String message;
+  final Set<String> fields;
+  final int status;
+
+  const ApiException({
+    required this.code,
+    required this.message,
     required this.status,
-    this.code,
-    this.errors,
+    this.fields = const {},
   });
 
-  factory ProblemDetailsException.fromJson(Map<String, dynamic> json) {
-    return ProblemDetailsException(
-      title: json['title'] ?? 'Erro inesperado',
-      detail: json['detail'] ?? 'Ocorreu um erro ao processar sua solicitação.',
-      status: json['status'] ?? 500,
-      code: json['code'],
-      errors: json['errors'] != null ? Map<String, dynamic>.from(json['errors']) : null,
+  bool get isNetworkError => code == ApiErrorCode.network;
+  bool get isNotFound => status == 404;
+  bool get isConflict => status == 409;
+  bool get isUnauthorized => status == 401;
+
+  factory ApiException.network() => const ApiException(
+    code: ApiErrorCode.network,
+    message: 'Não foi possível conectar ao servidor. Verifique sua internet.',
+    status: 0,
+  );
+
+  factory ApiException.fromResponse(Object? body, {required int status}) {
+    final error = body is Map<String, dynamic> ? body['error'] : null;
+    if (error is! Map<String, dynamic>) return ApiException.fromStatus(status);
+
+    final fields = error['fields'];
+    return ApiException(
+      code: ApiErrorCode.fromValue(error['code']),
+      message: error['message'] as String? ?? _defaultMessage(status),
+      status: status,
+      fields: fields is List ? fields.map((f) => f.toString()).toSet() : const {},
+    );
+  }
+
+  factory ApiException.fromStatus(int status) => ApiException(
+    code: ApiErrorCode.unknown,
+    message: _defaultMessage(status),
+    status: status,
+  );
+}
+```
+
+##### Desempacotamento de Respostas (`core/network/api_response.dart`):
+A função `unwrapApiResponse` extrai com segurança o campo `data` ou dispara a `ApiException` apropriada:
+```dart
+T unwrapApiResponse<T>(
+  Object? body,
+  T Function(Map<String, dynamic> json) fromJson, {
+  int status = 200,
+}) {
+  if (body is! Map<String, dynamic> || body['success'] is! bool) {
+    throw ApiException.fromStatus(500);
+  }
+  if (body['success'] != true) {
+    throw ApiException.fromResponse(body, status: status);
+  }
+  final data = body['data'];
+  if (data is! Map<String, dynamic>) throw ApiException.fromStatus(500);
+  return fromJson(data);
+}
+```
+
+##### Interceptor Global de Erros (`core/network/interceptors/error_interceptor.dart`):
+Converte qualquer falha HTTP do `Dio` em uma `ApiException` acessível em `DioException.error`:
+```dart
+class ErrorInterceptor extends Interceptor {
+  @override
+  void onError(DioException err, ErrorInterceptorHandler handler) {
+    handler.next(err.copyWith(error: _toApiException(err)));
+  }
+
+  ApiException _toApiException(DioException err) {
+    final existing = err.error;
+    if (existing is ApiException) return existing;
+
+    final response = err.response;
+    if (response == null) return ApiException.network();
+
+    return ApiException.fromResponse(
+      response.data,
+      status: response.statusCode ?? 500,
     );
   }
 }
 ```
 
+##### Exceções de Autenticação (`core/services/auth/auth_exception.dart`):
+Para erros de login social e Firebase Auth, utiliza-se a `AuthException`. No controlador de estado, a função `authErrorMessage` resolve qualquer exceção para uma mensagem amigável:
+```dart
+String authErrorMessage(Object error) => switch (error) {
+  AuthException(:final message) => message,
+  ApiException(:final message) => message,
+  _ => 'Ocorreu um erro inesperado. Tente novamente.',
+};
+```
+
+---
+
 ### 3.3. Serviços Externos (`core/services/`)
 
-Encapsula dependências de SDKs de terceiros (Firebase Auth, Google Maps, Local Storage/Secure Storage), garantindo que as features consumam contratos desacoplados:
+Encapsula dependências nativas e de terceiros sob contratos desacoplados:
+- `AuthService`: abstrai login social, Firebase Auth e verificação de tokens.
+- `LocationService`: abstrai GPS e cálculo de trajetos.
+- `StorageService`: armazenamento seguro de tokens e credenciais locais.
 
-- `AuthService`: abstrai login social e estado de sessão.
-- `LocationService`: abstrai acesso a GPS e cálculo de distâncias.
-- `StorageService`: armazenamento seguro de tokens e preferências locais.
+### 3.4. Componentes Globais (`core/widgets/`)
 
-### 3.4. Design System e Temas (`core/theme/` e `core/widgets/`)
-
-- `core/theme/`: define `AppColors` (paleta primária, secundária, status), `AppTypography` e a instância oficial de `ThemeData` (Material 3).
-- `core/widgets/`: biblioteca de componentes atômicos reutilizáveis:
-  - `AppButton`: botões com estados integrados de loading e disabled.
-  - `AppTextField`: inputs de formulário com formatação e mensagens de erro RFC 7807 pré-configuradas.
-  - `AppLoadingIndicator`: feedback visual consistente.
-  - `AppErrorFeedback`: componente para exibição amigável de falhas de rede.
+- `RideDockNavigation`: barra de navegação inferior flutuante customizada (Floating Elevation Dock) com micro-interações fluidas e popover de ações contextuais de carona.
+- `AppButton`: botões primários e secundários padronizados com suporte nativo a estado de loading.
+- `AppTextField`: inputs de formulário com estados de foco, erro e formatação visual uniforme.
 
 ---
 
 ## 4. Estrutura de uma Feature (`features/{nomeFeature}/`)
 
-Cada pasta dentro de `features/` representa um domínio isolado do aplicativo. Abaixo detalha-se a anatomia padrão, exemplificada pela funcionalidade **Carona**.
+Cada pasta dentro de `features/` representa um domínio isolado do aplicativo:
 
 ```text
 features/carona/
@@ -171,17 +323,17 @@ features/carona/
 │   │   └── criar_carona_request.dart     # Payload de envio
 │   └── repository/
 │       ├── carona_repository.dart        # Interface abstrata do repositório
-│       └── carona_repository_impl.dart   # Implementação concreta via Dio
+│       └── carona_repository_impl.dart   # Implementação concreta via Dio e unwrapApiResponse
 │
 ├── state/
-│   ├── carona_controller.dart            # Gerenciador de estado (ChangeNotifier, Cubit ou StateNotifier)
+│   ├── carona_controller.dart            # Gerenciador de estado (AsyncNotifier / Notifier)
 │   └── carona_state.dart                 # Estados da tela (Initial, Loading, Loaded, Error)
 │
 └── presentation/
     ├── pages/
     │   ├── buscar_carona_page.dart       # Página de busca e listagem
     │   ├── criar_carona_page.dart        # Formulário para motoristas
-    │   └── detalhes_carona_page.dart     # Informações completas e solicitação de vaga
+    │   └── detalhes_carona_page.dart     # Informações completas da viagem
     └── widgets/
         ├── card_carona.dart              # Card com horário, vagas e valor
         └── filtro_carona_sheet.dart      # Bottom sheet com filtros de pesquisa
@@ -189,58 +341,7 @@ features/carona/
 
 ### 4.1. Camada de Dados (`features/{feature}/data/`)
 
-#### Model / DTO (`data/models/carona_model.dart`)
-
-Espelha os dados trafegados com o backend Spring Boot:
-
-```dart
-class CaronaModel {
-  final String id;
-  final String motoristaId;
-  final String origem;
-  final String destino;
-  final DateTime horarioPartida;
-  final int vagasDisponiveis;
-  final double valorContribuicao;
-
-  CaronaModel({
-    required this.id,
-    required this.motoristaId,
-    required this.origem,
-    required this.destino,
-    required this.horarioPartida,
-    required this.vagasDisponiveis,
-    required this.valorContribuicao,
-  });
-
-  factory CaronaModel.fromJson(Map<String, dynamic> json) {
-    return CaronaModel(
-      id: json['id'] as String,
-      motoristaId: json['motoristaId'] as String,
-      origem: json['origem'] as String,
-      destino: json['destino'] as String,
-      horarioPartida: DateTime.parse(json['horarioPartida'] as String),
-      vagasDisponiveis: json['vagasDisponiveis'] as int,
-      valorContribuicao: (json['valorContribuicao'] as num).toDouble(),
-    );
-  }
-
-  Map<String, dynamic> toJson() => {
-    'id': id,
-    'motoristaId': motoristaId,
-    'origem': origem,
-    'destino': destino,
-    'horarioPartida': horarioPartida.toIso8601String(),
-    'vagasDisponiveis': vagasDisponiveis,
-    'valorContribuicao': valorContribuicao,
-  };
-}
-```
-
 #### Repositório (`data/repository/carona_repository.dart`)
-
-Encapsula as requisições HTTP, convertendo respostas do `Dio` em modelos de domínio:
-
 ```dart
 abstract class CaronaRepository {
   Future<List<CaronaModel>> listarCaronasDisponiveis();
@@ -250,13 +351,12 @@ abstract class CaronaRepository {
 
 class CaronaRepositoryImpl implements CaronaRepository {
   final Dio _dio;
-
   CaronaRepositoryImpl(this._dio);
 
   @override
   Future<List<CaronaModel>> listarCaronasDisponiveis() async {
     final response = await _dio.get('/caronas');
-    return (response.data as List)
+    return (response.data['data'] as List)
         .map((e) => CaronaModel.fromJson(e as Map<String, dynamic>))
         .toList();
   }
@@ -264,7 +364,7 @@ class CaronaRepositoryImpl implements CaronaRepository {
   @override
   Future<CaronaModel> criarCarona(Map<String, dynamic> payload) async {
     final response = await _dio.post('/caronas', data: payload);
-    return CaronaModel.fromJson(response.data as Map<String, dynamic>);
+    return unwrapApiResponse(response.data, CaronaModel.fromJson);
   }
 
   @override
@@ -276,55 +376,33 @@ class CaronaRepositoryImpl implements CaronaRepository {
 
 ### 4.2. Camada de Estado (`features/{feature}/state/`)
 
-Responsável por orquestrar a regra de tela, disparar requisições para o repositório e notificar a interface. Exemplo utilizando `ChangeNotifier` ou `StateNotifier/Cubit`:
+Responsável por orquestrar regras de negócio de tela e propagar erros via `ApiException`:
 
 ```dart
-// features/carona/state/carona_state.dart
-abstract class CaronaState {}
-
-class CaronaInitialState extends CaronaState {}
-class CaronaLoadingState extends CaronaState {}
-class CaronaLoadedState extends CaronaState {
-  final List<CaronaModel> caronas;
-  CaronaLoadedState(this.caronas);
-}
-class CaronaErrorState extends CaronaState {
-  final String mensagem;
-  CaronaErrorState(this.mensagem);
-}
-
-// features/carona/state/carona_controller.dart
-class CaronaController extends ValueNotifier<CaronaState> {
+class CaronaController extends StateNotifier<AsyncValue<List<CaronaModel>>> {
   final CaronaRepository _repository;
 
-  CaronaController(this._repository) : super(CaronaInitialState());
+  CaronaController(this._repository) : super(const AsyncValue.loading()) {
+    carregarCaronas();
+  }
 
   Future<void> carregarCaronas() async {
-    value = CaronaLoadingState();
+    state = const AsyncValue.loading();
     try {
-      final resultado = await _repository.listarCaronasDisponiveis();
-      value = CaronaLoadedState(resultado);
-    } on ProblemDetailsException catch (e) {
-      value = CaronaErrorState(e.detail);
-    } catch (e) {
-      value = CaronaErrorState('Não foi possível carregar as caronas.');
+      final caronas = await _repository.listarCaronasDisponiveis();
+      state = AsyncValue.data(caronas);
+    } on ApiException catch (e, st) {
+      state = AsyncValue.error(e.message, st);
+    } catch (e, st) {
+      state = AsyncValue.error('Não foi possível carregar as caronas.', st);
     }
   }
 }
 ```
 
-### 4.3. Camada de Apresentação (`features/{feature}/presentation/`)
-
-Composta exclusivamente de código visual:
-
-- `pages/`: representam telas completas navegáveis, associadas a rotas no router. A página escuta o Controller correspondente e renderiza os estados (Loading, Loaded, Error).
-- `widgets/`: componentes especializados que pertencem somente àquela feature (ex: `CardCarona`, exibindo detalhes da rota, preço e foto do motorista).
-
 ---
 
 ## 5. Fluxo de Dados e Ciclo de Execução
-
-O diagrama abaixo ilustra o ciclo completo de uma interação do usuário até a resposta do backend e atualização de tela:
 
 ```mermaid
 flowchart TD
@@ -347,70 +425,35 @@ flowchart TD
     end
 
     %% Fluxo de Ida (Request)
-    A -->|"1. Dispara evento"| B
-    B -->|"3. Solicita dados"| C
-    C -->|"4. Executa requisição HTTP"| D
-    D -->|"5. Injeta Headers (Token) e envia"| E
-    E -->|"6. Processa regras e Banco de Dados"| F
+    A -->|"1. Dispara ação"| B
+    B -->|"2. Solicita dados"| C
+    C -->|"3. Executa requisição HTTP"| D
+    D -->|"4. Injeta Bearer Token + Idempotency-Key"| E
+    E -->|"5. Executa regra de negócio"| F
 
     %% Fluxo de Volta (Response)
-    F -.->|"7. Retorno do Banco"| E
-    E -.->|"8. HTTP Response / RFC 7807"| D
-    D -.->|"9. Converte JSON em CaronaModel"| C
-    C -.->|"10. Retorna lista de modelos"| B
-    B -.->|"2 / 11. Emite Loading e Loaded States"| A
+    F -.->|"6. Retorno de dados"| E
+    E -.->|"7. Resposta HTTP (ApplicationResponse)"| D
+    D -.->|"8. Tratamento de Erros (ApiException) / Conversão JSON"| C
+    C -.->|"9. Retorna modelo tipado"| B
+    B -.->|"10. Emite novos estados (Data / Error)"| A
 ```
 
 ---
 
-## 6. Inicialização e Bootstrap (`main.dart` e `app_widget.dart`)
-
-### 6.1. `main.dart`
-
-Ponto de entrada único do aplicativo. Responsável pela inicialização assíncrona dos serviços nativos antes da renderização do app:
-
-- Inicialização do `WidgetsFlutterBinding`.
-- Inicialização do Firebase Core (`Firebase.initializeApp`).
-- Configuração do Service Locator / Injeção de Dependências (ex: `GetIt` ou registro de Providers).
-- Execução do método `runApp(const AppWidget())`.
-
-### 6.2. `app_widget.dart`
-
-Configuração principal da árvore de widgets da aplicação:
-
-- Instanciação do `MaterialApp.router` ou `MaterialApp`.
-- Aplicação do tema global (`AppTheme.lightTheme` e `AppTheme.darkTheme`).
-- Definição do título do aplicativo e configurações de internacionalização (`flutter_localizations`).
-- Configuração da pilha de rotas e guardas de rota (ex: redirecionamento para tela de login caso o token não esteja presente).
-
----
-
-## 7. Injeção de Dependências e Desacoplamento
-
-Para assegurar facilidade na criação de testes unitários e testes de widget, a aplicação adota o princípio de **Inversão de Dependências**.
-
-1. O cliente HTTP (`Dio`) é instanciado como singleton em `core/network/`.
-2. As implementações de repositório (`CaronaRepositoryImpl`) recebem o cliente HTTP via construtor.
-3. Os controladores de estado (`CaronaController`) recebem a interface do repositório (`CaronaRepository`) via construtor.
-4. Dessa forma, em testes de widget ou unitários, é possível injetar mocks sem necessidade de chamadas de rede reais.
-
----
-
-## 8. Checklist para Criação de uma Nova Feature
+## 6. Checklist para Criação de uma Nova Feature
 
 Ao desenvolver uma nova funcionalidade no aplicativo Converge:
 
 1. **Criar a pasta da feature** em `lib/features/{novaFeature}/`.
-2. **Criar a estrutura interna de pastas**:
-   - `data/models/` (modelos e DTOs com `fromJson` e `toJson`).
-   - `data/repository/` (contrato abstrato e implementação concreta).
-   - `state/` (controller e definição de estados).
-   - `presentation/pages/` (telas da feature).
-   - `presentation/widgets/` (componentes visuais locais da feature).
-3. **Mapear a API no Repositório**:
-   - Conectar com os endpoints do módulo correspondente do backend Spring Boot (`/api/v1/{recurso}`).
-   - Garantir que erros RFC 7807 sejam propagados de forma legível.
-4. **Registrar a injeção de dependências**:
-   - Registrar o repositório e o controller no Service Locator ou Provider da aplicação.
-5. **Cadastrar as rotas** em `app_widget.dart` ou no roteador central.
-6. **Reutilizar componentes de `core/widgets/`** (evitar recriar botões, campos de texto e loadings duplicados).
+2. **Organizar em 3 subcamadas**:
+   - `data/` (models, DTOs e repositório).
+   - `state/` (controllers e provedores de estado).
+   - `presentation/` (`pages/` navegáveis e `widgets/` locais).
+3. **Mapear a API**:
+   - Utilizar `unwrapApiResponse` e propagar exceções tipadas através de `ApiException`.
+4. **Respeitar o Design System**:
+   - **SEMPRE** utilizar `AppColors` de `core/config/styles.dart`. Cores hardcoded são proibidas.
+   - Utilizar estritamente ícones nativos `Icons.*_rounded`.
+   - Preservar assets essenciais (ex.: `assets/icon.png`).
+5. **Cadastrar rotas no `app_routes.dart`** com GoRouter.

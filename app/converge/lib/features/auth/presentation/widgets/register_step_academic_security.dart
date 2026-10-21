@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 
+import '../../../../core/config/styles.dart';
 import '../../../../core/utils/validators.dart';
 import 'onboarding_design_tokens.dart';
 
@@ -356,7 +357,7 @@ class _PasswordRequirementItem extends StatelessWidget {
   Widget build(BuildContext context) {
     final iconColor = isMet
         ? OnboardingDesignTokens.successGreen
-        : const Color(0xFF9CA3AF);
+        : AppColors.iconMuted;
     final textColor = isMet
         ? OnboardingDesignTokens.successGreen
         : OnboardingDesignTokens.subtitle;

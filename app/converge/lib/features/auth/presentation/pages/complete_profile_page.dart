@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
+import '../../../../core/config/styles.dart';
 import '../../../../core/utils/phone_input_formatter.dart';
 import '../../../../core/utils/validators.dart';
 import '../../state/auth_action_controller.dart';
@@ -56,10 +57,10 @@ class _CompleteProfilePageState extends ConsumerState<CompleteProfilePage> {
     final email = session is ProfileIncomplete ? session.authUser.email : null;
 
     return Scaffold(
-      backgroundColor: Colors.white,
+      backgroundColor: AppColors.cardBackground,
       appBar: AppBar(
-        backgroundColor: Colors.white,
-        surfaceTintColor: Colors.white,
+        backgroundColor: AppColors.cardBackground,
+        surfaceTintColor: AppColors.cardBackground,
         title: const Text(
           'Completar cadastro',
           style: TextStyle(fontWeight: FontWeight.w700),
@@ -87,7 +88,7 @@ class _CompleteProfilePageState extends ConsumerState<CompleteProfilePage> {
                     if (email != null) ...[
                       Text(
                         'Conclua seu perfil para a conta $email',
-                        style: const TextStyle(color: Color(0xFF6B7280)),
+                        style: const TextStyle(color: AppColors.textBodySecondary),
                       ),
                       const SizedBox(height: 16),
                     ],
@@ -95,14 +96,14 @@ class _CompleteProfilePageState extends ConsumerState<CompleteProfilePage> {
                       Container(
                         padding: const EdgeInsets.all(12),
                         decoration: BoxDecoration(
-                          color: const Color(0xFFFEF2F2),
+                          color: AppColors.errorBackground,
                           borderRadius: BorderRadius.circular(12),
-                          border: Border.all(color: const Color(0xFFFECACA)),
+                          border: Border.all(color: AppColors.errorBorder),
                         ),
                         child: Text(
                           authErrorMessage(actionState.error!),
                           style: const TextStyle(
-                            color: Color(0xFFB91C1C),
+                            color: AppColors.errorText,
                             fontSize: 14,
                           ),
                         ),
@@ -113,63 +114,61 @@ class _CompleteProfilePageState extends ConsumerState<CompleteProfilePage> {
                       'Nome completo',
                       style: TextStyle(fontWeight: FontWeight.w600),
                     ),
-                    const SizedBox(height: 6),
+                    const SizedBox(height: 8),
                     TextFormField(
                       controller: _nameController,
                       enabled: !isLoading,
-                      textInputAction: TextInputAction.next,
+                      textCapitalization: TextCapitalization.words,
                       validator: Validators.name,
                       decoration: InputDecoration(
-                        hintText: 'Ex.: Ana Souza',
+                        hintText: 'Ex.: João Silva',
                         border: OutlineInputBorder(
                           borderRadius: BorderRadius.circular(12),
                         ),
                       ),
                     ),
-                    const SizedBox(height: 14),
+                    const SizedBox(height: 16),
                     const Text(
-                      'Telefone',
+                      'Telefone com DDD',
                       style: TextStyle(fontWeight: FontWeight.w600),
                     ),
-                    const SizedBox(height: 6),
+                    const SizedBox(height: 8),
                     TextFormField(
                       controller: _phoneController,
                       enabled: !isLoading,
                       keyboardType: TextInputType.phone,
-                      textInputAction: TextInputAction.next,
                       inputFormatters: const [PhoneInputFormatter()],
                       validator: Validators.phone,
                       decoration: InputDecoration(
-                        hintText: '(00) 90000-0000',
+                        hintText: '(19) 99999-9999',
                         border: OutlineInputBorder(
                           borderRadius: BorderRadius.circular(12),
                         ),
                       ),
                     ),
-                    const SizedBox(height: 14),
+                    const SizedBox(height: 16),
                     const Text(
                       'Universidade',
                       style: TextStyle(fontWeight: FontWeight.w600),
                     ),
-                    const SizedBox(height: 6),
+                    const SizedBox(height: 8),
                     TextFormField(
                       controller: _universityController,
                       enabled: !isLoading,
-                      textInputAction: TextInputAction.next,
                       validator: (v) =>
                           Validators.required(v, field: 'Universidade'),
                       decoration: InputDecoration(
-                        hintText: 'PUC-Campinas',
+                        hintText: 'Ex.: PUC-Campinas',
                         border: OutlineInputBorder(
                           borderRadius: BorderRadius.circular(12),
                         ),
                       ),
                     ),
-                    const SizedBox(height: 14),
+                    const SizedBox(height: 16),
                     Row(
-                      crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
                         Expanded(
+                          flex: 3,
                           child: Column(
                             crossAxisAlignment: CrossAxisAlignment.start,
                             children: [
@@ -177,15 +176,14 @@ class _CompleteProfilePageState extends ConsumerState<CompleteProfilePage> {
                                 'Curso',
                                 style: TextStyle(fontWeight: FontWeight.w600),
                               ),
-                              const SizedBox(height: 6),
+                              const SizedBox(height: 8),
                               TextFormField(
                                 controller: _courseController,
                                 enabled: !isLoading,
-                                textInputAction: TextInputAction.next,
                                 validator: (v) =>
                                     Validators.required(v, field: 'Curso'),
                                 decoration: InputDecoration(
-                                  hintText: 'Eng. Software',
+                                  hintText: 'Ex.: Ciência da Computação',
                                   border: OutlineInputBorder(
                                     borderRadius: BorderRadius.circular(12),
                                   ),
@@ -196,6 +194,7 @@ class _CompleteProfilePageState extends ConsumerState<CompleteProfilePage> {
                         ),
                         const SizedBox(width: 12),
                         Expanded(
+                          flex: 2,
                           child: Column(
                             crossAxisAlignment: CrossAxisAlignment.start,
                             children: [
@@ -203,16 +202,14 @@ class _CompleteProfilePageState extends ConsumerState<CompleteProfilePage> {
                                 'Matrícula',
                                 style: TextStyle(fontWeight: FontWeight.w600),
                               ),
-                              const SizedBox(height: 6),
+                              const SizedBox(height: 8),
                               TextFormField(
                                 controller: _enrollmentController,
                                 enabled: !isLoading,
-                                textInputAction: TextInputAction.done,
-                                onFieldSubmitted: (_) => _submit(),
                                 validator: (v) =>
                                     Validators.required(v, field: 'Matrícula'),
                                 decoration: InputDecoration(
-                                  hintText: '2024-00123',
+                                  hintText: 'Ex.: 21004567',
                                   border: OutlineInputBorder(
                                     borderRadius: BorderRadius.circular(12),
                                   ),
@@ -228,8 +225,8 @@ class _CompleteProfilePageState extends ConsumerState<CompleteProfilePage> {
                       height: 52,
                       child: FilledButton(
                         style: FilledButton.styleFrom(
-                          backgroundColor: const Color(0xFF14171A),
-                          foregroundColor: Colors.white,
+                          backgroundColor: AppColors.primaryDark,
+                          foregroundColor: AppColors.textLight,
                           shape: RoundedRectangleBorder(
                             borderRadius: BorderRadius.circular(14),
                           ),
@@ -241,7 +238,7 @@ class _CompleteProfilePageState extends ConsumerState<CompleteProfilePage> {
                                 height: 22,
                                 child: CircularProgressIndicator(
                                   strokeWidth: 2,
-                                  color: Colors.white,
+                                  color: AppColors.textLight,
                                 ),
                               )
                             : const Text(

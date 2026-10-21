@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
 
 import '../../../../app_routes.dart';
+import '../../../../core/config/styles.dart';
 
 class WelcomePage extends StatelessWidget {
   const WelcomePage({super.key});
@@ -9,7 +10,7 @@ class WelcomePage extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      backgroundColor: Colors.white,
+      backgroundColor: AppColors.cardBackground,
       body: SafeArea(
         child: Center(
           child: ConstrainedBox(
@@ -23,25 +24,11 @@ class WelcomePage extends StatelessWidget {
                   Column(
                     mainAxisSize: MainAxisSize.min,
                     children: [
-                      Container(
-                        width: 88,
-                        height: 88,
-                        decoration: BoxDecoration(
-                          border: Border.all(
-                            color: const Color(0xFF14171A),
-                            width: 2,
-                          ),
-                          borderRadius: BorderRadius.circular(22),
-                        ),
-                        alignment: Alignment.center,
-                        child: const Text(
-                          'U',
-                          style: TextStyle(
-                            fontSize: 40,
-                            fontWeight: FontWeight.w800,
-                            color: Color(0xFF14171A),
-                          ),
-                        ),
+                      Image.asset(
+                        'assets/icon.png',
+                        width: 96,
+                        height: 96,
+                        fit: BoxFit.contain,
                       ),
                       const SizedBox(height: 24),
                       const Text(
@@ -49,7 +36,7 @@ class WelcomePage extends StatelessWidget {
                         style: TextStyle(
                           fontSize: 32,
                           fontWeight: FontWeight.w800,
-                          color: Color(0xFF14171A),
+                          color: AppColors.primaryDark,
                         ),
                       ),
                       const SizedBox(height: 8),
@@ -58,7 +45,7 @@ class WelcomePage extends StatelessWidget {
                         textAlign: TextAlign.center,
                         style: TextStyle(
                           fontSize: 16,
-                          color: Color(0xFF6B7280),
+                          color: AppColors.textBodySecondary,
                           height: 1.4,
                         ),
                       ),
@@ -72,8 +59,8 @@ class WelcomePage extends StatelessWidget {
                         height: 52,
                         child: FilledButton(
                           style: FilledButton.styleFrom(
-                            backgroundColor: const Color(0xFF14171A),
-                            foregroundColor: Colors.white,
+                            backgroundColor: AppColors.primaryDark,
+                            foregroundColor: AppColors.textLight,
                             shape: RoundedRectangleBorder(
                               borderRadius: BorderRadius.circular(14),
                             ),
@@ -94,12 +81,12 @@ class WelcomePage extends StatelessWidget {
                         child: const Text.rich(
                           TextSpan(
                             text: 'Não tem conta? ',
-                            style: TextStyle(color: Color(0xFF6B7280)),
+                            style: TextStyle(color: AppColors.textBodySecondary),
                             children: [
                               TextSpan(
                                 text: 'Criar conta',
                                 style: TextStyle(
-                                  color: Color(0xFF14171A),
+                                  color: AppColors.primaryDark,
                                   fontWeight: FontWeight.w700,
                                 ),
                               ),

@@ -1,3 +1,5 @@
+import java.util.Properties
+
 plugins {
     id("com.android.application")
     // START: FlutterFire Configuration
@@ -6,6 +8,22 @@ plugins {
     // The Flutter Gradle Plugin must be applied after the Android and Kotlin Gradle plugins.
     id("dev.flutter.flutter-gradle-plugin")
 }
+
+// Lê de forma segura a chave do Google Maps do .env sem expor no Git
+val envFile = project.rootProject.file("../.env")
+val envProps = Properties()
+if (envFile.exists()) {
+    envFile.forEachLine { line ->
+        val trimmed = line.trim()
+        if (trimmed.isNotEmpty() && !trimmed.startsWith("#") && trimmed.contains("=")) {
+            val parts = trimmed.split("=", limit = 2)
+            envProps.setProperty(parts[0].trim(), parts[1].trim())
+        }
+    }
+}
+val mapsApiKey = envProps.getProperty("GOOGLE_MAPS_API_KEY")
+    ?: System.getenv("GOOGLE_MAPS_API_KEY")
+    ?: ""
 
 android {
     namespace = "br.edu.puccampinas.converge"
@@ -23,6 +41,9 @@ android {
         targetSdk = flutter.targetSdkVersion
         versionCode = flutter.versionCode
         versionName = flutter.versionName
+
+        // Injeta chave dinamicamente via placeholder
+        manifestPlaceholders["GOOGLE_MAPS_API_KEY"] = mapsApiKey
     }
 
     buildTypes {
