@@ -5,7 +5,7 @@ import 'package:go_router/go_router.dart';
 import 'app_routes.dart';
 import 'features/auth/presentation/pages/complete_profile_page.dart';
 import 'features/auth/presentation/pages/forgot_password_page.dart';
-import 'features/auth/presentation/pages/home_page.dart';
+import 'features/home/presentation/pages/home_page.dart';
 import 'features/auth/presentation/pages/login_page.dart';
 import 'features/auth/presentation/pages/register_page.dart';
 import 'features/auth/presentation/pages/splash_page.dart';

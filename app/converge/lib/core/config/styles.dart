@@ -48,9 +48,21 @@ abstract final class AppColors {
   static const Color successBackground = Color(0xFFF0FDF4);
   static const Color successBorder = Color(0xFFBBF7D0);
 
+  // Elementos do Mapa Estilo Uber (Cartografia Monocromática com Alto Contraste)
+  static const Color mapBackground = Color(0xFFD6DADF); // Fundo cinza arquitetural contrastante
+  static const Color mapRoadPrimary = Color(0xFFFFFFFF); // Ruas em branco puro
+  static const Color mapRoadSecondary = Color(0xFFE5E8EC);
+  static const Color mapRoute = Color(0xFF111111);
+  static const Color mapBuilding = Color(0xFFBCC2C9); // Prédios e estruturas mais escuras
+  static const Color mapPinMarker = Color(0xFF111111);
+  static const Color mapPinOrigin = Color(0xFF111111); // Bolinha preta opaca de Origem
+  static const Color mapPinDestination = Color(0xFF111111); // Chegada quadriculada monocromática
+  static const Color mapWater = Color(0xFFB0B6BF); // Água em cinza grafite médio
+  static const Color driverApproachRoute = Color(0xFF94A3B8); // Cinza suave para trajeto do motorista
+
   // Itens de Navegação (Dock)
   static const Color dockItemActive = Colors.white;
-  static const Color dockItemInactive = Color(0x70FFFFFF); // alpha: 0.44
+  static const Color dockItemInactive = Color(0xFFA1A1AA); // Mais claro e legível quando não selecionado
   static const Color dockIndicatorDot = Colors.white;
 
   // Barreira Translúcida de Dismiss

@@ -3,14 +3,6 @@ import 'package:flutter/services.dart';
 
 import '../config/styles.dart';
 
-/// ============================================================================
-/// COMPONENTE: RideDockNavigation (Floating Elevation Dock)
-/// ============================================================================
-///
-/// Componente de navegação inferior flutuante simétrico (2-1-2) com cores
-/// padronizadas em AppColors e coreografia equilibrada (~400ms).
-/// ============================================================================
-
 class RideDockNavigation extends StatefulWidget {
   /// Índice da aba atualmente selecionada (0 a 3).
   final int currentIndex;
@@ -18,7 +10,7 @@ class RideDockNavigation extends StatefulWidget {
   /// Callback disparado ao alternar entre as abas.
   final ValueChanged<int> onTabSelected;
 
-  /// Callback disparado quando o usuário seleciona "Pedir carona".
+  /// Callback disparado quando o usuário seleciona "Pedir ride".
   final VoidCallback onRequestRide;
 
   /// Callback disparado quando o usuário seleciona "Iniciar expediente de motorista".
@@ -30,6 +22,12 @@ class RideDockNavigation extends StatefulWidget {
   /// Callback para alternar o estado de abertura.
   final VoidCallback? onToggleOpen;
 
+  /// Se o usuário está habilitado para ser motorista (role DRIVER).
+  final bool canDrive;
+
+  /// Callback acionado quando o usuário clica na ação de motorista bloqueada.
+  final VoidCallback? onLockedDriverTap;
+
   const RideDockNavigation({
     super.key,
     required this.currentIndex,
@@ -38,6 +36,8 @@ class RideDockNavigation extends StatefulWidget {
     required this.onStartDriverShift,
     this.isOpen,
     this.onToggleOpen,
+    this.canDrive = true,
+    this.onLockedDriverTap,
   }) : assert(currentIndex >= 0 && currentIndex <= 3,
             'currentIndex deve estar entre 0 e 3.');
 
@@ -128,9 +128,6 @@ class _RideDockNavigationState extends State<RideDockNavigation>
           mainAxisSize: MainAxisSize.min,
           crossAxisAlignment: CrossAxisAlignment.stretch,
           children: [
-            // ================================================================
-            // 1. POPOVER DISCRETO (EXPANSÃO SUAVE VIA SIZETRANSITION)
-            // ================================================================
             ClipRect(
               child: Align(
                 alignment: Alignment.bottomCenter,
@@ -146,9 +143,15 @@ class _RideDockNavigationState extends State<RideDockNavigation>
                           _handleToggle();
                           widget.onRequestRide();
                         },
+                        canDrive: widget.canDrive,
+                        onLockedDriverTap: widget.onLockedDriverTap,
                         onStartDriverShift: () {
                           _handleToggle();
-                          widget.onStartDriverShift();
+                          if (widget.canDrive) {
+                            widget.onStartDriverShift();
+                          } else {
+                            widget.onLockedDriverTap?.call();
+                          }
                         },
                         onClose: _handleToggle,
                       ),
@@ -158,9 +161,6 @@ class _RideDockNavigationState extends State<RideDockNavigation>
               ),
             ),
 
-            // ================================================================
-            // 2. PÍLULA FLUTUANTE SIMÉTRICA (2 Ícones à Esquerda / 2 à Direita)
-            // ================================================================
             SizedBox(
               height: 66,
               child: Stack(
@@ -241,9 +241,6 @@ class _RideDockNavigationState extends State<RideDockNavigation>
                     ),
                   ),
 
-                  // ==========================================================
-                  // 3. BOTÃO CENTRAL: AFUNDA E VIRA O "+"
-                  // ==========================================================
                   Positioned(
                     top: -10 + (16 * progress),
                     child: _CenterRideButton(
@@ -261,9 +258,6 @@ class _RideDockNavigationState extends State<RideDockNavigation>
   }
 }
 
-/// ============================================================================
-/// ITEM DE ABA SIMÉTRICO
-/// ============================================================================
 class _SymmetricTabItem extends StatelessWidget {
   final IconData icon;
   final String label;
@@ -326,9 +320,6 @@ class _SymmetricTabItem extends StatelessWidget {
   }
 }
 
-/// ============================================================================
-/// BOTÃO CENTRAL ("CARONAS") - AFUNDA E VIRA O "+"
-/// ============================================================================
 class _CenterRideButton extends StatefulWidget {
   final double progress;
   final VoidCallback onPressed;
@@ -394,12 +385,20 @@ class _CenterRideButtonState extends State<_CenterRideButton> {
             child: Center(
               child: Transform.rotate(
                 angle: progress * 3.141592653589793,
-                child: Icon(
-                  isExpanded
-                      ? Icons.close
-                      : Icons.directions_car_rounded,
-                  size: 27,
-                  color: Colors.white,
+                child: AnimatedSwitcher(
+                  duration: const Duration(milliseconds: 200),
+                  transitionBuilder: (child, animation) => ScaleTransition(
+                    scale: animation,
+                    child: child,
+                  ),
+                  child: Icon(
+                    isExpanded
+                        ? Icons.close
+                        : Icons.directions_car_rounded,
+                    key: ValueKey(isExpanded),
+                    size: 27,
+                    color: Colors.white,
+                  ),
                 ),
               ),
             ),
@@ -410,18 +409,20 @@ class _CenterRideButtonState extends State<_CenterRideButton> {
   }
 }
 
-/// ============================================================================
-/// POPOVER DISCRETO DE CARONAS (SURGE ACIMA DO DOCK)
-/// ============================================================================
+
 class _RidesPopoverCard extends StatelessWidget {
   final VoidCallback onRequestRide;
   final VoidCallback onStartDriverShift;
   final VoidCallback onClose;
+  final bool canDrive;
+  final VoidCallback? onLockedDriverTap;
 
   const _RidesPopoverCard({
     required this.onRequestRide,
     required this.onStartDriverShift,
     required this.onClose,
+    this.canDrive = true,
+    this.onLockedDriverTap,
   });
 
   @override
@@ -491,10 +492,14 @@ class _RidesPopoverCard extends StatelessWidget {
 
           _CompactActionRow(
             title: 'Iniciar expediente de motorista',
-            subtitle: 'Abra vagas no trajeto e compartilhe custos.',
-            icon: Icons.drive_eta_rounded,
-            badgeLabel: 'Disponível',
-            onTap: onStartDriverShift,
+            subtitle: canDrive
+                ? 'Abra vagas no trajeto e compartilhe custos.'
+                : 'Requer perfil de motorista cadastrado.',
+            icon: canDrive ? Icons.drive_eta_rounded : Icons.lock_rounded,
+            badgeLabel: canDrive ? 'Disponível' : 'Bloqueado',
+            onTap: canDrive
+                ? onStartDriverShift
+                : (onLockedDriverTap ?? onStartDriverShift),
           ),
         ],
       ),
