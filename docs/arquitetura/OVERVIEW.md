@@ -18,7 +18,7 @@ Este diretório centraliza a documentação arquitetural do projeto **Converge**
 lib/
 ├── core/                                       # Recursos transversais compartilhados
 │   ├── config/                                 # Configurações de ambiente (URLs, chaves de API)
-│   ├── network/                                # Cliente HTTP e interceptors (Auth, Idempotency, RFC 7807)
+│   ├── network/                                # Cliente HTTP e interceptors (Auth, Idempotency, Error/ApiException)
 │   ├── services/                               # Integrações externas e SDKs (Auth, Maps, Storage)
 │   ├── theme/                                  # Cores, tipografia e temas globais
 │   ├── utils/                                  # Formatadores e validadores genéricos
