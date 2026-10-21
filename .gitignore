@@ -1,2 +1,5 @@
 .vscode
 *.DS_Store
+
+# Configurações pessoais do IntelliJ IDEA
+.idea/
