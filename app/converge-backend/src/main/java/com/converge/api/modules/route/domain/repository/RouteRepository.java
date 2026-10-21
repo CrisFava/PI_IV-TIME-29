@@ -14,7 +14,7 @@ import java.util.List;
 @Repository
 public interface RouteRepository extends MongoRepository<Route, ObjectId> {
 
-    List<Route> findByUserId(String userId);
+    List<Route> findByUserIdAndStatusNot(String userId, RouteStatus status);
 
     @Query(
             value = "{ 'userId': ?0, 'type': ?1, 'origin.address': ?2, 'destination.address': ?3, " +
