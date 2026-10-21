@@ -14,18 +14,21 @@ O **Converge** é uma plataforma que conecta estudantes universitários com rota
 
 Desenvolvido para o componente curricular **Ideação e Validação em Engenharia de Software** da Escola Politécnica da **PUC-Campinas**.
 
+📅 **Cronograma do Projeto:** [Planilha no Google Sheets](https://docs.google.com/spreadsheets/d/1arm-50iZBGYSQvaEW27iy0OP_JpuNIx8qC4BAJbUTD0/edit?usp=sharing)
+
 ---
 
 ## Visão Geral da Arquitetura
 
-O sistema é estruturado em três módulos complementares dentro do diretório [`app/`](file:///E:/PIs/PI_IV_ES_TIME_29/app):
+O sistema é estruturado em três módulos complementares dentro do diretório [`app/`](app):
 
 ```
-       ┌────────────────────────┐
-       │   App Móvel Flutter    │  (app/converge)
-       │       (Interface)      │
-       └───────────┬────────────┘
-                   │ HTTP / REST
+       ┌────────────────────────┐   Login / ID Token   ┌────────────────────────┐
+       │   App Móvel Flutter    │ ◄──────────────────► │     Firebase Auth      │
+       │    (app/converge)      │                      │ (projeto es-pi-iv-2026)│
+       └───────────┬────────────┘                      └────────────────────────┘
+                   │ HTTP / REST (/api/v1)
+                   │ Authorization: Bearer <Firebase ID Token>
                    ▼
        ┌────────────────────────┐         TCP Sockets         ┌────────────────────────┐
        │   API Spring Boot 3    │ ◄─────────────────────────► │  Servidor Socket TCP   │
@@ -39,11 +42,11 @@ O sistema é estruturado em três módulos complementares dentro do diretório [
        └────────────────────────┘
 ```
 
-| Módulo          | Diretório                                                                      | Tecnologia                            | Papel no Sistema                                                                                                           |
-| :-------------- | :----------------------------------------------------------------------------- | :------------------------------------ | :------------------------------------------------------------------------------------------------------------------------- |
-| **Server**      | [`app/server`](file:///E:/PIs/PI_IV_ES_TIME_29/app/server)                     | Java 21, Sockets TCP, Maven           | Servidor de sockets de alto desempenho com serialização de objetos e handlers desacoplados para comunicação em tempo real. |
-| **Backend API** | [`app/converge-backend`](file:///E:/PIs/PI_IV_ES_TIME_29/app/converge-backend) | Java 21, Spring Boot 3, MongoDB Atlas | API RESTful com arquitetura modular hexagonal, autenticação, persistência e documentação Swagger/OpenAPI.                  |
-| **Mobile App**  | [`app/converge`](file:///E:/PIs/PI_IV_ES_TIME_29/app/converge)                 | Flutter & Dart                        | Aplicativo móvel para estudantes (motoristas e passageiros) gerenciarem caronas, perfis e viagens.                         |
+| Módulo          | Diretório                                      | Tecnologia                              | Papel no Sistema                                                                                                                |
+| :-------------- | :--------------------------------------------- | :-------------------------------------- | :------------------------------------------------------------------------------------------------------------------------------ |
+| **Server**      | [`app/server`](app/server)                     | Java 21, Sockets TCP, Maven             | Servidor de sockets de alto desempenho com serialização de objetos e handlers desacoplados para comunicação em tempo real.      |
+| **Backend API** | [`app/converge-backend`](app/converge-backend) | Java 21, Spring Boot 3, MongoDB Atlas   | API RESTful com arquitetura modular hexagonal, autenticação via token do Firebase, persistência e documentação Swagger/OpenAPI. |
+| **Mobile App**  | [`app/converge`](app/converge)                 | Flutter & Dart, Riverpod, Dio, Firebase | Aplicativo móvel para estudantes (motoristas e passageiros) gerenciarem caronas, perfis e viagens.                              |
 
 ---
 
@@ -55,8 +58,9 @@ Se você já possui o ambiente configurado, execute estes passos rápidos a part
 
 - **Java JDK 21** (`java -version`)
 - **Maven 3.9+** ou uso dos wrappers incluídos (`mvnw.cmd` / `./mvnw`)
-- **Flutter SDK 3.13+** (`flutter doctor`)
+- **Flutter SDK** com **Dart 3.13.3+** (`flutter doctor`)
 - Cluster ativo no **MongoDB Atlas**
+- Acesso ao projeto Firebase **`es-pi-iv-2026`** (para obter os arquivos de configuração do app)
 
 ---
 
@@ -85,9 +89,25 @@ MONGODB_DATABASE_NAME_TESTS=converge-tests
 MONGODB_DATABASE_NAME_PROD=converge-prod
 
 ENV_CHECK=true
+```
 
-SOCKET_SERVER_HOST=localhost
-SOCKET_SERVER_PORT=3000
+> [!NOTE]
+> O backend se conecta ao servidor de sockets em `localhost:3000` (valores padrão definidos em `SocketClient`).
+
+---
+
+### Configurar o Firebase no App Flutter
+
+Os arquivos de configuração nativos do Firebase **não são versionados** (estão no `.gitignore` de `app/converge`). Antes de rodar o app, coloque-os nos caminhos abaixo:
+
+- `app/converge/android/app/google-services.json`
+- `app/converge/ios/Runner/GoogleService-Info.plist`
+
+Eles podem ser baixados no console do Firebase (projeto `es-pi-iv-2026`) ou gerados com o FlutterFire CLI:
+
+```bash
+cd app/converge
+flutterfire configure --project=es-pi-iv-2026
 ```
 
 ---
@@ -120,7 +140,7 @@ mvn exec:java -Dexec.mainClass="com.converge.socket.Main"
 ```
 
 _O servidor iniciará escutando na porta **3000**._  
-_(Para encerrar com segurança quando necessário, digite `stop`, `exit` ou `desativar` no console)._
+_(Para encerrar com segurança quando necessário, digite `stop` ou `exit` no console)._
 
 #### Terminal 2: API REST Spring Boot (`app/converge-backend`)
 
@@ -136,8 +156,10 @@ cd app/converge-backend
 
 _A API estará disponível em:_
 
-- **Endpoints REST:** `http://localhost:8080`
+- **Endpoints REST:** `http://localhost:8080/api/v1`
 - **Swagger UI (Documentação Interativa):** `http://localhost:8080/swagger-ui.html`
+
+_Rotas protegidas exigem o cabeçalho `Authorization: Bearer <Firebase ID Token>`._
 
 #### Terminal 3: Aplicativo Móvel Flutter (`app/converge`)
 
@@ -147,6 +169,12 @@ Certifique-se de que há um emulador ativo ou dispositivo físico conectado (`fl
 cd app/converge
 flutter pub get
 flutter run
+```
+
+O app aponta para `http://localhost:8080/api/v1` por padrão. No **emulador Android**, `localhost` é o próprio emulador; use o endereço do host:
+
+```bash
+flutter run --dart-define=API_BASE_URL=http://10.0.2.2:8080/api/v1
 ```
 
 ---
@@ -160,14 +188,14 @@ Caso prefira rodar os serviços pela sua IDE:
 1. **Abrir o projeto**:
    - Abra a pasta raiz ou a pasta `app` na sua IDE como um projeto Maven.
 2. **Executar o Servidor de Sockets**:
-   - Navegue até [`app/server/src/main/java/com/converge/socket/Main.java`](file:///E:/PIs/PI_IV_ES_TIME_29/app/server/src/main/java/com/converge/socket/Main.java).
+   - Navegue até [`app/server/src/main/java/com/converge/socket/Main.java`](app/server/src/main/java/com/converge/socket/Main.java).
    - Clique em **Run** no método `main`.
 3. **Executar a API Backend**:
    - Certifique-se de que o arquivo `.env` existe em `app/converge-backend/.env` e será levado em consideração na hora da execução.
-   - Navegue até [`app/converge-backend/src/main/java/com/converge/api/ConvergeBackendApplication.java`](file:///E:/PIs/PI_IV_ES_TIME_29/app/converge-backend/src/main/java/com/converge/api/ConvergeBackendApplication.java).
+   - Navegue até [`app/converge-backend/src/main/java/com/converge/api/ConvergeBackendApplication.java`](app/converge-backend/src/main/java/com/converge/api/ConvergeBackendApplication.java).
    - Clique em **Run**.
 4. **Executar o App Flutter**:
-   - Abra o arquivo [`app/converge/lib/main.dart`](file:///E:/PIs/PI_IV_ES_TIME_29/app/converge/lib/main.dart).
+   - Abra o arquivo [`app/converge/lib/main.dart`](app/converge/lib/main.dart).
    - Selecione o dispositivo de destino e pressione **F5** (ou clique em **Run Without Debugging**).
 
 ---
@@ -195,10 +223,13 @@ Para rodar os testes apenas de um módulo específico:
 cd app/server
 mvn test
 
-# Testes da API Backend:
+# Testes da API Backend (Windows: .\mvnw.cmd test):
 cd app/converge-backend
-.\mvnw.cmd test
+./mvnw test
 ```
+
+> [!NOTE]
+> Os testes do backend usam o perfil `test` e precisam das mesmas variáveis do `.env` (conexão com o MongoDB Atlas). Instale o módulo `server` antes (`mvn clean install` em `app/server`).
 
 ### Testes do Aplicativo Flutter
 
@@ -222,30 +253,53 @@ flutter test
 │   ├── server/                        # Módulo Servidor TCP puro (Java 21)
 │   │   ├── pom.xml
 │   │   ├── README.md                  # Documentação dos handlers e protocolo do server
-│   │   └── src/main/java/com/converge/socket/Main.java
+│   │   └── src/
+│   │       ├── main/java/com/converge/socket/
+│   │       │   ├── Main.java          # Ponto de entrada (porta padrão 3000)
+│   │       │   ├── core/              # client, connection, exception, handler, protocol
+│   │       │   └── handler/           # Handlers de negócio (ex.: math)
+│   │       └── test/
 │   │
 │   ├── converge-backend/              # Módulo API REST Spring Boot (Java 21)
 │   │   ├── pom.xml
 │   │   ├── .env-example               # Modelo de variáveis de ambiente
 │   │   ├── README.md                  # Documentação da API REST
-│   │   └── src/main/java/com/converge/api/ConvergeBackendApplication.java
+│   │   └── src/
+│   │       ├── main/
+│   │       │   ├── java/com/converge/api/
+│   │       │   │   ├── ConvergeBackendApplication.java
+│   │       │   │   ├── modules/user/  # application, domain, presentation (hexagonal)
+│   │       │   │   └── shared/        # application (UserUtils), infrastructure
+│   │       │   │                      # (auth, mongo, socket, startup), presentation
+│   │       │   └── resources/         # application.yaml + perfis dev / test / prod
+│   │       └── test/
 │   │
 │   └── converge/                      # Módulo Aplicativo Móvel (Flutter)
 │       ├── pubspec.yaml               # Dependências do app Flutter
 │       ├── analysis_options.yaml
+│       ├── firebase.json              # Configuração do FlutterFire
 │       ├── android/ & ios/
-│       └── lib/
-│           └── main.dart              # Ponto de entrada do app Flutter
+│       ├── lib/
+│       │   ├── main.dart              # Ponto de entrada do app Flutter
+│       │   ├── app_widget.dart
+│       │   ├── app_router.dart / app_routes.dart
+│       │   ├── firebase_options.dart
+│       │   ├── core/                  # config, network (Dio + interceptors),
+│       │   │                          # services/auth, utils, widgets
+│       │   └── features/
+│       │       └── auth/              # data, presentation, state
+│       └── test/
 │
 └── docs/                              # Documentos de especificação e ideação
     ├── arquitetura/                   # Documentações detalhadas de arquitetura
     │   ├── OVERVIEW.md
-    │   ├── backend/
-    │   ├── frontend/
-    │   └── java/
+    │   ├── backend/                   # modular_hexagonal_monolith.md
+    │   ├── frontend/                  # feature_modular_architecture.md
+    │   └── java/                      # server_architecture.md
+    ├── BD/                            # Modelagem e dicionário de dados
     ├── requisitos/                    # Requisitos Funcionais e Não-Funcionais
     ├── Telas/                         # Wireframes e protótipos de interface
-    ├── Business Model Canvas.png
+    ├── assets/                        # Diagramas usados na documentação
     ├── MapaMental.pdf
     └── Relatório_PI_IV.pdf
 ```
