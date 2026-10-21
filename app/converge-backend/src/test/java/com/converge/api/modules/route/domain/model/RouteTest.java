@@ -105,4 +105,66 @@ class RouteTest {
         assertThat(route.getTotalSeats()).isNull();
         assertThat(route.getAvailableSeats()).isNull();
     }
+
+    @Test
+    @DisplayName("Deve reconhecer o dono do trajeto")
+    void shouldRecognizeOwner() {
+        Route route = offer(2.0, 3);
+
+        assertThat(route.isOwnedBy("user-123")).isTrue();
+        assertThat(route.isOwnedBy("outro-usuario")).isFalse();
+    }
+
+    @Test
+    @DisplayName("Deve marcar o trajeto como INACTIVE ao desativar")
+    void shouldDeactivateRoute() {
+        Route route = offer(2.0, 3);
+
+        route.deactivate();
+
+        assertThat(route.getStatus()).isEqualTo(RouteStatus.INACTIVE);
+    }
+
+    @Test
+    @DisplayName("Deve atualizar os dados da viagem e recalcular as vagas disponíveis")
+    void shouldUpdateTripData() {
+        Route route = offer(2.0, 3);
+
+        route.update("vehicle-789", PUC, HOME, "18:00", "18:40", Set.of(DayOfWeek.TUESDAY), 1.5, 2);
+
+        assertThat(route.getOrigin()).isEqualTo(PUC);
+        assertThat(route.getDestination()).isEqualTo(HOME);
+        assertThat(route.getDepartureTime()).isEqualTo("18:00");
+        assertThat(route.getWeekDays()).containsExactly(DayOfWeek.TUESDAY);
+        assertThat(route.getTotalSeats()).isEqualTo(2);
+        assertThat(route.getAvailableSeats()).isEqualTo(2);
+        assertThat(route.getType()).isEqualTo(RouteType.OFFER);
+    }
+
+    @Test
+    @DisplayName("Deve aplicar as regras de oferta também na atualização")
+    void shouldValidateOfferRulesOnUpdate() {
+        Route route = offer(2.0, 3);
+
+        ApplicationException ex = assertThrows(
+                ApplicationException.class,
+                () -> route.update("vehicle-456", HOME, PUC, "07:00", "07:40", WEEKDAYS, 2.0, 0)
+        );
+
+        assertThat(ex.getError().fields()).containsExactly("totalSeats");
+    }
+
+    @Test
+    @DisplayName("Deve lançar ROUTE_NOT_FOUND ao atualizar trajeto INACTIVE")
+    void shouldRejectUpdateOfInactiveRoute() {
+        Route route = offer(2.0, 3);
+        route.deactivate();
+
+        ApplicationException ex = assertThrows(
+                ApplicationException.class,
+                () -> route.update("vehicle-456", HOME, PUC, "07:00", "07:40", WEEKDAYS, 2.0, 3)
+        );
+
+        assertThat(ex.getError().code()).isEqualTo(ErrorCode.ROUTE_NOT_FOUND);
+    }
 }

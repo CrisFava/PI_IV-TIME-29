@@ -107,26 +107,72 @@ public class Route {
             @Nullable Integer totalSeats
     ) {
         this.userId = userId;
-        this.vehicleId = vehicleId;
         this.type = type;
-        this.origin = origin;
-        this.destination = destination;
-        this.departureTime = departureTime;
-        this.estimatedArrivalTime = estimatedArrivalTime;
-        this.weekDays.addAll(weekDays);
-        this.maxDetourKm = maxDetourKm;
-        this.totalSeats = totalSeats;
 
-        if (type == RouteType.OFFER) {
-            this.validateOfferRequirements();
-            this.availableSeats = totalSeats;
-        } else {
-            this.clearOfferFields();
-        }
+        this.applyTripData(
+                vehicleId, origin, destination, departureTime, estimatedArrivalTime, weekDays, maxDetourKm, totalSeats
+        );
     }
 
     public Set<DayOfWeek> getWeekDays() {
         return Set.copyOf(this.weekDays);
+    }
+
+    public boolean isOwnedBy(String userId) {
+        return this.userId.equals(userId);
+    }
+
+    public void update(
+            @Nullable String vehicleId,
+            Place origin,
+            Place destination,
+            String departureTime,
+            String estimatedArrivalTime,
+            Set<DayOfWeek> weekDays,
+            @Nullable Double maxDetourKm,
+            @Nullable Integer totalSeats
+    ) {
+        if (this.status == RouteStatus.INACTIVE) {
+            throw new ApplicationException(ErrorCode.ROUTE_NOT_FOUND, "Route not found.");
+        }
+
+        this.applyTripData(
+                vehicleId, origin, destination, departureTime, estimatedArrivalTime, weekDays, maxDetourKm, totalSeats
+        );
+    }
+
+    public void deactivate() {
+        this.status = RouteStatus.INACTIVE;
+    }
+
+    // O type não entra aqui: um trajeto não muda de OFFER para SEARCH depois de criado.
+    private void applyTripData(
+            @Nullable String vehicleId,
+            Place origin,
+            Place destination,
+            String departureTime,
+            String estimatedArrivalTime,
+            Set<DayOfWeek> weekDays,
+            @Nullable Double maxDetourKm,
+            @Nullable Integer totalSeats
+    ) {
+        this.vehicleId = vehicleId;
+        this.origin = origin;
+        this.destination = destination;
+        this.departureTime = departureTime;
+        this.estimatedArrivalTime = estimatedArrivalTime;
+        this.weekDays.clear();
+        this.weekDays.addAll(weekDays);
+        this.maxDetourKm = maxDetourKm;
+        this.totalSeats = totalSeats;
+
+        if (this.type == RouteType.OFFER) {
+            this.validateOfferRequirements();
+            // Sem o módulo de caronas ainda não há vagas ocupadas; quando houver, descontar as reservadas
+            this.availableSeats = totalSeats;
+        } else {
+            this.clearOfferFields();
+        }
     }
 
     private void validateOfferRequirements() {
