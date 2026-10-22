@@ -164,7 +164,9 @@ class _HomePageState extends ConsumerState<HomePage> {
 
     if (accepted) {
       // Motorista aceitou!
-      _showFeedback('O motorista ${driver.name} aceitou a corrida! Ele está a caminho.');
+      _showFeedback(
+        'O motorista ${driver.name} aceitou a corrida! Ele está a caminho.',
+      );
       List<LatLng>? approachRoute;
       try {
         approachRoute = await GoogleMapsService.computeRoutes(
@@ -227,20 +229,6 @@ class _HomePageState extends ConsumerState<HomePage> {
     setState(() => _isCarMenuOpen = !_isCarMenuOpen);
   }
 
-  void _onModeChanged(AppRideMode newMode) {
-    setState(() {
-      _currentMode = newMode;
-      if (newMode.isDriver) {
-        _passengerStep = PassengerRideStep.idle;
-      }
-    });
-    _showFeedback(
-      newMode.isDriver
-          ? 'Modo Motorista ativado.'
-          : 'Modo Passageiro ativado.',
-    );
-  }
-
   void _showLockedDriverWarning() {
     HapticFeedback.mediumImpact();
     _showFeedback(
@@ -266,7 +254,9 @@ class _HomePageState extends ConsumerState<HomePage> {
         _currentMode = AppRideMode.driver;
         _currentTabIndex = 0;
       });
-      _showFeedback('Modo Motorista ativo. Preencha os dados do seu expediente.');
+      _showFeedback(
+        'Modo Motorista ativo. Preencha os dados do seu expediente.',
+      );
     } else {
       _showLockedDriverWarning();
     }
@@ -284,7 +274,9 @@ class _HomePageState extends ConsumerState<HomePage> {
     // Exemplo:
     // await ref.read(caronaRepositoryProvider).iniciarExpediente(payload.toJson());
     // ========================================================================
-    debugPrint('Dados do expediente de motorista prontos para o backend: ${payload.toJson()}');
+    debugPrint(
+      'Dados do expediente de motorista prontos para o backend: ${payload.toJson()}',
+    );
   }
 
   void _handleSaveRoute() {
@@ -314,10 +306,7 @@ class _HomePageState extends ConsumerState<HomePage> {
         ),
         content: const Text(
           'Deseja realmente sair da sua conta Converge?',
-          style: TextStyle(
-            fontSize: 14,
-            color: AppColors.textSecondary,
-          ),
+          style: TextStyle(fontSize: 14, color: AppColors.textSecondary),
         ),
         actions: [
           TextButton(
@@ -433,9 +422,7 @@ class _HomePageState extends ConsumerState<HomePage> {
                       child: GestureDetector(
                         onTap: () => setState(() => _isCarMenuOpen = false),
                         behavior: HitTestBehavior.opaque,
-                        child: Container(
-                          color: AppColors.barrier,
-                        ),
+                        child: Container(color: AppColors.barrier),
                       ),
                     ),
                   ),
@@ -458,7 +445,8 @@ class _HomePageState extends ConsumerState<HomePage> {
                     isOpen: _isCarMenuOpen,
                     onToggleOpen: _onToggleCarMenu,
                     onRequestRide: _onRequestRide,
-                    onStartDriverShift: () => _onStartDriverShiftFromDock(canDrive),
+                    onStartDriverShift: () =>
+                        _onStartDriverShiftFromDock(canDrive),
                   ),
                 ),
               ],
@@ -476,7 +464,8 @@ class _HomePageState extends ConsumerState<HomePage> {
           child: HomeRealMapBackground(
             isDriverMode: _currentMode.isDriver,
             searchRadiusKm: _driverSearchRadiusKm,
-            showDrivers: _currentMode.isPassenger &&
+            showDrivers:
+                _currentMode.isPassenger &&
                 _passengerStep == PassengerRideStep.driverList,
             availableDrivers: _availableDrivers,
             acceptedDriver: _passengerStep == PassengerRideStep.driverAccepted
@@ -486,17 +475,20 @@ class _HomePageState extends ConsumerState<HomePage> {
             destinationLocation: _destinationLocation,
             pickupAddress: _pickupAddress,
             destinationAddress: _destinationAddress,
-            showTrajectory: _currentMode.isPassenger &&
+            showTrajectory:
+                _currentMode.isPassenger &&
                 (_passengerStep == PassengerRideStep.routeConfirmation ||
                     _passengerStep == PassengerRideStep.driverList ||
                     _passengerStep == PassengerRideStep.waitingDriver ||
                     _passengerStep == PassengerRideStep.driverAccepted),
             tripRoutePoints: _tripRoutePoints,
             driverApproachRoutePoints: _driverApproachRoutePoints,
-            isDraggingPin: _currentMode.isPassenger &&
+            isDraggingPin:
+                _currentMode.isPassenger &&
                 (_passengerStep == PassengerRideStep.dragMapPickup ||
                     _passengerStep == PassengerRideStep.dragMapDestination),
-            centralPinType: _passengerStep == PassengerRideStep.dragMapDestination
+            centralPinType:
+                _passengerStep == PassengerRideStep.dragMapDestination
                 ? CentralPinType.destination
                 : CentralPinType.pickup,
             pinLabel: _passengerStep == PassengerRideStep.dragMapDestination
@@ -607,11 +599,11 @@ class _HomePageState extends ConsumerState<HomePage> {
   }
 
   String _getTabTitle() => switch (_currentTabIndex) {
-        1 => 'Buscar e Histórico',
-        2 => 'Mensagens',
-        3 => 'Meu Perfil Acadêmico',
-        _ => 'Início',
-      };
+    1 => 'Buscar e Histórico',
+    2 => 'Mensagens',
+    3 => 'Meu Perfil Acadêmico',
+    _ => 'Início',
+  };
 
   // --- ABA 1: BUSCAR E HISTÓRICO ---
   Widget _buildSearchAndHistoryTab(double bottomPadding) {
@@ -627,7 +619,11 @@ class _HomePageState extends ConsumerState<HomePage> {
           ),
           child: const Row(
             children: [
-              Icon(Icons.search_rounded, color: AppColors.textPrimary, size: 22),
+              Icon(
+                Icons.search_rounded,
+                color: AppColors.textPrimary,
+                size: 22,
+              ),
               SizedBox(width: 12),
               Expanded(
                 child: Text(
@@ -666,7 +662,10 @@ class _HomePageState extends ConsumerState<HomePage> {
               children: [
                 const CircleAvatar(
                   backgroundColor: AppColors.neutralLight,
-                  child: Icon(Icons.person_rounded, color: AppColors.textPrimary),
+                  child: Icon(
+                    Icons.person_rounded,
+                    color: AppColors.textPrimary,
+                  ),
                 ),
                 const SizedBox(width: 12),
                 Expanded(

@@ -1,5 +1,6 @@
 import 'package:converge/core/services/maps/google_maps_service.dart';
 import 'package:dio/dio.dart';
+import 'package:flutter_dotenv/flutter_dotenv.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:google_maps_flutter/google_maps_flutter.dart';
 
@@ -10,10 +11,27 @@ void main() {
     setUp(() {
       mockDio = Dio();
       GoogleMapsService.testDio = mockDio;
+      dotenv.loadFromString(envString: 'GOOGLE_MAPS_API_KEY=test_mock_key');
     });
 
     tearDown(() {
       GoogleMapsService.testDio = null;
+      dotenv.clean();
+    });
+
+    test('Lança RoutesException com MISSING_API_KEY quando chave não estiver no .env', () async {
+      dotenv.clean();
+      expect(
+        () => GoogleMapsService.computeRoutes(
+          origin: const LatLng(0, 0),
+          destination: const LatLng(1, 1),
+        ),
+        throwsA(
+          isA<RoutesException>()
+              .having((e) => e.apiStatus, 'apiStatus', 'MISSING_API_KEY')
+              .having((e) => e.message, 'message', contains('não encontrada')),
+        ),
+      );
     });
 
     test('Retorna rota viária decodificada quando Routes API responder com encodedPolyline', () async {

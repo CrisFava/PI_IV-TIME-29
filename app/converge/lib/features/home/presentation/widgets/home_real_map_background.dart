@@ -219,7 +219,6 @@ class _HomeRealMapBackgroundState extends State<HomeRealMapBackground> {
 
   void _onMapCreated(GoogleMapController controller) {
     _mapController = controller;
-    controller.setMapStyle(_monochromeMapStyle);
     _adjustCameraForCurrentState();
   }
 
