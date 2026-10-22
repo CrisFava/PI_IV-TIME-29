@@ -68,5 +68,17 @@
 		</array>
 		<key>UIStatusBarHidden</key>
 		<false/>
+
+		<!-- Permissões de Localização para visualização do mapa e cálculo de caronas -->
+		<key>NSLocationWhenInUseUsageDescription</key>
+		<string>O Converge precisa da sua localização para definir pontos de embarque, desembarque e calcular trajetos de carona.</string>
+		<key>NSLocationAlwaysAndWhenInUseUsageDescription</key>
+		<string>O Converge utiliza sua localização para acompanhar a viagem em tempo real entre motoristas e passageiros.</string>
+		<key>NSLocationAlwaysUsageDescription</key>
+		<string>O Converge utiliza sua localização para acompanhar a viagem em tempo real entre motoristas e passageiros.</string>
+
+		<!-- Visualização incorporada para Google Maps no iOS -->
+		<key>io.flutter.embedded_views_preview</key>
+		<true/>
 	</dict>
 </plist>
