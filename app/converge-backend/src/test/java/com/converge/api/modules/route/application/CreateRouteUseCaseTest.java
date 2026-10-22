@@ -39,7 +39,9 @@ class CreateRouteUseCaseTest {
 
     @BeforeEach
     void setUp() {
-        createRouteUseCase = new CreateRouteUseCase(routeRepository, new RouteMapper());
+        createRouteUseCase = new CreateRouteUseCase(
+                routeRepository, new RouteMapper(), new RouteGeometryService(new FakeMapsGateway())
+        );
     }
 
     private CreateRouteCommand offerCommand() {
@@ -73,6 +75,8 @@ class CreateRouteUseCaseTest {
 
         assertThat(route.getUserId()).isEqualTo("user-123");
         assertThat(route.getType()).isEqualTo(RouteType.OFFER);
+        assertThat(route.getRouteDistanceKm()).isEqualTo(FakeMapsGateway.GOOGLE_ROUTE.distanceKm());
+        assertThat(route.getEncodedPolyline()).isEqualTo(FakeMapsGateway.GOOGLE_ROUTE.encodedPolyline());
         verify(routeRepository).save(route);
     }
 

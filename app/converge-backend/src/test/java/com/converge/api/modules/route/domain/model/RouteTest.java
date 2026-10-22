@@ -167,4 +167,28 @@ class RouteTest {
 
         assertThat(ex.getError().code()).isEqualTo(ErrorCode.ROUTE_NOT_FOUND);
     }
+
+    @Test
+    @DisplayName("Deve guardar a distância e o desenho do caminho")
+    void shouldDefineGeometry() {
+        Route route = offer(2.0, 3);
+
+        route.defineGeometry(12.63, "encoded-polyline");
+
+        assertThat(route.getRouteDistanceKm()).isEqualTo(12.63);
+        assertThat(route.getEncodedPolyline()).isEqualTo("encoded-polyline");
+    }
+
+    @Test
+    @DisplayName("Deve lançar BAD_REQUEST quando a distância for negativa")
+    void shouldRejectNegativeDistance() {
+        Route route = offer(2.0, 3);
+
+        ApplicationException ex = assertThrows(
+                ApplicationException.class,
+                () -> route.defineGeometry(-1, null)
+        );
+
+        assertThat(ex.getError().fields()).containsExactly("routeDistanceKm");
+    }
 }

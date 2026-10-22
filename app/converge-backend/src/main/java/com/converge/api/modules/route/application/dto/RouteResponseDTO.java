@@ -21,6 +21,7 @@ public record RouteResponseDTO(
         Integer totalSeats,
         Integer availableSeats,
         Double routeDistanceKm,
+        String encodedPolyline,
         LocalDateTime createdAt,
         LocalDateTime updatedAt
 ) {

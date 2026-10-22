@@ -2,6 +2,8 @@ package com.converge.api.modules.route.infrastructure.google;
 
 import com.converge.api.modules.route.application.gateway.PlaceDetails;
 import com.converge.api.modules.route.application.gateway.PlaceSuggestion;
+import com.converge.api.modules.route.application.gateway.RouteGeometry;
+import com.converge.api.modules.route.domain.model.subtypes.Coordinates;
 import com.converge.api.shared.presentation.exception.ApplicationException;
 import com.converge.api.shared.presentation.exception.ErrorCode;
 import org.junit.jupiter.api.BeforeEach;
@@ -151,5 +153,34 @@ class GoogleMapsGatewayTest {
         );
 
         assertThat(ex.getError().code()).isEqualTo(ErrorCode.EXTERNAL_SERVICE_ERROR);
+    }
+
+    @Test
+    @DisplayName("Deve traduzir a rota do Google: metros para km e a polyline")
+    void shouldMapComputedRoute() {
+        google.expect(requestTo(GoogleMapsGateway.ROUTES_URL))
+                .andExpect(method(HttpMethod.POST))
+                .andExpect(header("X-Goog-FieldMask", "routes.distanceMeters,routes.polyline.encodedPolyline"))
+                .andExpect(jsonPath("$.origin.location.latLng.latitude").value(-22.9056))
+                .andExpect(jsonPath("$.destination.location.latLng.longitude").value(-47.0524))
+                .andExpect(jsonPath("$.travelMode").value("DRIVE"))
+                .andRespond(withSuccess("""
+                        { "routes": [ { "distanceMeters": 12630, "polyline": { "encodedPolyline": "abc123" } } ] }
+                        """, MediaType.APPLICATION_JSON));
+
+        Optional<RouteGeometry> route = gateway.computeRoute(
+                new Coordinates(-22.9056, -47.0608), new Coordinates(-22.8337, -47.0524)
+        );
+
+        assertThat(route).contains(new RouteGeometry(12.63, "abc123"));
+        google.verify();
+    }
+
+    @Test
+    @DisplayName("Deve devolver Optional vazio quando o Google não encontrar rota")
+    void shouldReturnEmptyWhenNoRoute() {
+        google.expect(requestTo(GoogleMapsGateway.ROUTES_URL)).andRespond(withSuccess("{}", MediaType.APPLICATION_JSON));
+
+        assertThat(gateway.computeRoute(new Coordinates(0, 0), new Coordinates(1, 1))).isEmpty();
     }
 }

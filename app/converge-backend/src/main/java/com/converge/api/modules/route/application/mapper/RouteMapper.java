@@ -40,6 +40,7 @@ public class RouteMapper {
                 route.getTotalSeats(),
                 route.getAvailableSeats(),
                 route.getRouteDistanceKm(),
+                route.getEncodedPolyline(),
                 route.getCreatedAt(),
                 route.getUpdatedAt()
         );

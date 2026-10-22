@@ -3,6 +3,8 @@ package com.converge.api.modules.route.infrastructure.google;
 import com.converge.api.modules.route.application.gateway.MapsGateway;
 import com.converge.api.modules.route.application.gateway.PlaceDetails;
 import com.converge.api.modules.route.application.gateway.PlaceSuggestion;
+import com.converge.api.modules.route.application.gateway.RouteGeometry;
+import com.converge.api.modules.route.domain.model.subtypes.Coordinates;
 import com.converge.api.modules.route.infrastructure.google.GooglePlacesJson.AddressComponent;
 import com.converge.api.modules.route.infrastructure.google.GooglePlacesJson.AutocompleteRequest;
 import com.converge.api.modules.route.infrastructure.google.GooglePlacesJson.AutocompleteResponse;
@@ -13,6 +15,11 @@ import com.converge.api.modules.route.infrastructure.google.GooglePlacesJson.Loc
 import com.converge.api.modules.route.infrastructure.google.GooglePlacesJson.PlacePrediction;
 import com.converge.api.modules.route.infrastructure.google.GooglePlacesJson.PlaceResponse;
 import com.converge.api.modules.route.infrastructure.google.GooglePlacesJson.Suggestion;
+import com.converge.api.modules.route.infrastructure.google.GoogleRoutesJson.ComputeRoutesRequest;
+import com.converge.api.modules.route.infrastructure.google.GoogleRoutesJson.ComputeRoutesResponse;
+import com.converge.api.modules.route.infrastructure.google.GoogleRoutesJson.GoogleRoute;
+import com.converge.api.modules.route.infrastructure.google.GoogleRoutesJson.Location;
+import com.converge.api.modules.route.infrastructure.google.GoogleRoutesJson.Waypoint;
 import com.converge.api.shared.presentation.exception.ApplicationException;
 import com.converge.api.shared.presentation.exception.ErrorCode;
 import lombok.extern.slf4j.Slf4j;
@@ -37,10 +44,12 @@ import java.util.function.Supplier;
 public class GoogleMapsGateway implements MapsGateway {
 
     static final String PLACES_BASE_URL = "https://places.googleapis.com/v1";
+    static final String ROUTES_URL = "https://routes.googleapis.com/directions/v2:computeRoutes";
 
     private static final String API_KEY_HEADER = "X-Goog-Api-Key";
     private static final String FIELD_MASK_HEADER = "X-Goog-FieldMask";
     private static final String DETAILS_FIELD_MASK = "formattedAddress,addressComponents,location";
+    private static final String ROUTES_FIELD_MASK = "routes.distanceMeters,routes.polyline.encodedPolyline";
     private static final String LANGUAGE = "pt-BR";
     private static final List<String> REGIONS = List.of("br");
 
@@ -114,6 +123,35 @@ public class GoogleMapsGateway implements MapsGateway {
         });
 
         return Optional.ofNullable(response).map(this::toDetails);
+    }
+
+    @Override
+    public Optional<RouteGeometry> computeRoute(Coordinates origin, Coordinates destination) {
+        ComputeRoutesRequest request = new ComputeRoutesRequest(waypoint(origin), waypoint(destination), "DRIVE");
+
+        // URL absoluta: a Routes API fica em outro host, então o baseUrl do Places é ignorado
+        ComputeRoutesResponse response = call(() -> restClient.post()
+                .uri(ROUTES_URL)
+                .header(FIELD_MASK_HEADER, ROUTES_FIELD_MASK)
+                .body(request)
+                .retrieve()
+                .body(ComputeRoutesResponse.class));
+
+        if (response == null || response.routes() == null || response.routes().isEmpty()) {
+            return Optional.empty();
+        }
+
+        GoogleRoute route = response.routes().getFirst();
+        if (route.distanceMeters() == null) {
+            return Optional.empty();
+        }
+
+        String encodedPolyline = route.polyline() != null ? route.polyline().encodedPolyline() : null;
+        return Optional.of(new RouteGeometry(route.distanceMeters() / 1000.0, encodedPolyline));
+    }
+
+    private static Waypoint waypoint(Coordinates coordinates) {
+        return new Waypoint(new Location(new LatLng(coordinates.latitude(), coordinates.longitude())));
     }
 
     private PlaceSuggestion toSuggestion(PlacePrediction prediction) {

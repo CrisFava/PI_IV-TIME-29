@@ -45,7 +45,9 @@ class ManageRouteUseCasesTest {
 
         listMyRoutes = new ListMyRoutesUseCase(routeRepository);
         getRoute = new GetRouteUseCase(routeAccess);
-        updateRoute = new UpdateRouteUseCase(routeAccess, routeRepository, new RouteMapper());
+        updateRoute = new UpdateRouteUseCase(
+                routeAccess, routeRepository, new RouteMapper(), new RouteGeometryService(new FakeMapsGateway())
+        );
         deleteRoute = new DeleteRouteUseCase(routeAccess, routeRepository);
     }
 
@@ -97,6 +99,7 @@ class ManageRouteUseCasesTest {
         assertThat(updated.getDepartureTime()).isEqualTo("18:00");
         assertThat(updated.getOrigin().address()).isEqualTo("Rod. Dom Pedro I, km 136");
         assertThat(updated.getTotalSeats()).isEqualTo(2);
+        assertThat(updated.getRouteDistanceKm()).isEqualTo(FakeMapsGateway.GOOGLE_ROUTE.distanceKm());
         verify(routeRepository).save(route);
     }
 

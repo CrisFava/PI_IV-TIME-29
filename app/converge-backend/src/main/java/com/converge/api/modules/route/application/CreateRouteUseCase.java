@@ -1,6 +1,7 @@
 package com.converge.api.modules.route.application;
 
 import com.converge.api.modules.route.application.dto.CreateRouteCommand;
+import com.converge.api.modules.route.application.gateway.RouteGeometry;
 import com.converge.api.modules.route.application.mapper.RouteMapper;
 import com.converge.api.modules.route.domain.enums.RouteStatus;
 import com.converge.api.modules.route.domain.model.Route;
@@ -22,12 +23,19 @@ public class CreateRouteUseCase implements UseCase<CreateRouteCommand, Route> {
 
     private final RouteRepository routeRepository;
     private final RouteMapper routeMapper;
+    private final RouteGeometryService routeGeometryService;
 
     @Override
     public Route execute(CreateRouteCommand command) {
         Route route = routeMapper.toEntity(command.userId(), command.request());
         validateNotDuplicated(route);
+        applyGeometry(route);
         return routeRepository.save(route);
+    }
+
+    private void applyGeometry(Route route) {
+        RouteGeometry geometry = routeGeometryService.compute(route.getOrigin(), route.getDestination());
+        route.defineGeometry(geometry.distanceKm(), geometry.encodedPolyline());
     }
 
     private void validateNotDuplicated(Route route) {

@@ -21,6 +21,7 @@ import org.springframework.data.annotation.Id;
 import org.springframework.data.annotation.LastModifiedDate;
 import org.springframework.data.mongodb.core.index.Indexed;
 import org.springframework.data.mongodb.core.mapping.Document;
+import org.springframework.web.client.HttpClientErrorException.BadRequest;
 
 import java.time.DayOfWeek;
 import java.time.LocalDateTime;
@@ -84,6 +85,11 @@ public class Route {
     @Nullable
     private Double routeDistanceKm;
 
+    // Desenho do caminho no formato do Google; null quando a distância veio do
+    // Haversine
+    @Nullable
+    private String encodedPolyline;
+
     @NotNull
     @Indexed
     private RouteStatus status = RouteStatus.ACTIVE;
@@ -104,14 +110,12 @@ public class Route {
             String estimatedArrivalTime,
             Set<DayOfWeek> weekDays,
             @Nullable Double maxDetourKm,
-            @Nullable Integer totalSeats
-    ) {
+            @Nullable Integer totalSeats) {
         this.userId = userId;
         this.type = type;
 
         this.applyTripData(
-                vehicleId, origin, destination, departureTime, estimatedArrivalTime, weekDays, maxDetourKm, totalSeats
-        );
+                vehicleId, origin, destination, departureTime, estimatedArrivalTime, weekDays, maxDetourKm, totalSeats);
     }
 
     public Set<DayOfWeek> getWeekDays() {
@@ -130,22 +134,34 @@ public class Route {
             String estimatedArrivalTime,
             Set<DayOfWeek> weekDays,
             @Nullable Double maxDetourKm,
-            @Nullable Integer totalSeats
-    ) {
+            @Nullable Integer totalSeats) {
         if (this.status == RouteStatus.INACTIVE) {
             throw new ApplicationException(ErrorCode.ROUTE_NOT_FOUND, "Route not found.");
         }
 
         this.applyTripData(
-                vehicleId, origin, destination, departureTime, estimatedArrivalTime, weekDays, maxDetourKm, totalSeats
-        );
+                vehicleId, origin, destination, departureTime, estimatedArrivalTime, weekDays, maxDetourKm, totalSeats);
     }
 
     public void deactivate() {
         this.status = RouteStatus.INACTIVE;
     }
 
-    // O type não entra aqui: um trajeto não muda de OFFER para SEARCH depois de criado.
+    public void defineGeometry(double distanceKm, @Nullable String encodedPolyline) {
+        if (distanceKm < 0) {
+            throw new ApplicationException(
+                    ErrorCode.BAD_REQUEST,
+                    "Route distance cannot be negative.",
+                    Set.of("routeDistanceKm")
+            );
+        }
+
+        this.routeDistanceKm = distanceKm;
+        this.encodedPolyline = encodedPolyline;
+    }
+
+    // O type não entra aqui: um trajeto não muda de OFFER para SEARCH depois de
+    // criado.
     private void applyTripData(
             @Nullable String vehicleId,
             Place origin,
@@ -154,8 +170,7 @@ public class Route {
             String estimatedArrivalTime,
             Set<DayOfWeek> weekDays,
             @Nullable Double maxDetourKm,
-            @Nullable Integer totalSeats
-    ) {
+            @Nullable Integer totalSeats) {
         this.vehicleId = vehicleId;
         this.origin = origin;
         this.destination = destination;
@@ -168,7 +183,8 @@ public class Route {
 
         if (this.type == RouteType.OFFER) {
             this.validateOfferRequirements();
-            // Sem o módulo de caronas ainda não há vagas ocupadas; quando houver, descontar as reservadas
+            // Sem o módulo de caronas ainda não há vagas ocupadas; quando houver, descontar
+            // as reservadas
             this.availableSeats = totalSeats;
         } else {
             this.clearOfferFields();
@@ -193,13 +209,12 @@ public class Route {
         if (!fields.isEmpty()) {
             String message = "Offer requirements not met. Ensure vehicleId is provided and maxDetourKm and totalSeats are greater than zero.";
 
-
             throw new ApplicationException(ErrorCode.BAD_REQUEST, message, Set.copyOf(fields));
         }
     }
 
     private void clearOfferFields() {
-        //  Zerar (null) vehicleId, maxDetourKm, totalSeats e availableSeats.
+        // Zerar (null) vehicleId, maxDetourKm, totalSeats e availableSeats.
         this.vehicleId = null;
         this.maxDetourKm = null;
         this.totalSeats = null;
