@@ -14,6 +14,7 @@ dependencies:
   firebase_storage: ^14.0.0
   flutter:
     sdk: flutter
+  flutter_dotenv: ^6.0.1
   flutter_riverpod: ^3.4.3
   go_router: ^18.1.0
   google_maps_flutter: ^2.19.0
@@ -48,3 +49,4 @@ flutter:
   assets:
     - assets/icon.png
     - assets/converge_logo_1.png
+    - .env
