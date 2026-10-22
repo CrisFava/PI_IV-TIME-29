@@ -22,3 +22,25 @@ T unwrapApiResponse<T>(
   if (data is! Map<String, dynamic>) throw ApiException.fromStatus(500);
   return fromJson(data);
 }
+
+/// Extrai uma lista de itens do campo `data` no envelope `ApplicationResponse`.
+List<T> unwrapApiListResponse<T>(
+  Object? body,
+  T Function(Map<String, dynamic> json) fromJson, {
+  int status = 200,
+}) {
+  if (body is! Map<String, dynamic> || body['success'] is! bool) {
+    throw ApiException.fromStatus(500);
+  }
+
+  if (body['success'] != true) {
+    throw ApiException.fromResponse(body, status: status);
+  }
+
+  final data = body['data'];
+  if (data is! List<dynamic>) throw ApiException.fromStatus(500);
+  return data
+      .whereType<Map<String, dynamic>>()
+      .map(fromJson)
+      .toList();
+}

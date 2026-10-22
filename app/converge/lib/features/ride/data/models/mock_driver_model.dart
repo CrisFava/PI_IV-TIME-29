@@ -5,6 +5,9 @@ enum PassengerRideStep {
   /// Estado de repouso: mapa limpo, sem motoristas, botão "Pedir carona".
   idle,
 
+  /// Passo 0: Escolha inicial antes do embarque (Usar uma rota salva ou Selecionar no mapa).
+  chooseRouteOption,
+
   /// Passo 1: Seleção do Ponto de Embarque (Origem).
   selectPickup,
 

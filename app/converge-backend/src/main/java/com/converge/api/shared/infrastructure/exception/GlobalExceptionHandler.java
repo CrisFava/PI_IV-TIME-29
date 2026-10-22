@@ -5,6 +5,7 @@ import com.converge.api.shared.presentation.exception.ApplicationException;
 import com.converge.api.shared.presentation.exception.ErrorCode;
 import org.springframework.dao.DuplicateKeyException;
 import org.springframework.http.ResponseEntity;
+import org.springframework.http.converter.HttpMessageNotReadableException;
 import org.springframework.validation.FieldError;
 import org.springframework.web.bind.MethodArgumentNotValidException;
 import org.springframework.web.bind.annotation.ExceptionHandler;
@@ -62,6 +63,19 @@ public class GlobalExceptionHandler {
 
         return ResponseEntity
                 .status(ErrorCode.USER_ALREADY_EXISTS.getStatus())
+                .body(ApplicationResponse.failure(error));
+    }
+    @ExceptionHandler(HttpMessageNotReadableException.class)
+    public ResponseEntity<ApplicationResponse<Void>> handleHttpMessageNotReadable(
+            HttpMessageNotReadableException ex
+    ) {
+        ErrorResponse error = new ErrorResponse(
+                ErrorCode.BAD_REQUEST,
+                ex.getMessage()
+        );
+
+        return ResponseEntity
+                .status(ErrorCode.BAD_REQUEST.getStatus())
                 .body(ApplicationResponse.failure(error));
     }
 }
