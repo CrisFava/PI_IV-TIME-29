@@ -10,3 +10,8 @@ spring:
     mongodb:
       uri: ${MONGODB_CONNECTION_STRING}
       auto-index-creation: true
+
+google:
+  maps:
+    api-key: ${GOOGLE_MAPS_API_KEY:}
+    timeout: 5s

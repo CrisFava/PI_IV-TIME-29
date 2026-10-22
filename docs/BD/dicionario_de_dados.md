@@ -20,6 +20,7 @@
 | 09/10/2026 | Daniela Mikie Kikuchi Gonçalves | 1.1.1 | Renomeação de `recurring_agreements` → `reserved_seats` |
 | 09/10/2026 | Daniela Mikie Kikuchi Gonçalves | 1.1.2 | Revisão final e padronização de nomes |
 | 11/10/2026 | Sara Monteiro | 1.2.0 | Detalhamento do pagamento PIX: campo `pixKeyType` e enum no Usuário; regras da chave PIX; geração do QR Code "Pix Copia e Cola" estático (sem gateway); confirmação manual pelo motorista |
+| 21/10/2026 | Gustavo Alves de Siqueira Costa | 1.3.0 | `encodedPolyline` no Trajeto; `routeDistanceKm` calculada pela Routes API, com Haversine como alternativa |
 
 ---
 
@@ -111,7 +112,8 @@ Route é o registro de um deslocamento recorrente cadastrado por um usuário. Po
 | `maxDetourKm` | Número decimal | Sim | Simples | `2.0`, `0.5`, `5.0` | negativo, zero | Somente para `OFFER`. Distância máxima de desvio aceita pelo motorista. Usado no matching. |
 | `totalSeats` | Número inteiro | Não | Simples | `3`, `8` | `0`, negativo | Somente para `OFFER`. Calculado como `totalCapacity do veículo - 1`. |
 | `availableSeats` | Número inteiro | Não | Simples | `3`, `1`, `0` | negativo, maior que totalSeats | Somente para `OFFER`. Decrementado ao confirmar; incrementado ao cancelar. |
-| `routeDistanceKm` | Número decimal | Não | Simples | `12.4`, `5.8` | negativo, zero | Calculada via Google Maps na criação. Base para custos e desvios. |
+| `routeDistanceKm` | Número decimal | Não | Simples | `12.4`, `5.8` | negativo, zero | Distância pelas ruas, calculada pela Routes API (Google Maps) na criação e em cada edição. Se o Google estiver indisponível, recebe a distância em linha reta (Haversine). Base para custos e desvios. |
+| `encodedPolyline` | Texto | Não | Simples | `x~ijCzbe_HnAkBtCwE` | `""` (texto vazio) | Desenho do caminho no formato *encoded polyline* do Google, usado pelo app para traçar o trajeto no mapa. Calculado junto com `routeDistanceKm`. Nulo quando a distância veio do Haversine. |
 | `status` | Elemento de lista enumerada | Sim | Simples | `ACTIVE`, `PAUSED`, `INACTIVE` | valor fora do enum | Somente `ACTIVE` entra no matching. |
 | `createdAt` | Data e hora | Sim | Simples | `2025-03-01T08:00:00Z` | data futura | Gerado automaticamente. |
 | `updatedAt` | Data e hora | Sim | Simples | `2025-09-20T07:00:00Z` | data anterior à criação | Atualizado a cada edição. |
