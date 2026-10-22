@@ -321,6 +321,7 @@ Quando `active = false` (conta suspensa ou excluída):
   "totalSeats": "Integer | null",
   "availableSeats": "Integer | null",
   "routeDistanceKm": "Double | null",
+  "encodedPolyline": "String | null",
   "status": "ACTIVE | PAUSED | INACTIVE",
   "createdAt": "ISODate",
   "updatedAt": "ISODate"
