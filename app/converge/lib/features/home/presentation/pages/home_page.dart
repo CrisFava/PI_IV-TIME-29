@@ -7,6 +7,14 @@ import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:google_maps_flutter/google_maps_flutter.dart';
 
+import '../../../../core/network/api_error_code.dart';
+import '../../../../core/network/api_exception.dart';
+import '../../../../core/services/auth/auth_providers.dart';
+import '../../../route/data/models/create_route_request.dart';
+import '../../../route/data/models/route_place_model.dart';
+import '../../../route/data/models/route_response_model.dart';
+import '../../../route/state/saved_routes_controller.dart';
+
 import '../../../../core/config/styles.dart';
 import '../../../../core/services/maps/google_maps_service.dart';
 import '../../../../core/widgets/ride_dock_navigation.dart';
@@ -131,7 +139,7 @@ class _HomePageState extends ConsumerState<HomePage> {
         _showFeedback(e.message);
         return;
       } catch (e) {
-        _showFeedback('Não foi possível calcular o trajeto viário: $e');
+        _showFeedback('Não foi possível calcular o trajeto viário: ');
         return;
       }
     }
@@ -206,14 +214,55 @@ class _HomePageState extends ConsumerState<HomePage> {
 
   void _handleCancelFlow() {
     setState(() {
-      _passengerStep = PassengerRideStep.idle;
-      _destinationLocation = null;
-      _destinationAddress = '';
-      _selectedDriver = null;
-      _tripRoutePoints = null;
-      _driverApproachRoutePoints = null;
-      _availableDrivers = List.from(mockNearbyDriversList);
+      if (_passengerStep == PassengerRideStep.selectPickup) {
+        _passengerStep = PassengerRideStep.chooseRouteOption;
+      } else {
+        _passengerStep = PassengerRideStep.idle;
+        _destinationLocation = null;
+        _destinationAddress = '';
+        _selectedDriver = null;
+        _tripRoutePoints = null;
+        _driverApproachRoutePoints = null;
+        _availableDrivers = List.from(mockNearbyDriversList);
+      }
     });
+  }
+
+  Future<void> _handleSelectSavedRoute(RouteResponseModel route) async {
+    HapticFeedback.mediumImpact();
+    setState(() {
+      _pickupAddress = route.origin.address;
+      _pickupLocation = LatLng(route.origin.latitude, route.origin.longitude);
+      _destinationAddress = route.destination.address;
+      _destinationLocation = LatLng(
+        route.destination.latitude,
+        route.destination.longitude,
+      );
+      if (route.encodedPolyline != null && route.encodedPolyline!.isNotEmpty) {
+        _tripRoutePoints =
+            GoogleMapsService.decodePolyline(route.encodedPolyline!);
+      } else {
+        _tripRoutePoints = [];
+      }
+      _passengerStep = PassengerRideStep.driverList;
+    });
+
+    _showFeedback('Trajeto selecionado! Buscando motoristas disponíveis...');
+
+    if ((_tripRoutePoints == null || _tripRoutePoints!.isEmpty) &&
+        _destinationLocation != null) {
+      try {
+        final result = await GoogleMapsService.computeRoutes(
+          origin: _pickupLocation,
+          destination: _destinationLocation!,
+        );
+        if (mounted && result.isNotEmpty) {
+          setState(() {
+            _tripRoutePoints = result;
+          });
+        }
+      } catch (_) {}
+    }
   }
 
   void _onTabSelected(int index) {
@@ -242,9 +291,10 @@ class _HomePageState extends ConsumerState<HomePage> {
       _isCarMenuOpen = false;
       _currentMode = AppRideMode.passenger;
       _currentTabIndex = 0;
-      _passengerStep = PassengerRideStep.selectPickup;
+      _passengerStep = PassengerRideStep.chooseRouteOption;
     });
-    _showFeedback('Defina o ponto de embarque.');
+    ref.read(savedRoutesProvider.notifier).loadMyRoutes();
+    _showFeedback('Escolha como deseja definir seu trajeto.');
   }
 
   void _onStartDriverShiftFromDock(bool canDrive) {
@@ -279,9 +329,82 @@ class _HomePageState extends ConsumerState<HomePage> {
     );
   }
 
-  void _handleSaveRoute() {
+  Future<void> _handleSaveRoute() async {
     HapticFeedback.lightImpact();
-    _showFeedback('Trajeto salvo nos seus favoritos com sucesso!');
+    if (_destinationLocation == null) {
+      _showFeedback(
+        'Selecione uma origem e destino antes de salvar o trajeto.',
+      );
+      return;
+    }
+
+    final isDriver = _currentMode == AppRideMode.driver;
+    final request = CreateRouteRequest(
+      type: isDriver ? AppRouteType.offer : AppRouteType.search,
+      origin: RoutePlaceModel(
+        address: _pickupAddress,
+        neighborhood: 'Campus / Origem',
+        city: 'Campinas',
+        latitude: _pickupLocation.latitude,
+        longitude: _pickupLocation.longitude,
+      ),
+      destination: RoutePlaceModel(
+        address: _destinationAddress.isNotEmpty
+            ? _destinationAddress
+            : 'Destino Selecionado',
+        neighborhood: 'Destino',
+        city: 'Campinas',
+        latitude: _destinationLocation!.latitude,
+        longitude: _destinationLocation!.longitude,
+      ),
+      departureTime: '08:00',
+      estimatedArrivalTime: '08:45',
+      weekDays: const {'MONDAY', 'TUESDAY', 'WEDNESDAY', 'THURSDAY', 'FRIDAY'},
+      maxDetourKm: 3.0,
+      totalSeats: isDriver ? 3 : 1,
+    );
+
+    final authService = ref.read(authServiceProvider);
+    if (authService.currentUser == null) {
+      ref.read(savedRoutesProvider.notifier).saveLocalRoute(request);
+      await ref.read(authControllerProvider.notifier).signOut();
+      return;
+    }
+
+    _showFeedback('Salvando trajeto...');
+
+    try {
+      final saved = await ref
+          .read(savedRoutesProvider.notifier)
+          .saveRoute(request);
+      if (saved.encodedPolyline != null && saved.encodedPolyline!.isNotEmpty) {
+        final points = GoogleMapsService.decodePolyline(saved.encodedPolyline!);
+        if (points.isNotEmpty && mounted) {
+          setState(() {
+            _tripRoutePoints = points;
+          });
+        }
+      }
+      if (mounted) {
+        HapticFeedback.mediumImpact();
+        _showFeedback('Trajeto salvo com sucesso no backend!');
+      }
+    } on ApiException catch (e) {
+      ref.read(savedRoutesProvider.notifier).saveLocalRoute(request);
+      if (e.isUnauthorized || e.code == ApiErrorCode.invalidCredentials) {
+        // Desloga o usuário imediatamente sem emitir alerta de sessão expirada
+        await ref.read(authControllerProvider.notifier).signOut();
+        return;
+      }
+      if (mounted) {
+        _showFeedback(e.message);
+      }
+    } catch (e) {
+      ref.read(savedRoutesProvider.notifier).saveLocalRoute(request);
+      if (mounted) {
+        _showFeedback('Trajeto salvo localmente nos seus favoritos.');
+      }
+    }
   }
 
   Future<void> _confirmSignOut() async {
@@ -530,8 +653,13 @@ class _HomePageState extends ConsumerState<HomePage> {
               selectedDriver: _selectedDriver,
               bottomSafeArea: bottomPadding,
               onStartRideFlow: () {
+                setState(() => _passengerStep = PassengerRideStep.chooseRouteOption);
+                ref.read(savedRoutesProvider.notifier).loadMyRoutes();
+              },
+              onChooseMapOption: () {
                 setState(() => _passengerStep = PassengerRideStep.selectPickup);
               },
+              onSelectSavedRoute: _handleSelectSavedRoute,
               onStartDragMapPickup: _handleStartDragMapPickup,
               onStartDragMapDestination: _handleStartDragMapDestination,
               onPickupChosen: _handlePickupChosen,

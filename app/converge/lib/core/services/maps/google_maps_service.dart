@@ -43,10 +43,27 @@ class GoogleMapsService {
     return dotenv.maybeGet('GOOGLE_MAPS_API_KEY') ?? '';
   }
 
+  /// Calcula a rota viária pelas ruas reais da cidade para renderização visual
+  /// no Google Maps (Android e iOS).
+  ///
+  /// Se um [encodedPolyline] pré-calculado pelo backend for fornecido, realiza
+  /// a decodificação imediata. Caso contrário, consulta a Routes API da Google
+  /// para traçar exatamente pelas ruas, curvas e avenidas.
   static Future<List<LatLng>> computeRoutes({
     required LatLng origin,
     required LatLng destination,
+    String? encodedPolyline,
   }) async {
+    // 1. Se já recebemos a geometria do backend, prioriza a decodificação direta
+    if (encodedPolyline != null && encodedPolyline.isNotEmpty) {
+      try {
+        final decoded = decodePolyline(encodedPolyline);
+        if (decoded.isNotEmpty) return decoded;
+      } catch (e) {
+        debugPrint('Falha ao decodificar polyline fornecida: $e');
+      }
+    }
+
     if (apiKey.isEmpty) {
       throw const RoutesException(
         'Chave GOOGLE_MAPS_API_KEY não encontrada no arquivo .env.',
@@ -96,12 +113,14 @@ class GoogleMapsService {
           final detailsMsg = err['message'] as String?;
 
           final friendly = switch (status) {
-            'PERMISSION_DENIED' => 'Acesso negado à Routes API. Verifique a chave de API e se a Routes API está ativada no Google Cloud Console.',
+            'PERMISSION_DENIED' =>
+              'Acesso negado à Routes API. Verifique a chave de API.',
             'RESOURCE_EXHAUSTED' =>
               'Limite de requisições da Routes API excedido temporariamente.',
             'INVALID_ARGUMENT' =>
               'Parâmetros inválidos enviados para a Routes API.',
-            'NOT_FOUND' => 'Origem ou destino não puderam ser localizados em vias trafegáveis.',
+            'NOT_FOUND' =>
+              'Origem ou destino não puderam ser localizados em vias trafegáveis.',
             _ =>
               'Erro retornado pela Routes API: ${status ?? detailsMsg ?? "desconhecido"}.',
           };
@@ -119,7 +138,8 @@ class GoogleMapsService {
         DioExceptionType.sendTimeout ||
         DioExceptionType.receiveTimeout =>
           'Tempo limite esgotado ao conectar à Google Routes API.',
-        DioExceptionType.connectionError => 'Sem conexão com o serviço de rotas. Verifique sua conexão com a internet.',
+        DioExceptionType.connectionError =>
+          'Sem conexão com o serviço de rotas. Verifique sua internet.',
         DioExceptionType.badResponse =>
           'Erro HTTP ${e.response?.statusCode ?? 0} ao consultar rotas.',
         _ =>
@@ -156,16 +176,16 @@ class GoogleMapsService {
       throw const RoutesException('Objeto polyline ausente na rota retornada.');
     }
 
-    final encodedPolyline = polylineObj['encodedPolyline'] as String?;
-    if (encodedPolyline == null || encodedPolyline.isEmpty) {
+    final polyline = polylineObj['encodedPolyline'] as String?;
+    if (polyline == null || polyline.isEmpty) {
       throw const RoutesException(
-        'A rota retornada pela Google Routes API não possui pontos de traçado (polyline vazia).',
+        'A rota retornada pela Google Routes API não possui pontos de traçado.',
       );
     }
 
     List<LatLng> decodedPoints;
     try {
-      decodedPoints = decodePolyline(encodedPolyline);
+      decodedPoints = decodePolyline(polyline);
     } catch (e) {
       throw RoutesException('Falha ao decodificar a rota viária: $e');
     }
@@ -182,7 +202,13 @@ class GoogleMapsService {
   static Future<List<LatLng>> getDirectionsRoute({
     required LatLng origin,
     required LatLng destination,
-  }) => computeRoutes(origin: origin, destination: destination);
+    String? encodedPolyline,
+  }) =>
+      computeRoutes(
+        origin: origin,
+        destination: destination,
+        encodedPolyline: encodedPolyline,
+      );
 
   static Future<String> getAddressFromCoordinates(LatLng position) async {
     if (apiKey.isEmpty) {
