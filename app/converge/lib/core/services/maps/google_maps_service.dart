@@ -62,9 +62,18 @@ class GoogleMapsService {
 
   static Dio get _dio => testDio ?? _defaultDio;
 
-  static const String apiKey = String.fromEnvironment(
-    'GOOGLE_MAPS_API_KEY'
-  );
+  @visibleForTesting
+  static String? testApiKey;
+
+  /// Injetada em tempo de build via `--dart-define-from-file=.env`
+  /// (ou `--dart-define=GOOGLE_MAPS_API_KEY=...`).
+  static const String _envApiKey = String.fromEnvironment('GOOGLE_MAPS_API_KEY');
+
+  static String get apiKey => testApiKey ?? _envApiKey;
+
+  static const String _missingApiKeyMessage =
+      'Chave do Google Maps ausente no build. Rode o app com '
+      '--dart-define-from-file=.env para habilitar o cálculo de rotas.';
 
   /// Busca a rota viária de carro seguindo as ruas da cidade via Google Routes API (v2).
   ///
@@ -79,6 +88,13 @@ class GoogleMapsService {
     required LatLng origin,
     required LatLng destination,
   }) async {
+    if (apiKey.isEmpty) {
+      throw const RoutesException(
+        _missingApiKeyMessage,
+        apiStatus: 'MISSING_API_KEY',
+      );
+    }
+
     Response<Map<String, dynamic>> response;
     try {
       response = await _dio.post<Map<String, dynamic>>(
@@ -121,8 +137,10 @@ class GoogleMapsService {
           final detailsMsg = err['message'] as String?;
 
           final friendly = switch (status) {
+            // PERMISSION_DENIED cobre chave inválida, restrição de chave e API
+            // desativada; o detalhe do Google diz qual dos casos ocorreu.
             'PERMISSION_DENIED' =>
-              'Acesso negado à Routes API. Verifique a chave de API e se a Routes API está ativada no Google Cloud Console.',
+              'Acesso negado à Routes API${detailsMsg != null ? ': $detailsMsg' : '.'}',
             'RESOURCE_EXHAUSTED' =>
               'Limite de requisições da Routes API excedido temporariamente.',
             'INVALID_ARGUMENT' =>
@@ -212,6 +230,9 @@ class GoogleMapsService {
   /// Geocodificação reversa para buscar nome de rua/endereço a partir de coordenadas.
   /// Isolada e independente da lógica de roteamento viário.
   static Future<String> getAddressFromCoordinates(LatLng position) async {
+    if (apiKey.isEmpty) {
+      debugPrint('Google Geocoding API: $_missingApiKeyMessage');
+    }
     try {
       final response = await _dio.get<Map<String, dynamic>>(
         'https://maps.googleapis.com/maps/api/geocode/json',

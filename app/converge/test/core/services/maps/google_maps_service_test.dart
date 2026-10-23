@@ -10,10 +10,39 @@ void main() {
     setUp(() {
       mockDio = Dio();
       GoogleMapsService.testDio = mockDio;
+      GoogleMapsService.testApiKey = 'test-api-key';
     });
 
     tearDown(() {
       GoogleMapsService.testDio = null;
+      GoogleMapsService.testApiKey = null;
+    });
+
+    test('Lança RoutesException MISSING_API_KEY sem chamar a API quando a chave estiver ausente', () async {
+      GoogleMapsService.testApiKey = '';
+      var requested = false;
+
+      mockDio.interceptors.add(
+        InterceptorsWrapper(
+          onRequest: (options, handler) {
+            requested = true;
+            handler.next(options);
+          },
+        ),
+      );
+
+      await expectLater(
+        GoogleMapsService.computeRoutes(
+          origin: const LatLng(-22.8330, -47.0510),
+          destination: const LatLng(-22.8340, -47.0520),
+        ),
+        throwsA(
+          isA<RoutesException>()
+              .having((e) => e.apiStatus, 'apiStatus', 'MISSING_API_KEY')
+              .having((e) => e.message, 'message', contains('--dart-define-from-file=.env')),
+        ),
+      );
+      expect(requested, isFalse);
     });
 
     test('Retorna rota viária decodificada quando Routes API responder com encodedPolyline', () async {
