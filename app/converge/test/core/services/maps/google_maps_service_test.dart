@@ -19,6 +19,33 @@ void main() {
       dotenv.clean();
     });
 
+    test('Lança RoutesException MISSING_API_KEY sem chamar a API quando a chave estiver ausente', () async {
+      dotenv.clean();
+      var requested = false;
+
+      mockDio.interceptors.add(
+        InterceptorsWrapper(
+          onRequest: (options, handler) {
+            requested = true;
+            handler.next(options);
+          },
+        ),
+      );
+
+      await expectLater(
+        GoogleMapsService.computeRoutes(
+          origin: const LatLng(-22.8330, -47.0510),
+          destination: const LatLng(-22.8340, -47.0520),
+        ),
+        throwsA(
+          isA<RoutesException>()
+              .having((e) => e.apiStatus, 'apiStatus', 'MISSING_API_KEY')
+              .having((e) => e.message, 'message', contains('.env')),
+        ),
+      );
+      expect(requested, isFalse);
+    });
+
     test('decodePolyline decodifica corretamente e rejeita strings truncadas', () {
       // Polyline canônica do Google: (38.5, -120.2) -> (40.7, -120.95)
       const testPolyline = '_p~iF~ps|U_ulLnnqC';

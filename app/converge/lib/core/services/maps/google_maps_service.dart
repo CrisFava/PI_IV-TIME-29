@@ -113,8 +113,10 @@ class GoogleMapsService {
           final detailsMsg = err['message'] as String?;
 
           final friendly = switch (status) {
+            // PERMISSION_DENIED cobre chave inválida, restrição de chave e API
+            // desativada; o detalhe do Google diz qual dos casos ocorreu.
             'PERMISSION_DENIED' =>
-              'Acesso negado à Routes API. Verifique a chave de API.',
+              'Acesso negado à Routes API${detailsMsg != null ? ': $detailsMsg' : '.'}',
             'RESOURCE_EXHAUSTED' =>
               'Limite de requisições da Routes API excedido temporariamente.',
             'INVALID_ARGUMENT' =>
