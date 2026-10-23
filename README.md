@@ -169,10 +169,10 @@ Certifique-se de que há um emulador ativo ou dispositivo físico conectado (`fl
 cd app/converge
 flutter pub get
 cp .env.example .env   # preencha GOOGLE_MAPS_API_KEY
-flutter run --dart-define-from-file=.env
+flutter run
 ```
 
-O `--dart-define-from-file=.env` é obrigatório: é por ele que o código Dart recebe a `GOOGLE_MAPS_API_KEY` usada nas chamadas à Routes, Places e Geocoding API. Sem ele, o mapa nativo carrega (a chave chega por `build.gradle.kts` / `Info.plist`), mas o cálculo de rotas falha.
+O `.env` é empacotado como asset e lido em tempo de execução (`flutter_dotenv` no Dart e `AppDelegate` no iOS). Sem a `GOOGLE_MAPS_API_KEY` preenchida, o cálculo de rotas falha com `MISSING_API_KEY`.
 
 O app aponta para `http://localhost:8080/api/v1` por padrão. No **emulador Android**, `localhost` é o próprio emulador; use o endereço do host:
 
