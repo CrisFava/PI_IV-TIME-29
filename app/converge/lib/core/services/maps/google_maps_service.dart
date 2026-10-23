@@ -1,28 +1,14 @@
 import 'package:dio/dio.dart';
 import 'package:flutter/foundation.dart';
+import 'package:flutter_dotenv/flutter_dotenv.dart';
 import 'package:google_maps_flutter/google_maps_flutter.dart';
 
-/// ============================================================================
-/// EXCEÇÃO TIPADA: RoutesException
-/// ============================================================================
-/// Lançada em caso de erro na consulta, validação ou decodificação de rotas
-/// da Google Routes API.
-/// ============================================================================
 class RoutesException implements Exception {
-  /// Mensagem descritiva e amigável sobre o erro ocorrido.
   final String message;
-
-  /// Status de erro retornado pela Google Routes API (ex: PERMISSION_DENIED, RESOURCE_EXHAUSTED, INVALID_ARGUMENT, ZERO_RESULTS).
   final String? apiStatus;
-
-  /// Mensagem técnica detalhada (`error.message`) retornada pelo Google, se disponível.
   final String? apiErrorMessage;
 
-  const RoutesException(
-    this.message, {
-    this.apiStatus,
-    this.apiErrorMessage,
-  });
+  const RoutesException(this.message, {this.apiStatus, this.apiErrorMessage});
 
   @override
   String toString() {
@@ -37,18 +23,8 @@ class RoutesException implements Exception {
   }
 }
 
-/// Compatibilidade retroativa para callers que utilizavam DirectionsException
 typedef DirectionsException = RoutesException;
 
-/// ============================================================================
-/// SERVIÇO DE INTEGRAÇÃO COM GOOGLE MAPS API (ROUTES API & GEOCODING)
-/// ============================================================================
-/// Responsável por:
-/// 1. Consultar a moderna Google Routes API (v2:computeRoutes) em modo 'DRIVE' para traçar rotas viárias reais.
-/// 2. Validar a integridade da resposta, headers obrigatórios e status RPC de erro.
-/// 3. Decodificar o encodedPolyline retornado.
-/// 4. Geocodificação reversa de coordenadas para exibição de endereços reais.
-/// ============================================================================
 class GoogleMapsService {
   @visibleForTesting
   static Dio? testDio;
@@ -62,35 +38,35 @@ class GoogleMapsService {
 
   static Dio get _dio => testDio ?? _defaultDio;
 
-  @visibleForTesting
-  static String? testApiKey;
+  static String get apiKey {
+    if (!dotenv.isInitialized) return '';
+    return dotenv.maybeGet('GOOGLE_MAPS_API_KEY') ?? '';
+  }
 
-  /// Injetada em tempo de build via `--dart-define-from-file=.env`
-  /// (ou `--dart-define=GOOGLE_MAPS_API_KEY=...`).
-  static const String _envApiKey = String.fromEnvironment('GOOGLE_MAPS_API_KEY');
-
-  static String get apiKey => testApiKey ?? _envApiKey;
-
-  static const String _missingApiKeyMessage =
-      'Chave do Google Maps ausente no build. Rode o app com '
-      '--dart-define-from-file=.env para habilitar o cálculo de rotas.';
-
-  /// Busca a rota viária de carro seguindo as ruas da cidade via Google Routes API (v2).
+  /// Calcula a rota viária pelas ruas reais da cidade para renderização visual
+  /// no Google Maps (Android e iOS).
   ///
-  /// Lança [RoutesException] se:
-  /// - A API retornar erro RPC (ex: PERMISSION_DENIED, RESOURCE_EXHAUSTED, INVALID_ARGUMENT).
-  /// - Nenhuma rota viária for encontrada para as coordenadas informadas.
-  /// - A resposta for inválida ou não contiver um encodedPolyline válido.
-  /// - Ocorrer falha de rede, timeout ou erro na decodificação das coordenadas.
-  ///
-  /// Nunca retorna coordenadas artificiais ou linhas retas fictícias.
+  /// Se um [encodedPolyline] pré-calculado pelo backend for fornecido, realiza
+  /// a decodificação imediata. Caso contrário, consulta a Routes API da Google
+  /// para traçar exatamente pelas ruas, curvas e avenidas.
   static Future<List<LatLng>> computeRoutes({
     required LatLng origin,
     required LatLng destination,
+    String? encodedPolyline,
   }) async {
+    // 1. Se já recebemos a geometria do backend, prioriza a decodificação direta
+    if (encodedPolyline != null && encodedPolyline.isNotEmpty) {
+      try {
+        final decoded = decodePolyline(encodedPolyline);
+        if (decoded.isNotEmpty) return decoded;
+      } catch (e) {
+        debugPrint('Falha ao decodificar polyline fornecida: $e');
+      }
+    }
+
     if (apiKey.isEmpty) {
       throw const RoutesException(
-        _missingApiKeyMessage,
+        'Chave GOOGLE_MAPS_API_KEY não encontrada no arquivo .env.',
         apiStatus: 'MISSING_API_KEY',
       );
     }
@@ -165,10 +141,11 @@ class GoogleMapsService {
         DioExceptionType.receiveTimeout =>
           'Tempo limite esgotado ao conectar à Google Routes API.',
         DioExceptionType.connectionError =>
-          'Sem conexão com o serviço de rotas. Verifique sua conexão com a internet.',
+          'Sem conexão com o serviço de rotas. Verifique sua internet.',
         DioExceptionType.badResponse =>
           'Erro HTTP ${e.response?.statusCode ?? 0} ao consultar rotas.',
-        _ => 'Falha de rede ao consultar rotas: ${e.message ?? "erro desconhecido"}',
+        _ =>
+          'Falha de rede ao consultar rotas: ${e.message ?? "erro desconhecido"}',
       };
       throw RoutesException(message);
     } catch (e) {
@@ -191,7 +168,9 @@ class GoogleMapsService {
 
     final firstRoute = routes[0];
     if (firstRoute is! Map<String, dynamic>) {
-      throw const RoutesException('Formato de rota inválido na resposta da API.');
+      throw const RoutesException(
+        'Formato de rota inválido na resposta da API.',
+      );
     }
 
     final polylineObj = firstRoute['polyline'];
@@ -199,40 +178,45 @@ class GoogleMapsService {
       throw const RoutesException('Objeto polyline ausente na rota retornada.');
     }
 
-    final encodedPolyline = polylineObj['encodedPolyline'] as String?;
-    if (encodedPolyline == null || encodedPolyline.isEmpty) {
+    final polyline = polylineObj['encodedPolyline'] as String?;
+    if (polyline == null || polyline.isEmpty) {
       throw const RoutesException(
-        'A rota retornada não possui pontos de traçado (encodedPolyline vazio).',
+        'A rota retornada pela Google Routes API não possui pontos de traçado.',
       );
     }
 
     List<LatLng> decodedPoints;
     try {
-      decodedPoints = decodePolyline(encodedPolyline);
+      decodedPoints = decodePolyline(polyline);
     } catch (e) {
-      throw RoutesException('Falha ao decodificar a polyline da rota: $e');
+      throw RoutesException('Falha ao decodificar a rota viária: $e');
     }
 
     if (decodedPoints.isEmpty) {
-      throw const RoutesException('A rota decodificada não possui coordenadas válidas.');
+      throw const RoutesException(
+        'A rota decodificada não continha coordenadas utilizáveis.',
+      );
     }
 
     return decodedPoints;
   }
 
-  /// Delega para [computeRoutes] para compatibilidade com o chamador anterior.
   static Future<List<LatLng>> getDirectionsRoute({
     required LatLng origin,
     required LatLng destination,
+    String? encodedPolyline,
   }) =>
-      computeRoutes(origin: origin, destination: destination);
+      computeRoutes(
+        origin: origin,
+        destination: destination,
+        encodedPolyline: encodedPolyline,
+      );
 
-  /// Geocodificação reversa para buscar nome de rua/endereço a partir de coordenadas.
-  /// Isolada e independente da lógica de roteamento viário.
   static Future<String> getAddressFromCoordinates(LatLng position) async {
     if (apiKey.isEmpty) {
-      debugPrint('Google Geocoding API: $_missingApiKeyMessage');
+      return 'Ponto selecionado (${position.latitude.toStringAsFixed(4)}, ${position.longitude.toStringAsFixed(4)})';
     }
+
     try {
       final response = await _dio.get<Map<String, dynamic>>(
         'https://maps.googleapis.com/maps/api/geocode/json',
@@ -266,7 +250,6 @@ class GoogleMapsService {
     return 'Ponto selecionado (${position.latitude.toStringAsFixed(4)}, ${position.longitude.toStringAsFixed(4)})';
   }
 
-  /// Algoritmo oficial de decodificação de polylines do Google Maps (encodedPolyline).
   static List<LatLng> decodePolyline(String encoded) {
     final poly = <LatLng>[];
     int index = 0;
@@ -280,7 +263,9 @@ class GoogleMapsService {
       int result = 0;
       do {
         if (index >= len) {
-          throw const FormatException('String polyline truncada ou malformada.');
+          throw const FormatException(
+            'String polyline truncada ou malformada.',
+          );
         }
         b = encoded.codeUnitAt(index++) - 63;
         result |= (b & 0x1f) << shift;
@@ -293,7 +278,9 @@ class GoogleMapsService {
       result = 0;
       do {
         if (index >= len) {
-          throw const FormatException('String polyline truncada ou malformada.');
+          throw const FormatException(
+            'String polyline truncada ou malformada.',
+          );
         }
         b = encoded.codeUnitAt(index++) - 63;
         result |= (b & 0x1f) << shift;

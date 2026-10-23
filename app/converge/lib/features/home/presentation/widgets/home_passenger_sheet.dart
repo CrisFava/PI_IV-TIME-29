@@ -1,9 +1,14 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
+import '../../../route/data/models/place_suggestion_model.dart';
+import '../../../route/state/places_autocomplete_controller.dart';
 import 'package:google_maps_flutter/google_maps_flutter.dart';
 
 import '../../../../core/config/styles.dart';
 import '../../../ride/data/models/mock_driver_model.dart';
+import '../../../route/data/models/route_response_model.dart';
+import '../../../route/state/saved_routes_controller.dart';
 
 /// ============================================================================
 /// COMPONENTE: HomePassengerSheet (Fluxo de Solicitação do Passageiro)
@@ -16,7 +21,7 @@ import '../../../ride/data/models/mock_driver_model.dart';
 /// 5. Quinto: Aguardando Aceite (Simulação)
 /// 6. Sexto: Corrida Aceita (Trajeto de aproximação e Chat)
 /// ============================================================================
-class HomePassengerSheet extends StatefulWidget {
+class HomePassengerSheet extends ConsumerStatefulWidget {
   final PassengerRideStep step;
   final String pickupAddress;
   final String destinationAddress;
@@ -38,6 +43,8 @@ class HomePassengerSheet extends StatefulWidget {
   final VoidCallback onSendMessageToDriver;
   final VoidCallback onCancelFlow;
   final VoidCallback onSaveRoute;
+  final ValueChanged<RouteResponseModel>? onSelectSavedRoute;
+  final VoidCallback? onChooseMapOption;
   final double bottomSafeArea;
 
   const HomePassengerSheet({
@@ -62,15 +69,38 @@ class HomePassengerSheet extends StatefulWidget {
     required this.onSendMessageToDriver,
     required this.onCancelFlow,
     required this.onSaveRoute,
+    this.onSelectSavedRoute,
+    this.onChooseMapOption,
     this.bottomSafeArea = 0,
   });
 
   @override
-  State<HomePassengerSheet> createState() => _HomePassengerSheetState();
+  ConsumerState<HomePassengerSheet> createState() => _HomePassengerSheetState();
 }
 
-class _HomePassengerSheetState extends State<HomePassengerSheet> {
+class _HomePassengerSheetState extends ConsumerState<HomePassengerSheet> {
   final _searchController = TextEditingController();
+
+  Future<void> _handleDestinationSuggestionSelected(
+    PlaceSuggestionModel suggestion,
+  ) async {
+    HapticFeedback.lightImpact();
+    final details = await ref
+        .read(placesAutocompleteProvider.notifier)
+        .getPlaceDetails(suggestion.placeId);
+    if (details != null && mounted) {
+      widget.onDestinationChosen(
+        details.address,
+        LatLng(details.latitude, details.longitude),
+      );
+    } else if (mounted) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text('Não foi possível obter detalhes deste endereço.'),
+        ),
+      );
+    }
+  }
 
   @override
   void dispose() {
@@ -83,6 +113,8 @@ class _HomePassengerSheetState extends State<HomePassengerSheet> {
     switch (widget.step) {
       case PassengerRideStep.idle:
         return const SizedBox.shrink();
+      case PassengerRideStep.chooseRouteOption:
+        return _buildChooseRouteOptionSheet();
       case PassengerRideStep.selectPickup:
         return _buildSelectPickupSheet();
       case PassengerRideStep.dragMapPickup:
@@ -105,6 +137,776 @@ class _HomePassengerSheetState extends State<HomePassengerSheet> {
           bottomSafeArea: widget.bottomSafeArea,
         );
     }
+  }
+
+  // ==========================================================================
+  // PASSO 0: ESCOLHA ENTRE ROTA SALVA OU SELEÇÃO NO MAPA
+  // ==========================================================================
+  Widget _buildChooseRouteOptionSheet() {
+    final savedRoutesState = ref.watch(savedRoutesProvider);
+    final savedRoutes = savedRoutesState.routes;
+
+    return DraggableScrollableSheet(
+      initialChildSize: 0.62,
+      minChildSize: 0.38,
+      maxChildSize: 0.92,
+      snap: true,
+      snapSizes: const [0.38, 0.62, 0.92],
+      builder: (context, scrollController) {
+        return Container(
+          decoration: BoxDecoration(
+            color: AppColors.cardBackground,
+            borderRadius: const BorderRadius.vertical(top: Radius.circular(26)),
+            border: Border.all(color: AppColors.borderSubtle, width: 1),
+            boxShadow: [
+              BoxShadow(
+                color: Colors.black.withValues(alpha: 0.14),
+                blurRadius: 24,
+                offset: const Offset(0, -6),
+              ),
+            ],
+          ),
+          child: CustomScrollView(
+            controller: scrollController,
+            slivers: [
+              // Alça de arraste superior
+              SliverToBoxAdapter(
+                child: Center(
+                  child: Container(
+                    margin: const EdgeInsets.symmetric(vertical: 10),
+                    width: 38,
+                    height: 4,
+                    decoration: BoxDecoration(
+                      color: AppColors.borderMedium,
+                      borderRadius: BorderRadius.circular(2),
+                    ),
+                  ),
+                ),
+              ),
+
+              SliverPadding(
+                padding: EdgeInsets.fromLTRB(
+                  16,
+                  4,
+                  16,
+                  120 + widget.bottomSafeArea,
+                ),
+                sliver: SliverList(
+                  delegate: SliverChildListDelegate([
+                    Row(
+                      children: [
+                        IconButton(
+                          onPressed: widget.onCancelFlow,
+                          icon: const Icon(
+                            Icons.close_rounded,
+                            color: AppColors.textPrimary,
+                          ),
+                          tooltip: 'Fechar',
+                        ),
+                        const SizedBox(width: 4),
+                        const Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            Text(
+                              'Iniciar Carona',
+                              style: TextStyle(
+                                fontSize: 18,
+                                fontWeight: FontWeight.w800,
+                                color: AppColors.textPrimary,
+                                letterSpacing: -0.3,
+                              ),
+                            ),
+                            Text(
+                              'Como deseja definir seu trajeto hoje?',
+                              style: TextStyle(
+                                fontSize: 12,
+                                color: AppColors.textSecondary,
+                              ),
+                            ),
+                          ],
+                        ),
+                      ],
+                    ),
+                    const SizedBox(height: 16),
+
+                    // OPÇÃO 1: SELECIONAR NO MAPA
+                    Material(
+                      color: AppColors.neutralLight,
+                      borderRadius: BorderRadius.circular(18),
+                      child: InkWell(
+                        onTap: () {
+                          HapticFeedback.lightImpact();
+                          if (widget.onChooseMapOption != null) {
+                            widget.onChooseMapOption!();
+                          } else {
+                            widget.onStartRideFlow();
+                          }
+                        },
+                        borderRadius: BorderRadius.circular(18),
+                        child: Padding(
+                          padding: const EdgeInsets.all(16),
+                          child: Row(
+                            children: [
+                              Container(
+                                padding: const EdgeInsets.all(12),
+                                decoration: BoxDecoration(
+                                  color: AppColors.cardBackground,
+                                  shape: BoxShape.circle,
+                                  border: Border.all(color: AppColors.borderSubtle),
+                                ),
+                                child: const Icon(
+                                  Icons.map_rounded,
+                                  color: AppColors.textPrimary,
+                                  size: 22,
+                                ),
+                              ),
+                              const SizedBox(width: 14),
+                              const Expanded(
+                                child: Column(
+                                  crossAxisAlignment: CrossAxisAlignment.start,
+                                  children: [
+                                    Text(
+                                      'Selecionar no Mapa',
+                                      style: TextStyle(
+                                        fontSize: 15,
+                                        fontWeight: FontWeight.w800,
+                                        color: AppColors.textPrimary,
+                                      ),
+                                    ),
+                                    SizedBox(height: 3),
+                                    Text(
+                                      'Definir novo ponto de embarque e destino',
+                                      style: TextStyle(
+                                        fontSize: 12,
+                                        color: AppColors.textSecondary,
+                                      ),
+                                    ),
+                                  ],
+                                ),
+                              ),
+                              const Icon(
+                                Icons.arrow_forward_ios_rounded,
+                                size: 14,
+                                color: AppColors.textMuted,
+                              ),
+                            ],
+                          ),
+                        ),
+                      ),
+                    ),
+
+                    const SizedBox(height: 22),
+
+                    // OPÇÃO 2: USAR UMA ROTA SALVA
+                    Row(
+                      mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                      children: [
+                        const Row(
+                          children: [
+                            Icon(
+                              Icons.bookmark_rounded,
+                              size: 18,
+                              color: AppColors.primary,
+                            ),
+                            SizedBox(width: 8),
+                            Text(
+                              'Usar uma Rota Salva',
+                              style: TextStyle(
+                                fontSize: 15,
+                                fontWeight: FontWeight.w800,
+                                color: AppColors.textPrimary,
+                                letterSpacing: -0.2,
+                              ),
+                            ),
+                          ],
+                        ),
+                        if (savedRoutes.isNotEmpty)
+                          Container(
+                            padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
+                            decoration: BoxDecoration(
+                              color: AppColors.neutralLight,
+                              borderRadius: BorderRadius.circular(10),
+                            ),
+                            child: Text(
+                              '${savedRoutes.length} salvas',
+                              style: const TextStyle(
+                                fontSize: 11.5,
+                                fontWeight: FontWeight.w700,
+                                color: AppColors.textPrimary,
+                              ),
+                            ),
+                          ),
+                      ],
+                    ),
+                    const SizedBox(height: 12),
+
+                    if (savedRoutesState.isLoading && savedRoutes.isEmpty)
+                      const Center(
+                        child: Padding(
+                          padding: EdgeInsets.symmetric(vertical: 32),
+                          child: CircularProgressIndicator(
+                            color: AppColors.primary,
+                            strokeWidth: 2.8,
+                          ),
+                        ),
+                      )
+                    else if (savedRoutes.isEmpty)
+                      Container(
+                        padding: const EdgeInsets.all(20),
+                        decoration: BoxDecoration(
+                          color: AppColors.cardSecondary,
+                          borderRadius: BorderRadius.circular(16),
+                          border: Border.all(color: AppColors.borderSubtle),
+                        ),
+                        child: Column(
+                          children: [
+                            const Icon(
+                              Icons.bookmark_border_rounded,
+                              size: 36,
+                              color: AppColors.iconMuted,
+                            ),
+                            const SizedBox(height: 10),
+                            const Text(
+                              'Nenhuma rota salva encontrada',
+                              style: TextStyle(
+                                fontWeight: FontWeight.w700,
+                                fontSize: 14,
+                                color: AppColors.textPrimary,
+                              ),
+                            ),
+                            const SizedBox(height: 4),
+                            const Text(
+                              'Você pode selecionar no mapa e salvar seu trajeto frequente para pedir carona em 1 toque.',
+                              textAlign: TextAlign.center,
+                              style: TextStyle(
+                                fontSize: 12,
+                                color: AppColors.textSecondary,
+                              ),
+                            ),
+                            const SizedBox(height: 14),
+                            FilledButton.icon(
+                              style: FilledButton.styleFrom(
+                                backgroundColor: AppColors.primary,
+                                foregroundColor: AppColors.textLight,
+                                shape: RoundedRectangleBorder(
+                                  borderRadius: BorderRadius.circular(12),
+                                ),
+                              ),
+                              onPressed: () {
+                                HapticFeedback.lightImpact();
+                                if (widget.onChooseMapOption != null) {
+                                  widget.onChooseMapOption!();
+                                } else {
+                                  widget.onStartRideFlow();
+                                }
+                              },
+                              icon: const Icon(Icons.add_location_alt_rounded, size: 16),
+                              label: const Text('Definir Rota no Mapa'),
+                            ),
+                          ],
+                        ),
+                      )
+                    else
+                      ...savedRoutes.map((route) {
+                        return Padding(
+                          padding: const EdgeInsets.only(bottom: 12),
+                          child: Material(
+                            color: AppColors.cardBackground,
+                            shape: RoundedRectangleBorder(
+                              borderRadius: BorderRadius.circular(18),
+                              side: const BorderSide(color: AppColors.borderSubtle),
+                            ),
+                            child: InkWell(
+                              onTap: () {
+                                HapticFeedback.mediumImpact();
+                                widget.onSelectSavedRoute?.call(route);
+                              },
+                              borderRadius: BorderRadius.circular(18),
+                              child: Padding(
+                                padding: const EdgeInsets.all(16),
+                                child: Column(
+                                  crossAxisAlignment: CrossAxisAlignment.start,
+                                  children: [
+                                    // Linha do topo: Horário e Dias
+                                    Row(
+                                      mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                                      children: [
+                                        Container(
+                                          padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
+                                          decoration: BoxDecoration(
+                                            color: AppColors.neutralLight,
+                                            borderRadius: BorderRadius.circular(8),
+                                          ),
+                                          child: Row(
+                                            mainAxisSize: MainAxisSize.min,
+                                            children: [
+                                              const Icon(
+                                                Icons.schedule_rounded,
+                                                size: 13,
+                                                color: AppColors.textSecondary,
+                                              ),
+                                              const SizedBox(width: 5),
+                                              Text(
+                                                '${route.departureTime} → ${route.estimatedArrivalTime}',
+                                                style: const TextStyle(
+                                                  fontSize: 11.5,
+                                                  fontWeight: FontWeight.w700,
+                                                  color: AppColors.textPrimary,
+                                                ),
+                                              ),
+                                            ],
+                                          ),
+                                        ),
+                                        Text(
+                                          _formatDaysSummary(route.weekDays),
+                                          style: const TextStyle(
+                                            fontSize: 11.5,
+                                            color: AppColors.textSecondary,
+                                            fontWeight: FontWeight.w600,
+                                          ),
+                                        ),
+                                      ],
+                                    ),
+                                    const SizedBox(height: 12),
+
+                                    // Origem
+                                    Row(
+                                      crossAxisAlignment: CrossAxisAlignment.start,
+                                      children: [
+                                        const Icon(
+                                          Icons.radio_button_checked_rounded,
+                                          size: 15,
+                                          color: AppColors.success,
+                                        ),
+                                        const SizedBox(width: 10),
+                                        Expanded(
+                                          child: Text(
+                                            route.origin.address,
+                                            maxLines: 1,
+                                            overflow: TextOverflow.ellipsis,
+                                            style: const TextStyle(
+                                              fontSize: 13.5,
+                                              fontWeight: FontWeight.w700,
+                                              color: AppColors.textPrimary,
+                                            ),
+                                          ),
+                                        ),
+                                      ],
+                                    ),
+                                    Padding(
+                                      padding: const EdgeInsets.only(left: 7),
+                                      child: Container(
+                                        width: 1.5,
+                                        height: 14,
+                                        color: AppColors.borderMedium,
+                                      ),
+                                    ),
+                                    // Destino
+                                    Row(
+                                      crossAxisAlignment: CrossAxisAlignment.start,
+                                      children: [
+                                        const Icon(
+                                          Icons.location_on_rounded,
+                                          size: 15,
+                                          color: AppColors.primary,
+                                        ),
+                                        const SizedBox(width: 10),
+                                        Expanded(
+                                          child: Text(
+                                            route.destination.address,
+                                            maxLines: 1,
+                                            overflow: TextOverflow.ellipsis,
+                                            style: const TextStyle(
+                                              fontSize: 13.5,
+                                              fontWeight: FontWeight.w700,
+                                              color: AppColors.textPrimary,
+                                            ),
+                                          ),
+                                        ),
+                                      ],
+                                    ),
+
+                                    const SizedBox(height: 14),
+                                    const Divider(color: AppColors.borderSubtle, height: 1),
+                                    const SizedBox(height: 10),
+
+                                    // Rodapé com "Ver detalhes" e Ação
+                                    Row(
+                                      mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                                      children: [
+                                        OutlinedButton.icon(
+                                          onPressed: () {
+                                            HapticFeedback.lightImpact();
+                                            _showRouteDetailsModal(context, route);
+                                          },
+                                          icon: const Icon(
+                                            Icons.info_outline_rounded,
+                                            size: 15,
+                                            color: AppColors.textPrimary,
+                                          ),
+                                          label: const Text(
+                                            'Ver detalhes',
+                                            style: TextStyle(
+                                              fontSize: 12.5,
+                                              fontWeight: FontWeight.w700,
+                                              color: AppColors.textPrimary,
+                                            ),
+                                          ),
+                                          style: OutlinedButton.styleFrom(
+                                            visualDensity: VisualDensity.compact,
+                                            side: const BorderSide(color: AppColors.borderSubtle),
+                                            shape: RoundedRectangleBorder(
+                                              borderRadius: BorderRadius.circular(10),
+                                            ),
+                                            padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+                                          ),
+                                        ),
+                                        FilledButton.icon(
+                                          onPressed: () {
+                                            HapticFeedback.mediumImpact();
+                                            widget.onSelectSavedRoute?.call(route);
+                                          },
+                                          icon: const Icon(
+                                            Icons.directions_car_rounded,
+                                            size: 15,
+                                            color: AppColors.textLight,
+                                          ),
+                                          label: const Text(
+                                            'Pedir carona',
+                                            style: TextStyle(
+                                              fontSize: 12,
+                                              fontWeight: FontWeight.w700,
+                                              color: AppColors.textLight,
+                                            ),
+                                          ),
+                                          style: FilledButton.styleFrom(
+                                            backgroundColor: AppColors.primary,
+                                            visualDensity: VisualDensity.compact,
+                                            padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+                                            shape: RoundedRectangleBorder(
+                                              borderRadius: BorderRadius.circular(10),
+                                            ),
+                                          ),
+                                        ),
+                                      ],
+                                    ),
+                                  ],
+                                ),
+                              ),
+                            ),
+                          ),
+                        );
+                      }),
+                  ]),
+                ),
+              ),
+            ],
+          ),
+        );
+      },
+    );
+  }
+
+  void _showRouteDetailsModal(BuildContext context, RouteResponseModel route) {
+    showModalBottomSheet<void>(
+      context: context,
+      isScrollControlled: true,
+      backgroundColor: Colors.transparent,
+      builder: (modalContext) {
+        return Container(
+          decoration: const BoxDecoration(
+            color: AppColors.cardBackground,
+            borderRadius: BorderRadius.vertical(top: Radius.circular(26)),
+          ),
+          padding: EdgeInsets.fromLTRB(
+            20,
+            12,
+            20,
+            24 + MediaQuery.paddingOf(modalContext).bottom,
+          ),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Center(
+                child: Container(
+                  width: 38,
+                  height: 4,
+                  decoration: BoxDecoration(
+                    color: AppColors.borderMedium,
+                    borderRadius: BorderRadius.circular(2),
+                  ),
+                ),
+              ),
+              const SizedBox(height: 14),
+              Row(
+                mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                children: [
+                  const Row(
+                    children: [
+                      Icon(
+                        Icons.alt_route_rounded,
+                        color: AppColors.primary,
+                        size: 22,
+                      ),
+                      SizedBox(width: 8),
+                      Text(
+                        'Detalhes da Rota Salva',
+                        style: TextStyle(
+                          fontSize: 17,
+                          fontWeight: FontWeight.w800,
+                          color: AppColors.textPrimary,
+                          letterSpacing: -0.3,
+                        ),
+                      ),
+                    ],
+                  ),
+                  IconButton(
+                    onPressed: () => Navigator.pop(modalContext),
+                    icon: const Icon(
+                      Icons.close_rounded,
+                      color: AppColors.textPrimary,
+                    ),
+                    tooltip: 'Fechar',
+                  ),
+                ],
+              ),
+              const SizedBox(height: 14),
+              _buildDetailItem(
+                'Origem (Local de Embarque)',
+                route.origin.address,
+                subtitle: '${route.origin.neighborhood} - ${route.origin.city}',
+                icon: Icons.radio_button_checked_rounded,
+                iconColor: AppColors.success,
+              ),
+              const SizedBox(height: 8),
+              _buildDetailItem(
+                'Destino (Local de Desembarque)',
+                route.destination.address,
+                subtitle: '${route.destination.neighborhood} - ${route.destination.city}',
+                icon: Icons.location_on_rounded,
+                iconColor: AppColors.primary,
+              ),
+              const SizedBox(height: 12),
+              Row(
+                children: [
+                  Expanded(
+                    child: _buildStatBadge(
+                      'Saída',
+                      route.departureTime,
+                      Icons.schedule_rounded,
+                    ),
+                  ),
+                  const SizedBox(width: 8),
+                  Expanded(
+                    child: _buildStatBadge(
+                      'Chegada estimada',
+                      route.estimatedArrivalTime,
+                      Icons.flag_rounded,
+                    ),
+                  ),
+                ],
+              ),
+              const SizedBox(height: 8),
+              Row(
+                children: [
+                  Expanded(
+                    child: _buildStatBadge(
+                      'Distância',
+                      route.routeDistanceKm != null && route.routeDistanceKm! > 0
+                          ? '${route.routeDistanceKm!.toStringAsFixed(1)} km'
+                          : 'Calculada no mapa',
+                      Icons.straighten_rounded,
+                    ),
+                  ),
+                  const SizedBox(width: 8),
+                  Expanded(
+                    child: _buildStatBadge(
+                      'Desvio tolerado',
+                      'Até ${route.maxDetourKm ?? 3.0} km',
+                      Icons.navigation_rounded,
+                    ),
+                  ),
+                ],
+              ),
+              const SizedBox(height: 8),
+              _buildDetailItem(
+                'Frequência Semanal',
+                _formatFullWeekDays(route.weekDays),
+                icon: Icons.calendar_month_rounded,
+                iconColor: AppColors.textSecondary,
+              ),
+              const SizedBox(height: 20),
+              SizedBox(
+                width: double.infinity,
+                child: FilledButton.icon(
+                  style: FilledButton.styleFrom(
+                    backgroundColor: AppColors.primary,
+                    foregroundColor: AppColors.textLight,
+                    padding: const EdgeInsets.symmetric(vertical: 14),
+                    shape: RoundedRectangleBorder(
+                      borderRadius: BorderRadius.circular(14),
+                    ),
+                  ),
+                  onPressed: () {
+                    HapticFeedback.mediumImpact();
+                    Navigator.pop(modalContext);
+                    widget.onSelectSavedRoute?.call(route);
+                  },
+                  icon: const Icon(
+                    Icons.directions_car_rounded,
+                    size: 18,
+                  ),
+                  label: const Text(
+                    'Usar esta rota e buscar motoristas',
+                    style: TextStyle(
+                      fontSize: 14.5,
+                      fontWeight: FontWeight.w700,
+                    ),
+                  ),
+                ),
+              ),
+            ],
+          ),
+        );
+      },
+    );
+  }
+
+  Widget _buildDetailItem(
+    String title,
+    String mainValue, {
+    String? subtitle,
+    IconData? icon,
+    Color? iconColor,
+  }) {
+    return Container(
+      padding: const EdgeInsets.all(12),
+      decoration: BoxDecoration(
+        color: AppColors.neutralLight,
+        borderRadius: BorderRadius.circular(12),
+        border: Border.all(color: AppColors.borderSubtle),
+      ),
+      child: Row(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          if (icon != null) ...[
+            Icon(
+              icon,
+              size: 18,
+              color: iconColor ?? AppColors.textPrimary,
+            ),
+            const SizedBox(width: 10),
+          ],
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  title,
+                  style: const TextStyle(
+                    fontSize: 11,
+                    fontWeight: FontWeight.w600,
+                    color: AppColors.textSecondary,
+                  ),
+                ),
+                const SizedBox(height: 2),
+                Text(
+                  mainValue,
+                  style: const TextStyle(
+                    fontSize: 13.5,
+                    fontWeight: FontWeight.w700,
+                    color: AppColors.textPrimary,
+                  ),
+                ),
+                if (subtitle != null && subtitle.isNotEmpty) ...[
+                  const SizedBox(height: 2),
+                  Text(
+                    subtitle,
+                    style: const TextStyle(
+                      fontSize: 12,
+                      color: AppColors.textSecondary,
+                    ),
+                  ),
+                ],
+              ],
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildStatBadge(String label, String value, IconData icon) {
+    return Container(
+      padding: const EdgeInsets.all(10),
+      decoration: BoxDecoration(
+        color: AppColors.neutralLight,
+        borderRadius: BorderRadius.circular(12),
+        border: Border.all(color: AppColors.borderSubtle),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            children: [
+              Icon(icon, size: 14, color: AppColors.textSecondary),
+              const SizedBox(width: 6),
+              Text(
+                label,
+                style: const TextStyle(
+                  fontSize: 11,
+                  fontWeight: FontWeight.w500,
+                  color: AppColors.textSecondary,
+                ),
+              ),
+            ],
+          ),
+          const SizedBox(height: 4),
+          Text(
+            value,
+            style: const TextStyle(
+              fontSize: 13,
+              fontWeight: FontWeight.w700,
+              color: AppColors.textPrimary,
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  String _formatDaysSummary(Set<String> weekDays) {
+    if (weekDays.isEmpty) return 'Todos os dias';
+    const map = {
+      'MONDAY': 'Seg',
+      'TUESDAY': 'Ter',
+      'WEDNESDAY': 'Qua',
+      'THURSDAY': 'Qui',
+      'FRIDAY': 'Sex',
+      'SATURDAY': 'Sáb',
+      'SUNDAY': 'Dom',
+    };
+    if (weekDays.length == 5 &&
+        weekDays.contains('MONDAY') &&
+        weekDays.contains('FRIDAY')) {
+      return 'Segunda a Sexta';
+    }
+    return weekDays.map((d) => map[d.toUpperCase()] ?? d).join(', ');
+  }
+
+  String _formatFullWeekDays(Set<String> weekDays) {
+    if (weekDays.isEmpty) return 'Segunda a Sexta-feira';
+    const map = {
+      'MONDAY': 'Segunda-feira',
+      'TUESDAY': 'Terça-feira',
+      'WEDNESDAY': 'Quarta-feira',
+      'THURSDAY': 'Quinta-feira',
+      'FRIDAY': 'Sexta-feira',
+      'SATURDAY': 'Sábado',
+      'SUNDAY': 'Domingo',
+    };
+    return weekDays.map((d) => map[d.toUpperCase()] ?? d).join(', ');
   }
 
   // ==========================================================================
@@ -500,6 +1302,7 @@ class _HomePassengerSheetState extends State<HomePassengerSheet> {
   // ==========================================================================
   Widget _buildSearchDestinationSheet() {
     final query = _searchController.text.trim().toLowerCase();
+    final autocompleteState = ref.watch(placesAutocompleteProvider);
     final filteredDestinations = mockDestinationsList.where((dest) {
       if (query.isEmpty) return true;
       return dest.title.toLowerCase().contains(query) ||
@@ -567,7 +1370,7 @@ class _HomePassengerSheetState extends State<HomePassengerSheet> {
                             const SizedBox(width: 8),
                             Expanded(
                               child: Text(
-                                'Embarque: ${widget.pickupAddress}',
+                                'Embarque: ',
                                 style: const TextStyle(
                                   fontSize: 12,
                                   fontWeight: FontWeight.w600,
@@ -628,7 +1431,7 @@ class _HomePassengerSheetState extends State<HomePassengerSheet> {
                     ),
                     const SizedBox(height: 12),
 
-                    // Campo de Busca
+                    // Campo de Busca com Autocomplete (debounce de 1s)
                     Container(
                       decoration: BoxDecoration(
                         color: AppColors.neutralLight,
@@ -649,15 +1452,28 @@ class _HomePassengerSheetState extends State<HomePassengerSheet> {
                             color: AppColors.textSecondary,
                             size: 22,
                           ),
-                          suffixIcon: _searchController.text.isNotEmpty
-                              ? IconButton(
-                                  icon: const Icon(Icons.clear_rounded, size: 18),
-                                  onPressed: () {
-                                    _searchController.clear();
-                                    setState(() {});
-                                  },
+                          suffixIcon: autocompleteState.isLoading
+                              ? const SizedBox(
+                                  width: 20,
+                                  height: 20,
+                                  child: Padding(
+                                    padding: EdgeInsets.all(12),
+                                    child: CircularProgressIndicator(
+                                      strokeWidth: 2,
+                                      color: AppColors.primary,
+                                    ),
+                                  ),
                                 )
-                              : null,
+                              : _searchController.text.isNotEmpty
+                                  ? IconButton(
+                                      icon: const Icon(Icons.clear_rounded, size: 18),
+                                      onPressed: () {
+                                        _searchController.clear();
+                                        ref.read(placesAutocompleteProvider.notifier).clear();
+                                        setState(() {});
+                                      },
+                                    )
+                                  : null,
                           hintText: 'Digite o endereço ou destino...',
                           hintStyle: const TextStyle(
                             fontSize: 13.5,
@@ -669,12 +1485,15 @@ class _HomePassengerSheetState extends State<HomePassengerSheet> {
                             vertical: 14,
                           ),
                         ),
-                        onChanged: (_) => setState(() {}),
+                        onChanged: (text) {
+                          setState(() {});
+                          ref.read(placesAutocompleteProvider.notifier).onQueryChanged(text);
+                        },
                       ),
                     ),
                     const SizedBox(height: 12),
 
-                    // Botão: "Definir desembarque no mapa"
+                    // Botão: Definir desembarque no mapa
                     Material(
                       color: AppColors.cardBackground,
                       borderRadius: BorderRadius.circular(16),
@@ -730,78 +1549,184 @@ class _HomePassengerSheetState extends State<HomePassengerSheet> {
                         ),
                       ),
                     ),
-                    const SizedBox(height: 16),
 
-                    const Text(
-                      'Destinos Frequentes',
-                      style: TextStyle(
-                        fontSize: 13,
-                        fontWeight: FontWeight.w800,
-                        color: AppColors.textPrimary,
-                      ),
-                    ),
-                    const SizedBox(height: 8),
-
-                    // Lista de Sugestões de Destino
-                    ...filteredDestinations.map((dest) {
-                      return Padding(
-                        padding: const EdgeInsets.only(bottom: 8),
-                        child: Material(
-                          color: AppColors.cardBackground,
-                          borderRadius: BorderRadius.circular(14),
-                          child: InkWell(
-                            borderRadius: BorderRadius.circular(14),
-                            onTap: () {
-                              HapticFeedback.lightImpact();
-                              widget.onDestinationChosen(dest.title, dest.position);
-                            },
-                            child: Container(
-                              padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
-                              decoration: BoxDecoration(
-                                borderRadius: BorderRadius.circular(14),
-                                border: Border.all(color: AppColors.borderSubtle),
+                    if (autocompleteState.isLoading) ...[
+                      const SizedBox(height: 14),
+                      Container(
+                        padding: const EdgeInsets.all(12),
+                        decoration: BoxDecoration(
+                          color: AppColors.neutralLight,
+                          borderRadius: BorderRadius.circular(12),
+                          border: Border.all(color: AppColors.borderSubtle),
+                        ),
+                        child: const Row(
+                          children: [
+                            SizedBox(
+                              width: 14,
+                              height: 14,
+                              child: CircularProgressIndicator(
+                                strokeWidth: 2,
+                                color: AppColors.primary,
                               ),
-                              child: Row(
-                                children: [
-                                  const _CheckeredCircleBadge(size: 18),
-                                  const SizedBox(width: 12),
-                                  Expanded(
-                                    child: Column(
-                                      crossAxisAlignment: CrossAxisAlignment.start,
-                                      children: [
-                                        Text(
-                                          dest.title,
-                                          style: const TextStyle(
-                                            fontSize: 14,
-                                            fontWeight: FontWeight.w700,
-                                            color: AppColors.textPrimary,
-                                          ),
-                                        ),
-                                        const SizedBox(height: 2),
-                                        Text(
-                                          dest.subtitle,
-                                          style: const TextStyle(
-                                            fontSize: 12,
-                                            color: AppColors.textSecondary,
-                                          ),
-                                          maxLines: 1,
-                                          overflow: TextOverflow.ellipsis,
-                                        ),
-                                      ],
+                            ),
+                            SizedBox(width: 10),
+                            Text(
+                              'Consultando endereços no servidor...',
+                              style: TextStyle(
+                                fontSize: 12,
+                                color: AppColors.textSecondary,
+                                fontWeight: FontWeight.w600,
+                              ),
+                            ),
+                          ],
+                        ),
+                      ),
+                    ],
+
+                    if (autocompleteState.suggestions.isNotEmpty) ...[
+                      const SizedBox(height: 16),
+                      const Text(
+                        'Sugestões de Endereço (Google Places via Backend)',
+                        style: TextStyle(
+                          fontSize: 13,
+                          fontWeight: FontWeight.w800,
+                          color: AppColors.textPrimary,
+                        ),
+                      ),
+                      const SizedBox(height: 8),
+                      ...autocompleteState.suggestions.map((suggestion) {
+                        return Padding(
+                          padding: const EdgeInsets.only(bottom: 8),
+                          child: Material(
+                            color: AppColors.cardBackground,
+                            borderRadius: BorderRadius.circular(14),
+                            child: InkWell(
+                              borderRadius: BorderRadius.circular(14),
+                              onTap: () => _handleDestinationSuggestionSelected(suggestion),
+                              child: Container(
+                                padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
+                                decoration: BoxDecoration(
+                                  borderRadius: BorderRadius.circular(14),
+                                  border: Border.all(color: AppColors.borderSubtle),
+                                ),
+                                child: Row(
+                                  children: [
+                                    const Icon(
+                                      Icons.location_on_rounded,
+                                      color: AppColors.primary,
+                                      size: 20,
                                     ),
-                                  ),
-                                  const Icon(
-                                    Icons.chevron_right_rounded,
-                                    color: AppColors.iconMuted,
-                                    size: 20,
-                                  ),
-                                ],
+                                    const SizedBox(width: 12),
+                                    Expanded(
+                                      child: Column(
+                                        crossAxisAlignment: CrossAxisAlignment.start,
+                                        children: [
+                                          Text(
+                                            suggestion.mainText,
+                                            style: const TextStyle(
+                                              fontSize: 14,
+                                              fontWeight: FontWeight.w700,
+                                              color: AppColors.textPrimary,
+                                            ),
+                                          ),
+                                          if (suggestion.secondaryText.isNotEmpty) ...[
+                                            const SizedBox(height: 2),
+                                            Text(
+                                              suggestion.secondaryText,
+                                              style: const TextStyle(
+                                                fontSize: 12,
+                                                color: AppColors.textSecondary,
+                                              ),
+                                              maxLines: 1,
+                                              overflow: TextOverflow.ellipsis,
+                                            ),
+                                          ],
+                                        ],
+                                      ),
+                                    ),
+                                    const Icon(
+                                      Icons.chevron_right_rounded,
+                                      color: AppColors.iconMuted,
+                                      size: 20,
+                                    ),
+                                  ],
+                                ),
                               ),
                             ),
                           ),
+                        );
+                      }),
+                    ] else ...[
+                      const SizedBox(height: 16),
+                      const Text(
+                        'Destinos Frequentes',
+                        style: TextStyle(
+                          fontSize: 13,
+                          fontWeight: FontWeight.w800,
+                          color: AppColors.textPrimary,
                         ),
-                      );
-                    }),
+                      ),
+                      const SizedBox(height: 8),
+                      ...filteredDestinations.map((dest) {
+                        return Padding(
+                          padding: const EdgeInsets.only(bottom: 8),
+                          child: Material(
+                            color: AppColors.cardBackground,
+                            borderRadius: BorderRadius.circular(14),
+                            child: InkWell(
+                              borderRadius: BorderRadius.circular(14),
+                              onTap: () {
+                                HapticFeedback.lightImpact();
+                                widget.onDestinationChosen(dest.title, dest.position);
+                              },
+                              child: Container(
+                                padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
+                                decoration: BoxDecoration(
+                                  borderRadius: BorderRadius.circular(14),
+                                  border: Border.all(color: AppColors.borderSubtle),
+                                ),
+                                child: Row(
+                                  children: [
+                                    const _CheckeredCircleBadge(size: 18),
+                                    const SizedBox(width: 12),
+                                    Expanded(
+                                      child: Column(
+                                        crossAxisAlignment: CrossAxisAlignment.start,
+                                        children: [
+                                          Text(
+                                            dest.title,
+                                            style: const TextStyle(
+                                              fontSize: 14,
+                                              fontWeight: FontWeight.w700,
+                                              color: AppColors.textPrimary,
+                                            ),
+                                          ),
+                                          const SizedBox(height: 2),
+                                          Text(
+                                            dest.subtitle,
+                                            style: const TextStyle(
+                                              fontSize: 12,
+                                              color: AppColors.textSecondary,
+                                            ),
+                                            maxLines: 1,
+                                            overflow: TextOverflow.ellipsis,
+                                          ),
+                                        ],
+                                      ),
+                                    ),
+                                    const Icon(
+                                      Icons.chevron_right_rounded,
+                                      color: AppColors.iconMuted,
+                                      size: 20,
+                                    ),
+                                  ],
+                                ),
+                              ),
+                            ),
+                          ),
+                        );
+                      }),
+                    ],
                   ]),
                 ),
               ),
@@ -812,7 +1737,7 @@ class _HomePassengerSheetState extends State<HomePassengerSheet> {
     );
   }
 
-  // ==========================================================================
+    // ==========================================================================
   // PASSO 4: ARRASTO DO MAPA PARA DESEMBARQUE ESTILO UBER (PINO FIXO)
   // ==========================================================================
   Widget _buildDragMapDestinationSheet() {
