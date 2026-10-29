@@ -26,6 +26,7 @@ import com.converge.api.modules.user.application.dto.UpdateUserCommand;
 import org.springframework.web.bind.annotation.PutMapping;
 import com.converge.api.modules.user.application.DeleteUserUseCase;
 import org.springframework.web.bind.annotation.DeleteMapping;
+import com.converge.api.modules.user.application.BecomeDriverUseCase;
 
 @RestController
 @RequestMapping("/api/v1/users")
@@ -37,6 +38,7 @@ public class UserController {
     private final UserMapper mapper;
     private final UpdateUserUseCase updateUser;
     private final DeleteUserUseCase deleteUser;
+    private final BecomeDriverUseCase becomeDriver;
 
     @PostMapping
     public ResponseEntity<ApplicationResponse<CreateUserResponseDTO>> createUser(
@@ -94,5 +96,19 @@ public class UserController {
         deleteUser.execute(principal.uid());
 
         return ResponseEntity.noContent().build();
+    }
+
+    @PostMapping("/me/driver")
+    public ResponseEntity<ApplicationResponse<CreateUserResponseDTO>> becomeDriver(
+            @AuthenticationPrincipal AuthenticatedUser principal
+    ) {
+        if (principal == null || principal.uid() == null) {
+            throw new ApplicationException(
+                    ErrorCode.INVALID_CREDENTIALS,
+                    "Não autenticado."
+            );
+        }
+        User user = becomeDriver.execute(principal.uid());
+        return ResponseEntity.ok(ApplicationResponse.success(mapper.toResponse(user)));
     }
 }
