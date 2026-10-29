@@ -241,4 +241,25 @@ public class User {
             throw new ApplicationException(ErrorCode.BAD_REQUEST, message, Set.copyOf(fields));
         }
     }
+
+    public void updateProfile(
+
+            String name,
+            String phone,
+            @Nullable String photoUrl,
+            @Nullable DriverLicense driverLicense,
+            @Nullable String pixKey,
+            @Nullable PixKeyType pixKeyType
+    ) {
+        this.name = name;
+        this.phone = phone;
+        this.photoUrl = photoUrl;
+        this.driverLicense = driverLicense;
+        this.pixKey = pixKey;
+        this.pixKeyType = pixKeyType;
+
+        if (participationRoles.contains(DRIVER)){
+            this.validateDriverRequirements();
+        }
+    }
 }

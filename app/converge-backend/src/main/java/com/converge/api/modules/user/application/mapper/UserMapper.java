@@ -1,8 +1,11 @@
 package com.converge.api.modules.user.application.mapper;
 
 import com.converge.api.modules.user.domain.model.user.User;
+import com.converge.api.modules.user.domain.model.user.subtypes.driver.DriverLicense;
 import com.converge.api.modules.user.application.dto.CreateUserRequestDTO;
 import com.converge.api.modules.user.application.dto.CreateUserResponseDTO;
+import com.converge.api.modules.user.application.dto.DriverLicenseRequestDTO;
+
 import org.springframework.stereotype.Component;
 
 @Component
@@ -54,6 +57,19 @@ public class UserMapper {
                 user.isActive(),
                 user.getCreatedAt(),
                 user.getUpdatedAt()
+        );
+    }
+
+    public DriverLicense toDriverLicense(DriverLicenseRequestDTO dto) {
+        if (dto == null) {
+            return null;
+        }
+
+        return new DriverLicense(
+            dto.number(),
+            dto.category(),
+            dto.expiresAt(),
+            dto.documentUrl()
         );
     }
 }
