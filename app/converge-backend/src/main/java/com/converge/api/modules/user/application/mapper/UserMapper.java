@@ -5,6 +5,9 @@ import com.converge.api.modules.user.domain.model.user.subtypes.driver.DriverLic
 import com.converge.api.modules.user.application.dto.CreateUserRequestDTO;
 import com.converge.api.modules.user.application.dto.CreateUserResponseDTO;
 import com.converge.api.modules.user.application.dto.DriverLicenseRequestDTO;
+import com.converge.api.shared.presentation.exception.ApplicationException;
+import com.converge.api.shared.presentation.exception.ErrorCode;
+
 
 import org.springframework.stereotype.Component;
 
@@ -32,8 +35,10 @@ public class UserMapper {
 
     public CreateUserResponseDTO toResponse(User user) {
         if (user == null) {
-            // TODO: Throw and Treat the error
-            return null;
+            throw new ApplicationException(
+                    ErrorCode.USER_NOT_FOUND,
+                    "Usuário não encontrado."
+             );
         }
 
         return new CreateUserResponseDTO(
