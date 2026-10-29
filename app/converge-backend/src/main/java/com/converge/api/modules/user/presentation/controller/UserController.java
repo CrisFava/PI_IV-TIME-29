@@ -24,6 +24,8 @@ import com.converge.api.modules.user.application.UpdateUserUseCase;
 import com.converge.api.modules.user.application.dto.UpdateUserRequestDTO;
 import com.converge.api.modules.user.application.dto.UpdateUserCommand;
 import org.springframework.web.bind.annotation.PutMapping;
+import com.converge.api.modules.user.application.DeleteUserUseCase;
+import org.springframework.web.bind.annotation.DeleteMapping;
 
 @RestController
 @RequestMapping("/api/v1/users")
@@ -34,6 +36,7 @@ public class UserController {
     private final UserUtils userUtils;
     private final UserMapper mapper;
     private final UpdateUserUseCase updateUser;
+    private final DeleteUserUseCase deleteUser;
 
     @PostMapping
     public ResponseEntity<ApplicationResponse<CreateUserResponseDTO>> createUser(
@@ -75,5 +78,21 @@ public class UserController {
         User user = updateUser.execute(new UpdateUserCommand(principal.uid(), request));
 
         return ResponseEntity.ok(ApplicationResponse.success(mapper.toResponse(user)));
+    }
+
+    @DeleteMapping("/me")
+    public ResponseEntity<Void> deleteCurrentUser(
+
+            @AuthenticationPrincipal AuthenticatedUser principal
+    ) {
+        if (principal == null || principal.uid() == null) {
+            throw new ApplicationException(
+                    ErrorCode.INVALID_CREDENTIALS,
+                    "Não autenticado."
+            );
+        }
+        deleteUser.execute(principal.uid());
+
+        return ResponseEntity.noContent().build();
     }
 }

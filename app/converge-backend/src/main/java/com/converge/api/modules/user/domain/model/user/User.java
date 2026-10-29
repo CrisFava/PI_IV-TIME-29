@@ -262,4 +262,8 @@ public class User {
             this.validateDriverRequirements();
         }
     }
+
+    public void deactivate() {
+        this.active = false;
+    }
 }
