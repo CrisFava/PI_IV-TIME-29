@@ -1,5 +1,6 @@
 package com.converge.api.modules.user.domain.model.vehicle;
 
+import java.math.BigDecimal;
 import java.time.LocalDateTime;
 import java.util.ArrayList;
 import java.util.Collections;
@@ -14,6 +15,7 @@ import org.springframework.data.annotation.LastModifiedDate;
 import org.springframework.data.mongodb.core.index.CompoundIndex;
 import org.springframework.data.mongodb.core.mapping.Document;
 
+import com.converge.api.modules.user.domain.enums.vehicle.ConsumptionUnit;
 import com.converge.api.modules.user.domain.enums.vehicle.EnergySource;
 import com.converge.api.modules.user.domain.enums.vehicle.VehicleType;
 import com.converge.api.modules.user.domain.model.vehicle.subtypes.FuelSource;
@@ -106,6 +108,7 @@ public class Vehicle {
     ) {
         this.validateCapacity(type, totalCapacity);
         this.validateFuelSources(fuelSources);
+        this.validateFuelRanges(type, fuelSources);
 
         this.nickname = nickname;
         this.model = model;
@@ -160,6 +163,48 @@ public class Vehicle {
         }
     }
 
+    private void validateFuelRanges(VehicleType type, List<FuelSource> fuelSources) {
+        for (FuelSource fuel : fuelSources) {
+            double[] consumption = consumptionRange(type, fuel.consumptionUnit());
+            double average = fuel.averageConsumption();
+
+            if (average < consumption[0] || average > consumption[1]) {
+                throw new ApplicationException(
+                        ErrorCode.BAD_REQUEST,
+                        "O consumo médio de " + fuel.energySource() + " deve ficar entre "
+                                + (int) consumption[0] + " e " + (int) consumption[1] + " para este tipo de veículo.",
+                        Set.of("fuelSources")
+                );
+            }
+
+            BigDecimal minPrice = fuel.energySource() == EnergySource.ELECTRIC
+                    ? new BigDecimal("0.30") : new BigDecimal("3.00");
+            BigDecimal maxPrice = fuel.energySource() == EnergySource.ELECTRIC
+                    ? new BigDecimal("3.00") : new BigDecimal("12.00");
+
+            if (fuel.currentEnergyPrice().compareTo(minPrice) < 0
+                    || fuel.currentEnergyPrice().compareTo(maxPrice) > 0) {
+                throw new ApplicationException(
+                        ErrorCode.BAD_REQUEST,
+                        "O preço de " + fuel.energySource() + " deve ficar entre R$ "
+                                + minPrice + " e R$ " + maxPrice + ".",
+                        Set.of("fuelSources")
+                );
+            }
+        }
+    }
+
+    private double[] consumptionRange(VehicleType type, ConsumptionUnit unit) {
+        boolean electric = unit == ConsumptionUnit.KM_PER_KWH;
+
+        return switch (type) {
+            case HATCH, SEDAN -> electric ? new double[]{3, 9} : new double[]{6, 25};
+            case SUV, PICKUP, VAN -> electric ? new double[]{3, 9} : new double[]{4, 18};
+            case MOTORCYCLE -> electric ? new double[]{15, 40} : new double[]{15, 50};
+            case OTHER -> electric ? new double[]{3, 40} : new double[]{4, 50};
+        };
+    }
+
     public List<FuelSource> getFuelSources() {
         return Collections.unmodifiableList(this.fuelSources);
     }
@@ -178,6 +223,10 @@ public class Vehicle {
 
     public void deactivate() {
         this.active = false;
+    }
+
+    public void reactivate() {
+        this.active = true;
     }
 
     public boolean isOwnedBy(String userId) {
