@@ -1,7 +1,11 @@
 package com.converge.api.modules.user.application.mapper;
 
+import com.converge.api.modules.user.domain.enums.user.VerificationMethod;
+import com.converge.api.modules.user.domain.enums.user.VerificationStatus;
 import com.converge.api.modules.user.domain.model.user.User;
+import com.converge.api.modules.user.domain.model.user.subtypes.AcademicRecord;
 import com.converge.api.modules.user.domain.model.user.subtypes.driver.DriverLicense;
+import com.converge.api.modules.user.application.dto.AcademicRecordRequestDTO;
 import com.converge.api.modules.user.application.dto.CreateUserRequestDTO;
 import com.converge.api.modules.user.application.dto.CreateUserResponseDTO;
 import com.converge.api.modules.user.application.dto.DriverLicenseRequestDTO;
@@ -26,8 +30,8 @@ public class UserMapper {
                 dto.phone(),
                 dto.photoUrl(),
                 dto.participationRoles(),
-                dto.academicRecord(),
-                dto.driverLicense(),
+                toAcademicRecord(dto.academicRecord()),
+                toDriverLicense(dto.driverLicense()),
                 dto.pixKey(),
                 dto.pixKeyType()
         );
@@ -62,6 +66,25 @@ public class UserMapper {
                 user.isActive(),
                 user.getCreatedAt(),
                 user.getUpdatedAt()
+        );
+    }
+
+    public AcademicRecord toAcademicRecord(AcademicRecordRequestDTO dto) {
+        if (dto == null) {
+            return null;
+        }
+
+        return new AcademicRecord(
+                dto.university(),
+                dto.course(),
+                dto.enrollmentNumber(),
+                dto.institutionalEmail(),
+                dto.documentUrl(),
+                VerificationStatus.PENDING,
+                VerificationMethod.INSTITUTIONAL_EMAIL,
+                null,
+                null,
+                null
         );
     }
 

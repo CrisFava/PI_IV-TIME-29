@@ -3,7 +3,7 @@ package com.converge.api.modules.user.application.service;
 import com.converge.api.modules.user.application.CreateUserUseCase;
 import com.converge.api.modules.user.domain.enums.user.ParticipationRole;
 import com.converge.api.modules.user.domain.model.user.User;
-import com.converge.api.modules.user.domain.model.user.subtypes.AcademicRecord;
+import com.converge.api.modules.user.application.dto.AcademicRecordRequestDTO;
 import com.converge.api.modules.user.domain.repository.UserRepository;
 import com.converge.api.modules.user.application.dto.CreateUserRequestDTO;
 import com.converge.api.modules.user.application.mapper.UserMapper;
@@ -42,11 +42,12 @@ class UserServiceTest {
     }
 
     private CreateUserRequestDTO validRequest() {
-        AcademicRecord academicRecord = new AcademicRecord(
+        AcademicRecordRequestDTO academicRecord = new AcademicRecordRequestDTO(
                 "PUC-Campinas",
                 "Engenharia de Software",
                 "2024-00123",
-                "ana@puc-campinas.edu.br"
+                "ana@puc-campinas.edu.br",
+                null
         );
         return new CreateUserRequestDTO(
                 "uid-123",
