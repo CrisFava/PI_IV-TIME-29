@@ -1,7 +1,7 @@
 package com.converge.api.modules.user.application;
 
 import com.converge.api.modules.user.domain.model.user.User;
-import com.converge.api.modules.user.domain.model.user.subtypes.AcademicRecord;
+import com.converge.api.modules.user.application.dto.AcademicRecordRequestDTO;
 import com.converge.api.modules.user.domain.repository.UserRepository;
 import com.converge.api.modules.user.application.dto.CreateUserRequestDTO;
 import com.converge.api.modules.user.application.mapper.UserMapper;
@@ -51,7 +51,7 @@ public class CreateUserUseCase implements UseCase<CreateUserRequestDTO, User> {
         }
     }
 
-    private void validateAcademicRecord(@NotBlank AcademicRecord academicRecord){
+    private void validateAcademicRecord(@NotBlank AcademicRecordRequestDTO academicRecord){
         String email = academicRecord.institutionalEmail();
 
         if (email != null && !email.isBlank() && userRepository.existsByAcademicRecordInstitutionalEmail(email)) {

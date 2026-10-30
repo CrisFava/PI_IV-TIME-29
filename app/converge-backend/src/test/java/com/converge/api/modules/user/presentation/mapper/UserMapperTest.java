@@ -1,5 +1,6 @@
 package com.converge.api.modules.user.presentation.mapper;
 
+import com.converge.api.modules.user.application.dto.AcademicRecordRequestDTO;
 import com.converge.api.modules.user.application.mapper.UserMapper;
 import com.converge.api.modules.user.domain.enums.user.ParticipationRole;
 import com.converge.api.modules.user.domain.enums.user.PaymentStanding;
@@ -29,6 +30,14 @@ class UserMapperTest {
                 "ana@puc-campinas.edu.br"
         );
 
+        AcademicRecordRequestDTO academicRecordRequest = new AcademicRecordRequestDTO(
+                "PUC-Campinas",
+                "Engenharia de Software",
+                "2024-00123",
+                "ana@puc-campinas.edu.br",
+                null
+        );
+
         CreateUserRequestDTO dto = new CreateUserRequestDTO(
                 "uid-firebase-999",
                 "Ana Souza",
@@ -36,7 +45,7 @@ class UserMapperTest {
                 "(19) 91234-5678",
                 "https://storage.firebase.com/foto.jpg",
                 Set.of(ParticipationRole.PASSENGER),
-                academicRecord,
+                academicRecordRequest,
                 null,
                 null,
                 null

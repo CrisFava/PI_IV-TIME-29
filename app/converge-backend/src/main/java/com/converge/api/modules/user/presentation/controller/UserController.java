@@ -20,6 +20,13 @@ import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RestController;
+import com.converge.api.modules.user.application.UpdateUserUseCase;
+import com.converge.api.modules.user.application.dto.UpdateUserRequestDTO;
+import com.converge.api.modules.user.application.dto.UpdateUserCommand;
+import org.springframework.web.bind.annotation.PutMapping;
+import com.converge.api.modules.user.application.DeleteUserUseCase;
+import org.springframework.web.bind.annotation.DeleteMapping;
+import com.converge.api.modules.user.application.BecomeDriverUseCase;
 
 @RestController
 @RequestMapping("/api/v1/users")
@@ -29,6 +36,9 @@ public class UserController {
     private final CreateUserUseCase createUser;
     private final UserUtils userUtils;
     private final UserMapper mapper;
+    private final UpdateUserUseCase updateUser;
+    private final DeleteUserUseCase deleteUser;
+    private final BecomeDriverUseCase becomeDriver;
 
     @PostMapping
     public ResponseEntity<ApplicationResponse<CreateUserResponseDTO>> createUser(
@@ -52,6 +62,53 @@ public class UserController {
         }
 
         User user = userUtils.getCurrentUser(principal);
+        return ResponseEntity.ok(ApplicationResponse.success(mapper.toResponse(user)));
+    }
+
+    @PutMapping("/me")
+    public ResponseEntity<ApplicationResponse<CreateUserResponseDTO>> updateCurrentUser(
+            @AuthenticationPrincipal AuthenticatedUser principal,
+            @Valid @RequestBody UpdateUserRequestDTO request
+    ) {
+        if (principal == null || principal.uid() == null) {
+            throw new ApplicationException(
+                    ErrorCode.INVALID_CREDENTIALS,
+                    "Não autenticado."
+            );
+        }
+
+        User user = updateUser.execute(new UpdateUserCommand(principal.uid(), request));
+
+        return ResponseEntity.ok(ApplicationResponse.success(mapper.toResponse(user)));
+    }
+
+    @DeleteMapping("/me")
+    public ResponseEntity<Void> deleteCurrentUser(
+
+            @AuthenticationPrincipal AuthenticatedUser principal
+    ) {
+        if (principal == null || principal.uid() == null) {
+            throw new ApplicationException(
+                    ErrorCode.INVALID_CREDENTIALS,
+                    "Não autenticado."
+            );
+        }
+        deleteUser.execute(principal.uid());
+
+        return ResponseEntity.noContent().build();
+    }
+
+    @PostMapping("/me/driver")
+    public ResponseEntity<ApplicationResponse<CreateUserResponseDTO>> becomeDriver(
+            @AuthenticationPrincipal AuthenticatedUser principal
+    ) {
+        if (principal == null || principal.uid() == null) {
+            throw new ApplicationException(
+                    ErrorCode.INVALID_CREDENTIALS,
+                    "Não autenticado."
+            );
+        }
+        User user = becomeDriver.execute(principal.uid());
         return ResponseEntity.ok(ApplicationResponse.success(mapper.toResponse(user)));
     }
 }
