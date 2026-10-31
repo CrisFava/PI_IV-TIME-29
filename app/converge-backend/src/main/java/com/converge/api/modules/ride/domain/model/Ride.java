@@ -1,10 +1,12 @@
 package com.converge.api.modules.ride.domain.model;
 
+import com.converge.api.modules.ride.domain.enums.ParticipantStatus;
 import com.converge.api.modules.ride.domain.enums.RideStatus;
 import com.converge.api.modules.ride.domain.model.subtypes.Participant;
 import com.converge.api.modules.ride.domain.model.subtypes.RideCosts;
 import com.converge.api.modules.ride.domain.model.subtypes.VehicleSnapshot;
 import com.converge.api.modules.route.domain.model.subtypes.Place;
+import com.converge.api.modules.user.domain.enums.user.ParticipationRole;
 import com.converge.api.shared.presentation.exception.ApplicationException;
 import com.converge.api.shared.presentation.exception.ErrorCode;
 import jakarta.annotation.Nullable;
@@ -23,6 +25,7 @@ import org.springframework.data.annotation.CreatedDate;
 import org.springframework.data.annotation.Id;
 import org.springframework.data.annotation.LastModifiedDate;
 import org.springframework.data.mongodb.core.index.CompoundIndex;
+import org.springframework.data.mongodb.core.index.Indexed;
 import org.springframework.data.mongodb.core.mapping.Document;
 
 import java.time.DayOfWeek;
@@ -52,6 +55,7 @@ public class Ride {
     private int sequentialNumber;
 
     @NotBlank
+    @Indexed
     private String driverId;
 
     @NotBlank
@@ -62,6 +66,7 @@ public class Ride {
     private VehicleSnapshot vehicleSnapshot;
 
     @NotBlank
+    @Indexed
     private String driverRouteId;
 
     @NotNull
@@ -73,6 +78,7 @@ public class Ride {
     private Place destination;
 
     @NotNull
+    @Indexed
     private LocalDateTime departureDateTime;
 
     @NotNull
@@ -90,6 +96,7 @@ public class Ride {
     private int availableSeats;
 
     @NotNull
+    @Indexed
     private RideStatus status;
 
     @Nullable
@@ -203,4 +210,255 @@ public class Ride {
             );
         }
     }
+
+    public boolean isOwnedBy(String userId) {
+        return this.driverId.equals(userId);
+    }
+
+    public void cancel(String userId, @Nullable String reason) {
+        if (this.status != RideStatus.AWAITING_CONFIRMATION && this.status != RideStatus.CONFIRMED) {
+            throw new ApplicationException(
+                    ErrorCode.BAD_REQUEST,
+                    "Só é possível cancelar uma viagem antes de ela começar.",
+                    Set.of("status")
+            );
+        }
+
+        this.status = RideStatus.CANCELLED;
+        this.cancelledBy = userId;
+        this.cancellationReason = reason;
+
+        LocalDateTime now = LocalDateTime.now();
+        this.participants.stream()
+                .filter(participant -> participant.getRole() == ParticipationRole.PASSENGER)
+                .filter(this::isActive)
+                .forEach(participant -> participant.cancel(reason, false, now));
+    }
+
+    public void leave(String passengerId, @Nullable String reason) {
+        if (this.status != RideStatus.AWAITING_CONFIRMATION && this.status != RideStatus.CONFIRMED) {
+            throw new ApplicationException(
+                    ErrorCode.BAD_REQUEST,
+                    "Não é mais possível sair desta viagem.",
+                    Set.of("status")
+            );
+        }
+
+        Participant passenger = this.participants.stream()
+                .filter(participant -> participant.getRole() == ParticipationRole.PASSENGER)
+                .filter(participant -> participant.getUserId().equals(passengerId))
+                .filter(this::isActive)
+                .findFirst()
+                .orElseThrow(() -> new ApplicationException(
+                        ErrorCode.BAD_REQUEST,
+                        "Você não tem participação ativa nesta viagem como passageiro.",
+                        Set.of("passengerId")
+                ));
+
+        LocalDateTime now = LocalDateTime.now();
+        boolean wasConfirmed = passenger.getStatus() == ParticipantStatus.CONFIRMED;
+        boolean late = wasConfirmed && now.isAfter(this.departureDateTime.minusHours(2));
+
+        passenger.cancel(reason, late, now);
+
+        if (wasConfirmed) {
+            this.availableSeats++;
+        }
+
+        boolean hasConfirmedPassenger = this.participants.stream()
+                .anyMatch(participant -> participant.getRole() == ParticipationRole.PASSENGER
+                        && participant.getStatus() == ParticipantStatus.CONFIRMED);
+
+        if (!hasConfirmedPassenger && this.status == RideStatus.CONFIRMED) {
+            this.status = RideStatus.AWAITING_CONFIRMATION;
+        }
+    }
+
+    public void start() {
+        if (this.status != RideStatus.CONFIRMED) {
+            throw new ApplicationException(
+                    ErrorCode.BAD_REQUEST,
+                    "Só é possível iniciar uma viagem confirmada, com ao menos um passageiro confirmado.",
+                    Set.of("status")
+            );
+        }
+
+        this.status = RideStatus.IN_PROGRESS;
+    }
+
+    public void markNoShow(String passengerId) {
+        this.validateInProgress();
+
+        Participant passenger = this.findConfirmedPassenger(passengerId);
+
+        passenger.markNoShow(LocalDateTime.now());
+        this.availableSeats++;
+    }
+
+    public void complete() {
+        this.validateInProgress();
+
+        List<Participant> presentPassengers = this.participants.stream()
+                .filter(participant -> participant.getRole() == ParticipationRole.PASSENGER)
+                .filter(participant -> participant.getStatus() == ParticipantStatus.CONFIRMED)
+                .toList();
+
+        if (presentPassengers.isEmpty()) {
+            throw new ApplicationException(
+                    ErrorCode.BAD_REQUEST,
+                    "Não há passageiro presente para concluir a viagem. Cancele a viagem.",
+                    Set.of("participants")
+            );
+        }
+
+        LocalDateTime now = LocalDateTime.now();
+
+        presentPassengers.forEach(participant -> participant.complete(now));
+        this.participants.stream()
+                .filter(participant -> participant.getRole() == ParticipationRole.DRIVER)
+                .filter(participant -> participant.getStatus() == ParticipantStatus.CONFIRMED)
+                .forEach(participant -> participant.complete(now));
+
+        this.status = RideStatus.COMPLETED;
+        this.completedAt = now;
+    }
+
+    private void validateInProgress() {
+        if (this.status != RideStatus.IN_PROGRESS) {
+            throw new ApplicationException(
+                    ErrorCode.BAD_REQUEST,
+                    "Esta ação só vale para uma viagem em andamento.",
+                    Set.of("status")
+            );
+        }
+    }
+
+    private Participant findConfirmedPassenger(String passengerId) {
+        return this.participants.stream()
+                .filter(participant -> participant.getRole() == ParticipationRole.PASSENGER)
+                .filter(participant -> participant.getUserId().equals(passengerId))
+                .filter(participant -> participant.getStatus() == ParticipantStatus.CONFIRMED)
+                .findFirst()
+                .orElseThrow(() -> new ApplicationException(
+                        ErrorCode.BAD_REQUEST,
+                        "Não há passageiro confirmado com este id nesta viagem.",
+                        Set.of("passengerId")
+                ));
+    }
+
+    private boolean isActive(Participant participant) {
+        return participant.getStatus() == ParticipantStatus.REQUESTED
+                || participant.getStatus() == ParticipantStatus.CONFIRMED;
+    }
+
+    public void requestSeat(
+            String passengerId,
+            String passengerRouteId,
+            Place boardingLocation,
+            Place dropOffLocation
+    ) {
+        if (this.status != RideStatus.AWAITING_CONFIRMATION && this.status != RideStatus.CONFIRMED) {
+            throw new ApplicationException(
+                    ErrorCode.BAD_REQUEST,
+                    "Esta viagem não aceita mais pedidos de vaga.",
+                    Set.of("status")
+            );
+        }
+
+        if (this.departureDateTime.isBefore(LocalDateTime.now())) {
+            throw new ApplicationException(
+                    ErrorCode.BAD_REQUEST,
+                    "Esta viagem já saiu e não aceita pedidos de vaga.",
+                    Set.of("departureDateTime")
+            );
+        }
+
+        if (this.isOwnedBy(passengerId)) {
+            throw new ApplicationException(
+                    ErrorCode.BAD_REQUEST,
+                    "O motorista não pode pedir vaga na própria viagem.",
+                    Set.of("passengerId")
+            );
+        }
+
+        boolean alreadyInRide = this.participants.stream()
+                .anyMatch(participant -> participant.getUserId().equals(passengerId)
+                        && (participant.getStatus() == ParticipantStatus.REQUESTED
+                        || participant.getStatus() == ParticipantStatus.CONFIRMED));
+
+        if (alreadyInRide) {
+            throw new ApplicationException(
+                    ErrorCode.RIDE_ALREADY_EXISTS,
+                    "Você já tem um pedido ou uma vaga nesta viagem.",
+                    Set.of("passengerId")
+            );
+        }
+
+        if (this.availableSeats < 1) {
+            throw new ApplicationException(
+                    ErrorCode.BAD_REQUEST,
+                    "Esta viagem não tem mais vagas.",
+                    Set.of("availableSeats")
+            );
+        }
+
+        this.participants.add(Participant.passengerRequest(
+                passengerId,
+                passengerRouteId,
+                boardingLocation,
+                dropOffLocation,
+                LocalDateTime.now()
+        ));
+    }
+
+    public void acceptPassenger(String passengerId) {
+        this.validateCanRespondToRequests();
+        Participant passenger = this.findRequestedPassenger(passengerId);
+
+        if (this.availableSeats < 1) {
+            throw new ApplicationException(
+                    ErrorCode.BAD_REQUEST,
+                    "Esta viagem não tem mais vagas.",
+                    Set.of("availableSeats")
+            );
+        }
+
+        passenger.confirm(LocalDateTime.now());
+        this.availableSeats--;
+        this.status = RideStatus.CONFIRMED;
+
+        if (this.chatRoomId == null && this.id != null) {
+            this.chatRoomId = "ride_" + this.id.toHexString();
+        }
+    }
+
+    public void rejectPassenger(String passengerId, @Nullable String reason) {
+        this.validateCanRespondToRequests();
+        Participant passenger = this.findRequestedPassenger(passengerId);
+
+        passenger.reject(reason, LocalDateTime.now());
+    }
+
+    private void validateCanRespondToRequests() {
+        if (this.status != RideStatus.AWAITING_CONFIRMATION && this.status != RideStatus.CONFIRMED) {
+            throw new ApplicationException(
+                    ErrorCode.BAD_REQUEST,
+                    "Esta viagem não aceita mais respostas a pedidos de vaga.",
+                    Set.of("status")
+            );
+        }
+    }
+
+    private Participant findRequestedPassenger(String passengerId) {
+        return this.participants.stream()
+                .filter(participant -> participant.getUserId().equals(passengerId))
+                .filter(participant -> participant.getStatus() == ParticipantStatus.REQUESTED)
+                .findFirst()
+                .orElseThrow(() -> new ApplicationException(
+                        ErrorCode.BAD_REQUEST,
+                        "Não há pedido de vaga pendente deste passageiro.",
+                        Set.of("passengerId")
+                ));
+    }
+
 }

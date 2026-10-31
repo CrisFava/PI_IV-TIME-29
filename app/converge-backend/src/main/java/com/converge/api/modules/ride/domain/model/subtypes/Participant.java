@@ -12,6 +12,7 @@ import jakarta.validation.constraints.PositiveOrZero;
 import lombok.AccessLevel;
 import lombok.Getter;
 import lombok.NoArgsConstructor;
+import org.springframework.data.mongodb.core.index.Indexed;
 
 import java.math.BigDecimal;
 import java.time.LocalDateTime;
@@ -21,6 +22,7 @@ import java.time.LocalDateTime;
 public class Participant {
 
     @NotBlank
+    @Indexed
     private String userId;
 
     @NotNull
@@ -74,7 +76,7 @@ public class Participant {
 
     private boolean paymentConfirmedByDriver = false;
 
-    @NotNull
+    @Nullable
     private LocalDateTime confirmedAt;
 
     @Nullable
@@ -98,5 +100,67 @@ public class Participant {
         driver.updatedAt = now;
 
         return driver;
+    }
+
+    public void confirm(LocalDateTime now) {
+        this.status = ParticipantStatus.CONFIRMED;
+        this.respondedAt = now;
+        this.confirmedAt = now;
+        this.updatedAt = now;
+    }
+
+    public void reject(@Nullable String reason, LocalDateTime now) {
+        this.status = ParticipantStatus.REJECTED;
+        this.respondedAt = now;
+        this.rejectionReason = reason;
+        this.updatedAt = now;
+    }
+
+    public void complete(LocalDateTime now) {
+        this.status = ParticipantStatus.COMPLETED;
+        this.updatedAt = now;
+    }
+
+    public void markNoShow(LocalDateTime now) {
+        this.status = ParticipantStatus.NO_SHOW;
+        this.finalAmount = BigDecimal.ZERO;
+        this.paymentStatus = ParticipantPaymentStatus.NOT_APPLICABLE;
+        this.updatedAt = now;
+    }
+
+    public void cancel(@Nullable String reason, boolean late, LocalDateTime now) {
+        this.status = ParticipantStatus.CANCELLED;
+        this.cancellationReason = reason;
+        this.lateCancellation = late;
+        this.cancelledAt = now;
+        this.updatedAt = now;
+
+        if (!late) {
+            this.paymentStatus = ParticipantPaymentStatus.NOT_APPLICABLE;
+        }
+    }
+
+    public static Participant passengerRequest(
+            String userId,
+            String passengerRouteId,
+            Place boardingLocation,
+            Place dropOffLocation,
+            LocalDateTime now
+    ) {
+        Participant passenger = new Participant();
+
+        passenger.userId = userId;
+        passenger.role = ParticipationRole.PASSENGER;
+        passenger.passengerRouteId = passengerRouteId;
+        passenger.boardingLocation = boardingLocation;
+        passenger.dropOffLocation = dropOffLocation;
+        passenger.status = ParticipantStatus.REQUESTED;
+        passenger.requestedAt = now;
+        passenger.estimatedAmount = BigDecimal.ZERO;
+        passenger.maxAmount = BigDecimal.ZERO;
+        passenger.paymentStatus = ParticipantPaymentStatus.PENDING;
+        passenger.updatedAt = now;
+
+        return passenger;
     }
 }

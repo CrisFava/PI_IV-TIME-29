@@ -6,19 +6,19 @@ import jakarta.validation.constraints.NotNull;
 
 
 public record VehicleSnapshot (
-    
+
     @NotBlank
     String model,
-    
+
     @NotBlank
     String licensePlate,
 
-    @NotNull 
+    @NotNull
     VehicleType type,
 
     @NotBlank
     String color
 
 ) {
-    
+
 }
