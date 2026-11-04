@@ -283,6 +283,12 @@ public class Ride {
             );
         }
 
+        LocalDateTime now = LocalDateTime.now();
+        this.participants.stream()
+                .filter(participant -> participant.getRole() == ParticipationRole.PASSENGER)
+                .filter(participant -> participant.getStatus() == ParticipantStatus.REQUESTED)
+                .forEach(participant -> participant.reject("Viagem iniciada.", now));
+
         this.status = RideStatus.IN_PROGRESS;
     }
 
@@ -304,11 +310,10 @@ public class Ride {
                 .toList();
 
         if (presentPassengers.isEmpty()) {
-            throw new ApplicationException(
-                    ErrorCode.BAD_REQUEST,
-                    "Não há passageiro presente para concluir a viagem. Cancele a viagem.",
-                    Set.of("participants")
-            );
+            this.status = RideStatus.CANCELLED;
+            this.cancelledBy = this.driverId;
+            this.cancellationReason = "Todos os passageiros ausentes.";
+            return;
         }
 
         LocalDateTime now = LocalDateTime.now();
@@ -381,6 +386,18 @@ public class Ride {
             );
         }
 
+        boolean wasRejected = this.participants.stream()
+                .anyMatch(participant -> participant.getUserId().equals(passengerId)
+                        && participant.getStatus() == ParticipantStatus.REJECTED);
+
+        if (wasRejected) {
+            throw new ApplicationException(
+                    ErrorCode.NOT_ALLOWED,
+                    "O motorista recusou o seu pedido nesta viagem.",
+                    Set.of("passengerId")
+            );
+        }
+
         boolean alreadyInRide = this.participants.stream()
                 .anyMatch(participant -> participant.getUserId().equals(passengerId)
                         && (participant.getStatus() == ParticipantStatus.REQUESTED
@@ -413,6 +430,15 @@ public class Ride {
 
     public void acceptPassenger(String passengerId) {
         this.validateCanRespondToRequests();
+
+        if (this.departureDateTime.isBefore(LocalDateTime.now())) {
+            throw new ApplicationException(
+                    ErrorCode.BAD_REQUEST,
+                    "O horário de saída já passou e não é mais possível aceitar passageiros.",
+                    Set.of("departureDateTime")
+            );
+        }
+
         Participant passenger = this.findRequestedPassenger(passengerId);
 
         if (this.availableSeats < 1) {

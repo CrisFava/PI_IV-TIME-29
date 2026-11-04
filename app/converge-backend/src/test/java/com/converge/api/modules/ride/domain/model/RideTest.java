@@ -270,16 +270,59 @@ class RideTest {
     }
 
     @Test
-    @DisplayName("Passageiro recusado pode pedir vaga de novo")
-    void shouldAllowNewRequestAfterRejection() {
+    @DisplayName("Passageiro recusado não pode pedir vaga de novo na mesma viagem")
+    void shouldNotAllowNewRequestAfterRejection() {
         Ride ride = validRide();
         ride.requestSeat("passenger-456", "route-456", place("Rua A"), place("Campus PUC"));
         ride.rejectPassenger("passenger-456", null);
+
+        assertThatThrownBy(() -> ride.requestSeat("passenger-456", "route-456", place("Rua A"), place("Campus PUC")))
+                .isInstanceOf(ApplicationException.class);
+
+        assertThat(ride.getParticipants()).hasSize(2);
+    }
+
+    @Test
+    @DisplayName("Passageiro que saiu por conta própria pode pedir vaga de novo")
+    void shouldAllowNewRequestAfterLeaving() {
+        Ride ride = validRide();
+        ride.requestSeat("passenger-456", "route-456", place("Rua A"), place("Campus PUC"));
+        ride.leave("passenger-456", null);
 
         ride.requestSeat("passenger-456", "route-456", place("Rua A"), place("Campus PUC"));
 
         assertThat(ride.getParticipants()).hasSize(3);
         assertThat(ride.getParticipants().get(2).getStatus()).isEqualTo(ParticipantStatus.REQUESTED);
+    }
+
+    @Test
+    @DisplayName("Ao iniciar a viagem, quem ainda estava pendente é recusado automaticamente")
+    void shouldRejectPendingRequestsWhenRideStarts() {
+        Ride ride = validRide();
+        ride.requestSeat("passenger-1", "route-1", place("Rua A"), place("Campus PUC"));
+        ride.requestSeat("passenger-2", "route-2", place("Rua B"), place("Campus PUC"));
+        ride.acceptPassenger("passenger-1");
+
+        ride.start();
+
+        assertThat(ride.getParticipants().get(1).getStatus()).isEqualTo(ParticipantStatus.CONFIRMED);
+        Participant forgotten = ride.getParticipants().get(2);
+        assertThat(forgotten.getStatus()).isEqualTo(ParticipantStatus.REJECTED);
+        assertThat(forgotten.getRejectionReason()).isEqualTo("Viagem iniciada.");
+    }
+
+    @Test
+    @DisplayName("Não deve aceitar passageiro depois do horário de saída")
+    void shouldNotAcceptPassengerAfterDeparture() {
+        Ride ride = validRide();
+        ride.requestSeat("passenger-456", "route-456", place("Rua A"), place("Campus PUC"));
+        ReflectionTestUtils.setField(ride, "departureDateTime", LocalDateTime.now().minusMinutes(1));
+
+        assertThatThrownBy(() -> ride.acceptPassenger("passenger-456"))
+                .isInstanceOf(ApplicationException.class);
+
+        assertThat(ride.getParticipants().get(1).getStatus()).isEqualTo(ParticipantStatus.REQUESTED);
+        assertThat(ride.getAvailableSeats()).isEqualTo(3);
     }
 
     @Test
@@ -440,12 +483,18 @@ class RideTest {
     }
 
     @Test
-    @DisplayName("Não deve concluir viagem sem nenhum passageiro presente")
-    void shouldNotCompleteRideWithoutPresentPassenger() {
+    @DisplayName("Se todos os passageiros faltaram, concluir encerra a viagem como cancelada")
+    void shouldCancelRideWhenAllPassengersAreAbsent() {
         Ride ride = rideInProgress();
         ride.markNoShow("passenger-1");
 
-        assertThatThrownBy(ride::complete).isInstanceOf(ApplicationException.class);
+        ride.complete();
+
+        assertThat(ride.getStatus()).isEqualTo(RideStatus.CANCELLED);
+        assertThat(ride.getCancelledBy()).isEqualTo("driver-123");
+        assertThat(ride.getCancellationReason()).isEqualTo("Todos os passageiros ausentes.");
+        assertThat(ride.getCompletedAt()).isNull();
+        assertThat(ride.getParticipants().get(1).getStatus()).isEqualTo(ParticipantStatus.NO_SHOW);
     }
 
     @Test
