@@ -42,7 +42,8 @@ public class IndicatorController {
                 "arvoreEquivalente", "1 árvore absorve cerca de 22 kg de CO2 por ano.",
                 "carroEvitado", "Cada passageiro efetivo representa 1 carro que deixou de rodar.",
                 "co2", "CO2 evitado = energia economizada x fator de emissão da fonte do veículo.",
-                "fatoresProvisorios", true
+                "fonteEletricidade", "Fator do Sistema Interligado Nacional (MCTI): 0,0385 kg CO2/kWh (2023).",
+                "fonteCombustiveis", "Fatores de referência em kg CO2/litro (GHG Protocol): gasolina 2,31; etanol 1,50; diesel 2,68."
         );
         return ResponseEntity.ok(ApplicationResponse.success(methodology));
     }
