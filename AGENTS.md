@@ -154,3 +154,45 @@ uv tool install graphifyy   # ou: pipx install graphifyy
 graphify install            # instala a skill /graphify no Claude Code
 ```
 Depois, gere o grafo inicial com `/graphify .`.
+
+---
+
+## 8. Autoria dos Arquivos de Código (Java e Dart)
+
+Todo arquivo `.java` e `.dart` versionado deve ter, **na primeira linha**, um comentário de autoria seguido de uma linha em branco:
+
+```dart
+// Autor: Nome Completo - RA 00000000
+
+package com.converge...;   // ou o primeiro import/declaração em Dart
+```
+
+### Integrantes e identidades de commit
+Os nomes completos e RAs oficiais estão na tabela **Equipe do Projeto** do `README.md`, que é a fonte da verdade. Os nomes de commit abaixo pertencem a cada integrante:
+
+| Integrante (nome no cabeçalho)  | RA       | Nomes / usuários usados nos commits                              |
+| :------------------------------ | :------- | :--------------------------------------------------------------- |
+| Allan Giovanni Matias Paes      | 25008211 | `Allan Matias`, `Matias`, `Allan Giovanni Matias Paes`, `Matiaszz` |
+| Cristian Eduardo Fava           | 25000636 | `duckcoder1101`, `Cristian Eduardo Fava`, `CrisFava`             |
+| Daniela Mikie Kikuchi Gonçalves | 25003068 | `Dani Mikie`                                                     |
+| Gustavo Alves de Siqueira Costa | 25001650 | `gustavoADSC`, `GustavoADSC`, `Gustavo Alves`                    |
+| Sara Fernandes Monteiro         | 25024107 | `Sara Monteiro`                                                  |
+
+Se aparecer uma identidade de commit que não está na tabela, pergunte ao usuário a quem ela pertence antes de definir a autoria.
+
+### Regra para definir o autor
+1. **Base**: o autor é quem **criou o arquivo** no histórico da branch `develop`, ignorando commits de merge:
+   `git log origin/develop --no-merges --follow --diff-filter=A --format='%an' -- <arquivo> | tail -1`
+2. **Exceção (arquivo muito alterado)**: se o criador responde por **menos de 50%** das linhas atuais (`git blame -w HEAD -- <arquivo>`), o autor passa a ser quem tem mais linhas. Em caso de empate em 50%, o criador continua como autor.
+3. **Arquivo novo** que ainda não existe na `develop`: o autor é o integrante dono do `git config user.name`/`user.email` local, ou seja, quem está fazendo o commit.
+4. **Não altere uma autoria existente** só porque outra pessoa editou o arquivo. Reavalie apenas se o arquivo foi reescrito e passou a se encaixar na exceção da regra 2.
+5. **Arquivos gerados por ferramenta** não recebem cabeçalho, porque a próxima geração apagaria o comentário. Exemplo: `app/converge/lib/firebase_options.dart`, gerado pelo FlutterFire CLI.
+
+### Quando aplicar
+- **Antes de cada commit**: confira os arquivos `.java` e `.dart` que estão sendo adicionados no commit e garanta que todos têm o cabeçalho de autoria correto.
+- **Periodicamente** (por exemplo, ao iniciar uma tarefa ou antes de abrir um PR): procure arquivos sem autoria no repositório inteiro e defina a autoria pelas regras acima:
+  ```bash
+  git ls-files '*.java' '*.dart' | grep -v 'firebase_options.dart' \
+    | while read -r f; do head -1 "$f" | grep -q '^// Autor:' || echo "$f"; done
+  ```
+- Depois de adicionar cabeçalhos em arquivos Dart, rode `flutter analyze` (0 erros e 0 warnings) e, se o graphify estiver disponível, `graphify update .`.
