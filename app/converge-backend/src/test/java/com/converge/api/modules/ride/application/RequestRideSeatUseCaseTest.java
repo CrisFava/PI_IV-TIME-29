@@ -1,3 +1,5 @@
+// Autor: Sara Fernandes Monteiro - RA 25024107
+
 package com.converge.api.modules.ride.application;
 
 import com.converge.api.modules.ride.application.dto.RequestRideSeatCommand;
@@ -14,7 +16,6 @@ import com.converge.api.modules.route.domain.enums.RouteType;
 import com.converge.api.modules.route.domain.model.Route;
 import com.converge.api.modules.route.domain.model.subtypes.Coordinates;
 import com.converge.api.modules.route.domain.model.subtypes.Place;
-import com.converge.api.modules.route.domain.repository.RouteRepository;
 import com.converge.api.modules.user.domain.enums.vehicle.VehicleType;
 import com.converge.api.modules.user.domain.model.vehicle.Vehicle;
 import com.converge.api.modules.user.application.VehicleAccess;
@@ -52,7 +53,6 @@ class RequestRideSeatUseCaseTest {
     @Mock private RideAccess rideAccess;
     @Mock private RideEligibility rideEligibility;
     @Mock private RouteAccess routeAccess;
-    @Mock private RouteRepository routeRepository;
     @Mock private VehicleAccess vehicleAccess;
     @Mock private RideRepository rideRepository;
     @Mock private RideMapper rideMapper;
@@ -70,7 +70,7 @@ class RequestRideSeatUseCaseTest {
     @BeforeEach
     void setUp() {
         requestSeat = new RequestRideSeatUseCase(
-                rideAccess, rideEligibility, routeAccess, routeRepository, vehicleAccess, rideRepository, rideMapper);
+                rideAccess, rideEligibility, routeAccess, vehicleAccess, rideRepository, rideMapper);
     }
 
     private Place place(String address) {
@@ -107,8 +107,7 @@ class RequestRideSeatUseCaseTest {
     }
 
     private void driverRouteIsValid() {
-        when(routeRepository.findById(driverRouteObjectId)).thenReturn(Optional.of(driverRoute));
-        when(driverRoute.getStatus()).thenReturn(RouteStatus.ACTIVE);
+        when(routeAccess.getActiveRoute(driverRouteObjectId.toHexString())).thenReturn(driverRoute);
         when(driverRoute.getType()).thenReturn(RouteType.OFFER);
         when(driverRoute.getWeekDays()).thenReturn(Set.of(date.getDayOfWeek()));
         when(driverRoute.getTotalSeats()).thenReturn(3);
@@ -271,6 +270,19 @@ class RequestRideSeatUseCaseTest {
     }
 
     @Test
+    @DisplayName("Trajeto do motorista inexistente, inativo ou de id inválido não permite pedir vaga")
+    void shouldRejectWhenDriverRouteIsNotFound() {
+        passengerRouteIsValid();
+        when(routeAccess.getActiveRoute(driverRouteObjectId.toHexString()))
+                .thenThrow(new ApplicationException(ErrorCode.ROUTE_NOT_FOUND, "Trajeto não encontrado."));
+
+        ApplicationException thrown = assertThrows(ApplicationException.class, () -> requestSeat.execute(command()));
+
+        assertThat(thrown.getError().code()).isEqualTo(ErrorCode.ROUTE_NOT_FOUND);
+        verify(rideRepository, never()).save(any());
+    }
+
+    @Test
     @DisplayName("Não deve pedir vaga com um trajeto que não é de procura")
     void shouldRejectWhenPassengerRouteIsNotSearch() {
         when(rideAccess.currentUserId(UID)).thenReturn(PASSENGER_ID);
@@ -286,8 +298,7 @@ class RequestRideSeatUseCaseTest {
     @DisplayName("Não deve pedir vaga em um trajeto que não é de oferta")
     void shouldRejectWhenDriverRouteIsNotOffer() {
         passengerRouteIsValid();
-        when(routeRepository.findById(driverRouteObjectId)).thenReturn(Optional.of(driverRoute));
-        when(driverRoute.getStatus()).thenReturn(RouteStatus.ACTIVE);
+        when(routeAccess.getActiveRoute(driverRouteObjectId.toHexString())).thenReturn(driverRoute);
         when(driverRoute.getType()).thenReturn(RouteType.SEARCH);
 
         assertThrows(ApplicationException.class, () -> requestSeat.execute(command()));
@@ -326,8 +337,7 @@ class RequestRideSeatUseCaseTest {
     @DisplayName("O motorista não pode pedir vaga no próprio trajeto")
     void shouldRejectWhenPassengerIsTheOwnerOfTheDriverRoute() {
         passengerRouteIsValid();
-        when(routeRepository.findById(driverRouteObjectId)).thenReturn(Optional.of(driverRoute));
-        when(driverRoute.getStatus()).thenReturn(RouteStatus.ACTIVE);
+        when(routeAccess.getActiveRoute(driverRouteObjectId.toHexString())).thenReturn(driverRoute);
         when(driverRoute.getType()).thenReturn(RouteType.OFFER);
         when(driverRoute.getWeekDays()).thenReturn(Set.of(date.getDayOfWeek()));
         when(driverRoute.isOwnedBy(PASSENGER_ID)).thenReturn(true);
@@ -341,8 +351,7 @@ class RequestRideSeatUseCaseTest {
     @DisplayName("Não deve pedir vaga em um dia que o motorista não faz o trajeto")
     void shouldRejectWhenDateIsNotInDriverWeekDays() {
         passengerRouteIsValid();
-        when(routeRepository.findById(driverRouteObjectId)).thenReturn(Optional.of(driverRoute));
-        when(driverRoute.getStatus()).thenReturn(RouteStatus.ACTIVE);
+        when(routeAccess.getActiveRoute(driverRouteObjectId.toHexString())).thenReturn(driverRoute);
         when(driverRoute.getType()).thenReturn(RouteType.OFFER);
         when(driverRoute.getWeekDays()).thenReturn(Set.of(date.plusDays(1).getDayOfWeek()));
 

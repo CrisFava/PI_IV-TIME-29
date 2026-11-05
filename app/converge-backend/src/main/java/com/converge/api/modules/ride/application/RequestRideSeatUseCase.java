@@ -1,3 +1,5 @@
+// Autor: Sara Fernandes Monteiro - RA 25024107
+
 package com.converge.api.modules.ride.application;
 
 import com.converge.api.modules.ride.application.dto.RequestRideSeatCommand;
@@ -9,14 +11,12 @@ import com.converge.api.modules.route.application.RouteAccess;
 import com.converge.api.modules.route.domain.enums.RouteStatus;
 import com.converge.api.modules.route.domain.enums.RouteType;
 import com.converge.api.modules.route.domain.model.Route;
-import com.converge.api.modules.route.domain.repository.RouteRepository;
 import com.converge.api.modules.user.application.VehicleAccess;
 import com.converge.api.modules.user.domain.model.vehicle.Vehicle;
 import com.converge.api.shared.application.UseCase;
 import com.converge.api.shared.presentation.exception.ApplicationException;
 import com.converge.api.shared.presentation.exception.ErrorCode;
 import lombok.RequiredArgsConstructor;
-import org.bson.types.ObjectId;
 import org.springframework.dao.DuplicateKeyException;
 import org.springframework.stereotype.Service;
 
@@ -32,7 +32,6 @@ public class RequestRideSeatUseCase implements UseCase<RequestRideSeatCommand, R
     private final RideAccess rideAccess;
     private final RideEligibility rideEligibility;
     private final RouteAccess routeAccess;
-    private final RouteRepository routeRepository;
     private final VehicleAccess vehicleAccess;
     private final RideRepository rideRepository;
     private final RideMapper rideMapper;
@@ -47,7 +46,7 @@ public class RequestRideSeatUseCase implements UseCase<RequestRideSeatCommand, R
         Route passengerRoute = routeAccess.getOwnedRoute(command.request().passengerRouteId(), passengerId);
         validatePassengerRoute(passengerRoute, date);
 
-        Route driverRoute = loadDriverRoute(command.request().driverRouteId());
+        Route driverRoute = routeAccess.getActiveRoute(command.request().driverRouteId());
         validateDriverRoute(driverRoute, passengerId, date);
 
         LocalDateTime departure = date.atTime(LocalTime.parse(driverRoute.getDepartureTime()));
@@ -110,16 +109,6 @@ public class RequestRideSeatUseCase implements UseCase<RequestRideSeatCommand, R
                     Set.of("date")
             );
         }
-    }
-
-    private Route loadDriverRoute(String routeId) {
-        if (!ObjectId.isValid(routeId)) {
-            throw driverRouteNotFound();
-        }
-
-        return routeRepository.findById(new ObjectId(routeId))
-                .filter(route -> route.getStatus() == RouteStatus.ACTIVE)
-                .orElseThrow(this::driverRouteNotFound);
     }
 
     private void validateDriverRoute(Route route, String passengerId, LocalDate date) {
@@ -190,9 +179,5 @@ public class RequestRideSeatUseCase implements UseCase<RequestRideSeatCommand, R
         return rideRepository.findTopByDriverIdOrderBySequentialNumberDesc(driverId)
                 .map(ride -> ride.getSequentialNumber() + 1)
                 .orElse(1);
-    }
-
-    private ApplicationException driverRouteNotFound() {
-        return new ApplicationException(ErrorCode.ROUTE_NOT_FOUND, "Trajeto do motorista não encontrado.");
     }
 }
