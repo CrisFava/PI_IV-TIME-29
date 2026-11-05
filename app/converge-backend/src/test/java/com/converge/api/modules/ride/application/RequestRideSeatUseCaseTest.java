@@ -17,7 +17,7 @@ import com.converge.api.modules.route.domain.model.subtypes.Place;
 import com.converge.api.modules.route.domain.repository.RouteRepository;
 import com.converge.api.modules.user.domain.enums.vehicle.VehicleType;
 import com.converge.api.modules.user.domain.model.vehicle.Vehicle;
-import com.converge.api.modules.user.domain.repository.VehicleRepository;
+import com.converge.api.modules.user.application.VehicleAccess;
 import com.converge.api.shared.presentation.exception.ApplicationException;
 import com.converge.api.shared.presentation.exception.ErrorCode;
 import org.bson.types.ObjectId;
@@ -53,7 +53,7 @@ class RequestRideSeatUseCaseTest {
     @Mock private RideEligibility rideEligibility;
     @Mock private RouteAccess routeAccess;
     @Mock private RouteRepository routeRepository;
-    @Mock private VehicleRepository vehicleRepository;
+    @Mock private VehicleAccess vehicleAccess;
     @Mock private RideRepository rideRepository;
     @Mock private RideMapper rideMapper;
     @Mock private Route passengerRoute;
@@ -70,7 +70,7 @@ class RequestRideSeatUseCaseTest {
     @BeforeEach
     void setUp() {
         requestSeat = new RequestRideSeatUseCase(
-                rideAccess, rideEligibility, routeAccess, routeRepository, vehicleRepository, rideRepository, rideMapper);
+                rideAccess, rideEligibility, routeAccess, routeRepository, vehicleAccess, rideRepository, rideMapper);
     }
 
     private Place place(String address) {
@@ -137,9 +137,7 @@ class RequestRideSeatUseCaseTest {
         when(driverRoute.getOrigin()).thenReturn(place("Rua das Flores, 50"));
         when(driverRoute.getDestination()).thenReturn(place("Campus PUC"));
 
-        when(vehicleRepository.findById(vehicleObjectId)).thenReturn(Optional.of(vehicle));
-        when(vehicle.isActive()).thenReturn(true);
-        when(vehicle.isOwnedBy(DRIVER_ID)).thenReturn(true);
+        when(vehicleAccess.getActiveVehicleOf(vehicleObjectId.toHexString(), DRIVER_ID)).thenReturn(vehicle);
         when(vehicle.getId()).thenReturn(vehicleObjectId);
         when(rideMapper.toVehicleSnapshot(vehicle))
                 .thenReturn(new VehicleSnapshot("Volkswagen Gol", "ABC1234", VehicleType.HATCH, "Azul"));
@@ -193,7 +191,7 @@ class RequestRideSeatUseCaseTest {
 
         assertThat(ride).isSameAs(existing);
         assertThat(ride.getParticipants()).hasSize(2);
-        verify(vehicleRepository, never()).findById(any());
+        verify(vehicleAccess, never()).getActiveVehicleOf(any(), any());
     }
 
     @Test
@@ -314,8 +312,8 @@ class RequestRideSeatUseCaseTest {
         driverRouteIsValid();
         when(driverRoute.getUserId()).thenReturn(DRIVER_ID);
         when(driverRoute.getVehicleId()).thenReturn(vehicleObjectId.toHexString());
-        when(vehicleRepository.findById(vehicleObjectId)).thenReturn(Optional.of(vehicle));
-        when(vehicle.isActive()).thenReturn(false);
+        when(vehicleAccess.getActiveVehicleOf(vehicleObjectId.toHexString(), DRIVER_ID))
+                .thenThrow(new ApplicationException(ErrorCode.VEHICLE_NOT_FOUND, "Veículo não encontrado."));
         when(rideRepository.findByDriverRouteIdAndDepartureDateTimeAndStatusNot(any(), any(), any()))
                 .thenReturn(Optional.empty());
 

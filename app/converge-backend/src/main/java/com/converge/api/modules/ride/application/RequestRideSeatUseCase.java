@@ -10,8 +10,8 @@ import com.converge.api.modules.route.domain.enums.RouteStatus;
 import com.converge.api.modules.route.domain.enums.RouteType;
 import com.converge.api.modules.route.domain.model.Route;
 import com.converge.api.modules.route.domain.repository.RouteRepository;
+import com.converge.api.modules.user.application.VehicleAccess;
 import com.converge.api.modules.user.domain.model.vehicle.Vehicle;
-import com.converge.api.modules.user.domain.repository.VehicleRepository;
 import com.converge.api.shared.application.UseCase;
 import com.converge.api.shared.presentation.exception.ApplicationException;
 import com.converge.api.shared.presentation.exception.ErrorCode;
@@ -33,7 +33,7 @@ public class RequestRideSeatUseCase implements UseCase<RequestRideSeatCommand, R
     private final RideEligibility rideEligibility;
     private final RouteAccess routeAccess;
     private final RouteRepository routeRepository;
-    private final VehicleRepository vehicleRepository;
+    private final VehicleAccess vehicleAccess;
     private final RideRepository rideRepository;
     private final RideMapper rideMapper;
 
@@ -183,16 +183,7 @@ public class RequestRideSeatUseCase implements UseCase<RequestRideSeatCommand, R
     }
 
     private Vehicle loadVehicle(Route route, String driverId) {
-        String vehicleId = route.getVehicleId();
-
-        if (vehicleId == null || !ObjectId.isValid(vehicleId)) {
-            throw vehicleNotFound();
-        }
-
-        return vehicleRepository.findById(new ObjectId(vehicleId))
-                .filter(Vehicle::isActive)
-                .filter(vehicle -> vehicle.isOwnedBy(driverId))
-                .orElseThrow(this::vehicleNotFound);
+        return vehicleAccess.getActiveVehicleOf(route.getVehicleId(), driverId);
     }
 
     private int nextSequentialNumber(String driverId) {
@@ -203,9 +194,5 @@ public class RequestRideSeatUseCase implements UseCase<RequestRideSeatCommand, R
 
     private ApplicationException driverRouteNotFound() {
         return new ApplicationException(ErrorCode.ROUTE_NOT_FOUND, "Trajeto do motorista não encontrado.");
-    }
-
-    private ApplicationException vehicleNotFound() {
-        return new ApplicationException(ErrorCode.VEHICLE_NOT_FOUND, "O veículo do trajeto não foi encontrado.");
     }
 }

@@ -33,6 +33,17 @@ public class VehicleAccess {
                 .orElseThrow(this::vehicleNotFound);
     }
 
+    public Vehicle getActiveVehicleOf(String vehicleId, String ownerId) {
+        if (vehicleId == null || !ObjectId.isValid(vehicleId)) {
+            throw vehicleNotFound();
+        }
+
+        return vehicleRepository.findById(new ObjectId(vehicleId))
+                .filter(Vehicle::isActive)
+                .filter(vehicle -> vehicle.isOwnedBy(ownerId))
+                .orElseThrow(this::vehicleNotFound);
+    }
+
     private ApplicationException vehicleNotFound() {
         return new ApplicationException(ErrorCode.VEHICLE_NOT_FOUND, "Veículo não encontrado.");
     }
