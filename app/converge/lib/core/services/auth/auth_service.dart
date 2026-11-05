@@ -1,3 +1,5 @@
+// Autor: Cristian Eduardo Fava - RA 25000636
+
 import 'auth_user.dart';
 
 /// Contrato do provedor de identidade. As features dependem desta interface,

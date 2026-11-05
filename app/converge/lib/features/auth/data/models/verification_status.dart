@@ -1,3 +1,5 @@
+// Autor: Cristian Eduardo Fava - RA 25000636
+
 /// Espelha `VerificationStatus` do backend.
 enum VerificationStatus {
   verified,

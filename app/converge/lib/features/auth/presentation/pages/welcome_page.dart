@@ -1,3 +1,5 @@
+// Autor: Allan Giovanni Matias Paes - RA 25008211
+
 import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
 

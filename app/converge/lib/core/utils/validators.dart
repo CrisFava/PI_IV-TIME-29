@@ -1,3 +1,5 @@
+// Autor: Cristian Eduardo Fava - RA 25000636
+
 /// Validadores no formato de `FormField.validator`: devolvem a mensagem de
 /// erro ou `null` se o valor for válido.
 abstract class Validators {

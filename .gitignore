@@ -3,3 +3,6 @@
 
 # Configurações pessoais do IntelliJ IDEA
 .idea/
+
+# Saída gerada pelo graphify (grafo de conhecimento local)
+graphify-out/

@@ -1,3 +1,5 @@
+// Autor: Allan Giovanni Matias Paes - RA 25008211
+
 package com.converge.api.shared.presentation.dto;
 
 import com.converge.api.shared.infrastructure.exception.ErrorResponse;

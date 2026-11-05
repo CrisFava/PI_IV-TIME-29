@@ -1,3 +1,5 @@
+// Autor: Allan Giovanni Matias Paes - RA 25008211
+
 import 'dart:math' as math;
 import 'dart:ui' as ui;
 import 'package:converge/features/home/presentation/widgets/home_map_background.dart';

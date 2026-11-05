@@ -1,3 +1,5 @@
+// Autor: Cristian Eduardo Fava - RA 25000636
+
 import '../../data/models/academic_record_model.dart';
 import '../../data/models/create_user_request.dart';
 

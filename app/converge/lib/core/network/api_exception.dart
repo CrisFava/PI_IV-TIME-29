@@ -1,3 +1,5 @@
+// Autor: Cristian Eduardo Fava - RA 25000636
+
 import 'api_error_code.dart';
 
 /// Erro de API no formato normalizado pelo backend:

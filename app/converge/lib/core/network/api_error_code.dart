@@ -1,3 +1,5 @@
+// Autor: Cristian Eduardo Fava - RA 25000636
+
 /// Espelho do enum `ErrorCode` do backend Spring Boot, mais os códigos
 /// gerados no próprio app quando não há resposta válida do servidor.
 enum ApiErrorCode {

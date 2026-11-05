@@ -1,3 +1,5 @@
+// Autor: Daniela Mikie Kikuchi Gonçalves - RA 25003068
+
 package com.converge.api.modules.indicator.application.dto;
 
 import com.converge.api.modules.indicator.domain.enums.IndicatorPeriod;

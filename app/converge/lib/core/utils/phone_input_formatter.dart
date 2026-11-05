@@ -1,3 +1,5 @@
+// Autor: Allan Giovanni Matias Paes - RA 25008211
+
 import 'package:flutter/services.dart';
 
 /// Formata dígitos de telefone no padrão `(00) 90000-0000` ou `(00) 0000-0000`.

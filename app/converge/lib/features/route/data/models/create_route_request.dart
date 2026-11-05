@@ -1,3 +1,5 @@
+// Autor: Allan Giovanni Matias Paes - RA 25008211
+
 import 'package:flutter/foundation.dart';
 import 'route_place_model.dart';
 

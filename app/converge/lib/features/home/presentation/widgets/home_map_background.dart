@@ -1,3 +1,5 @@
+// Autor: Allan Giovanni Matias Paes - RA 25008211
+
 import 'dart:math' as math;
 import 'package:flutter/material.dart';
 
