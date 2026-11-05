@@ -1,3 +1,5 @@
+// Autor: Cristian Eduardo Fava - RA 25000636
+
 part of '../auth_session.dart';
 
 /// Logado no Firebase, mas sem cadastro no backend: o `POST` de cadastro

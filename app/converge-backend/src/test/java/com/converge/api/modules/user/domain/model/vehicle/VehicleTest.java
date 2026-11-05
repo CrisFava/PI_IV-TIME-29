@@ -1,3 +1,5 @@
+// Autor: Sara Fernandes Monteiro - RA 25024107
+
 package com.converge.api.modules.user.domain.model.vehicle;
 
 import com.converge.api.modules.user.domain.enums.vehicle.ConsumptionUnit;

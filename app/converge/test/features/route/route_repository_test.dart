@@ -1,3 +1,5 @@
+// Autor: Allan Giovanni Matias Paes - RA 25008211
+
 import 'package:converge/features/route/data/models/create_route_request.dart';
 import 'package:converge/features/route/data/models/route_place_model.dart';
 import 'package:converge/features/route/data/repository/route_endpoints.dart';

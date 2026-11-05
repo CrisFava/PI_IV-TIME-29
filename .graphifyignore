@@ -1,0 +1,16 @@
+# Escopo do grafo do graphify: código-fonte e documentação.
+# Arquivos gerados de plataforma e imagens ficam de fora.
+app/converge/ios/
+app/converge/android/
+app/converge/macos/
+app/converge/linux/
+app/converge/windows/
+app/converge/web/
+app/converge/build/
+app/converge/.dart_tool/
+*.png
+*.jpg
+*.jpeg
+*.h
+*.m
+*.swift

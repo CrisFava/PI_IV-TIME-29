@@ -1,3 +1,5 @@
+// Autor: Allan Giovanni Matias Paes - RA 25008211
+
 package com.converge.socket.core.protocol;
 
 import java.io.Serial;

@@ -1,3 +1,5 @@
+// Autor: Cristian Eduardo Fava - RA 25000636
+
 import 'package:converge/core/network/api_exception.dart';
 import 'package:converge/core/services/auth/auth_providers.dart';
 import 'package:converge/features/auth/data/repository/auth_repository_impl.dart';

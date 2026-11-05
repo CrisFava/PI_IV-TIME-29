@@ -1,3 +1,5 @@
+// Autor: Cristian Eduardo Fava - RA 25000636
+
 import 'package:converge/features/auth/data/models/academic_record_model.dart';
 import 'package:converge/features/auth/data/models/participation_role.dart';
 import 'package:converge/features/auth/data/models/user_model.dart';

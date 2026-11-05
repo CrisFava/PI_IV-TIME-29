@@ -1,3 +1,5 @@
+// Autor: Cristian Eduardo Fava - RA 25000636
+
 /// Endpoints do módulo de usuários no converge-backend (`/api/v1/users`).
 /// - `POST /users` body: `CreateUserRequestDTO` -> `ApplicationResponse<CreateUserResponseDTO>`
 /// - `GET /users/me` header: Bearer token -> `ApplicationResponse<CreateUserResponseDTO>`, 404 se não cadastrado

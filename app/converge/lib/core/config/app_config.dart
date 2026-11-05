@@ -1,3 +1,5 @@
+// Autor: Cristian Eduardo Fava - RA 25000636
+
 abstract class AppConfig {
   static const String appName = 'Converge';
 

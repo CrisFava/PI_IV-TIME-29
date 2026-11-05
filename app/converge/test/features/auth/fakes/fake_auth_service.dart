@@ -1,3 +1,5 @@
+// Autor: Cristian Eduardo Fava - RA 25000636
+
 import 'dart:async';
 
 import 'package:converge/core/services/auth/auth_exception.dart';

@@ -1,5 +1,8 @@
+// Autor: Gustavo Alves de Siqueira Costa - RA 25001650
+
 package com.converge.api.modules.route.application;
 
+import com.converge.api.modules.route.domain.enums.RouteStatus;
 import com.converge.api.modules.route.domain.enums.RouteType;
 import com.converge.api.modules.route.domain.model.Route;
 import com.converge.api.modules.route.domain.model.subtypes.Coordinates;
@@ -14,6 +17,7 @@ import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
+import org.springframework.test.util.ReflectionTestUtils;
 
 import java.time.DayOfWeek;
 import java.util.Optional;
@@ -95,5 +99,58 @@ class RouteAccessTest {
         when(routeRepository.findById(new ObjectId(ROUTE_ID))).thenReturn(Optional.of(routeOwnedBy("outro-usuario")));
 
         assertRouteNotFound(ROUTE_ID, "user-123");
+    }
+
+    private void assertActiveRouteNotFound(String routeId) {
+        ApplicationException ex = assertThrows(
+                ApplicationException.class,
+                () -> routeAccess.getActiveRoute(routeId)
+        );
+
+        assertThat(ex.getError().code()).isEqualTo(ErrorCode.ROUTE_NOT_FOUND);
+    }
+
+    @Test
+    @DisplayName("getActiveRoute: deve devolver o trajeto ativo mesmo sendo de outro usuário")
+    void shouldReturnActiveRouteOfAnyUser() {
+        Route route = routeOwnedBy("motorista-456");
+        when(routeRepository.findById(new ObjectId(ROUTE_ID))).thenReturn(Optional.of(route));
+
+        assertThat(routeAccess.getActiveRoute(ROUTE_ID)).isSameAs(route);
+    }
+
+    @Test
+    @DisplayName("getActiveRoute: deve lançar ROUTE_NOT_FOUND quando o id não é um ObjectId válido")
+    void shouldRejectInvalidIdForActiveRoute() {
+        assertActiveRouteNotFound("abc");
+    }
+
+    @Test
+    @DisplayName("getActiveRoute: deve lançar ROUTE_NOT_FOUND quando o trajeto não existe")
+    void shouldRejectMissingActiveRoute() {
+        when(routeRepository.findById(new ObjectId(ROUTE_ID))).thenReturn(Optional.empty());
+
+        assertActiveRouteNotFound(ROUTE_ID);
+    }
+
+    @Test
+    @DisplayName("getActiveRoute: deve lançar ROUTE_NOT_FOUND quando o trajeto foi excluído")
+    void shouldRejectInactiveRouteForActiveRoute() {
+        Route route = routeOwnedBy("motorista-456");
+        route.deactivate();
+        when(routeRepository.findById(new ObjectId(ROUTE_ID))).thenReturn(Optional.of(route));
+
+        assertActiveRouteNotFound(ROUTE_ID);
+    }
+
+    @Test
+    @DisplayName("getActiveRoute: deve lançar ROUTE_NOT_FOUND quando o trajeto está pausado")
+    void shouldRejectPausedRouteForActiveRoute() {
+        Route route = routeOwnedBy("motorista-456");
+        // O Route ainda não tem um método para pausar
+        ReflectionTestUtils.setField(route, "status", RouteStatus.PAUSED);
+        when(routeRepository.findById(new ObjectId(ROUTE_ID))).thenReturn(Optional.of(route));
+
+        assertActiveRouteNotFound(ROUTE_ID);
     }
 }

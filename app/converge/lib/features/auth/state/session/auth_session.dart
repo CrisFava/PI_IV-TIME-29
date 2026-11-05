@@ -1,3 +1,5 @@
+// Autor: Cristian Eduardo Fava - RA 25000636
+
 import '../../../../core/services/auth/auth_user.dart';
 import '../../data/models/user_model.dart';
 

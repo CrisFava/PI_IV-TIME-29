@@ -1,3 +1,5 @@
+// Autor: Allan Giovanni Matias Paes - RA 25008211
+
 package com.converge.api.shared.infrastructure.config.startup;
 
 import lombok.extern.slf4j.Slf4j;

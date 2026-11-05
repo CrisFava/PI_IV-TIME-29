@@ -1,3 +1,5 @@
+// Autor: Cristian Eduardo Fava - RA 25000636
+
 part of '../auth_session.dart';
 
 /// Logado no Firebase e com perfil carregado do backend.

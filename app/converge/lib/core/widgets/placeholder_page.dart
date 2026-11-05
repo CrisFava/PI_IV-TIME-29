@@ -1,3 +1,5 @@
+// Autor: Cristian Eduardo Fava - RA 25000636
+
 import 'package:flutter/material.dart';
 
 /// Tela provisória enquanto a interface real não é implementada.
