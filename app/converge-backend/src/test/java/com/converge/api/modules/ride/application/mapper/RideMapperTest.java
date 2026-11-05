@@ -1,12 +1,15 @@
 package com.converge.api.modules.ride.application.mapper;
 
+import com.converge.api.modules.ride.application.dto.ParticipantResponseDTO;
 import com.converge.api.modules.ride.application.dto.RideResponseDTO;
+import com.converge.api.modules.ride.domain.enums.ParticipantPaymentStatus;
 import com.converge.api.modules.ride.domain.enums.ParticipantStatus;
 import com.converge.api.modules.ride.domain.enums.RideStatus;
 import com.converge.api.modules.ride.domain.model.Ride;
 import com.converge.api.modules.ride.domain.model.subtypes.VehicleSnapshot;
 import com.converge.api.modules.route.domain.model.subtypes.Coordinates;
 import com.converge.api.modules.route.domain.model.subtypes.Place;
+import com.converge.api.modules.user.domain.enums.user.ParticipationRole;
 import com.converge.api.modules.user.domain.enums.vehicle.VehicleType;
 import com.converge.api.modules.user.domain.model.vehicle.Vehicle;
 import org.junit.jupiter.api.DisplayName;
@@ -15,6 +18,7 @@ import org.mockito.Mockito;
 
 import java.time.DayOfWeek;
 import java.time.LocalDateTime;
+import java.util.Map;
 import java.util.Set;
 
 import static org.assertj.core.api.Assertions.assertThat;
@@ -22,18 +26,32 @@ import static org.mockito.Mockito.when;
 
 class RideMapperTest {
 
+    private static final String DRIVER = "driver-123";
+    private static final String ANA = "ana-id";
+    private static final String BIA = "bia-id";
+    private static final String CAIO = "caio-id";
+    private static final String DAVI = "davi-id";
+
     private final RideMapper mapper = new RideMapper();
+
+    private final Map<String, String> names = Map.of(
+            DRIVER, "Sara Monteiro",
+            ANA, "Ana Souza",
+            BIA, "Bia Lima",
+            CAIO, "Caio Melo",
+            DAVI, "Davi Nunes"
+    );
 
     private Place place(String address) {
         return Place.of(address, "Centro", "Campinas", new Coordinates(-22.9064, -47.0616));
     }
 
-    private Ride ride() {
+    private Ride emptyRide() {
         LocalDateTime departure = LocalDateTime.now().plusDays(1);
 
         return new Ride(
                 1,
-                "driver-123",
+                DRIVER,
                 "vehicle-123",
                 new VehicleSnapshot("Volkswagen Gol", "ABC1234", VehicleType.HATCH, "Azul"),
                 "route-123",
@@ -46,37 +64,140 @@ class RideMapperTest {
         );
     }
 
+    private Ride rideWithEveryKindOfPassenger() {
+        Ride ride = emptyRide();
+
+        ride.requestSeat(ANA, "route-ana", place("Rua da Ana, 1"), place("Campus PUC"));
+        ride.acceptPassenger(ANA);
+
+        ride.requestSeat(BIA, "route-bia", place("Rua da Bia, 2"), place("Campus PUC"));
+
+        ride.requestSeat(CAIO, "route-caio", place("Rua do Caio, 3"), place("Campus PUC"));
+        ride.rejectPassenger(CAIO, null);
+
+        ride.requestSeat(DAVI, "route-davi", place("Rua do Davi, 4"), place("Campus PUC"));
+        ride.acceptPassenger(DAVI);
+        ride.leave(DAVI, null);
+
+        return ride;
+    }
+
+    private RideResponseDTO viewedBy(String viewerId) {
+        return mapper.toResponse(rideWithEveryKindOfPassenger(), viewerId, names);
+    }
+
+    private ParticipantResponseDTO entryOf(RideResponseDTO response, ParticipationRole role, String name) {
+        return response.participants().stream()
+                .filter(participant -> participant.role() == role && name.equals(participant.name()))
+                .findFirst()
+                .orElseThrow();
+    }
+
+    private void assertBasicOnly(ParticipantResponseDTO participant) {
+        assertThat(participant.userId()).isNull();
+        assertThat(participant.boardingLocation()).isNull();
+        assertThat(participant.dropOffLocation()).isNull();
+        assertThat(participant.estimatedAmount()).isNull();
+        assertThat(participant.maxAmount()).isNull();
+        assertThat(participant.finalAmount()).isNull();
+        assertThat(participant.paymentStatus()).isNull();
+        assertThat(participant.paymentConfirmedByDriver()).isFalse();
+    }
+
     @Test
-    @DisplayName("Deve converter a viagem, com o motorista como participante sem pontos de embarque")
-    void shouldMapRideToResponse() {
-        Ride ride = ride();
+    @DisplayName("Motorista vê todos os participantes, com todos os dados e nomes")
+    void driverShouldSeeEverything() {
+        RideResponseDTO response = viewedBy(DRIVER);
 
-        RideResponseDTO response = mapper.toResponse(ride);
+        assertThat(response.participants()).hasSize(5);
 
-        assertThat(response.id()).isNull();
-        assertThat(response.sequentialNumber()).isEqualTo(1);
-        assertThat(response.driverId()).isEqualTo("driver-123");
-        assertThat(response.status()).isEqualTo(RideStatus.AWAITING_CONFIRMATION);
+        ParticipantResponseDTO bia = entryOf(response, ParticipationRole.PASSENGER, "Bia Lima");
+        assertThat(bia.userId()).isEqualTo(BIA);
+        assertThat(bia.status()).isEqualTo(ParticipantStatus.REQUESTED);
+        assertThat(bia.boardingLocation().address()).isEqualTo("Rua da Bia, 2");
+        assertThat(bia.paymentStatus()).isEqualTo(ParticipantPaymentStatus.PENDING);
+
+        assertThat(entryOf(response, ParticipationRole.PASSENGER, "Caio Melo").status())
+                .isEqualTo(ParticipantStatus.REJECTED);
+        assertThat(entryOf(response, ParticipationRole.PASSENGER, "Davi Nunes").status())
+                .isEqualTo(ParticipantStatus.CANCELLED);
+    }
+
+    @Test
+    @DisplayName("Passageiro confirmado vê os próprios dados completos, o motorista e nada dos pendentes, recusados ou cancelados")
+    void confirmedPassengerShouldSeeOnlyOwnDataAndBasicsOfTheConfirmed() {
+        RideResponseDTO response = viewedBy(ANA);
+
+        assertThat(response.participants()).hasSize(2);
+
+        ParticipantResponseDTO own = entryOf(response, ParticipationRole.PASSENGER, "Ana Souza");
+        assertThat(own.userId()).isEqualTo(ANA);
+        assertThat(own.boardingLocation().address()).isEqualTo("Rua da Ana, 1");
+
+        ParticipantResponseDTO driver = entryOf(response, ParticipationRole.DRIVER, "Sara Monteiro");
+        assertThat(driver.status()).isEqualTo(ParticipantStatus.CONFIRMED);
+        assertBasicOnly(driver);
+    }
+
+    @Test
+    @DisplayName("Passageiro pendente vê só nome, papel e status dos confirmados, sem endereços nem valores")
+    void pendingPassengerShouldSeeConfirmedOnesWithoutPersonalData() {
+        RideResponseDTO response = viewedBy(BIA);
+
+        assertThat(response.participants()).hasSize(3);
+
+        ParticipantResponseDTO own = entryOf(response, ParticipationRole.PASSENGER, "Bia Lima");
+        assertThat(own.userId()).isEqualTo(BIA);
+        assertThat(own.boardingLocation().address()).isEqualTo("Rua da Bia, 2");
+
+        ParticipantResponseDTO ana = entryOf(response, ParticipationRole.PASSENGER, "Ana Souza");
+        assertThat(ana.status()).isEqualTo(ParticipantStatus.CONFIRMED);
+        assertBasicOnly(ana);
+    }
+
+    @Test
+    @DisplayName("Recusado e cancelado continuam vendo só o básico dos confirmados")
+    void rejectedAndCancelledPassengersShouldNotSeePersonalDataOfOthers() {
+        for (String viewer : new String[]{CAIO, DAVI}) {
+            RideResponseDTO response = viewedBy(viewer);
+
+            assertThat(response.participants()).hasSize(3);
+            assertBasicOnly(entryOf(response, ParticipationRole.PASSENGER, "Ana Souza"));
+            assertThat(response.participants())
+                    .noneMatch(participant -> "Bia Lima".equals(participant.name()));
+        }
+    }
+
+    @Test
+    @DisplayName("Os dados da própria viagem aparecem para todos")
+    void rideDataShouldBeTheSameForEveryone() {
+        RideResponseDTO response = viewedBy(ANA);
+
+        assertThat(response.driverId()).isEqualTo(DRIVER);
+        assertThat(response.status()).isEqualTo(RideStatus.CONFIRMED);
+        assertThat(response.availableSeats()).isEqualTo(2);
         assertThat(response.origin().address()).isEqualTo("Rua das Flores, 50");
-        assertThat(response.destination().address()).isEqualTo("Campus PUC");
-        assertThat(response.participants()).hasSize(1);
-        assertThat(response.participants().get(0).status()).isEqualTo(ParticipantStatus.CONFIRMED);
-        assertThat(response.participants().get(0).boardingLocation()).isNull();
+        assertThat(response.id()).isNull();
         assertThat(response.costs()).isNull();
     }
 
     @Test
-    @DisplayName("Deve converter o pedido de vaga de um passageiro com os pontos de embarque")
-    void shouldMapPassengerRequestWithBoardingPoints() {
-        Ride ride = ride();
-        ride.requestSeat("passenger-456", "route-456", place("Rua do Daniel, 10"), place("Campus PUC"));
+    @DisplayName("Os ids que precisam de nome são só os dos participantes visíveis para quem olha")
+    void shouldListOnlyVisibleUserIds() {
+        Ride ride = rideWithEveryKindOfPassenger();
 
-        RideResponseDTO response = mapper.toResponse(ride);
+        assertThat(mapper.visibleUserIds(ride, DRIVER)).containsExactlyInAnyOrder(DRIVER, ANA, BIA, CAIO, DAVI);
+        assertThat(mapper.visibleUserIds(ride, ANA)).containsExactlyInAnyOrder(DRIVER, ANA);
+        assertThat(mapper.visibleUserIds(ride, BIA)).containsExactlyInAnyOrder(DRIVER, ANA, BIA);
+    }
 
-        assertThat(response.participants()).hasSize(2);
-        assertThat(response.participants().get(1).userId()).isEqualTo("passenger-456");
-        assertThat(response.participants().get(1).status()).isEqualTo(ParticipantStatus.REQUESTED);
-        assertThat(response.participants().get(1).boardingLocation().address()).isEqualTo("Rua do Daniel, 10");
+    @Test
+    @DisplayName("Sem nome conhecido, o participante aparece com o nome vazio")
+    void shouldLeaveNameEmptyWhenUserIsUnknown() {
+        RideResponseDTO response = mapper.toResponse(rideWithEveryKindOfPassenger(), DRIVER, Map.of());
+
+        assertThat(response.participants()).hasSize(5);
+        assertThat(response.participants()).allMatch(participant -> participant.name() == null);
     }
 
     @Test

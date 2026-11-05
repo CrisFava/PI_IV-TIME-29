@@ -39,9 +39,9 @@ public class RequestRideSeatUseCase implements UseCase<RequestRideSeatCommand, R
 
     @Override
     public Ride execute(RequestRideSeatCommand command) {
-        rideEligibility.assertCanParticipate(command.firebaseUid());
-
         String passengerId = rideAccess.currentUserId(command.firebaseUid());
+        rideEligibility.assertCanJoin(passengerId, "Você");
+
         LocalDate date = command.request().date();
 
         Route passengerRoute = routeAccess.getOwnedRoute(command.request().passengerRouteId(), passengerId);
@@ -158,6 +158,8 @@ public class RequestRideSeatUseCase implements UseCase<RequestRideSeatCommand, R
 
     private Ride createRide(Route driverRoute, LocalDate date, LocalDateTime departure) {
         String driverId = driverRoute.getUserId();
+        rideEligibility.assertCanOffer(driverId, "O motorista");
+
         Vehicle vehicle = loadVehicle(driverRoute, driverId);
 
         LocalDateTime arrival = date.atTime(LocalTime.parse(driverRoute.getEstimatedArrivalTime()));

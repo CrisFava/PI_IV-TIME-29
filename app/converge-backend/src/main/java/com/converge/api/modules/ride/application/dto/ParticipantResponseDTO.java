@@ -10,6 +10,7 @@ import java.time.LocalDateTime;
 
 public record ParticipantResponseDTO(
         String userId,
+        String name,
         ParticipationRole role,
         ParticipantStatus status,
         PlaceResponseDTO boardingLocation,

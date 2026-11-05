@@ -247,8 +247,25 @@ class RequestRideSeatUseCaseTest {
     @Test
     @DisplayName("Usuário sem vínculo acadêmico verificado ou bloqueado não pode pedir vaga")
     void shouldRejectWhenPassengerIsNotEligible() {
+        when(rideAccess.currentUserId(UID)).thenReturn(PASSENGER_ID);
         doThrow(new ApplicationException(ErrorCode.NOT_ALLOWED, "Você está bloqueado por pagamentos vencidos."))
-                .when(rideEligibility).assertCanParticipate(UID);
+                .when(rideEligibility).assertCanJoin(PASSENGER_ID, "Você");
+
+        assertThrows(ApplicationException.class, () -> requestSeat.execute(command()));
+
+        verify(rideRepository, never()).save(any());
+    }
+
+    @Test
+    @DisplayName("Não deve criar a viagem se o motorista não pode oferecer carona (CNH, vínculo ou conta)")
+    void shouldRejectWhenDriverCannotOfferRides() {
+        passengerRouteIsValid();
+        driverRouteIsValid();
+        when(driverRoute.getUserId()).thenReturn(DRIVER_ID);
+        when(rideRepository.findByDriverRouteIdAndDepartureDateTimeAndStatusNot(any(), any(), any()))
+                .thenReturn(Optional.empty());
+        doThrow(new ApplicationException(ErrorCode.NOT_ALLOWED, "O motorista não tem a CNH verificada."))
+                .when(rideEligibility).assertCanOffer(DRIVER_ID, "O motorista");
 
         assertThrows(ApplicationException.class, () -> requestSeat.execute(command()));
 

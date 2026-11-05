@@ -10,7 +10,7 @@ import com.converge.api.modules.ride.application.MarkNoShowUseCase;
 import com.converge.api.modules.ride.application.RejectPassengerUseCase;
 import com.converge.api.modules.ride.application.RequestRideSeatUseCase;
 import com.converge.api.modules.ride.application.StartRideUseCase;
-import com.converge.api.modules.ride.application.mapper.RideMapper;
+import com.converge.api.modules.ride.application.RideViewService;
 import com.converge.api.modules.ride.presentation.controller.RideController;
 import com.converge.api.shared.infrastructure.config.auth.AuthenticatedUser;
 import com.converge.api.shared.infrastructure.exception.GlobalExceptionHandler;
@@ -50,7 +50,7 @@ class RideExceptionHandlerTest {
     @Mock private ListMyRidesUseCase listMyRides;
     @Mock private GetRideUseCase getRide;
     @Mock private CancelRideUseCase cancelRide;
-    @Mock private RideMapper mapper;
+    @Mock private RideViewService rideView;
 
     private MockMvc mockMvc;
 
@@ -58,7 +58,7 @@ class RideExceptionHandlerTest {
     void setUp() {
         RideController controller = new RideController(
                 requestRideSeat, startRide, completeRide, markNoShow, leaveRide,
-                acceptPassenger, rejectPassenger, listMyRides, getRide, cancelRide, mapper);
+                acceptPassenger, rejectPassenger, listMyRides, getRide, cancelRide, rideView);
 
         HandlerMethodArgumentResolver authenticatedUser = new HandlerMethodArgumentResolver() {
             @Override

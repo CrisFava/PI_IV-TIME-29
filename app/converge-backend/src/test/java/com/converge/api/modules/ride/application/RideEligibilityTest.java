@@ -1,14 +1,9 @@
 package com.converge.api.modules.ride.application;
 
-import com.converge.api.modules.user.domain.enums.user.PaymentStanding;
-import com.converge.api.modules.user.domain.enums.user.VerificationMethod;
-import com.converge.api.modules.user.domain.enums.user.VerificationStatus;
-import com.converge.api.modules.user.domain.model.user.User;
-import com.converge.api.modules.user.domain.model.user.subtypes.AcademicRecord;
-import com.converge.api.modules.user.domain.repository.UserRepository;
-import com.converge.api.shared.application.UserUtils;
+import com.converge.api.modules.user.application.GetUserEligibilityUseCase;
+import com.converge.api.modules.user.application.dto.UserEligibilityDTO;
 import com.converge.api.shared.presentation.exception.ApplicationException;
-import org.bson.types.ObjectId;
+import com.converge.api.shared.presentation.exception.ErrorCode;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
@@ -16,8 +11,7 @@ import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 
-import java.util.Optional;
-
+import static org.assertj.core.api.Assertions.assertThat;
 import static org.junit.jupiter.api.Assertions.assertDoesNotThrow;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.mockito.Mockito.when;
@@ -25,101 +19,89 @@ import static org.mockito.Mockito.when;
 @ExtendWith(MockitoExtension.class)
 class RideEligibilityTest {
 
-    private static final String UID = "firebase-uid-123";
+    private static final String USER_ID = "user-123";
 
-    @Mock private UserUtils userUtils;
-    @Mock private UserRepository userRepository;
-    @Mock private User user;
+    @Mock
+    private GetUserEligibilityUseCase getUserEligibility;
 
     private RideEligibility rideEligibility;
 
     @BeforeEach
     void setUp() {
-        rideEligibility = new RideEligibility(userUtils, userRepository);
+        rideEligibility = new RideEligibility(getUserEligibility);
     }
 
-    private AcademicRecord academicRecord(VerificationStatus status) {
-        return new AcademicRecord(
-                "PUC-Campinas",
-                "Engenharia de Software",
-                "123456",
-                "ana@puc-campinas.edu.br",
-                null,
-                status,
-                VerificationMethod.INSTITUTIONAL_EMAIL,
-                null,
-                null,
-                null
-        );
+    private void userIs(boolean active, boolean academicVerified, boolean blockedByDebt, boolean driverLicenseValid) {
+        when(getUserEligibility.execute(USER_ID))
+                .thenReturn(new UserEligibilityDTO(active, academicVerified, blockedByDebt, driverLicenseValid));
     }
 
     @Test
-    @DisplayName("Usuário verificado e em dia pode participar")
-    void shouldAllowVerifiedUserUpToDate() {
-        when(userUtils.getCurrentUser(UID)).thenReturn(user);
-        when(user.getAcademicRecord()).thenReturn(academicRecord(VerificationStatus.VERIFIED));
-        when(user.getPaymentStanding()).thenReturn(PaymentStanding.UP_TO_DATE);
+    @DisplayName("Usuário ativo, verificado e em dia pode participar")
+    void shouldAllowVerifiedActiveUserToJoin() {
+        userIs(true, true, false, false);
 
-        assertDoesNotThrow(() -> rideEligibility.assertCanParticipate(UID));
+        assertDoesNotThrow(() -> rideEligibility.assertCanJoin(USER_ID, "Você"));
     }
 
     @Test
-    @DisplayName("Usuário com dívida vencida, mas ainda não bloqueado, pode participar")
-    void shouldAllowUserWithOverdueButNotBlocked() {
-        when(userUtils.getCurrentUser(UID)).thenReturn(user);
-        when(user.getAcademicRecord()).thenReturn(academicRecord(VerificationStatus.VERIFIED));
-        when(user.getPaymentStanding()).thenReturn(PaymentStanding.HAS_OVERDUE);
-
-        assertDoesNotThrow(() -> rideEligibility.assertCanParticipate(UID));
-    }
-
-    @Test
-    @DisplayName("Usuário com vínculo acadêmico não verificado não pode participar")
+    @DisplayName("Vínculo acadêmico não verificado impede participar, citando quem foi barrado")
     void shouldRejectWhenAcademicRecordIsNotVerified() {
-        when(userUtils.getCurrentUser(UID)).thenReturn(user);
-        when(user.getAcademicRecord()).thenReturn(academicRecord(VerificationStatus.UNDER_REVIEW));
+        userIs(true, false, false, false);
 
-        assertThrows(ApplicationException.class, () -> rideEligibility.assertCanParticipate(UID));
+        ApplicationException thrown = assertThrows(ApplicationException.class,
+                () -> rideEligibility.assertCanJoin(USER_ID, "O passageiro"));
+
+        assertThat(thrown.getError().code()).isEqualTo(ErrorCode.NOT_ALLOWED);
+        assertThat(thrown.getError().message()).startsWith("O passageiro").contains("vínculo acadêmico");
     }
 
     @Test
-    @DisplayName("Usuário sem vínculo acadêmico não pode participar")
-    void shouldRejectWhenThereIsNoAcademicRecord() {
-        when(userUtils.getCurrentUser(UID)).thenReturn(user);
-        when(user.getAcademicRecord()).thenReturn(null);
-
-        assertThrows(ApplicationException.class, () -> rideEligibility.assertCanParticipate(UID));
-    }
-
-    @Test
-    @DisplayName("Usuário bloqueado por dívidas não pode participar")
+    @DisplayName("Usuário bloqueado por dívida não pode participar")
     void shouldRejectWhenUserIsBlocked() {
-        when(userUtils.getCurrentUser(UID)).thenReturn(user);
-        when(user.getAcademicRecord()).thenReturn(academicRecord(VerificationStatus.VERIFIED));
-        when(user.getPaymentStanding()).thenReturn(PaymentStanding.BLOCKED);
+        userIs(true, true, true, false);
 
-        assertThrows(ApplicationException.class, () -> rideEligibility.assertCanParticipate(UID));
+        ApplicationException thrown = assertThrows(ApplicationException.class,
+                () -> rideEligibility.assertCanJoin(USER_ID, "Você"));
+
+        assertThat(thrown.getError().message()).contains("bloqueado");
     }
 
     @Test
-    @DisplayName("Passageiro a ser aceito é conferido pelo id")
-    void shouldCheckPassengerById() {
-        ObjectId passengerId = new ObjectId();
-        when(userRepository.findById(passengerId)).thenReturn(Optional.of(user));
-        when(user.getAcademicRecord()).thenReturn(academicRecord(VerificationStatus.VERIFIED));
-        when(user.getPaymentStanding()).thenReturn(PaymentStanding.BLOCKED);
+    @DisplayName("Conta desativada impede participar")
+    void shouldRejectWhenAccountIsInactive() {
+        userIs(false, true, false, false);
 
-        assertThrows(ApplicationException.class,
-                () -> rideEligibility.assertUserCanParticipate(passengerId.toHexString()));
+        ApplicationException thrown = assertThrows(ApplicationException.class,
+                () -> rideEligibility.assertCanJoin(USER_ID, "Você"));
+
+        assertThat(thrown.getError().message()).contains("conta desativada");
     }
 
     @Test
-    @DisplayName("Id de passageiro inválido ou inexistente é usuário não encontrado")
-    void shouldRejectInvalidOrUnknownPassengerId() {
-        ObjectId unknown = new ObjectId();
-        when(userRepository.findById(unknown)).thenReturn(Optional.empty());
+    @DisplayName("Motorista com CNH verificada e dentro da validade pode oferecer carona")
+    void shouldAllowDriverWithValidLicenseToOffer() {
+        userIs(true, true, false, true);
 
-        assertThrows(ApplicationException.class, () -> rideEligibility.assertUserCanParticipate("id-invalido"));
-        assertThrows(ApplicationException.class, () -> rideEligibility.assertUserCanParticipate(unknown.toHexString()));
+        assertDoesNotThrow(() -> rideEligibility.assertCanOffer(USER_ID, "O motorista"));
+    }
+
+    @Test
+    @DisplayName("Motorista com CNH vencida ou não verificada não pode oferecer carona")
+    void shouldRejectDriverWithoutValidLicense() {
+        userIs(true, true, false, false);
+
+        ApplicationException thrown = assertThrows(ApplicationException.class,
+                () -> rideEligibility.assertCanOffer(USER_ID, "O motorista"));
+
+        assertThat(thrown.getError().message()).startsWith("O motorista").contains("CNH");
+    }
+
+    @Test
+    @DisplayName("Oferecer carona também exige vínculo, conta ativa e estar em dia")
+    void shouldApplyJoinRulesToDriversToo() {
+        userIs(true, true, true, true);
+
+        assertThrows(ApplicationException.class, () -> rideEligibility.assertCanOffer(USER_ID, "O motorista"));
     }
 }

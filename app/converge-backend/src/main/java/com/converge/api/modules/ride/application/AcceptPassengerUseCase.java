@@ -19,8 +19,8 @@ public class AcceptPassengerUseCase implements UseCase<PassengerRequestCommand, 
     public Ride execute(PassengerRequestCommand command) {
         Ride ride = rideAccess.getOwnedRide(command.rideId(), command.firebaseUid());
 
-        rideEligibility.assertCanParticipate(command.firebaseUid());
-        rideEligibility.assertUserCanParticipate(command.passengerId());
+        rideEligibility.assertCanOffer(ride.getDriverId(), "Você");
+        rideEligibility.assertCanJoin(command.passengerId(), "O passageiro");
 
         ride.acceptPassenger(command.passengerId());
 

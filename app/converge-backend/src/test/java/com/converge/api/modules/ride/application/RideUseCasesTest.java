@@ -167,7 +167,25 @@ class RideUseCasesTest {
         currentUserIs(userObjectId);
         when(rideRepository.findById(rideObjectId)).thenReturn(Optional.of(ride));
         doThrow(new ApplicationException(ErrorCode.NOT_ALLOWED, "O passageiro está bloqueado por pagamentos vencidos."))
-                .when(rideEligibility).assertUserCanParticipate("passenger-456");
+                .when(rideEligibility).assertCanJoin("passenger-456", "O passageiro");
+
+        assertThrows(ApplicationException.class, () -> acceptPassenger.execute(
+                new PassengerRequestCommand(rideObjectId.toHexString(), "passenger-456", UID)));
+
+        assertThat(ride.getParticipants().get(1).getStatus()).isEqualTo(ParticipantStatus.REQUESTED);
+        verify(rideRepository, never()).save(any());
+    }
+
+    @Test
+    @DisplayName("Motorista que perdeu a CNH ou o vínculo não pode aceitar passageiros")
+    void shouldNotAcceptWhenDriverCannotOfferRidesAnymore() {
+        AcceptPassengerUseCase acceptPassenger = new AcceptPassengerUseCase(rideAccess, rideEligibility, rideRepository);
+        Ride ride = rideOf(userObjectId.toHexString(), LocalDateTime.now().plusDays(1));
+        ride.requestSeat("passenger-456", "route-456", place("Rua A"), place("Campus PUC"));
+        currentUserIs(userObjectId);
+        when(rideRepository.findById(rideObjectId)).thenReturn(Optional.of(ride));
+        doThrow(new ApplicationException(ErrorCode.NOT_ALLOWED, "Você não tem a CNH verificada."))
+                .when(rideEligibility).assertCanOffer(userObjectId.toHexString(), "Você");
 
         assertThrows(ApplicationException.class, () -> acceptPassenger.execute(
                 new PassengerRequestCommand(rideObjectId.toHexString(), "passenger-456", UID)));

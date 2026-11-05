@@ -9,6 +9,7 @@ import com.converge.api.modules.ride.application.ListMyRidesUseCase;
 import com.converge.api.modules.ride.application.MarkNoShowUseCase;
 import com.converge.api.modules.ride.application.RejectPassengerUseCase;
 import com.converge.api.modules.ride.application.RequestRideSeatUseCase;
+import com.converge.api.modules.ride.application.RideViewService;
 import com.converge.api.modules.ride.application.StartRideUseCase;
 import com.converge.api.modules.ride.application.dto.CancelRideCommand;
 import com.converge.api.modules.ride.application.dto.CancelRideRequestDTO;
@@ -19,7 +20,6 @@ import com.converge.api.modules.ride.application.dto.RequestRideSeatCommand;
 import com.converge.api.modules.ride.application.dto.RequestRideSeatRequestDTO;
 import com.converge.api.modules.ride.application.dto.RideRefCommand;
 import com.converge.api.modules.ride.application.dto.RideResponseDTO;
-import com.converge.api.modules.ride.application.mapper.RideMapper;
 import com.converge.api.modules.ride.domain.model.Ride;
 import com.converge.api.shared.infrastructure.config.auth.AuthenticatedUser;
 import com.converge.api.shared.presentation.dto.ApplicationResponse;
@@ -54,7 +54,7 @@ public class RideController {
     private final ListMyRidesUseCase listMyRides;
     private final GetRideUseCase getRide;
     private final CancelRideUseCase cancelRide;
-    private final RideMapper mapper;
+    private final RideViewService rideView;
 
     @PostMapping("/request")
     public ResponseEntity<ApplicationResponse<RideResponseDTO>> requestSeat(
@@ -65,17 +65,16 @@ public class RideController {
 
         return ResponseEntity
                 .status(HttpStatus.CREATED)
-                .body(ApplicationResponse.success(mapper.toResponse(ride)));
+                .body(ApplicationResponse.success(rideView.view(ride, uid(principal))));
     }
 
     @GetMapping
     public ResponseEntity<ApplicationResponse<List<RideResponseDTO>>> listMyRides(
             @AuthenticationPrincipal AuthenticatedUser principal
     ) {
-        List<RideResponseDTO> rides = listMyRides.execute(uid(principal))
-                .stream()
-                .map(mapper::toResponse)
-                .toList();
+        String uid = uid(principal);
+
+        List<RideResponseDTO> rides = rideView.viewAll(listMyRides.execute(uid), uid);
 
         return ResponseEntity.ok(ApplicationResponse.success(rides));
     }
@@ -87,7 +86,7 @@ public class RideController {
     ) {
         Ride ride = getRide.execute(new RideRefCommand(rideId, uid(principal)));
 
-        return ResponseEntity.ok(ApplicationResponse.success(mapper.toResponse(ride)));
+        return ResponseEntity.ok(ApplicationResponse.success(rideView.view(ride, uid(principal))));
     }
 
     @PostMapping("/{rideId}/cancel")
@@ -99,7 +98,7 @@ public class RideController {
         CancelRideRequestDTO body = request != null ? request : new CancelRideRequestDTO(null);
         Ride ride = cancelRide.execute(new CancelRideCommand(rideId, uid(principal), body));
 
-        return ResponseEntity.ok(ApplicationResponse.success(mapper.toResponse(ride)));
+        return ResponseEntity.ok(ApplicationResponse.success(rideView.view(ride, uid(principal))));
     }
 
     @PostMapping("/{rideId}/start")
@@ -109,7 +108,7 @@ public class RideController {
     ) {
         Ride ride = startRide.execute(new RideRefCommand(rideId, uid(principal)));
 
-        return ResponseEntity.ok(ApplicationResponse.success(mapper.toResponse(ride)));
+        return ResponseEntity.ok(ApplicationResponse.success(rideView.view(ride, uid(principal))));
     }
 
     @PostMapping("/{rideId}/complete")
@@ -119,7 +118,7 @@ public class RideController {
     ) {
         Ride ride = completeRide.execute(new RideRefCommand(rideId, uid(principal)));
 
-        return ResponseEntity.ok(ApplicationResponse.success(mapper.toResponse(ride)));
+        return ResponseEntity.ok(ApplicationResponse.success(rideView.view(ride, uid(principal))));
     }
 
     @PostMapping("/{rideId}/passengers/{passengerId}/no-show")
@@ -130,7 +129,7 @@ public class RideController {
     ) {
         Ride ride = markNoShow.execute(new PassengerRequestCommand(rideId, passengerId, uid(principal)));
 
-        return ResponseEntity.ok(ApplicationResponse.success(mapper.toResponse(ride)));
+        return ResponseEntity.ok(ApplicationResponse.success(rideView.view(ride, uid(principal))));
     }
 
     @PostMapping("/{rideId}/leave")
@@ -142,7 +141,7 @@ public class RideController {
         CancelRideRequestDTO body = request != null ? request : new CancelRideRequestDTO(null);
         Ride ride = leaveRide.execute(new CancelRideCommand(rideId, uid(principal), body));
 
-        return ResponseEntity.ok(ApplicationResponse.success(mapper.toResponse(ride)));
+        return ResponseEntity.ok(ApplicationResponse.success(rideView.view(ride, uid(principal))));
     }
 
     @PostMapping("/{rideId}/passengers/{passengerId}/accept")
@@ -153,7 +152,7 @@ public class RideController {
     ) {
         Ride ride = acceptPassenger.execute(new PassengerRequestCommand(rideId, passengerId, uid(principal)));
 
-        return ResponseEntity.ok(ApplicationResponse.success(mapper.toResponse(ride)));
+        return ResponseEntity.ok(ApplicationResponse.success(rideView.view(ride, uid(principal))));
     }
 
     @PostMapping("/{rideId}/passengers/{passengerId}/reject")
@@ -166,7 +165,7 @@ public class RideController {
         RejectPassengerRequestDTO body = request != null ? request : new RejectPassengerRequestDTO(null);
         Ride ride = rejectPassenger.execute(new RejectPassengerCommand(rideId, passengerId, uid(principal), body));
 
-        return ResponseEntity.ok(ApplicationResponse.success(mapper.toResponse(ride)));
+        return ResponseEntity.ok(ApplicationResponse.success(rideView.view(ride, uid(principal))));
     }
 
     private String uid(AuthenticatedUser principal) {
