@@ -2,14 +2,16 @@ package com.converge.api.modules.indicator.domain.service;
 
 // Autora: Daniela Mikie Kikuchi Gonçalves
 // Contas de impacto ambiental (RF53, RF55, RF57). Só recebe e devolve números.
-// Os fatores de emissão abaixo são provisórios; trocar quando o time definir os oficiais.
+// Fatores de emissão:
+//  - Combustíveis: valores de referência em kg de CO2 por litro (GHG Protocol / médias usadas em inventários).
+//  - Eletricidade: fator do Sistema Interligado Nacional (MCTI), 38,5 kg CO2/MWh em 2023 = 0,0385 kg/kWh.
 public final class SustainabilityCalculator {
 
-    // kg de CO2 por litro (combustão) ou por kWh (elétrico). TODO: confirmar com o time.
-    private static final double CO2_KG_PER_LITER_GASOLINE = 2.3;
-    private static final double CO2_KG_PER_LITER_ETHANOL  = 1.2;
-    private static final double CO2_KG_PER_LITER_DIESEL   = 2.6;
-    private static final double CO2_KG_PER_KWH_ELECTRIC   = 0.1;
+    // kg de CO2 por litro (combustão) ou por kWh (elétrico).
+    private static final double CO2_KG_PER_LITER_GASOLINE = 2.31;
+    private static final double CO2_KG_PER_LITER_ETHANOL  = 1.50;
+    private static final double CO2_KG_PER_LITER_DIESEL   = 2.68;
+    private static final double CO2_KG_PER_KWH_ELECTRIC   = 0.0385; // MCTI, SIN 2023
 
     // 1 árvore absorve ~22 kg de CO2 por ano.
     private static final double CO2_KG_ABSORVIDO_POR_ARVORE_ANO = 22.0;
