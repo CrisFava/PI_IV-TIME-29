@@ -24,7 +24,9 @@ import org.bson.types.ObjectId;
 import org.springframework.data.annotation.CreatedDate;
 import org.springframework.data.annotation.Id;
 import org.springframework.data.annotation.LastModifiedDate;
+import org.springframework.data.annotation.Version;
 import org.springframework.data.mongodb.core.index.CompoundIndex;
+import org.springframework.data.mongodb.core.index.CompoundIndexes;
 import org.springframework.data.mongodb.core.index.Indexed;
 import org.springframework.data.mongodb.core.mapping.Document;
 
@@ -40,12 +42,22 @@ import java.util.Set;
 @NoArgsConstructor(access = AccessLevel.PROTECTED)
 @Getter
 @EqualsAndHashCode(onlyExplicitlyIncluded = true)
-@CompoundIndex(
-        name = "unique_driver_sequential_number",
-        def = "{'driverId': 1, 'sequentialNumber': 1}",
-        unique = true
-)
+@CompoundIndexes({
+        @CompoundIndex(
+                name = "unique_driver_sequential_number",
+                def = "{'driverId': 1, 'sequentialNumber': 1}",
+                unique = true
+        ),
+        @CompoundIndex(
+                name = Ride.UNIQUE_OPEN_RIDE_INDEX,
+                def = "{'driverRouteId': 1, 'departureDateTime': 1}",
+                unique = true,
+                partialFilter = "{'status': {'$in': ['AWAITING_CONFIRMATION', 'CONFIRMED', 'IN_PROGRESS', 'COMPLETED']}}"
+        )
+})
 public class Ride {
+
+    public static final String UNIQUE_OPEN_RIDE_INDEX = "unique_open_ride_per_route_date";
 
     @Id
     @EqualsAndHashCode.Include
@@ -121,6 +133,9 @@ public class Ride {
 
     @LastModifiedDate
     private LocalDateTime updatedAt;
+
+    @Version
+    private Long version;
 
     public Ride(
             int sequentialNumber,
@@ -224,9 +239,7 @@ public class Ride {
             );
         }
 
-        this.status = RideStatus.CANCELLED;
-        this.cancelledBy = userId;
-        this.cancellationReason = reason;
+        this.markCancelled(userId, reason);
 
         LocalDateTime now = LocalDateTime.now();
         this.participants.stream()
@@ -310,9 +323,7 @@ public class Ride {
                 .toList();
 
         if (presentPassengers.isEmpty()) {
-            this.status = RideStatus.CANCELLED;
-            this.cancelledBy = this.driverId;
-            this.cancellationReason = "Todos os passageiros ausentes.";
+            this.markCancelled(this.driverId, "Todos os passageiros ausentes.");
             return;
         }
 
@@ -349,6 +360,12 @@ public class Ride {
                         "Não há passageiro confirmado com este id nesta viagem.",
                         Set.of("passengerId")
                 ));
+    }
+
+    private void markCancelled(String userId, @Nullable String reason) {
+        this.status = RideStatus.CANCELLED;
+        this.cancelledBy = userId;
+        this.cancellationReason = reason;
     }
 
     private boolean isActive(Participant participant) {

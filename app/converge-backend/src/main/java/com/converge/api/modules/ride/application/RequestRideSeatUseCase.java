@@ -17,6 +17,7 @@ import com.converge.api.shared.presentation.exception.ApplicationException;
 import com.converge.api.shared.presentation.exception.ErrorCode;
 import lombok.RequiredArgsConstructor;
 import org.bson.types.ObjectId;
+import org.springframework.dao.DuplicateKeyException;
 import org.springframework.stereotype.Service;
 
 import java.time.LocalDate;
@@ -56,14 +57,41 @@ public class RequestRideSeatUseCase implements UseCase<RequestRideSeatCommand, R
                         driverRoute.getId().toHexString(), departure, RideStatus.CANCELLED)
                 .orElseGet(() -> createRide(driverRoute, date, departure));
 
-        ride.requestSeat(
-                passengerId,
-                passengerRoute.getId().toHexString(),
-                passengerRoute.getOrigin(),
-                passengerRoute.getDestination()
-        );
+        String passengerRouteId = passengerRoute.getId().toHexString();
 
-        return rideRepository.save(ride);
+        ride.requestSeat(passengerId, passengerRouteId, passengerRoute.getOrigin(), passengerRoute.getDestination());
+
+        try {
+            return rideRepository.save(ride);
+        } catch (DuplicateKeyException exception) {
+            if (!isDuplicatedOpenRide(exception)) {
+                throw rideConflict();
+            }
+
+            Ride existing = rideRepository
+                    .findByDriverRouteIdAndDepartureDateTimeAndStatusNot(
+                            driverRoute.getId().toHexString(), departure, RideStatus.CANCELLED)
+                    .orElseThrow(this::rideConflict);
+
+            existing.requestSeat(
+                    passengerId, passengerRouteId, passengerRoute.getOrigin(), passengerRoute.getDestination());
+
+            return rideRepository.save(existing);
+        }
+    }
+
+    private boolean isDuplicatedOpenRide(DuplicateKeyException exception) {
+        String message = exception.getMostSpecificCause().getMessage();
+
+        return (message != null && message.contains(Ride.UNIQUE_OPEN_RIDE_INDEX))
+                || (exception.getMessage() != null && exception.getMessage().contains(Ride.UNIQUE_OPEN_RIDE_INDEX));
+    }
+
+    private ApplicationException rideConflict() {
+        return new ApplicationException(
+                ErrorCode.RIDE_CONFLICT,
+                "Não foi possível registrar o pedido agora. Tente novamente."
+        );
     }
 
     private void validatePassengerRoute(Route route, LocalDate date) {

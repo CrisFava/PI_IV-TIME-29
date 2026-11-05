@@ -27,6 +27,7 @@ import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
+import org.springframework.dao.DuplicateKeyException;
 
 import java.time.LocalDate;
 import java.util.Optional;
@@ -37,6 +38,7 @@ import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.Mockito.doThrow;
 import static org.mockito.Mockito.never;
+import static org.mockito.Mockito.times;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
@@ -115,6 +117,14 @@ class RequestRideSeatUseCaseTest {
     }
 
     private void stubNewRideCreation(Optional<Ride> lastRideOfDriver) {
+        stubNewRideCreation(lastRideOfDriver, Optional.empty(), null);
+    }
+
+    private void stubNewRideCreation(
+            Optional<Ride> lastRideOfDriver,
+            Optional<Ride> foundAfterConflict,
+            RuntimeException firstSaveFailure
+    ) {
         passengerRouteIsValid();
         driverRouteIsValid();
         when(passengerRoute.getId()).thenReturn(passengerRouteObjectId);
@@ -135,9 +145,15 @@ class RequestRideSeatUseCaseTest {
                 .thenReturn(new VehicleSnapshot("Volkswagen Gol", "ABC1234", VehicleType.HATCH, "Azul"));
 
         when(rideRepository.findByDriverRouteIdAndDepartureDateTimeAndStatusNot(any(), any(), any()))
-                .thenReturn(Optional.empty());
+                .thenReturn(Optional.empty(), foundAfterConflict);
         when(rideRepository.findTopByDriverIdOrderBySequentialNumberDesc(DRIVER_ID)).thenReturn(lastRideOfDriver);
-        when(rideRepository.save(any(Ride.class))).thenAnswer(invocation -> invocation.getArgument(0));
+        if (firstSaveFailure == null) {
+            when(rideRepository.save(any(Ride.class))).thenAnswer(invocation -> invocation.getArgument(0));
+        } else {
+            when(rideRepository.save(any(Ride.class)))
+                    .thenThrow(firstSaveFailure)
+                    .thenAnswer(invocation -> invocation.getArgument(0));
+        }
     }
 
     @Test
@@ -197,6 +213,35 @@ class RequestRideSeatUseCaseTest {
         assertThrows(ApplicationException.class, () -> requestSeat.execute(command()));
 
         verify(rideRepository, never()).save(any());
+    }
+
+    @Test
+    @DisplayName("Se outra pessoa criou a mesma viagem ao mesmo tempo, o pedido entra nela")
+    void shouldJoinTheRideCreatedByAConcurrentRequest() {
+        Ride createdByTheOtherPassenger = existingRide();
+        DuplicateKeyException duplicated = new DuplicateKeyException(
+                "E11000 duplicate key error collection: rides index: " + Ride.UNIQUE_OPEN_RIDE_INDEX + " dup key");
+        stubNewRideCreation(Optional.empty(), Optional.of(createdByTheOtherPassenger), duplicated);
+
+        Ride ride = requestSeat.execute(command());
+
+        assertThat(ride).isSameAs(createdByTheOtherPassenger);
+        assertThat(ride.getParticipants()).hasSize(2);
+        assertThat(ride.getParticipants().get(1).getUserId()).isEqualTo(PASSENGER_ID);
+        verify(rideRepository, times(2)).save(any(Ride.class));
+    }
+
+    @Test
+    @DisplayName("Se o número sequencial da viagem colidir, deve pedir para tentar de novo")
+    void shouldAskToTryAgainWhenSequentialNumberCollides() {
+        DuplicateKeyException duplicated = new DuplicateKeyException(
+                "E11000 duplicate key error collection: rides index: unique_driver_sequential_number dup key");
+        stubNewRideCreation(Optional.empty(), Optional.empty(), duplicated);
+
+        ApplicationException thrown = assertThrows(ApplicationException.class, () -> requestSeat.execute(command()));
+
+        assertThat(thrown.getError().code()).isEqualTo(ErrorCode.RIDE_CONFLICT);
+        verify(rideRepository, times(1)).save(any(Ride.class));
     }
 
     @Test

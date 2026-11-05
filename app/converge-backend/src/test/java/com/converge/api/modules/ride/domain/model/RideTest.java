@@ -13,6 +13,8 @@ import com.converge.api.shared.presentation.exception.ApplicationException;
 import org.bson.types.ObjectId;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
+import org.springframework.data.mongodb.core.index.CompoundIndex;
+import org.springframework.data.mongodb.core.index.CompoundIndexes;
 import org.springframework.test.util.ReflectionTestUtils;
 
 import java.time.DayOfWeek;
@@ -516,6 +518,26 @@ class RideTest {
 
         assertThatThrownBy(() -> ride.cancel("driver-123", null))
                 .isInstanceOf(ApplicationException.class);
+    }
+
+    @Test
+    @DisplayName("O índice único de viagem aberta vale para todos os status, menos CANCELLED")
+    void shouldKeepUniqueOpenRideIndexInSyncWithRideStatus() {
+        CompoundIndex openRideIndex = null;
+        for (CompoundIndex candidate : Ride.class.getAnnotation(CompoundIndexes.class).value()) {
+            if (candidate.name().equals(Ride.UNIQUE_OPEN_RIDE_INDEX)) {
+                openRideIndex = candidate;
+            }
+        }
+
+        assertThat(openRideIndex).isNotNull();
+        for (RideStatus rideStatus : RideStatus.values()) {
+            if (rideStatus == RideStatus.CANCELLED) {
+                assertThat(openRideIndex.partialFilter()).doesNotContain(rideStatus.name());
+            } else {
+                assertThat(openRideIndex.partialFilter()).contains(rideStatus.name());
+            }
+        }
     }
 
     @Test
