@@ -24,7 +24,9 @@ public class RouteMapper {
             dto.estimatedArrivalTime(), 
             dto.weekDays(), 
             dto.maxDetourKm(), 
-            dto.totalSeats());
+            dto.totalSeats(),
+            dto.toll(),
+            dto.parking());
     }
 
     public RouteResponseDTO toResponse(Route route) {
@@ -41,6 +43,8 @@ public class RouteMapper {
                 route.getMaxDetourKm(),
                 route.getTotalSeats(),
                 route.getAvailableSeats(),
+                route.getToll(),
+                route.getParking(),
                 route.getRouteDistanceKm(),
                 route.getEncodedPolyline(),
                 route.getCreatedAt(),

@@ -23,7 +23,6 @@ import org.springframework.data.annotation.Id;
 import org.springframework.data.annotation.LastModifiedDate;
 import org.springframework.data.mongodb.core.index.Indexed;
 import org.springframework.data.mongodb.core.mapping.Document;
-import org.springframework.web.client.HttpClientErrorException.BadRequest;
 
 import java.time.DayOfWeek;
 import java.time.LocalDateTime;
@@ -31,6 +30,8 @@ import java.util.ArrayList;
 import java.util.HashSet;
 import java.util.List;
 import java.util.Set;
+import java.math.BigDecimal;
+import java.math.RoundingMode;
 
 @Document(collection = "routes")
 @NoArgsConstructor(access = AccessLevel.PROTECTED)
@@ -78,6 +79,12 @@ public class Route {
     @Nullable
     private Double maxDetourKm;
 
+    @Nullable 
+    private BigDecimal toll;
+
+    @Nullable 
+    private BigDecimal parking;
+
     @Nullable
     private Integer totalSeats;
 
@@ -112,12 +119,30 @@ public class Route {
             String estimatedArrivalTime,
             Set<DayOfWeek> weekDays,
             @Nullable Double maxDetourKm,
-            @Nullable Integer totalSeats) {
+            @Nullable Integer totalSeats,
+            @Nullable BigDecimal toll,
+            @Nullable BigDecimal parking) {
         this.userId = userId;
         this.type = type;
 
         this.applyTripData(
-                vehicleId, origin, destination, departureTime, estimatedArrivalTime, weekDays, maxDetourKm, totalSeats);
+                vehicleId, origin, destination, departureTime, estimatedArrivalTime, weekDays, maxDetourKm, totalSeats, toll, parking);
+    }
+
+    // Sem pedágio e estacionamento: num OFFER eles valem 0.00
+    public Route(
+            String userId,
+            @Nullable String vehicleId,
+            RouteType type,
+            Place origin,
+            Place destination,
+            String departureTime,
+            String estimatedArrivalTime,
+            Set<DayOfWeek> weekDays,
+            @Nullable Double maxDetourKm,
+            @Nullable Integer totalSeats) {
+        this(userId, vehicleId, type, origin, destination, departureTime, estimatedArrivalTime, weekDays,
+                maxDetourKm, totalSeats, null, null);
     }
 
     public Set<DayOfWeek> getWeekDays() {
@@ -136,13 +161,15 @@ public class Route {
             String estimatedArrivalTime,
             Set<DayOfWeek> weekDays,
             @Nullable Double maxDetourKm,
-            @Nullable Integer totalSeats) {
+            @Nullable Integer totalSeats,
+            @Nullable BigDecimal toll,
+            @Nullable BigDecimal parking) {
         if (this.status == RouteStatus.INACTIVE) {
             throw new ApplicationException(ErrorCode.ROUTE_NOT_FOUND, "Route not found.");
         }
 
         this.applyTripData(
-                vehicleId, origin, destination, departureTime, estimatedArrivalTime, weekDays, maxDetourKm, totalSeats);
+                vehicleId, origin, destination, departureTime, estimatedArrivalTime, weekDays, maxDetourKm, totalSeats, toll, parking);
     }
 
     public void deactivate() {
@@ -172,7 +199,9 @@ public class Route {
             String estimatedArrivalTime,
             Set<DayOfWeek> weekDays,
             @Nullable Double maxDetourKm,
-            @Nullable Integer totalSeats) {
+            @Nullable Integer totalSeats,
+            @Nullable BigDecimal toll,
+            @Nullable BigDecimal parking) {
         this.vehicleId = vehicleId;
         this.origin = origin;
         this.destination = destination;
@@ -182,9 +211,19 @@ public class Route {
         this.weekDays.addAll(weekDays);
         this.maxDetourKm = maxDetourKm;
         this.totalSeats = totalSeats;
+        this.totalSeats = totalSeats;
+        this.toll = toll;
+        this.parking = parking;
+
 
         if (this.type == RouteType.OFFER) {
             this.validateOfferRequirements();
+            if (this.type == RouteType.OFFER) {
+                this.validateOfferRequirements();
+                this.toll = toMoney(this.toll);
+                this.parking = toMoney(this.parking);
+            }
+
             // Sem o módulo de caronas ainda não há vagas ocupadas; quando houver, descontar
             // as reservadas
             this.availableSeats = totalSeats;
@@ -194,7 +233,7 @@ public class Route {
     }
 
     private void validateOfferRequirements() {
-        List<String> fields = new ArrayList<>(3);
+        List<String> fields = new ArrayList<>(5);
 
         if (this.maxDetourKm == null || this.maxDetourKm <= 0) {
             fields.add("maxDetourKm");
@@ -208,18 +247,40 @@ public class Route {
             fields.add("vehicleId");
         }
 
+        if (this.toll != null && this.toll.signum() < 0) {
+            fields.add("toll");
+        }
+
+        if (this.parking != null && this.parking.signum() < 0) {
+            fields.add("parking");
+        }
+
         if (!fields.isEmpty()) {
-            String message = "Offer requirements not met. Ensure vehicleId is provided and maxDetourKm and totalSeats are greater than zero.";
+            String message = "Offer requirements not met. Ensure vehicleId is provided, maxDetourKm and totalSeats " + "are greater than zero, and toll and parking are not negative.";
 
             throw new ApplicationException(ErrorCode.BAD_REQUEST, message, Set.copyOf(fields));
         }
     }
 
     private void clearOfferFields() {
-        // Zerar (null) vehicleId, maxDetourKm, totalSeats e availableSeats.
+        // Zerar (null) vehicleId, maxDetourKm, totalSeats e availableSeats, toll, parking.
         this.vehicleId = null;
         this.maxDetourKm = null;
         this.totalSeats = null;
         this.availableSeats = null;
+        this.toll = null;
+        this.parking = null;
+    }
+    // null vira 0.00; dinheiro sempre com 2 casas
+    private static BigDecimal toMoney(@Nullable BigDecimal value) {
+        return (value == null ? BigDecimal.ZERO : value).setScale(2, RoundingMode.HALF_EVEN);
+    }
+
+    // Trajetos salvos antes destes campos existirem não têm o valor no banco: num OFFER, valem 0.00
+    public BigDecimal getToll() {
+        return type == RouteType.OFFER && toll == null ? BigDecimal.ZERO.setScale(2) : toll;
+    }
+    public BigDecimal getParking() {
+        return type == RouteType.OFFER && parking == null ? BigDecimal.ZERO.setScale(2) : parking;
     }
 }

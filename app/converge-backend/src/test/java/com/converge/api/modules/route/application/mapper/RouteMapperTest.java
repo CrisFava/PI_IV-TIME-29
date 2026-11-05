@@ -13,6 +13,7 @@ import com.converge.api.modules.route.domain.model.subtypes.Place;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 
+import java.math.BigDecimal;
 import java.time.DayOfWeek;
 import java.util.Set;
 
@@ -32,7 +33,7 @@ class RouteMapperTest {
     private CreateRouteRequestDTO offerRequest() {
         return new CreateRouteRequestDTO(
                 RouteType.OFFER, "vehicle-456", HOME, PUC, "07:00", "07:40",
-                Set.of(DayOfWeek.MONDAY, DayOfWeek.FRIDAY), 2.0, 3
+                Set.of(DayOfWeek.MONDAY, DayOfWeek.FRIDAY), 2.0, 3, new BigDecimal("12.5"), null
         );
     }
 
@@ -62,6 +63,8 @@ class RouteMapperTest {
         assertThat(route.getWeekDays()).containsExactlyInAnyOrder(DayOfWeek.MONDAY, DayOfWeek.FRIDAY);
         assertThat(route.getMaxDetourKm()).isEqualTo(2.0);
         assertThat(route.getTotalSeats()).isEqualTo(3);
+        assertThat(route.getToll()).isEqualTo(new BigDecimal("12.50"));
+        assertThat(route.getParking()).isEqualTo(new BigDecimal("0.00"));
     }
 
     @Test
@@ -79,6 +82,8 @@ class RouteMapperTest {
         assertThat(response.id()).isNull();
         assertThat(response.status()).isEqualTo(RouteStatus.ACTIVE);
         assertThat(response.availableSeats()).isEqualTo(3);
+        assertThat(response.toll()).isEqualTo(new BigDecimal("0.00"));
+        assertThat(response.parking()).isEqualTo(new BigDecimal("0.00"));
         assertThat(response.origin().latitude()).isEqualTo(-22.9056);
         assertThat(response.origin().longitude()).isEqualTo(-47.0608);
         assertThat(response.destination().neighborhood()).isNull();

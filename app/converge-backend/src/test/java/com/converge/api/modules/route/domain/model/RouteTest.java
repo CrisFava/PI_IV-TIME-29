@@ -10,7 +10,9 @@ import com.converge.api.shared.presentation.exception.ApplicationException;
 import com.converge.api.shared.presentation.exception.ErrorCode;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
+import org.springframework.test.util.ReflectionTestUtils;
 
+import java.math.BigDecimal;
 import java.time.DayOfWeek;
 import java.util.Set;
 
@@ -132,7 +134,7 @@ class RouteTest {
     void shouldUpdateTripData() {
         Route route = offer(2.0, 3);
 
-        route.update("vehicle-789", PUC, HOME, "18:00", "18:40", Set.of(DayOfWeek.TUESDAY), 1.5, 2);
+        route.update("vehicle-789", PUC, HOME, "18:00", "18:40", Set.of(DayOfWeek.TUESDAY), 1.5, 2, null, null);
 
         assertThat(route.getOrigin()).isEqualTo(PUC);
         assertThat(route.getDestination()).isEqualTo(HOME);
@@ -150,7 +152,7 @@ class RouteTest {
 
         ApplicationException ex = assertThrows(
                 ApplicationException.class,
-                () -> route.update("vehicle-456", HOME, PUC, "07:00", "07:40", WEEKDAYS, 2.0, 0)
+                () -> route.update("vehicle-456", HOME, PUC, "07:00", "07:40", WEEKDAYS, 2.0, 0, null, null)
         );
 
         assertThat(ex.getError().fields()).containsExactly("totalSeats");
@@ -164,7 +166,7 @@ class RouteTest {
 
         ApplicationException ex = assertThrows(
                 ApplicationException.class,
-                () -> route.update("vehicle-456", HOME, PUC, "07:00", "07:40", WEEKDAYS, 2.0, 3)
+                () -> route.update("vehicle-456", HOME, PUC, "07:00", "07:40", WEEKDAYS, 2.0, 3, null, null)
         );
 
         assertThat(ex.getError().code()).isEqualTo(ErrorCode.ROUTE_NOT_FOUND);
@@ -192,5 +194,62 @@ class RouteTest {
         );
 
         assertThat(ex.getError().fields()).containsExactly("routeDistanceKm");
+    }
+
+    private Route offerWithCosts(BigDecimal toll, BigDecimal parking) {
+        return new Route("user-123", "vehicle-456", RouteType.OFFER, HOME, PUC, "07:00", "07:40", WEEKDAYS, 2.0, 3,
+                toll, parking);
+    }
+
+    @Test
+    @DisplayName("Deve usar 0.00 quando a oferta não informar pedágio e estacionamento")
+    void shouldDefaultTollAndParkingToZero() {
+        Route route = offerWithCosts(null, null);
+
+        assertThat(route.getToll()).isEqualTo(new BigDecimal("0.00"));
+        assertThat(route.getParking()).isEqualTo(new BigDecimal("0.00"));
+    }
+
+    @Test
+    @DisplayName("Deve guardar pedágio e estacionamento com 2 casas decimais")
+    void shouldStoreTollAndParkingWithTwoDecimals() {
+        Route route = offerWithCosts(new BigDecimal("12.5"), new BigDecimal("8"));
+
+        assertThat(route.getToll()).isEqualTo(new BigDecimal("12.50"));
+        assertThat(route.getParking()).isEqualTo(new BigDecimal("8.00"));
+    }
+
+    @Test
+    @DisplayName("Deve lançar BAD_REQUEST quando pedágio ou estacionamento forem negativos")
+    void shouldRejectNegativeTollAndParking() {
+        ApplicationException ex = assertThrows(
+                ApplicationException.class,
+                () -> offerWithCosts(new BigDecimal("-1.00"), new BigDecimal("-0.50"))
+        );
+
+        assertThat(ex.getError().code()).isEqualTo(ErrorCode.BAD_REQUEST);
+        assertThat(ex.getError().fields()).containsExactlyInAnyOrder("toll", "parking");
+    }
+
+    @Test
+    @DisplayName("Deve descartar pedágio e estacionamento quando o trajeto for SEARCH")
+    void shouldClearTollAndParkingForSearch() {
+        Route route = new Route("user-123", null, RouteType.SEARCH, HOME, PUC, "07:00", "07:40", WEEKDAYS, null, null,
+                new BigDecimal("12.50"), new BigDecimal("8.00"));
+
+        assertThat(route.getToll()).isNull();
+        assertThat(route.getParking()).isNull();
+    }
+
+    @Test
+    @DisplayName("Deve mostrar 0.00 em oferta salva antes de pedágio e estacionamento existirem")
+    void shouldShowZeroForLegacyOfferWithoutTollAndParking() {
+        Route route = offerWithCosts(new BigDecimal("12.50"), new BigDecimal("8.00"));
+        // Simula um documento antigo do banco, sem os dois campos
+        ReflectionTestUtils.setField(route, "toll", null);
+        ReflectionTestUtils.setField(route, "parking", null);
+
+        assertThat(route.getToll()).isEqualTo(new BigDecimal("0.00"));
+        assertThat(route.getParking()).isEqualTo(new BigDecimal("0.00"));
     }
 }
