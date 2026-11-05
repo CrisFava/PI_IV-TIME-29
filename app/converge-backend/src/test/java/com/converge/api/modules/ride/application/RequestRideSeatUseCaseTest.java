@@ -30,6 +30,7 @@ import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 import org.springframework.dao.DuplicateKeyException;
 
+import java.math.BigDecimal;
 import java.time.LocalDate;
 import java.util.Optional;
 import java.util.Set;
@@ -94,7 +95,9 @@ class RequestRideSeatUseCaseTest {
                 date.atTime(8, 0),
                 date.atTime(8, 40),
                 Set.of(date.getDayOfWeek()),
-                3
+                3,
+                null,
+                null
         );
     }
 
@@ -170,6 +173,30 @@ class RequestRideSeatUseCaseTest {
         assertThat(passenger.getUserId()).isEqualTo(PASSENGER_ID);
         assertThat(passenger.getStatus()).isEqualTo(ParticipantStatus.REQUESTED);
         assertThat(passenger.getPassengerRouteId()).isEqualTo(passengerRouteObjectId.toHexString());
+    }
+
+    @Test
+    @DisplayName("Ao criar a viagem, copia o pedágio e o estacionamento do trajeto do motorista para o custo")
+    void shouldCopyTollAndParkingFromDriverRoute() {
+        stubNewRideCreation(Optional.empty());
+        when(driverRoute.getToll()).thenReturn(new BigDecimal("6.00"));
+        when(driverRoute.getParking()).thenReturn(new BigDecimal("12.50"));
+
+        Ride ride = requestSeat.execute(command());
+
+        assertThat(ride.getCosts().toll()).isEqualByComparingTo("6.00");
+        assertThat(ride.getCosts().parking()).isEqualByComparingTo("12.50");
+    }
+
+    @Test
+    @DisplayName("Trajeto antigo, sem pedágio nem estacionamento, gera custo zerado")
+    void shouldUseZeroTollAndParkingWhenRouteHasNoneYet() {
+        stubNewRideCreation(Optional.empty());
+
+        Ride ride = requestSeat.execute(command());
+
+        assertThat(ride.getCosts().toll()).isEqualByComparingTo("0");
+        assertThat(ride.getCosts().parking()).isEqualByComparingTo("0");
     }
 
     @Test

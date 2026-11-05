@@ -19,6 +19,7 @@ import org.springframework.data.mongodb.core.index.CompoundIndex;
 import org.springframework.data.mongodb.core.index.CompoundIndexes;
 import org.springframework.test.util.ReflectionTestUtils;
 
+import java.math.BigDecimal;
 import java.time.DayOfWeek;
 import java.time.LocalDateTime;
 import java.util.Set;
@@ -46,7 +47,9 @@ class RideTest {
                 departure,
                 arrival,
                 weekDays,
-                totalSeats
+                totalSeats,
+                null,
+                null
         );
     }
 
@@ -62,7 +65,8 @@ class RideTest {
         assertThat(ride.getStatus()).isEqualTo(RideStatus.AWAITING_CONFIRMATION);
         assertThat(ride.getTotalSeats()).isEqualTo(3);
         assertThat(ride.getAvailableSeats()).isEqualTo(3);
-        assertThat(ride.getCosts()).isNull();
+        assertThat(ride.getCosts()).isNotNull();
+        assertThat(ride.getCosts().totalCost()).isNull();
     }
 
     @Test
@@ -540,6 +544,45 @@ class RideTest {
                 assertThat(openRideIndex.partialFilter()).contains(rideStatus.name());
             }
         }
+    }
+
+    private Ride rideWithExtras(BigDecimal toll, BigDecimal parking) {
+        return new Ride(
+                1,
+                "driver-123",
+                "vehicle-123",
+                new VehicleSnapshot("Volkswagen Gol", "ABC1234", VehicleType.HATCH, "Azul"),
+                "route-123",
+                place("Rua das Flores, 50"),
+                place("Campus PUC"),
+                tomorrow,
+                tomorrow.plusMinutes(40),
+                Set.of(DayOfWeek.MONDAY),
+                3,
+                toll,
+                parking
+        );
+    }
+
+    @Test
+    @DisplayName("A viagem nasce com o pedágio e o estacionamento do trajeto na ficha de custos, e o resto por calcular")
+    void shouldStartWithTollAndParkingInCosts() {
+        Ride ride = rideWithExtras(new BigDecimal("6.00"), new BigDecimal("12.50"));
+
+        assertThat(ride.getCosts().toll()).isEqualByComparingTo("6.00");
+        assertThat(ride.getCosts().parking()).isEqualByComparingTo("12.50");
+        assertThat(ride.getCosts().energyCost()).isNull();
+        assertThat(ride.getCosts().totalCost()).isNull();
+        assertThat(ride.getCosts().totalShared()).isNull();
+    }
+
+    @Test
+    @DisplayName("Trajeto sem pedágio nem estacionamento gera custos zerados")
+    void shouldStartWithZeroTollAndParkingWhenRouteHasNone() {
+        Ride ride = rideWithExtras(null, null);
+
+        assertThat(ride.getCosts().toll()).isEqualByComparingTo("0");
+        assertThat(ride.getCosts().parking()).isEqualByComparingTo("0");
     }
 
     @Test

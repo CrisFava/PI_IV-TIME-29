@@ -84,7 +84,9 @@ class RideUseCasesTest {
                 departure,
                 departure.plusMinutes(40),
                 Set.of(DayOfWeek.MONDAY),
-                3
+                3,
+                null,
+                null
         );
     }
 

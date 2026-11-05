@@ -62,7 +62,9 @@ class RideMapperTest {
                 departure,
                 departure.plusMinutes(40),
                 Set.of(DayOfWeek.MONDAY),
-                3
+                3,
+                null,
+                null
         );
     }
 
@@ -180,7 +182,9 @@ class RideMapperTest {
         assertThat(response.availableSeats()).isEqualTo(2);
         assertThat(response.origin().address()).isEqualTo("Rua das Flores, 50");
         assertThat(response.id()).isNull();
-        assertThat(response.costs()).isNull();
+        assertThat(response.costs()).isNotNull();
+        assertThat(response.costs().toll()).isEqualByComparingTo("0");
+        assertThat(response.costs().totalCost()).isNull();
     }
 
     @Test

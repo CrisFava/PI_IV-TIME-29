@@ -32,6 +32,7 @@ import org.springframework.data.mongodb.core.index.CompoundIndexes;
 import org.springframework.data.mongodb.core.index.Indexed;
 import org.springframework.data.mongodb.core.mapping.Document;
 
+import java.math.BigDecimal;
 import java.time.DayOfWeek;
 import java.time.LocalDateTime;
 import java.util.ArrayList;
@@ -150,7 +151,9 @@ public class Ride {
             LocalDateTime departureDateTime,
             LocalDateTime estimatedArrivalDateTime,
             Set<DayOfWeek> weekDays,
-            int totalSeats
+            int totalSeats,
+            @Nullable BigDecimal toll,
+            @Nullable BigDecimal parking
     ) {
         LocalDateTime now = LocalDateTime.now();
 
@@ -171,6 +174,7 @@ public class Ride {
         this.totalSeats = totalSeats;
         this.availableSeats = totalSeats;
         this.status = RideStatus.AWAITING_CONFIRMATION;
+        this.costs = RideCosts.withExtras(toll, parking);
         this.participants.add(Participant.driver(driverId, now));
     }
 

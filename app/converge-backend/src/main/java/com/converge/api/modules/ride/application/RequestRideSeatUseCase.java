@@ -167,7 +167,9 @@ public class RequestRideSeatUseCase implements UseCase<RequestRideSeatCommand, R
                 departure,
                 arrival,
                 driverRoute.getWeekDays(),
-                driverRoute.getTotalSeats()
+                driverRoute.getTotalSeats(),
+                driverRoute.getToll(),
+                driverRoute.getParking()
         );
     }
 

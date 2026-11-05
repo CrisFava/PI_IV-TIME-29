@@ -3,6 +3,7 @@
 package com.converge.api.modules.ride.domain.model.subtypes;
 
 import com.converge.api.modules.user.domain.enums.vehicle.EnergySource;
+import jakarta.annotation.Nullable;
 import jakarta.validation.constraints.NotNull;
 import jakarta.validation.constraints.Positive;
 import jakarta.validation.constraints.PositiveOrZero;
@@ -10,26 +11,26 @@ import jakarta.validation.constraints.PositiveOrZero;
 import java.math.BigDecimal;
 
 public record RideCosts(
-        @NotNull
+        @Nullable
         @PositiveOrZero
         Double routeDistanceKm,
 
-        @NotNull
+        @Nullable
         @PositiveOrZero
         Double totalDistanceWithDetoursKm,
 
-        @NotNull
+        @Nullable
         EnergySource energySourceUsed,
 
-        @NotNull
+        @Nullable
         @Positive
         Double averageConsumptionUsed,
 
-        @NotNull
+        @Nullable
         @PositiveOrZero
         BigDecimal energyPriceUsed,
 
-        @NotNull
+        @Nullable
         @PositiveOrZero
         BigDecimal energyCost,
 
@@ -41,12 +42,27 @@ public record RideCosts(
         @PositiveOrZero
         BigDecimal parking,
 
-        @NotNull
+        @Nullable
         @PositiveOrZero
         BigDecimal totalCost,
 
-        @NotNull
+        @Nullable
         @PositiveOrZero
         BigDecimal totalShared
 ) {
+
+    public static RideCosts withExtras(@Nullable BigDecimal toll, @Nullable BigDecimal parking) {
+        return new RideCosts(
+                null,
+                null,
+                null,
+                null,
+                null,
+                null,
+                toll != null ? toll : BigDecimal.ZERO,
+                parking != null ? parking : BigDecimal.ZERO,
+                null,
+                null
+        );
+    }
 }
