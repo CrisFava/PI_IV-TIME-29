@@ -1,3 +1,5 @@
+// Autor: Cristian Eduardo Fava - RA 25000636
+
 import 'profile_input.dart';
 
 /// Dados do formulário de criação de conta.

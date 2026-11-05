@@ -1,3 +1,5 @@
+// Autor: Allan Giovanni Matias Paes - RA 25008211
+
 import '../models/create_route_request.dart';
 import '../models/place_details_model.dart';
 import '../models/place_suggestion_model.dart';

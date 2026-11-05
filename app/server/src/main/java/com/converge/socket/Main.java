@@ -1,3 +1,5 @@
+// Autor: Allan Giovanni Matias Paes - RA 25008211
+
 package com.converge.socket;
 
 import com.converge.socket.core.SocketServer;

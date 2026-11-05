@@ -1,3 +1,5 @@
+// Autor: Cristian Eduardo Fava - RA 25000636
+
 import 'package:firebase_core/firebase_core.dart';
 import 'package:flutter/widgets.dart';
 import 'package:flutter_dotenv/flutter_dotenv.dart';

@@ -1,3 +1,5 @@
+// Autor: Allan Giovanni Matias Paes - RA 25008211
+
 import 'dart:convert';
 import 'package:converge/core/network/interceptors/auth_interceptor.dart';
 import 'package:converge/core/services/auth/auth_service.dart';

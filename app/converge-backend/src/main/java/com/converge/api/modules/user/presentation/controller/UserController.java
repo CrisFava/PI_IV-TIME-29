@@ -1,3 +1,5 @@
+// Autor: Allan Giovanni Matias Paes - RA 25008211
+
 package com.converge.api.modules.user.presentation.controller;
 
 import com.converge.api.modules.user.application.CreateUserUseCase;

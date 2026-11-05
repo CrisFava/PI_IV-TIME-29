@@ -1,3 +1,5 @@
+// Autor: Cristian Eduardo Fava - RA 25000636
+
 import 'fake_user.dart';
 
 import 'package:converge/core/network/api_exception.dart';

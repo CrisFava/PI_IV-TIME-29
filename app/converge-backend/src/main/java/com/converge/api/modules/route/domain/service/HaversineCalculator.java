@@ -1,3 +1,5 @@
+// Autor: Gustavo Alves de Siqueira Costa - RA 25001650
+
 package com.converge.api.modules.route.domain.service;
 
 import com.converge.api.modules.route.domain.model.subtypes.Coordinates;

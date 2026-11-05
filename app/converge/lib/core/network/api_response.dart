@@ -1,3 +1,5 @@
+// Autor: Cristian Eduardo Fava - RA 25000636
+
 import 'api_exception.dart';
 
 /// Extrai o `data` do envelope `ApplicationResponse` do backend:

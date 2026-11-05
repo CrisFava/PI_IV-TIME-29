@@ -1,3 +1,5 @@
+// Autor: Allan Giovanni Matias Paes - RA 25008211
+
 import 'package:google_maps_flutter/google_maps_flutter.dart';
 
 /// Passos do fluxo de solicitação de carona pelo passageiro (Uber-like).

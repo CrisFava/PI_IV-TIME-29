@@ -1,3 +1,5 @@
+// Autor: Cristian Eduardo Fava - RA 25000636
+
 /// Falha do provedor de identidade com mensagem pronta para o usuário.
 class AuthException implements Exception {
   final String code;
