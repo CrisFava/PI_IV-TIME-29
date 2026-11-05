@@ -449,6 +449,8 @@ Quando `active = false` (conta suspensa ou excluída):
 
 ### Regras de Negócio Críticas
 
+> **Onde o cálculo roda:** o cálculo e o rateio dos valores (`estimatedAmount`, `maxAmount`, `finalAmount`, divisão entre participantes e geração do payload PIX) são feitos no **Servidor Java de sockets** (`app/server`), acionado pelo backend via `SocketClient`. O backend reúne os dados dos participantes, pede o cálculo ao servidor e grava os valores resultantes nos campos abaixo. As regras a seguir descrevem o resultado esperado desse cálculo, independentemente de onde ele é executado.
+
 - `availableSeats` é decrementado ao confirmar participante e incrementado ao cancelar — operação atômica obrigatória.
 - **`estimatedAmount` (RF34, RF36):** valor estimado atual de cada participante, exibido durante a vida da carona. É **recalculado sempre que há entrada, cancelamento ou ausência** de participantes — o custo é dividido entre os participantes efetivos no momento. Nunca ultrapassa o `maxAmount`.
 - `maxAmount` é o **teto de proteção do passageiro** (RF35/RF37): corresponde à **metade do custo da rota com o desvio do passageiro**, calculado e gravado no momento da confirmação. O `finalAmount` **nunca pode superá-lo**, mesmo que outros participantes cancelem/faltem ou que o custo mude depois.
@@ -625,6 +627,8 @@ O backend monta o payload sob demanda (padrão BR Code do Banco Central, CRC16 i
 **Módulo:** `modules/matching`
 **Descrição:** Cache dos resultados do algoritmo de compatibilidade. Invalidado quando trajetos são alterados. TTL garante limpeza mesmo em falhas de invalidação.
 
+> **Onde o cálculo roda:** o módulo `matching` do backend apenas orquestra (reúne os trajetos candidatos, aciona o cálculo e grava o resultado nesta coleção). O **cálculo de compatibilidade** (`compatibilityScore`, `calculatedDetourKm`, `scheduleDifferenceMin`, `estimatedCostPerPassenger`) é feito no **Servidor Java de sockets** (`app/server`), acionado via `SocketClient`. Esta coleção guarda apenas o resultado já calculado.
+
 ```json
 {
   "_id": "ObjectId (String)",
@@ -658,7 +662,7 @@ O backend monta o payload sob demanda (padrão BR Code do Banco Central, CRC16 i
 ## 10. Coleção `indicators`
 
 **Módulo:** `modules/indicator`
-**Descrição:** Indicadores de mobilidade, sustentabilidade e financeiro por usuário e período. Atualizados ao concluir uma viagem. Documentos pré-calculados por período (`WEEKLY`, `MONTHLY`, `SEMESTERLY`). O período `TOTAL` foi removido — o acumulado histórico é calculado **somando apenas os documentos `MONTHLY`** sob demanda, evitando o risco de estouro do limite de 16 MB do MongoDB.
+**Descrição:** Indicadores de mobilidade e sustentabilidade por usuário e período (no MVP; o financeiro fica para evolução futura). Atualizados ao concluir uma viagem. Documentos pré-calculados por período (`WEEKLY`, `MONTHLY`, `SEMESTERLY`). O período `TOTAL` foi removido — o acumulado histórico é calculado **somando apenas os documentos `MONTHLY`** sob demanda, evitando o risco de estouro do limite de 16 MB do MongoDB.
 
 ```json
 {
@@ -666,33 +670,18 @@ O backend monta o payload sob demanda (padrão BR Code do Banco Central, CRC16 i
   "userId": "String (ref: users._id)",
   "period": "WEEKLY | MONTHLY | SEMESTERLY",
   "reference": "String (ex: '2025-05' para mensal, '2025-S1' para semestral, '2025-W20' para semanal)",
-  "mobility": {
-    "ridesAsDriver": "Integer",
-    "ridesAsPassenger": "Integer",
-    "sharedKm": "Double",
-    "estimatedCarsAvoided": "Integer"
-  },
-  "sustainability": {
-    "fuelSavedL": "Double | null",
-    "energySavedKwh": "Double | null",
-    "co2AvoidedKg": "Double",
-    "equivalentTrees": "Double"
-  },
-  "financial": {
-    "totalPassengerSavings": "Decimal128",
-    "totalDriverIncome": "Decimal128"
-  },
-  "series": [
-    {
-      "date": "ISODate",
-      "rides": "Integer",
-      "sharedKm": "Double",
-      "co2AvoidedKg": "Double"
-    }
-  ],
+  "ridesAsDriver": "Integer",
+  "ridesAsPassenger": "Integer",
+  "sharedKm": "Double",
+  "carsAvoided": "Integer",
+  "co2AvoidedKg": "Double",
   "updatedAt": "ISODate"
 }
 ```
+
+> **MVP (versão enxuta implementada):** o documento grava apenas mobilidade básica e CO₂ evitado, em campos planos (sem os subdocumentos `mobility`/`sustainability`). `totalRides` (= `ridesAsDriver + ridesAsPassenger`) e `equivalentTrees` (= `co2AvoidedKg / 22`) são **calculados na leitura**, não gravados. O período `ALL_TIME` **não** existe por usuário: o acumulado histórico é a soma dos documentos `MONTHLY`.
+>
+> **Evolução futura (ainda não implementada):** os subdocumentos `financial { totalPassengerSavings, totalDriverIncome }`, o array `series[]` (pontos para gráfico) e os campos `fuelSavedL`/`energySavedKwh` de sustentabilidade poderão ser adicionados numa versão futura, quando houver dados de pagamento e necessidade de gráfico de evolução.
 
 ### Índices
 

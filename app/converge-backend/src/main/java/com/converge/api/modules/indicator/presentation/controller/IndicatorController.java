@@ -3,11 +3,16 @@
 package com.converge.api.modules.indicator.presentation.controller;
 
 import com.converge.api.modules.indicator.application.GetPlatformIndicatorsUseCase;
+import com.converge.api.modules.indicator.application.GetUserIndicatorsUseCase;
 import com.converge.api.modules.indicator.application.dto.PlatformIndicatorResponseDTO;
+import com.converge.api.modules.indicator.application.dto.UserIndicatorResponseDTO;
 import com.converge.api.modules.indicator.domain.enums.IndicatorPeriod;
+import com.converge.api.shared.application.UserUtils;
+import com.converge.api.shared.infrastructure.config.auth.AuthenticatedUser;
 import com.converge.api.shared.presentation.dto.ApplicationResponse;
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.ResponseEntity;
+import org.springframework.security.core.annotation.AuthenticationPrincipal;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RequestMapping;
@@ -23,6 +28,8 @@ import java.util.Map;
 public class IndicatorController {
 
     private final GetPlatformIndicatorsUseCase getPlatformIndicators;
+    private final GetUserIndicatorsUseCase getUserIndicators;
+    private final UserUtils userUtils;
 
     // Ex.: GET /api/v1/indicators/platform?period=MONTHLY&reference=2025-05
     @GetMapping("/platform")
@@ -32,6 +39,21 @@ public class IndicatorController {
     ) {
         PlatformIndicatorResponseDTO data = getPlatformIndicators.execute(
                 new GetPlatformIndicatorsUseCase.Query(period, reference)
+        );
+        return ResponseEntity.ok(ApplicationResponse.success(data));
+    }
+
+    // Impacto do próprio usuário logado (RF51 "pelo usuário").
+    // Ex.: GET /api/v1/indicators/me?period=MONTHLY&reference=2025-05
+    @GetMapping("/me")
+    public ResponseEntity<ApplicationResponse<UserIndicatorResponseDTO>> getMine(
+            @AuthenticationPrincipal AuthenticatedUser principal,
+            @RequestParam(defaultValue = "MONTHLY") IndicatorPeriod period,
+            @RequestParam(required = false) String reference
+    ) {
+        String userId = userUtils.getCurrentUser(principal).getId().toHexString();
+        UserIndicatorResponseDTO data = getUserIndicators.execute(
+                new GetUserIndicatorsUseCase.Query(userId, period, reference)
         );
         return ResponseEntity.ok(ApplicationResponse.success(data));
     }

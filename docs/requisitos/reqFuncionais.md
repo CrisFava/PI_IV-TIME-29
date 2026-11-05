@@ -19,7 +19,7 @@ Os requisitos funcionais descrevem o que o sistema Converge deve fazer.
 | **RF13** | O sistema deve permitir que o motorista defina um desvio máximo aceitável de rota para aceitar passageiros. |
 | **RF14** | O sistema deve utilizar as informações de origem, destino, horário, dias da semana, capacidade disponível e desvio aceitável para identificar possíveis combinações de carona entre usuários. |
 | **RF15** | O sistema deve identificar trajetos e horários compatíveis entre usuários que oferecem e que procuram carona. |
-| **RF16** | O módulo de matching, integrado ao backend, deve calcular um índice de compatibilidade para cada combinação encontrada e ordenar os resultados. |
+| **RF16** | O matching deve calcular um índice de compatibilidade para cada combinação encontrada e ordenar os resultados. O cálculo roda no Servidor Java de sockets (`app/server`); o backend reúne os dados, aciona o servidor e persiste o resultado. |
 | **RF17** | O sistema deve apresentar ao usuário as caronas compatíveis identificadas pelo mecanismo de matching, ordenadas pelo índice de compatibilidade. |
 | **RF18** | O sistema deve permitir a visualização das informações de perfil relevantes dos usuários envolvidos em uma combinação de carona. |
 | **RF19** | O sistema deve permitir que um passageiro solicite uma vaga e que o motorista aceite ou recuse a solicitação. |

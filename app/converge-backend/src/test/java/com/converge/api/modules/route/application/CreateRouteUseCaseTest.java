@@ -56,7 +56,9 @@ class CreateRouteUseCaseTest {
                 "07:40",
                 Set.of(DayOfWeek.MONDAY, DayOfWeek.FRIDAY),
                 2.0,
-                3
+                3,
+                null,
+                null
         );
         return new CreateRouteCommand("user-123", request);
     }

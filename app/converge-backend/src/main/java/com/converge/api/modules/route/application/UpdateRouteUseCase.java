@@ -33,7 +33,9 @@ public class UpdateRouteUseCase implements UseCase<UpdateRouteCommand, Route> {
             request.estimatedArrivalTime(), 
             request.weekDays(), 
             request.maxDetourKm(), 
-            request.totalSeats()
+            request.totalSeats(),
+            request.toll(),
+            request.parking()
         );
 
         RouteGeometry geometry = routeGeometryService.compute(route.getOrigin(), route.getDestination());
