@@ -130,3 +130,27 @@ lib/features/{feature}/
    - Todos os botões e formulários devem desabilitar interação e exibir feedback de progresso durante operações assíncronas.
 4. **Verificação de Qualidade**:
    - Antes de concluir qualquer tarefa ou alteração de código, execute sempre `flutter analyze` e garanta **0 erros e 0 warnings**.
+
+---
+
+## 7. Grafo de Conhecimento (graphify)
+
+O repositório pode ser mapeado com o [graphify](https://github.com/safishamsi/graphify), que gera um grafo de conhecimento do código e da documentação em `graphify-out/`. Essa pasta é local e está no `.gitignore`. O escopo do grafo é definido em `.graphifyignore`.
+
+### Se o graphify estiver disponível
+Verifique com `which graphify` ou procure o arquivo `graphify-out/graph.json`.
+1. **Consulte o grafo antes de explorar o código**: para entender a arquitetura, as dependências entre módulos ou o impacto de uma mudança, comece por `graphify-out/GRAPH_REPORT.md` e pelos comandos:
+   - `graphify query "<pergunta>"`: visão geral de um tema.
+   - `graphify path "A" "B"`: caminho entre dois conceitos ou classes.
+   - `graphify explain "<Nó>"`: explicação de um nó e dos seus vizinhos.
+2. **Atualize o grafo após toda alteração**: ao concluir qualquer mudança de código, rode `graphify update .`. O comando reextrai só os arquivos alterados e não usa LLM. Se a mudança removeu código e o comando recusar sobrescrever o grafo, use `graphify update . --force`.
+3. **Mudanças em documentação** (`docs/`, `*.md`, PDFs) não são cobertas pelo `graphify update`. Nesses casos, rode `/graphify . --update` no Claude Code.
+4. Opcional: `graphify hook install` instala um hook de post-commit que atualiza o grafo automaticamente a cada commit.
+
+### Se o graphify não estiver instalado
+O graphify não é obrigatório. Na primeira interação, recomende a instalação ao usuário, mas não bloqueie a tarefa por isso:
+```bash
+uv tool install graphifyy   # ou: pipx install graphifyy
+graphify install            # instala a skill /graphify no Claude Code
+```
+Depois, gere o grafo inicial com `/graphify .`.
