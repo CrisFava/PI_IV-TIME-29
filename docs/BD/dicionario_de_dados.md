@@ -21,6 +21,7 @@
 | 09/10/2026 | Daniela Mikie Kikuchi Gonçalves | 1.1.2 | Revisão final e padronização de nomes |
 | 11/10/2026 | Sara Monteiro | 1.2.0 | Detalhamento do pagamento PIX: campo `pixKeyType` e enum no Usuário; regras da chave PIX; geração do QR Code "Pix Copia e Cola" estático (sem gateway); confirmação manual pelo motorista |
 | 21/10/2026 | Gustavo Alves de Siqueira Costa | 1.3.0 | `encodedPolyline` no Trajeto; `routeDistanceKm` calculada pela Routes API, com Haversine como alternativa |
+| 05/11/2026 | Daniela Mikie Kikuchi Gonçalves | 1.4.0 | Indicador por usuário (`indicators`) ajustado para a versão enxuta do MVP (campos planos, `carsAvoided`); `financial` e `series` marcados como evolução futura |
 
 ---
 
@@ -550,6 +551,8 @@ Estrutura composta e multivalorada que representa cada participante de uma viage
 
 ---
 
+> **Nota:** as seções 3.9 a 3.12 descrevem a **estrutura completa prevista**. No MVP, o indicador por usuário grava uma versão **enxuta e plana** (ver seção 4.10): só `ridesAsDriver`, `ridesAsPassenger`, `sharedKm`, `carsAvoided` e `co2AvoidedKg`. Os subdocumentos `financial` (3.11) e `series` (3.12), e os campos `fuelSavedL`/`energySavedKwh` (3.10), ficam como **evolução futura**.
+
 ### 3.9. MobilityData (Dados de Mobilidade)
 
 | Atributo / Dado | Tipo conceitual | Obrigatório | Comentários |
@@ -557,7 +560,7 @@ Estrutura composta e multivalorada que representa cada participante de uma viage
 | `ridesAsDriver` | Número inteiro | Sim | Viagens concluídas no período em que o usuário foi motorista. |
 | `ridesAsPassenger` | Número inteiro | Sim | Viagens concluídas no período em que o usuário foi passageiro. |
 | `sharedKm` | Número decimal | Sim | Soma dos km das viagens participadas no período. `Double`. |
-| `estimatedCarsAvoided` | Número inteiro | Sim | Cada passageiro efetivo = 1 carro evitado. |
+| `carsAvoided` | Número inteiro | Sim | Cada passageiro efetivo = 1 carro evitado. (No MVP o campo chama-se `carsAvoided`.) |
 
 ---
 
@@ -572,7 +575,9 @@ Estrutura composta e multivalorada que representa cada participante de uma viage
 
 ---
 
-### 3.11. FinancialData (Dados Financeiros do Indicador)
+### 3.11. FinancialData (Dados Financeiros do Indicador) — evolução futura
+
+> Não implementado no MVP. Depende dos dados de pagamento das viagens.
 
 | Atributo / Dado | Tipo conceitual | Obrigatório | Comentários |
 | :---: | :--- | :---: | :--- |
@@ -581,7 +586,9 @@ Estrutura composta e multivalorada que representa cada participante de uma viage
 
 ---
 
-### 3.12. SeriesPoint (Ponto de Série Temporal)
+### 3.12. SeriesPoint (Ponto de Série Temporal) — evolução futura
+
+> Não implementado no MVP. Será usado quando a tela tiver gráfico de evolução.
 
 Estrutura usada no array `series` dos Indicadores. Cada ponto representa um dia ou semana. O período `TOTAL` não gera pontos — o acumulado histórico é calculado somando os documentos mensais na leitura.
 
@@ -982,29 +989,18 @@ Estrutura composta que representa a CNH do motorista. Opcional — só preenchid
   "userId": "64a9f8e7d6c5b4a3f2e1d0c9",
   "period": "MONTHLY",
   "reference": "2025-05",
-  "mobility": {
-    "ridesAsDriver": 0,
-    "ridesAsPassenger": 22,
-    "sharedKm": 272.8,
-    "estimatedCarsAvoided": 22
-  },
-  "sustainability": {
-    "fuelSavedL": 21.8,
-    "energySavedKwh": null,
-    "co2AvoidedKg": 50.7,
-    "equivalentTrees": 2.3
-  },
-  "financial": {
-    "totalPassengerSavings": { "$numberDecimal": "132.00" },
-    "totalDriverIncome": { "$numberDecimal": "0.00" }
-  },
-  "series": [
-    { "date": "2025-05-01T00:00:00Z", "rides": 5, "sharedKm": 62.0, "co2AvoidedKg": 11.5 },
-    { "date": "2025-05-08T00:00:00Z", "rides": 5, "sharedKm": 62.0, "co2AvoidedKg": 11.5 }
-  ],
+  "ridesAsDriver": 0,
+  "ridesAsPassenger": 22,
+  "sharedKm": 272.8,
+  "carsAvoided": 22,
+  "co2AvoidedKg": 50.7,
   "updatedAt": "2025-05-30T09:00:00Z"
 }
 ```
+
+> **MVP (versão enxuta implementada):** campos planos, sem os subdocumentos `mobility`/`sustainability`. `totalRides` (= `ridesAsDriver + ridesAsPassenger`) e `equivalentTrees` (= `co2AvoidedKg / 22`) são **calculados na leitura**, não gravados. O campo de carros evitados chama-se **`carsAvoided`**. Não há documento `ALL_TIME` por usuário — o acumulado é a soma dos meses.
+>
+> **Evolução futura (ainda não implementada):** `financial { totalPassengerSavings, totalDriverIncome }`, `series[]` e os campos `fuelSavedL`/`energySavedKwh` ficam para uma versão futura. As seções 3.9 a 3.12 abaixo descrevem essa estrutura futura completa.
 
 ---
 
