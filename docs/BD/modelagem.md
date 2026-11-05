@@ -658,7 +658,7 @@ O backend monta o payload sob demanda (padrão BR Code do Banco Central, CRC16 i
 ## 10. Coleção `indicators`
 
 **Módulo:** `modules/indicator`
-**Descrição:** Indicadores de mobilidade, sustentabilidade e financeiro por usuário e período. Atualizados ao concluir uma viagem. Documentos pré-calculados por período (`WEEKLY`, `MONTHLY`, `SEMESTERLY`). O período `TOTAL` foi removido — o acumulado histórico é calculado **somando apenas os documentos `MONTHLY`** sob demanda, evitando o risco de estouro do limite de 16 MB do MongoDB.
+**Descrição:** Indicadores de mobilidade e sustentabilidade por usuário e período (no MVP; o financeiro fica para evolução futura). Atualizados ao concluir uma viagem. Documentos pré-calculados por período (`WEEKLY`, `MONTHLY`, `SEMESTERLY`). O período `TOTAL` foi removido — o acumulado histórico é calculado **somando apenas os documentos `MONTHLY`** sob demanda, evitando o risco de estouro do limite de 16 MB do MongoDB.
 
 ```json
 {
@@ -666,33 +666,18 @@ O backend monta o payload sob demanda (padrão BR Code do Banco Central, CRC16 i
   "userId": "String (ref: users._id)",
   "period": "WEEKLY | MONTHLY | SEMESTERLY",
   "reference": "String (ex: '2025-05' para mensal, '2025-S1' para semestral, '2025-W20' para semanal)",
-  "mobility": {
-    "ridesAsDriver": "Integer",
-    "ridesAsPassenger": "Integer",
-    "sharedKm": "Double",
-    "estimatedCarsAvoided": "Integer"
-  },
-  "sustainability": {
-    "fuelSavedL": "Double | null",
-    "energySavedKwh": "Double | null",
-    "co2AvoidedKg": "Double",
-    "equivalentTrees": "Double"
-  },
-  "financial": {
-    "totalPassengerSavings": "Decimal128",
-    "totalDriverIncome": "Decimal128"
-  },
-  "series": [
-    {
-      "date": "ISODate",
-      "rides": "Integer",
-      "sharedKm": "Double",
-      "co2AvoidedKg": "Double"
-    }
-  ],
+  "ridesAsDriver": "Integer",
+  "ridesAsPassenger": "Integer",
+  "sharedKm": "Double",
+  "carsAvoided": "Integer",
+  "co2AvoidedKg": "Double",
   "updatedAt": "ISODate"
 }
 ```
+
+> **MVP (versão enxuta implementada):** o documento grava apenas mobilidade básica e CO₂ evitado, em campos planos (sem os subdocumentos `mobility`/`sustainability`). `totalRides` (= `ridesAsDriver + ridesAsPassenger`) e `equivalentTrees` (= `co2AvoidedKg / 22`) são **calculados na leitura**, não gravados. O período `ALL_TIME` **não** existe por usuário: o acumulado histórico é a soma dos documentos `MONTHLY`.
+>
+> **Evolução futura (ainda não implementada):** os subdocumentos `financial { totalPassengerSavings, totalDriverIncome }`, o array `series[]` (pontos para gráfico) e os campos `fuelSavedL`/`energySavedKwh` de sustentabilidade poderão ser adicionados numa versão futura, quando houver dados de pagamento e necessidade de gráfico de evolução.
 
 ### Índices
 
