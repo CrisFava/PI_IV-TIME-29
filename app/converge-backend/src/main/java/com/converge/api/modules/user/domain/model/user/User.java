@@ -3,6 +3,7 @@ package com.converge.api.modules.user.domain.model.user;
 import com.converge.api.modules.user.domain.enums.user.ParticipationRole;
 import com.converge.api.modules.user.domain.enums.user.PaymentStanding;
 import com.converge.api.modules.user.domain.enums.user.PixKeyType;
+import com.converge.api.modules.user.domain.enums.user.VerificationStatus;
 import com.converge.api.modules.user.domain.model.user.subtypes.AcademicRecord;
 import com.converge.api.modules.user.domain.model.user.subtypes.driver.DriverLicense;
 import com.converge.api.modules.user.domain.model.user.subtypes.Reputation;
@@ -190,6 +191,20 @@ public class User {
 
     public boolean hasRole(ParticipationRole role) {
         return this.participationRoles.contains(role);
+    }
+
+    public boolean isAcademicVerified() {
+        return this.academicRecord != null && this.academicRecord.status() == VerificationStatus.VERIFIED;
+    }
+
+    public boolean isBlockedByDebt() {
+        return this.paymentStanding == PaymentStanding.BLOCKED;
+    }
+
+    public boolean hasValidDriverLicense(LocalDateTime now) {
+        return this.driverLicense != null
+                && this.driverLicense.status() == VerificationStatus.VERIFIED
+                && !this.driverLicense.expiresAt().isBefore(now);
     }
 
     public void addRole(ParticipationRole role) {
