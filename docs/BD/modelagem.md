@@ -449,6 +449,8 @@ Quando `active = false` (conta suspensa ou excluída):
 
 ### Regras de Negócio Críticas
 
+> **Onde o cálculo roda:** o cálculo e o rateio dos valores (`estimatedAmount`, `maxAmount`, `finalAmount`, divisão entre participantes e geração do payload PIX) são feitos no **Servidor Java de sockets** (`app/server`), acionado pelo backend via `SocketClient`. O backend reúne os dados dos participantes, pede o cálculo ao servidor e grava os valores resultantes nos campos abaixo. As regras a seguir descrevem o resultado esperado desse cálculo, independentemente de onde ele é executado.
+
 - `availableSeats` é decrementado ao confirmar participante e incrementado ao cancelar — operação atômica obrigatória.
 - **`estimatedAmount` (RF34, RF36):** valor estimado atual de cada participante, exibido durante a vida da carona. É **recalculado sempre que há entrada, cancelamento ou ausência** de participantes — o custo é dividido entre os participantes efetivos no momento. Nunca ultrapassa o `maxAmount`.
 - `maxAmount` é o **teto de proteção do passageiro** (RF35/RF37): corresponde à **metade do custo da rota com o desvio do passageiro**, calculado e gravado no momento da confirmação. O `finalAmount` **nunca pode superá-lo**, mesmo que outros participantes cancelem/faltem ou que o custo mude depois.
@@ -624,6 +626,8 @@ O backend monta o payload sob demanda (padrão BR Code do Banco Central, CRC16 i
 
 **Módulo:** `modules/matching`
 **Descrição:** Cache dos resultados do algoritmo de compatibilidade. Invalidado quando trajetos são alterados. TTL garante limpeza mesmo em falhas de invalidação.
+
+> **Onde o cálculo roda:** o módulo `matching` do backend apenas orquestra (reúne os trajetos candidatos, aciona o cálculo e grava o resultado nesta coleção). O **cálculo de compatibilidade** (`compatibilityScore`, `calculatedDetourKm`, `scheduleDifferenceMin`, `estimatedCostPerPassenger`) é feito no **Servidor Java de sockets** (`app/server`), acionado via `SocketClient`. Esta coleção guarda apenas o resultado já calculado.
 
 ```json
 {

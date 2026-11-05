@@ -17,8 +17,8 @@ Os requisitos não funcionais descrevem como o sistema deve se comportar — qua
 | **RNF09** | O sistema deve apresentar mensagens de erro compreensíveis ao usuário quando uma operação não puder ser concluída, utilizando as propriedades `title` e `detail` do padrão RFC 7807. |
 | **RNF10** | O backend deve registrar erros e eventos relevantes em logs estruturados para permitir diagnóstico e manutenção da aplicação. |
 | **RNF11** | As principais regras de negócio do backend (casos de uso) devem possuir testes unitários automatizados com JUnit. |
-| **RNF12** | O módulo de matching deve possuir testes unitários que cubram cenários de compatibilidade e incompatibilidade de trajetos. |
-| **RNF13** | O módulo de cálculo e rateio de custos deve possuir testes unitários que validem os valores calculados, o comportamento esperado e a geração do código PIX, incluindo o cálculo do CRC16 do payload. |
+| **RNF12** | O cálculo de matching (hospedado no Servidor Java de sockets) deve possuir testes unitários que cubram cenários de compatibilidade e incompatibilidade de trajetos. |
+| **RNF13** | O cálculo e rateio de custos (hospedado no Servidor Java de sockets) deve possuir testes unitários que validem os valores calculados, o comportamento esperado e a geração do código PIX, incluindo o cálculo do CRC16 do payload. |
 | **RNF14** | O projeto Flutter deve possuir testes automatizados das funcionalidades relevantes utilizando Flutter Test. |
 | **RNF15** | O projeto deve permitir a execução dos testes automatizados de forma isolada durante o desenvolvimento e no processo de validação. |
 | **RNF16** | O sistema deve ser capaz de processar múltiplas requisições simultâneas de usuários sem degradar o funcionamento das funcionalidades principais. |
@@ -50,9 +50,9 @@ As restrições tecnológicas são decisões de projeto fixadas pela equipe — 
 | **RT01** | O backend deve ser desenvolvido em **Java 21**. |
 | **RT02** | O backend deve utilizar **Spring Boot 4** (`spring-boot-starter-parent:4.1.1` como parent Maven). |
 | **RT03** | O banco de dados principal da aplicação deve ser **MongoDB** (Atlas em produção; URI configurada via variável de ambiente `MONGODB_CONNECTION_STRING`). |
-| **RT04** | O módulo de matching deve ser implementado em Java, integrado ao backend como um bounded context dentro do Monólito Modular, sem servidor separado. |
+| **RT04** | O cálculo de compatibilidade do matching deve ser implementado em **Java puro no Servidor de Sockets** (`app/server`), fora do Spring Boot. O backend mantém um módulo `matching` (bounded context do Monólito Modular) que apenas orquestra: reúne os dados, aciona o servidor via `SocketClient` e persiste o resultado. |
 | **RT05** | O aplicativo cliente deve ser desenvolvido em **Flutter/Dart** (Dart SDK `^3.13.3`). |
-| **RT06** | O projeto deve possuir testes unitários automatizados em todas as camadas críticas (casos de uso, matching e cálculo de custos no backend; funcionalidades relevantes no frontend). |
+| **RT06** | O projeto deve possuir testes unitários automatizados em todas as camadas críticas (casos de uso no backend; cálculo de matching e de custos no Servidor Java de sockets; funcionalidades relevantes no frontend). |
 | **RT07** | O projeto deve utilizar **JUnit** no backend e **Flutter Test** no aplicativo como frameworks de teste. |
 | **RT08** | A aplicação deve integrar **Google Maps API** para geocoding, cálculo de distância e visualização de rotas, via `GoogleMapsService` na camada `shared/infrastructure/maps`, ativado por `app.maps.provider=google`. Em ambiente de desenvolvimento, deve ser utilizada a implementação `MockMapsService` (`app.maps.provider=mock`). |
 | **RT09** | A aplicação deve utilizar **Firebase Auth** como provedor de autenticação (`app.auth.provider=firebase`), **Firebase Storage** para arquivos (`app.storage.provider=firebase`) e **Firebase Realtime Database** para comunicação em tempo real. Implementações mock devem estar disponíveis para desenvolvimento local. |
@@ -66,5 +66,6 @@ As restrições tecnológicas são decisões de projeto fixadas pela equipe — 
 | **RT17** | O sistema deve utilizar **Spring Data MongoDB** para armazenamento, consulta e recuperação dos dados de viagens, usuários, trajetos, avaliações e demais entidades. |
 | **RT18** | O sistema deve utilizar **Firebase Storage** para armazenamento de arquivos (fotos de perfil e documentos de verificação universitária), ativado via `app.storage.provider=firebase` no `application.yaml`. |
 | **RT19** | O sistema deve utilizar **Firebase Realtime Database** para as funcionalidades de chat entre participantes de carona, garantindo comunicação em tempo real. |
-| **RT20** | O mecanismo de matching deve ser implementado como módulo integrado ao backend Spring Boot, respeitando a arquitetura de Monólito Modular definida no projeto. |
+| **RT20** | O cálculo pesado do matching e da estimativa de custos deve rodar no **Servidor Java de Sockets** (`app/server`, TCP, Java puro), acionado pelo backend via `SocketClient`. O backend Spring Boot mantém os módulos orquestradores (`matching` e o de custos) respeitando a arquitetura de Monólito Modular, mas delega o cálculo ao servidor. |
 | **RT21** | No MVP, o código PIX deve ser gerado pelo próprio backend segundo o padrão BR Code do Banco Central (QR Code estático), sem dependência de gateway de pagamento ou API externa. A confirmação de recebimento é manual, e a verificação automática via gateway fica como evolução futura.|
+| **RT22** | O projeto deve manter um **Servidor de Sockets em Java puro** (`app/server`, projeto Maven próprio, Java 21, TCP via `ObjectInputStream`/`ObjectOutputStream`, porta padrão 3000) responsável pelos **cálculos pesados**: compatibilidade do matching e estimativa/rateio de custos. Novas funcionalidades de cálculo entram como *handlers* (`RequestHandler`) sem alterar a infraestrutura de rede. O backend Spring Boot se comunica com ele via `SocketClient` (`shared/infrastructure/socket`). |
