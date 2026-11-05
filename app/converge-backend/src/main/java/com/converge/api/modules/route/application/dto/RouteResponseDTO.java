@@ -5,6 +5,7 @@ package com.converge.api.modules.route.application.dto;
 import com.converge.api.modules.route.domain.enums.RouteStatus;
 import com.converge.api.modules.route.domain.enums.RouteType;
 
+import java.math.BigDecimal;
 import java.time.DayOfWeek;
 import java.time.LocalDateTime;
 import java.util.Set;
@@ -22,6 +23,8 @@ public record RouteResponseDTO(
         Double maxDetourKm,
         Integer totalSeats,
         Integer availableSeats,
+        BigDecimal toll,
+        BigDecimal parking,
         Double routeDistanceKm,
         String encodedPolyline,
         LocalDateTime createdAt,

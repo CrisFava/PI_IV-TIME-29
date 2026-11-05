@@ -18,6 +18,7 @@ import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 
+import java.math.BigDecimal;
 import java.time.DayOfWeek;
 import java.util.List;
 import java.util.Optional;
@@ -93,7 +94,9 @@ class ManageRouteUseCasesTest {
                 "18:40",
                 Set.of(DayOfWeek.TUESDAY),
                 1.5,
-                2
+                2,
+                new BigDecimal("7.80"),
+                new BigDecimal("15")
         );
 
         Route updated = updateRoute.execute(new UpdateRouteCommand(ROUTE_ID, "user-123", request));
@@ -101,6 +104,8 @@ class ManageRouteUseCasesTest {
         assertThat(updated.getDepartureTime()).isEqualTo("18:00");
         assertThat(updated.getOrigin().address()).isEqualTo("Rod. Dom Pedro I, km 136");
         assertThat(updated.getTotalSeats()).isEqualTo(2);
+        assertThat(updated.getToll()).isEqualTo(new BigDecimal("7.80"));
+        assertThat(updated.getParking()).isEqualTo(new BigDecimal("15.00"));
         assertThat(updated.getRouteDistanceKm()).isEqualTo(FakeMapsGateway.GOOGLE_ROUTE.distanceKm());
         verify(routeRepository).save(route);
     }

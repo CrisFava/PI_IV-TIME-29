@@ -4,11 +4,14 @@ package com.converge.api.modules.route.application.dto;
 
 import jakarta.annotation.Nullable;
 import jakarta.validation.Valid;
+import jakarta.validation.constraints.DecimalMin;
+import jakarta.validation.constraints.Digits;
 import jakarta.validation.constraints.NotBlank;
 import jakarta.validation.constraints.NotEmpty;
 import jakarta.validation.constraints.NotNull;
 import jakarta.validation.constraints.Pattern;
 
+import java.math.BigDecimal;
 import java.time.DayOfWeek;
 import java.util.Set;
 
@@ -43,7 +46,18 @@ public record UpdateRouteRequestDTO(
         Double maxDetourKm,
 
         @Nullable
-        Integer totalSeats
+        Integer totalSeats,
+
+        // Opcionais, só para OFFER: se não vierem, valem 0.00
+        @Nullable
+        @DecimalMin(value = "0.00", message = "O pedágio não pode ser negativo.")
+        @Digits(integer = 6, fraction = 2, message = "O pedágio deve ter no máximo 2 casas decimais.")
+        BigDecimal toll,
+
+        @Nullable
+        @DecimalMin(value = "0.00", message = "O estacionamento não pode ser negativo.")
+        @Digits(integer = 6, fraction = 2, message = "O estacionamento deve ter no máximo 2 casas decimais.")
+        BigDecimal parking
 ) {
     private static final String TIME_PATTERN = "^([01]\\d|2[0-3]):[0-5]\\d$";
 }
