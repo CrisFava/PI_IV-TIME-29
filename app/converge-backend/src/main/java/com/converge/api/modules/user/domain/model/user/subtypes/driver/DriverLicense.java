@@ -37,7 +37,7 @@ public record DriverLicense(
                 number,
                 category,
                 documentUrl,
-                VerificationStatus.PENDING,
+                VerificationStatus.UNDER_REVIEW,
                 expiresAt,
                 null,
                 null

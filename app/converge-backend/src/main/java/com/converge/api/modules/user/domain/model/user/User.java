@@ -264,20 +264,29 @@ public class User {
             String name,
             String phone,
             @Nullable String photoUrl,
-            @Nullable DriverLicense driverLicense,
             @Nullable String pixKey,
             @Nullable PixKeyType pixKeyType
     ) {
         this.name = name;
         this.phone = phone;
         this.photoUrl = photoUrl;
-        this.driverLicense = driverLicense;
         this.pixKey = pixKey;
         this.pixKeyType = pixKeyType;
 
         if (participationRoles.contains(DRIVER)){
             this.validateDriverRequirements();
         }
+    }
+
+    public void submitDriverLicense(DriverLicense driverLicense) {
+        if (driverLicense == null) {
+            throw new ApplicationException(
+                    ErrorCode.BAD_REQUEST,
+                    "Informe os dados da CNH.",
+                    Set.of("driverLicense")
+            );
+        }
+        this.driverLicense = driverLicense;
     }
 
     public void deactivate() {
