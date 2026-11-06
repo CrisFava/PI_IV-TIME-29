@@ -38,7 +38,8 @@ class UserBecomeDriverTest {
         User user = createPassenger();
         DriverLicense license = new DriverLicense("123456", DriverLicenseCategory.B, LocalDateTime.now().plusYears(1), null);
 
-        user.updateProfile("Diana Reis", "(19) 96666-5555", null, license, "diana@email.com", PixKeyType.EMAIL);
+        user.submitDriverLicense(license);
+        user.updateProfile("Diana Reis", "(19) 96666-5555", null, "diana@email.com", PixKeyType.EMAIL);
 
         user.addRole(ParticipationRole.DRIVER);
 

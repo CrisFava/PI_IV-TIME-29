@@ -2,7 +2,6 @@
 
 package com.converge.api.modules.user.application.dto;
 
-import jakarta.validation.Valid;
 import jakarta.validation.constraints.NotBlank;
 import jakarta.validation.constraints.Pattern;
 import jakarta.validation.constraints.Size;
@@ -21,9 +20,6 @@ public record UpdateUserRequestDTO (
     
     @Nullable
     String photoUrl,
-
-    @Valid
-    DriverLicenseRequestDTO driverLicense,
 
     @Nullable
     String pixKey,

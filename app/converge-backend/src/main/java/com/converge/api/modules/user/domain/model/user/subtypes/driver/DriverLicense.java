@@ -37,10 +37,32 @@ public record DriverLicense(
                 number,
                 category,
                 documentUrl,
-                VerificationStatus.PENDING,
+                VerificationStatus.UNDER_REVIEW,
                 expiresAt,
                 null,
                 null
+        );
+    }
+
+    public boolean isExpiredAt(LocalDateTime now) {
+        return expiresAt.toLocalDate().isBefore(now.toLocalDate());
+    }
+
+    public VerificationStatus effectiveStatus(LocalDateTime now) {
+        return status == VerificationStatus.VERIFIED && isExpiredAt(now)
+                ? VerificationStatus.EXPIRED
+                : status;
+    }
+
+    public DriverLicense withEffectiveStatus(LocalDateTime now) {
+        return new DriverLicense(
+                number,
+                category,
+                documentUrl,
+                effectiveStatus(now),
+                expiresAt,
+                verifiedAt,
+                rejectionReason
         );
     }
 }

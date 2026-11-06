@@ -34,7 +34,7 @@ class UserUpdateProfileTest {
                 new AcademicRecord("PUC-Campinas", "Engenharia de Software", "2024-00123", "ana@puc-campinas.edu.br")
         );
 
-        user.updateProfile("Ana Lima", "(19) 99999-0000", null, null, null, null);
+        user.updateProfile("Ana Lima", "(19) 99999-0000", null, null, null);
 
         assertThat(user.getName()).isEqualTo("Ana Lima");
         assertThat(user.getPhone()).isEqualTo("(19) 99999-0000");
@@ -59,7 +59,7 @@ class UserUpdateProfileTest {
             PixKeyType.EMAIL
     );
         assertThatThrownBy(() ->
-                driver.updateProfile("Bruno Lima", "(19) 98888-7777", null, license, null, null)
+                driver.updateProfile("Bruno Lima", "(19) 98888-7777", null, null, null)
         ).isInstanceOf(ApplicationException.class);
     }
 }

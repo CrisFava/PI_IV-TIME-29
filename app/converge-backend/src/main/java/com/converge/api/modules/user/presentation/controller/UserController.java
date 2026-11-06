@@ -6,6 +6,7 @@ import com.converge.api.modules.user.application.CreateUserUseCase;
 import com.converge.api.modules.user.domain.model.user.User;
 import com.converge.api.modules.user.application.dto.CreateUserRequestDTO;
 import com.converge.api.modules.user.application.dto.CreateUserResponseDTO;
+import com.converge.api.modules.user.application.dto.SubmitDriverLicenseCommand;
 import com.converge.api.modules.user.application.mapper.UserMapper;
 import com.converge.api.shared.application.UserUtils;
 import com.converge.api.shared.infrastructure.config.auth.AuthenticatedUser;
@@ -29,6 +30,8 @@ import org.springframework.web.bind.annotation.PutMapping;
 import com.converge.api.modules.user.application.DeleteUserUseCase;
 import org.springframework.web.bind.annotation.DeleteMapping;
 import com.converge.api.modules.user.application.BecomeDriverUseCase;
+import com.converge.api.modules.user.application.SubmitDriverLicenseUseCase;
+import com.converge.api.modules.user.application.dto.DriverLicenseRequestDTO;
 
 @RestController
 @RequestMapping("/api/v1/users")
@@ -41,6 +44,7 @@ public class UserController {
     private final UpdateUserUseCase updateUser;
     private final DeleteUserUseCase deleteUser;
     private final BecomeDriverUseCase becomeDriver;
+    private final SubmitDriverLicenseUseCase submitDriverLicense;
 
     @PostMapping
     public ResponseEntity<ApplicationResponse<CreateUserResponseDTO>> createUser(
@@ -111,6 +115,22 @@ public class UserController {
             );
         }
         User user = becomeDriver.execute(principal.uid());
+        return ResponseEntity.ok(ApplicationResponse.success(mapper.toResponse(user)));
+    }
+
+    @PostMapping("/me/driver-license")
+    public ResponseEntity<ApplicationResponse<CreateUserResponseDTO>> submitDriverLicense(
+            @AuthenticationPrincipal AuthenticatedUser principal,
+            @Valid @RequestBody DriverLicenseRequestDTO request
+    ) {
+        if (principal == null || principal.uid() == null) {
+            throw new ApplicationException(
+                    ErrorCode.INVALID_CREDENTIALS,
+                    "Não autenticado."
+            );
+        }
+        User user = submitDriverLicense.execute(new SubmitDriverLicenseCommand(principal.uid(), request));
+
         return ResponseEntity.ok(ApplicationResponse.success(mapper.toResponse(user)));
     }
 }
