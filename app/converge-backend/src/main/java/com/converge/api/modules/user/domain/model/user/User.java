@@ -205,8 +205,7 @@ public class User {
 
     public boolean hasValidDriverLicense(LocalDateTime now) {
         return this.driverLicense != null
-                && this.driverLicense.status() == VerificationStatus.VERIFIED
-                && !this.driverLicense.expiresAt().isBefore(now);
+                && this.driverLicense.effectiveStatus(now) == VerificationStatus.VERIFIED;
     }
 
     public void addRole(ParticipationRole role) {

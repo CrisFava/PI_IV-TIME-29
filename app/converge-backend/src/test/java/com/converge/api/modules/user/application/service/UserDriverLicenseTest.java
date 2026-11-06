@@ -98,6 +98,28 @@ class UserDriverLicenseTest {
     }
 
     @Test
+    @DisplayName("CNH verificada que vence hoje ainda dá elegibilidade durante o dia")
+    void shouldBeEligibleOnTheExpirationDay() {
+        LocalDateTime now = LocalDateTime.of(2026, 12, 10, 15, 0);
+        DriverLicense expiringToday = new DriverLicense(
+                "123456789", DriverLicenseCategory.B, null, VerificationStatus.VERIFIED,
+                LocalDateTime.of(2026, 12, 10, 0, 0), LocalDateTime.of(2026, 1, 5, 10, 0), null);
+
+        assertThat(driverWith(expiringToday).hasValidDriverLicense(now)).isTrue();
+    }
+
+    @Test
+    @DisplayName("CNH verificada perde a elegibilidade no dia seguinte ao vencimento")
+    void shouldLoseEligibilityTheDayAfterExpiration() {
+        LocalDateTime now = LocalDateTime.of(2026, 12, 11, 8, 0);
+        DriverLicense expiredYesterday = new DriverLicense(
+                "123456789", DriverLicenseCategory.B, null, VerificationStatus.VERIFIED,
+                LocalDateTime.of(2026, 12, 10, 0, 0), LocalDateTime.of(2026, 1, 5, 10, 0), null);
+
+        assertThat(driverWith(expiredYesterday).hasValidDriverLicense(now)).isFalse();
+    }
+
+    @Test
     @DisplayName("Reenviar a CNH recomeça a análise e tira a elegibilidade até ser aprovada")
     void shouldRestartReviewWhenLicenseIsResubmitted() {
         User driver = driverWith(verifiedLicense());

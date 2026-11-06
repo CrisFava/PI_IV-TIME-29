@@ -13,6 +13,7 @@ import com.converge.api.modules.user.application.dto.CreateUserResponseDTO;
 import com.converge.api.modules.user.application.dto.DriverLicenseRequestDTO;
 import com.converge.api.shared.presentation.exception.ApplicationException;
 import com.converge.api.shared.presentation.exception.ErrorCode;
+import java.time.LocalDateTime;
 
 
 import org.springframework.stereotype.Component;
@@ -56,7 +57,7 @@ public class UserMapper {
                 user.getPhotoUrl(),
                 user.getParticipationRoles(),
                 user.getAcademicRecord(),
-                user.getDriverLicense(),
+                toLicenseView(user.getDriverLicense()),
                 user.getPixKey(),
                 user.getPixKeyType(),
                 user.getPaymentStanding(),
@@ -102,4 +103,9 @@ public class UserMapper {
             dto.documentUrl()
         );
     }
+
+    private DriverLicense toLicenseView(DriverLicense license) {
+        return license == null ? null : license.withEffectiveStatus(LocalDateTime.now());
+    }
+
 }
