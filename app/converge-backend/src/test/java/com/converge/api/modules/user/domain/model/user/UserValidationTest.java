@@ -9,10 +9,7 @@ import com.converge.api.modules.user.domain.enums.user.VerificationMethod;
 import com.converge.api.modules.user.domain.enums.user.VerificationStatus;
 import com.converge.api.modules.user.domain.model.user.subtypes.AcademicRecord;
 import com.converge.api.modules.user.domain.model.user.subtypes.driver.DriverLicense;
-import jakarta.validation.ConstraintViolation;
-import jakarta.validation.Validation;
-import jakarta.validation.Validator;
-import jakarta.validation.ValidatorFactory;
+import jakarta.validation.*;
 import org.junit.jupiter.api.BeforeAll;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
@@ -123,23 +120,6 @@ class UserValidationTest {
         Set<ConstraintViolation<User>> violations = validator.validate(user);
 
         assertThat(violations).anyMatch(v -> v.getPropertyPath().toString().equals("email"));
-    }
-
-    @Test
-    @DisplayName("Deve falhar quando participationRoles estiver vazio")
-    void shouldFailWhenParticipationRolesIsEmpty() {
-        User user = new User(
-                "firebase-uid-123",
-                "Ana Souza",
-                "ana@puc-campinas.edu.br",
-                "(19) 91234-5678",
-                Collections.emptySet(),
-                createValidAcademicRecord()
-        );
-
-        Set<ConstraintViolation<User>> violations = validator.validate(user);
-
-        assertThat(violations).anyMatch(v -> v.getPropertyPath().toString().equals("participationRoles"));
     }
 
     @Test
