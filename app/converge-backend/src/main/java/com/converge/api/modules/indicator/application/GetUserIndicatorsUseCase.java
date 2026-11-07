@@ -12,6 +12,7 @@ import com.converge.api.shared.presentation.exception.ErrorCode;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
 
+import java.time.Instant;
 import java.util.List;
 import java.util.Set;
 
@@ -88,7 +89,7 @@ public class GetUserIndicatorsUseCase
                 carsAvoided,
                 co2AvoidedKg,
                 co2AvoidedKg / 22.0,
-                java.time.Instant.now()
+                Instant.now()
         );
     }
 }

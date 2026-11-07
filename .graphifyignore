@@ -14,3 +14,7 @@ app/converge/.dart_tool/
 *.h
 *.m
 *.swift
+lombok.*
+org.springframework.*
+package:flutter/*
+java.*

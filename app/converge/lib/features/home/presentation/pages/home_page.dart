@@ -4,6 +4,7 @@ import 'package:converge/features/home/presentation/widgets/home_driver_form_she
 import 'package:converge/features/home/presentation/widgets/home_mode_selector_header.dart';
 import 'package:converge/features/home/presentation/widgets/home_passenger_sheet.dart';
 import 'package:converge/features/home/presentation/widgets/home_real_map_background.dart';
+import '../widgets/become_driver_sheet.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
@@ -282,10 +283,16 @@ class _HomePageState extends ConsumerState<HomePage> {
 
   void _showLockedDriverWarning() {
     HapticFeedback.mediumImpact();
-    _showFeedback(
-      'Apenas usuários habilitados como motoristas podem iniciar expediente. Redirecionando para o seu perfil...',
+    showBecomeDriverSheet(
+      context: context,
+      onSuccess: () {
+        _showFeedback('Parab?ns! Modo Motorista ativado com sucesso.');
+        setState(() {
+          _currentMode = AppRideMode.driver;
+          _currentTabIndex = 0;
+        });
+      },
     );
-    _onTabSelected(3); // Redireciona imediatamente para a aba de Perfil
   }
 
   void _onRequestRide() {
@@ -989,6 +996,12 @@ class _HomePageState extends ConsumerState<HomePage> {
                 ),
               ),
 
+              const SizedBox(height: 16),
+              if (user.isDriver as bool)
+                _buildDriverActiveCard()
+              else
+                _buildBecomeDriverProfileCard(),
+
               const SizedBox(height: 18),
               const Divider(color: AppColors.neutralLight),
               const SizedBox(height: 10),
@@ -1039,6 +1052,116 @@ class _HomePageState extends ConsumerState<HomePage> {
           ),
         ),
       ],
+    );
+  }
+
+  Widget _buildBecomeDriverProfileCard() {
+    return Container(
+      padding: const EdgeInsets.all(16),
+      decoration: BoxDecoration(
+        color: AppColors.cardSecondary,
+        borderRadius: BorderRadius.circular(18),
+        border: Border.all(color: AppColors.borderSubtle),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        children: [
+          Row(
+            children: [
+              Container(
+                width: 40,
+                height: 40,
+                decoration: BoxDecoration(
+                  color: AppColors.primary,
+                  borderRadius: BorderRadius.circular(12),
+                ),
+                child: const Icon(
+                  Icons.directions_car_rounded,
+                  color: AppColors.dockItemActive,
+                  size: 22,
+                ),
+              ),
+              const SizedBox(width: 12),
+              const Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      'Tornar-se Motorista',
+                      style: TextStyle(
+                        fontSize: 15,
+                        fontWeight: FontWeight.w700,
+                        color: AppColors.textPrimary,
+                        letterSpacing: -0.2,
+                      ),
+                    ),
+                    SizedBox(height: 2),
+                    Text(
+                      'Ofere?a caronas e divida custos no campus',
+                      style: TextStyle(
+                        fontSize: 12,
+                        color: AppColors.textSecondary,
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+            ],
+          ),
+          const SizedBox(height: 14),
+          ElevatedButton.icon(
+            onPressed: () {
+              HapticFeedback.lightImpact();
+              showBecomeDriverSheet(
+                context: context,
+                onSuccess: () {
+                  _showFeedback(
+                    'Parab?ns! Voc? agora ? um motorista cadastrado.',
+                  );
+                },
+              );
+            },
+            icon: const Icon(Icons.arrow_forward_rounded, size: 16),
+            label: const Text('Ativar Modo Motorista'),
+            style: ElevatedButton.styleFrom(
+              backgroundColor: AppColors.primary,
+              foregroundColor: AppColors.dockItemActive,
+              elevation: 0,
+              padding: const EdgeInsets.symmetric(vertical: 12),
+              shape: RoundedRectangleBorder(
+                borderRadius: BorderRadius.circular(12),
+              ),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildDriverActiveCard() {
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
+      decoration: BoxDecoration(
+        color: AppColors.successBackground,
+        borderRadius: BorderRadius.circular(14),
+        border: Border.all(color: AppColors.successBorder),
+      ),
+      child: const Row(
+        children: [
+          Icon(Icons.verified_rounded, color: AppColors.success, size: 20),
+          SizedBox(width: 10),
+          Expanded(
+            child: Text(
+              'Perfil de motorista ativo. Voc? pode abrir vagas e iniciar expediente.',
+              style: TextStyle(
+                fontSize: 12.5,
+                fontWeight: FontWeight.w600,
+                color: AppColors.textPrimary,
+              ),
+            ),
+          ),
+        ],
+      ),
     );
   }
 
