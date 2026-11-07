@@ -149,8 +149,7 @@ public class User {
         this.photoUrl = photoUrl;
         this.academicRecord = academicRecord;
 
-        this.pixKey = pixKey;
-        this.pixKeyType = pixKeyType;
+        this.applyPixKey(pixKey, pixKeyType);
         this.driverLicense = driverLicense;
 
         if (participationRoles.contains(DRIVER)){
@@ -258,6 +257,27 @@ public class User {
         }
     }
 
+    private void applyPixKey(@Nullable String pixKey, @Nullable PixKeyType pixKeyType) {
+        boolean hasKey = pixKey != null && !pixKey.isBlank();
+
+        if (!hasKey && pixKeyType == null) {
+            this.pixKey = null;
+            this.pixKeyType = null;
+            return;
+        }
+
+        if (!hasKey || pixKeyType == null) {
+            throw new ApplicationException(
+                    ErrorCode.BAD_REQUEST,
+                    "Informe a chave PIX e o tipo da chave.",
+                    Set.of("pixKey", "pixKeyType")
+            );
+        }
+
+        this.pixKey = pixKeyType.normalize(pixKey);
+        this.pixKeyType = pixKeyType;
+    }
+
     public void updateProfile(
 
             String name,
@@ -269,8 +289,7 @@ public class User {
         this.name = name;
         this.phone = phone;
         this.photoUrl = photoUrl;
-        this.pixKey = pixKey;
-        this.pixKeyType = pixKeyType;
+        this.applyPixKey(pixKey, pixKeyType);
 
         if (participationRoles.contains(DRIVER)){
             this.validateDriverRequirements();
