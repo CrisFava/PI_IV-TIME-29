@@ -10,8 +10,10 @@ enum ParticipationRole {
   };
 
   static ParticipationRole? fromJson(String? value) {
+    if (value == null) return null;
+    final normalized = value.trim().toUpperCase();
     for (final role in values) {
-      if (role.toJson() == value) return role;
+      if (role.toJson() == normalized) return role;
     }
     return null;
   }

@@ -19,6 +19,7 @@ class UserModel {
   final AcademicRecordModel academicRecord;
   final String? pixKey;
   final PixKeyType? pixKeyType;
+  final bool hasDriverLicense;
   final bool active;
 
   const UserModel({
@@ -32,10 +33,35 @@ class UserModel {
     required this.academicRecord,
     this.pixKey,
     this.pixKeyType,
+    this.hasDriverLicense = false,
     required this.active,
   });
 
-  bool get isDriver => participationRoles.contains(ParticipationRole.driver);
+  bool get isDriver =>
+      participationRoles.contains(ParticipationRole.driver) ||
+      (hasDriverLicense && pixKey != null && pixKey!.trim().isNotEmpty);
+
+  UserModel copyWith({
+    Set<ParticipationRole>? participationRoles,
+    String? pixKey,
+    PixKeyType? pixKeyType,
+    bool? hasDriverLicense,
+  }) {
+    return UserModel(
+      id: id,
+      firebaseUid: firebaseUid,
+      name: name,
+      email: email,
+      phone: phone,
+      photoUrl: photoUrl,
+      participationRoles: participationRoles ?? this.participationRoles,
+      academicRecord: academicRecord,
+      pixKey: pixKey ?? this.pixKey,
+      pixKeyType: pixKeyType ?? this.pixKeyType,
+      hasDriverLicense: hasDriverLicense ?? this.hasDriverLicense,
+      active: active,
+    );
+  }
 
   factory UserModel.fromJson(Map<String, dynamic> json) => UserModel(
     id: json['id'] as String,
@@ -46,13 +72,14 @@ class UserModel {
     photoUrl: json['photoUrl'] as String?,
     participationRoles: {
       for (final role in (json['participationRoles'] as List? ?? const []))
-        ?ParticipationRole.fromJson(role as String?),
+        ?ParticipationRole.fromJson(role?.toString()),
     },
     academicRecord: AcademicRecordModel.fromJson(
       json['academicRecord'] as Map<String, dynamic>,
     ),
     pixKey: json['pixKey'] as String?,
     pixKeyType: PixKeyType.fromJson(json['pixKeyType'] as String?),
+    hasDriverLicense: json['driverLicense'] != null,
     active: json['active'] as bool? ?? true,
   );
 }

@@ -9,6 +9,7 @@ import '../../../core/services/auth/auth_service.dart';
 // ---
 import '../data/models/cpf_validation_result.dart';
 import '../data/models/driver_license_input.dart';
+import '../data/models/participation_role.dart';
 import '../data/models/pix_key_type.dart';
 // ---
 import '../data/models/user_model.dart';
@@ -128,15 +129,23 @@ class AuthController extends AsyncNotifier<AuthSession> {
   /// Envia a Carteira de Motorista (`POST /users/me/driver-license`).
   Future<UserModel> submitDriverLicense(DriverLicenseInput license) async {
     final updated = await _repository.submitDriverLicense(license);
-    state = AsyncData(Authenticated(updated));
-    return updated;
+    final withLicense = updated.copyWith(hasDriverLicense: true);
+    state = AsyncData(Authenticated(withLicense));
+    return withLicense;
   }
 
   /// Promove o usuário autenticado a motorista chamando `POST /users/me/driver`.
   Future<UserModel> becomeDriver() async {
     final updated = await _repository.becomeDriver();
-    state = AsyncData(Authenticated(updated));
-    return updated;
+    final ensuredDriver = updated.copyWith(
+      participationRoles: {
+        ...updated.participationRoles,
+        ParticipationRole.driver,
+      },
+      hasDriverLicense: true,
+    );
+    state = AsyncData(Authenticated(ensuredDriver));
+    return ensuredDriver;
   }
 
   /// Valida o CPF através do Socket Server TCP via backend.
