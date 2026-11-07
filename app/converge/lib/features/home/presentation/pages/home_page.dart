@@ -286,11 +286,13 @@ class _HomePageState extends ConsumerState<HomePage> {
 
   void _showLockedDriverWarning() {
     HapticFeedback.mediumImpact();
+    setState(() => _isCarMenuOpen = false);
     showBecomeDriverSheet(
       context: context,
       onSuccess: () {
-        _showFeedback('Parab?ns! Modo Motorista ativado com sucesso.');
+        _showFeedback('Parabéns! Modo Motorista ativado com sucesso.');
         setState(() {
+          _isCarMenuOpen = false;
           _currentMode = AppRideMode.driver;
           _currentTabIndex = 0;
         });
@@ -311,7 +313,11 @@ class _HomePageState extends ConsumerState<HomePage> {
 
   void _onStartDriverShiftFromDock(bool canDrive) {
     setState(() => _isCarMenuOpen = false);
-    if (canDrive) {
+    final latestSession = ref.read(authControllerProvider).value;
+    final isDriverNow = canDrive ||
+        (latestSession is Authenticated && latestSession.user.isDriver);
+
+    if (isDriverNow) {
       setState(() {
         _currentMode = AppRideMode.driver;
         _currentTabIndex = 0;
@@ -322,6 +328,36 @@ class _HomePageState extends ConsumerState<HomePage> {
     } else {
       _showLockedDriverWarning();
     }
+  }
+
+  void _handleCloseDriverFormSheet() {
+    setState(() {
+      _currentMode = AppRideMode.passenger;
+      _destinationLocation = null;
+      _destinationAddress = '';
+      _tripRoutePoints = null;
+    });
+  }
+
+  Future<void> _handleDriverDestinationSelected(
+    String address,
+    LatLng position,
+  ) async {
+    setState(() {
+      _destinationAddress = address;
+      _destinationLocation = position;
+    });
+    try {
+      final points = await GoogleMapsService.computeRoutes(
+        origin: _pickupLocation,
+        destination: position,
+      );
+      if (mounted && points.isNotEmpty) {
+        setState(() {
+          _tripRoutePoints = points;
+        });
+      }
+    } catch (_) {}
   }
 
   Future<void> _handleStartDriverShift(DriverShiftPayload payload) async {
@@ -611,11 +647,12 @@ class _HomePageState extends ConsumerState<HomePage> {
             pickupAddress: _pickupAddress,
             destinationAddress: _destinationAddress,
             showTrajectory:
-                _currentMode.isPassenger &&
-                (_passengerStep == PassengerRideStep.routeConfirmation ||
-                    _passengerStep == PassengerRideStep.driverList ||
-                    _passengerStep == PassengerRideStep.waitingDriver ||
-                    _passengerStep == PassengerRideStep.driverAccepted),
+                (_currentMode.isDriver && _destinationLocation != null) ||
+                (_currentMode.isPassenger &&
+                    (_passengerStep == PassengerRideStep.routeConfirmation ||
+                        _passengerStep == PassengerRideStep.driverList ||
+                        _passengerStep == PassengerRideStep.waitingDriver ||
+                        _passengerStep == PassengerRideStep.driverAccepted)),
             tripRoutePoints: _tripRoutePoints,
             driverApproachRoutePoints: _driverApproachRoutePoints,
             isDraggingPin:
@@ -651,6 +688,8 @@ class _HomePageState extends ConsumerState<HomePage> {
               },
               onStartShift: _handleStartDriverShift,
               onSaveRoute: _handleSaveRoute,
+              onClose: _handleCloseDriverFormSheet,
+              onDestinationSelected: _handleDriverDestinationSelected,
             ),
           )
         else if (_passengerStep != PassengerRideStep.idle)

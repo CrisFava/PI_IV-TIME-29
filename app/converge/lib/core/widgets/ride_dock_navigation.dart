@@ -146,13 +146,22 @@ class _RideDockNavigationState extends State<RideDockNavigation>
                           widget.onRequestRide();
                         },
                         canDrive: widget.canDrive,
-                        onLockedDriverTap: widget.onLockedDriverTap,
+                        onLockedDriverTap: () {
+                          _handleToggle();
+                          if (widget.onLockedDriverTap != null) {
+                            widget.onLockedDriverTap!();
+                          } else {
+                            widget.onStartDriverShift();
+                          }
+                        },
                         onStartDriverShift: () {
                           _handleToggle();
                           if (widget.canDrive) {
                             widget.onStartDriverShift();
+                          } else if (widget.onLockedDriverTap != null) {
+                            widget.onLockedDriverTap!();
                           } else {
-                            widget.onLockedDriverTap?.call();
+                            widget.onStartDriverShift();
                           }
                         },
                         onClose: _handleToggle,

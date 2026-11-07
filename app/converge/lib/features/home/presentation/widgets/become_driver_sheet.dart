@@ -188,7 +188,6 @@ class _BecomeDriverSheetState extends ConsumerState<BecomeDriverSheet> {
         _currentStep = _DriverSetupStep.success;
         _simulationProgress = 1.0;
       });
-      widget.onSuccess?.call();
     } catch (e, st) {
       debugPrint('[BecomeDriverSheet] Falha na ativação do motorista: $e\n$st');
       if (!mounted) return;
@@ -1011,6 +1010,7 @@ class _BecomeDriverSheetState extends ConsumerState<BecomeDriverSheet> {
               onPressed: () {
                 HapticFeedback.lightImpact();
                 Navigator.of(context).pop(true);
+                widget.onSuccess?.call();
               },
               style: FilledButton.styleFrom(
                 backgroundColor: AppColors.primary,

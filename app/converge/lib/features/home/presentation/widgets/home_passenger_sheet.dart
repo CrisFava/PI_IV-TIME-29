@@ -11,6 +11,7 @@ import '../../../../core/config/styles.dart';
 import '../../../ride/data/models/mock_driver_model.dart';
 import '../../../route/data/models/route_response_model.dart';
 import '../../../route/state/saved_routes_controller.dart';
+import 'home_driver_form_sheet.dart';
 
 /// ============================================================================
 /// COMPONENTE: HomePassengerSheet (Fluxo de Solicitação do Passageiro)
@@ -81,16 +82,44 @@ class HomePassengerSheet extends ConsumerStatefulWidget {
 }
 
 class _HomePassengerSheetState extends ConsumerState<HomePassengerSheet> {
+  final _pickupSearchController = TextEditingController();
   final _searchController = TextEditingController();
+
+  Future<void> _handlePickupSuggestionSelected(
+    PlaceSuggestionModel suggestion,
+  ) async {
+    HapticFeedback.lightImpact();
+    FocusScope.of(context).unfocus();
+    final details = await ref
+        .read(placesAutocompleteProvider.notifier)
+        .getPlaceDetails(suggestion.placeId);
+    if (details != null && mounted) {
+      _pickupSearchController.clear();
+      ref.read(placesAutocompleteProvider.notifier).clear();
+      widget.onPickupChosen(
+        details.address,
+        LatLng(details.latitude, details.longitude),
+      );
+    } else if (mounted) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text('Não foi possível obter detalhes deste endereço.'),
+        ),
+      );
+    }
+  }
 
   Future<void> _handleDestinationSuggestionSelected(
     PlaceSuggestionModel suggestion,
   ) async {
     HapticFeedback.lightImpact();
+    FocusScope.of(context).unfocus();
     final details = await ref
         .read(placesAutocompleteProvider.notifier)
         .getPlaceDetails(suggestion.placeId);
     if (details != null && mounted) {
+      _searchController.clear();
+      ref.read(placesAutocompleteProvider.notifier).clear();
       widget.onDestinationChosen(
         details.address,
         LatLng(details.latitude, details.longitude),
@@ -106,6 +135,7 @@ class _HomePassengerSheetState extends ConsumerState<HomePassengerSheet> {
 
   @override
   void dispose() {
+    _pickupSearchController.dispose();
     _searchController.dispose();
     super.dispose();
   }
@@ -915,6 +945,8 @@ class _HomePassengerSheetState extends ConsumerState<HomePassengerSheet> {
   // PASSO 1: SELEÇÃO DO PONTO DE EMBARQUE (ORIGEM)
   // ==========================================================================
   Widget _buildSelectPickupSheet() {
+    final autocompleteState = ref.watch(placesAutocompleteProvider);
+
     return DraggableScrollableSheet(
       initialChildSize: 0.54,
       minChildSize: 0.34,
@@ -1035,6 +1067,159 @@ class _HomePassengerSheetState extends ConsumerState<HomePassengerSheet> {
                       ),
                     ),
                     const SizedBox(height: 12),
+
+                    // Campo de Busca de Embarque com Autocomplete (debounce de 1s) e Lupa Animada
+                    Container(
+                      decoration: BoxDecoration(
+                        color: AppColors.neutralLight,
+                        borderRadius: BorderRadius.circular(16),
+                        border: Border.all(color: AppColors.borderSubtle),
+                      ),
+                      child: TextField(
+                        controller: _pickupSearchController,
+                        autofocus: false,
+                        style: const TextStyle(
+                          fontSize: 14.5,
+                          fontWeight: FontWeight.w600,
+                          color: AppColors.textPrimary,
+                        ),
+                        decoration: InputDecoration(
+                          prefixIcon: const Icon(
+                            Icons.pin_drop_rounded,
+                            color: AppColors.textPrimary,
+                            size: 20,
+                          ),
+                          suffixIcon: autocompleteState.isLoading
+                              ? const FloatingSearchLensIcon(
+                                  key: ValueKey('pickup_floating_search_lens'),
+                                )
+                              : _pickupSearchController.text.isNotEmpty
+                                  ? IconButton(
+                                      icon: const Icon(
+                                        Icons.clear_rounded,
+                                        size: 18,
+                                        color: AppColors.textSecondary,
+                                      ),
+                                      onPressed: () {
+                                        _pickupSearchController.clear();
+                                        ref
+                                            .read(
+                                              placesAutocompleteProvider
+                                                  .notifier,
+                                            )
+                                            .clear();
+                                        setState(() {});
+                                      },
+                                    )
+                                  : const Icon(
+                                      Icons.search_rounded,
+                                      size: 20,
+                                      color: AppColors.textMuted,
+                                    ),
+                          hintText: 'Pesquisar outro endereço de embarque...',
+                          hintStyle: const TextStyle(
+                            fontSize: 13.5,
+                            color: AppColors.textPlaceholder,
+                          ),
+                          border: InputBorder.none,
+                          contentPadding: const EdgeInsets.symmetric(
+                            horizontal: 14,
+                            vertical: 14,
+                          ),
+                        ),
+                        onChanged: (text) {
+                          setState(() {});
+                          ref
+                              .read(placesAutocompleteProvider.notifier)
+                              .onQueryChanged(text);
+                        },
+                      ),
+                    ),
+                    const SizedBox(height: 12),
+
+                    if (autocompleteState.suggestions.isNotEmpty) ...[
+                      const Text(
+                        'Sugestões de Endereço',
+                        style: TextStyle(
+                          fontSize: 13,
+                          fontWeight: FontWeight.w800,
+                          color: AppColors.textPrimary,
+                        ),
+                      ),
+                      const SizedBox(height: 8),
+                      ...autocompleteState.suggestions.map((suggestion) {
+                        return Padding(
+                          padding: const EdgeInsets.only(bottom: 8),
+                          child: Material(
+                            color: AppColors.cardBackground,
+                            borderRadius: BorderRadius.circular(14),
+                            child: InkWell(
+                              borderRadius: BorderRadius.circular(14),
+                              onTap: () =>
+                                  _handlePickupSuggestionSelected(suggestion),
+                              child: Container(
+                                padding: const EdgeInsets.symmetric(
+                                  horizontal: 14,
+                                  vertical: 12,
+                                ),
+                                decoration: BoxDecoration(
+                                  borderRadius: BorderRadius.circular(14),
+                                  border: Border.all(
+                                    color: AppColors.borderSubtle,
+                                  ),
+                                ),
+                                child: Row(
+                                  children: [
+                                    const Icon(
+                                      Icons.location_on_rounded,
+                                      color: AppColors.primary,
+                                      size: 20,
+                                    ),
+                                    const SizedBox(width: 12),
+                                    Expanded(
+                                      child: Column(
+                                        crossAxisAlignment:
+                                            CrossAxisAlignment.start,
+                                        children: [
+                                          Text(
+                                            suggestion.mainText,
+                                            style: const TextStyle(
+                                              fontSize: 14,
+                                              fontWeight: FontWeight.w700,
+                                              color: AppColors.textPrimary,
+                                            ),
+                                          ),
+                                          if (suggestion
+                                              .secondaryText
+                                              .isNotEmpty) ...[
+                                            const SizedBox(height: 2),
+                                            Text(
+                                              suggestion.secondaryText,
+                                              style: const TextStyle(
+                                                fontSize: 12,
+                                                color: AppColors.textSecondary,
+                                              ),
+                                              maxLines: 1,
+                                              overflow: TextOverflow.ellipsis,
+                                            ),
+                                          ],
+                                        ],
+                                      ),
+                                    ),
+                                    const Icon(
+                                      Icons.chevron_right_rounded,
+                                      color: AppColors.iconMuted,
+                                      size: 20,
+                                    ),
+                                  ],
+                                ),
+                              ),
+                            ),
+                          ),
+                        );
+                      }),
+                      const SizedBox(height: 8),
+                    ],
 
                     // Botão estilo Uber: "Ajustar embarque no mapa"
                     Material(
@@ -1353,49 +1538,6 @@ class _HomePassengerSheetState extends ConsumerState<HomePassengerSheet> {
                 padding: EdgeInsets.fromLTRB(16, 4, 16, 120 + widget.bottomSafeArea),
                 sliver: SliverList(
                   delegate: SliverChildListDelegate([
-                    // Pill indicando o embarque já definido
-                    GestureDetector(
-                      onTap: () {
-                        HapticFeedback.lightImpact();
-                        widget.onStartRideFlow(); // Volta para trocar o embarque
-                      },
-                      child: Container(
-                        padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
-                        decoration: BoxDecoration(
-                          color: AppColors.neutralLight,
-                          borderRadius: BorderRadius.circular(12),
-                          border: Border.all(color: AppColors.borderSubtle),
-                        ),
-                        child: Row(
-                          children: [
-                            const _OriginOpaqueDotBadge(size: 14),
-                            const SizedBox(width: 8),
-                            Expanded(
-                              child: Text(
-                                'Embarque: ',
-                                style: const TextStyle(
-                                  fontSize: 12,
-                                  fontWeight: FontWeight.w600,
-                                  color: AppColors.textPrimary,
-                                ),
-                                maxLines: 1,
-                                overflow: TextOverflow.ellipsis,
-                              ),
-                            ),
-                            const Text(
-                              'Alterar',
-                              style: TextStyle(
-                                fontSize: 11.5,
-                                fontWeight: FontWeight.w700,
-                                color: AppColors.textSecondary,
-                              ),
-                            ),
-                          ],
-                        ),
-                      ),
-                    ),
-                    const SizedBox(height: 12),
-
                     // Cabeçalho com botão Voltar
                     Row(
                       children: [
@@ -1450,32 +1592,32 @@ class _HomePassengerSheetState extends ConsumerState<HomePassengerSheet> {
                         ),
                         decoration: InputDecoration(
                           prefixIcon: const Icon(
-                            Icons.search_rounded,
-                            color: AppColors.textSecondary,
-                            size: 22,
+                            Icons.pin_drop_rounded,
+                            color: AppColors.textPrimary,
+                            size: 20,
                           ),
                           suffixIcon: autocompleteState.isLoading
-                              ? const SizedBox(
-                                  width: 20,
-                                  height: 20,
-                                  child: Padding(
-                                    padding: EdgeInsets.all(12),
-                                    child: CircularProgressIndicator(
-                                      strokeWidth: 2,
-                                      color: AppColors.primary,
-                                    ),
-                                  ),
+                              ? const FloatingSearchLensIcon(
+                                  key: ValueKey('passenger_floating_search_lens'),
                                 )
                               : _searchController.text.isNotEmpty
                                   ? IconButton(
-                                      icon: const Icon(Icons.clear_rounded, size: 18),
+                                      icon: const Icon(
+                                        Icons.clear_rounded,
+                                        size: 18,
+                                        color: AppColors.textSecondary,
+                                      ),
                                       onPressed: () {
                                         _searchController.clear();
                                         ref.read(placesAutocompleteProvider.notifier).clear();
                                         setState(() {});
                                       },
                                     )
-                                  : null,
+                                  : const Icon(
+                                      Icons.search_rounded,
+                                      size: 20,
+                                      color: AppColors.textMuted,
+                                    ),
                           hintText: 'Digite o endereço ou destino...',
                           hintStyle: const TextStyle(
                             fontSize: 13.5,
@@ -1552,43 +1694,10 @@ class _HomePassengerSheetState extends ConsumerState<HomePassengerSheet> {
                       ),
                     ),
 
-                    if (autocompleteState.isLoading) ...[
-                      const SizedBox(height: 14),
-                      Container(
-                        padding: const EdgeInsets.all(12),
-                        decoration: BoxDecoration(
-                          color: AppColors.neutralLight,
-                          borderRadius: BorderRadius.circular(12),
-                          border: Border.all(color: AppColors.borderSubtle),
-                        ),
-                        child: const Row(
-                          children: [
-                            SizedBox(
-                              width: 14,
-                              height: 14,
-                              child: CircularProgressIndicator(
-                                strokeWidth: 2,
-                                color: AppColors.primary,
-                              ),
-                            ),
-                            SizedBox(width: 10),
-                            Text(
-                              'Consultando endereços no servidor...',
-                              style: TextStyle(
-                                fontSize: 12,
-                                color: AppColors.textSecondary,
-                                fontWeight: FontWeight.w600,
-                              ),
-                            ),
-                          ],
-                        ),
-                      ),
-                    ],
-
                     if (autocompleteState.suggestions.isNotEmpty) ...[
                       const SizedBox(height: 16),
                       const Text(
-                        'Sugestões de Endereço (Google Places via Backend)',
+                        'Sugestões de Endereço',
                         style: TextStyle(
                           fontSize: 13,
                           fontWeight: FontWeight.w800,
