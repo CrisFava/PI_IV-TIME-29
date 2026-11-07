@@ -1,30 +1,22 @@
 // Autor: Allan Giovanni Matias Paes - RA 25008211
 
 enum PixKeyType {
-  cpf,
-  email,
-  phone,
-  random;
+  cpf('CPF', 'CPF'),
+  email('EMAIL', 'E-mail'),
+  phone('PHONE', 'Telefone'),
+  random('RANDOM', 'Chave Aleatória');
 
-  String toJson() => switch (this) {
-    cpf => 'CPF',
-    email => 'EMAIL',
-    phone => 'PHONE',
-    random => 'RANDOM',
-  };
+  const PixKeyType(this.code, this.label);
+  final String code;
+  final String label;
 
-  static PixKeyType? fromJson(String? value) => switch (value?.toUpperCase()) {
-    'CPF' => cpf,
-    'EMAIL' => email,
-    'PHONE' => phone,
-    'RANDOM' => random,
-    _ => null,
-  };
+  String toJson() => code;
 
-  String get label => switch (this) {
-    cpf => 'CPF',
-    email => 'E-mail',
-    phone => 'Telefone',
-    random => 'Chave Aleatória',
-  };
+  static PixKeyType? fromJson(String? value) {
+    final upper = value?.toUpperCase();
+    for (final t in values) {
+      if (t.code == upper) return t;
+    }
+    return null;
+  }
 }

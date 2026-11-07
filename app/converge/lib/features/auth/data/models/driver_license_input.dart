@@ -1,32 +1,12 @@
 // Autor: Allan Giovanni Matias Paes - RA 25008211
 
 enum DriverLicenseCategory {
-  a,
-  b,
-  ab,
-  c,
-  d,
-  e;
+  a, b, ab, c, d, e;
 
-  String toJson() => switch (this) {
-    a => 'A',
-    b => 'B',
-    ab => 'AB',
-    c => 'C',
-    d => 'D',
-    e => 'E',
-  };
+  String toJson() => name.toUpperCase();
 
   static DriverLicenseCategory? fromJson(String? value) =>
-      switch (value?.toUpperCase()) {
-        'A' => a,
-        'B' => b,
-        'AB' => ab,
-        'C' => c,
-        'D' => d,
-        'E' => e,
-        _ => null,
-      };
+      values.asNameMap()[value?.toLowerCase()];
 
   String get label => toJson();
 }
