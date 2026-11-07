@@ -5,6 +5,9 @@ import 'package:converge/core/services/auth/auth_providers.dart';
 import 'package:converge/features/auth/data/repository/auth_repository_impl.dart';
 import 'package:converge/features/auth/state/auth_action_controller.dart';
 import 'package:converge/features/auth/state/auth_controller.dart';
+import 'package:converge/features/auth/state/become_driver_controller.dart';
+import 'package:converge/features/auth/data/models/driver_license_input.dart';
+import 'package:converge/features/auth/data/models/pix_key_type.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:converge/core/services/auth/auth_exception.dart';
@@ -261,5 +264,178 @@ void main() {
       container.read(authControllerProvider).value,
       isA<Unauthenticated>(),
     );
+  });
+  group('becomeDriver', () {
+    test('promove o usu?rio autenticado a motorista com sucesso', () async {
+      auth = FakeAuthService(
+        initialUser: const AuthUser(
+          uid: 'uid-1',
+          email: 'ana@puc.edu.br',
+          emailVerified: true,
+        ),
+      );
+      repository = FakeAuthRepository(stored: fakeUser());
+      final container = createContainer();
+      await container.read(authControllerProvider.future);
+
+      final initialSession =
+          container.read(authControllerProvider).value as Authenticated;
+      expect(initialSession.user.isDriver, isFalse);
+
+      final updated =
+          await container.read(authControllerProvider.notifier).becomeDriver();
+      expect(updated.isDriver, isTrue);
+
+      final currentSession =
+          container.read(authControllerProvider).value as Authenticated;
+      expect(currentSession.user.isDriver, isTrue);
+    });
+
+    test('repassa erro se a chamada ao backend falhar', () async {
+      auth = FakeAuthService(
+        initialUser: const AuthUser(
+          uid: 'uid-1',
+          email: 'ana@puc.edu.br',
+          emailVerified: true,
+        ),
+      );
+      repository = FakeAuthRepository(stored: fakeUser())
+        ..becomeDriverError = ApiException.fromStatus(500);
+      final container = createContainer();
+      await container.read(authControllerProvider.future);
+
+      expect(
+        () => container.read(authControllerProvider.notifier).becomeDriver(),
+        throwsA(isA<ApiException>()),
+      );
+    });
+
+    test('BecomeDriverController ativa motorista e gerencia estado', () async {
+      auth = FakeAuthService(
+        initialUser: const AuthUser(
+          uid: 'uid-1',
+          email: 'ana@puc.edu.br',
+          emailVerified: true,
+        ),
+      );
+      repository = FakeAuthRepository(stored: fakeUser());
+      final container = createContainer();
+      await container.read(authControllerProvider.future);
+
+      final ok =
+          await container.read(becomeDriverProvider.notifier).becomeDriver();
+      expect(ok, isTrue);
+
+      final session =
+          container.read(authControllerProvider).value as Authenticated;
+      expect(session.user.isDriver, isTrue);
+    });
+
+    test('updatePixKey atualiza chave PIX e tipo na sess?o', () async {
+      auth = FakeAuthService(
+        initialUser: const AuthUser(
+          uid: 'uid-1',
+          email: 'ana@puc.edu.br',
+          emailVerified: true,
+        ),
+      );
+      repository = FakeAuthRepository(stored: fakeUser());
+      final container = createContainer();
+      await container.read(authControllerProvider.future);
+
+      final updated = await container
+          .read(authControllerProvider.notifier)
+          .updatePixKey(
+            pixKey: '123.456.789-00',
+            pixKeyType: PixKeyType.cpf,
+          );
+
+      expect(updated.pixKey, '123.456.789-00');
+      expect(updated.pixKeyType, PixKeyType.cpf);
+
+      final session =
+          container.read(authControllerProvider).value as Authenticated;
+      expect(session.user.pixKey, '123.456.789-00');
+      expect(session.user.pixKeyType, PixKeyType.cpf);
+    });
+
+    test('activateDriverAtomic cadastra PIX e ativa motorista atomicamente', () async {
+      auth = FakeAuthService(
+        initialUser: const AuthUser(
+          uid: 'uid-1',
+          email: 'ana@puc.edu.br',
+          emailVerified: true,
+        ),
+      );
+      repository = FakeAuthRepository(stored: fakeUser());
+      final container = createContainer();
+      await container.read(authControllerProvider.future);
+
+      final ok = await container
+          .read(becomeDriverProvider.notifier)
+          .activateDriverAtomic(
+            pixKey: 'ana@puc.edu.br',
+            pixKeyType: PixKeyType.email,
+            license: DriverLicenseInput(
+              number: '12345678901',
+              category: DriverLicenseCategory.b,
+              expiresAt: DateTime(2028, 12, 31),
+            ),
+            verificationDelay: Duration.zero,
+          );
+
+      expect(ok, isTrue);
+      expect(repository.lastSubmittedLicense, isNotNull);
+      expect(repository.lastSubmittedLicense!.number, '12345678901');
+
+      final session =
+          container.read(authControllerProvider).value as Authenticated;
+      expect(session.user.isDriver, isTrue);
+      expect(session.user.pixKey, 'ana@puc.edu.br');
+      expect(session.user.pixKeyType, PixKeyType.email);
+    });
+    test('submitDriverLicense envia carteira de motorista', () async {
+      auth = FakeAuthService(
+        initialUser: const AuthUser(
+          uid: 'uid-1',
+          email: 'ana@puc.edu.br',
+          emailVerified: true,
+        ),
+      );
+      repository = FakeAuthRepository(stored: fakeUser());
+      final container = createContainer();
+      await container.read(authControllerProvider.future);
+
+      final license = DriverLicenseInput(
+        number: '12345678901',
+        category: DriverLicenseCategory.ab,
+        expiresAt: DateTime(2030, 1, 1),
+      );
+      await container
+          .read(authControllerProvider.notifier)
+          .submitDriverLicense(license);
+
+      expect(repository.lastSubmittedLicense, license);
+    });
+
+    test('validateCpf retorna resultado do validador', () async {
+      auth = FakeAuthService(
+        initialUser: const AuthUser(
+          uid: 'uid-1',
+          email: 'ana@puc.edu.br',
+          emailVerified: true,
+        ),
+      );
+      repository = FakeAuthRepository(stored: fakeUser());
+      final container = createContainer();
+      await container.read(authControllerProvider.future);
+
+      final result = await container
+          .read(authControllerProvider.notifier)
+          .validateCpf('123.456.789-00');
+
+      expect(result.valid, isTrue);
+      expect(result.message, 'CPF válido.');
+    });
   });
 }

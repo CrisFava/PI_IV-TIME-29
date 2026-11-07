@@ -16,7 +16,7 @@ import static com.converge.api.shared.infrastructure.config.customization.Color.
 @Component
 public class Setup {
 
-    private static final boolean ONLY_BACKEND  = true;
+    private static final boolean ONLY_BACKEND  = false;
 
 
     @PostConstruct

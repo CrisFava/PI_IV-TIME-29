@@ -2,6 +2,7 @@
 
 import 'academic_record_model.dart';
 import 'participation_role.dart';
+import 'pix_key_type.dart';
 
 /// Perfil do usuário na plataforma, conforme `CreateUserResponseDTO`.
 ///
@@ -16,6 +17,8 @@ class UserModel {
   final String? photoUrl;
   final Set<ParticipationRole> participationRoles;
   final AcademicRecordModel academicRecord;
+  final String? pixKey;
+  final PixKeyType? pixKeyType;
   final bool active;
 
   const UserModel({
@@ -27,6 +30,8 @@ class UserModel {
     required this.photoUrl,
     required this.participationRoles,
     required this.academicRecord,
+    this.pixKey,
+    this.pixKeyType,
     required this.active,
   });
 
@@ -46,6 +51,8 @@ class UserModel {
     academicRecord: AcademicRecordModel.fromJson(
       json['academicRecord'] as Map<String, dynamic>,
     ),
+    pixKey: json['pixKey'] as String?,
+    pixKeyType: PixKeyType.fromJson(json['pixKeyType'] as String?),
     active: json['active'] as bool? ?? true,
   );
 }

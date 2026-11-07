@@ -279,7 +279,6 @@ public class User {
     }
 
     public void updateProfile(
-
             String name,
             String phone,
             @Nullable String photoUrl,

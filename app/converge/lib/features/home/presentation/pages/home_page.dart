@@ -4,6 +4,9 @@ import 'package:converge/features/home/presentation/widgets/home_driver_form_she
 import 'package:converge/features/home/presentation/widgets/home_mode_selector_header.dart';
 import 'package:converge/features/home/presentation/widgets/home_passenger_sheet.dart';
 import 'package:converge/features/home/presentation/widgets/home_real_map_background.dart';
+
+import '../widgets/become_driver_sheet.dart';
+
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
@@ -241,8 +244,9 @@ class _HomePageState extends ConsumerState<HomePage> {
         route.destination.longitude,
       );
       if (route.encodedPolyline != null && route.encodedPolyline!.isNotEmpty) {
-        _tripRoutePoints =
-            GoogleMapsService.decodePolyline(route.encodedPolyline!);
+        _tripRoutePoints = GoogleMapsService.decodePolyline(
+          route.encodedPolyline!,
+        );
       } else {
         _tripRoutePoints = [];
       }
@@ -282,10 +286,16 @@ class _HomePageState extends ConsumerState<HomePage> {
 
   void _showLockedDriverWarning() {
     HapticFeedback.mediumImpact();
-    _showFeedback(
-      'Apenas usuários habilitados como motoristas podem iniciar expediente. Redirecionando para o seu perfil...',
+    showBecomeDriverSheet(
+      context: context,
+      onSuccess: () {
+        _showFeedback('Parab?ns! Modo Motorista ativado com sucesso.');
+        setState(() {
+          _currentMode = AppRideMode.driver;
+          _currentTabIndex = 0;
+        });
+      },
     );
-    _onTabSelected(3); // Redireciona imediatamente para a aba de Perfil
   }
 
   void _onRequestRide() {
@@ -655,7 +665,9 @@ class _HomePageState extends ConsumerState<HomePage> {
               selectedDriver: _selectedDriver,
               bottomSafeArea: bottomPadding,
               onStartRideFlow: () {
-                setState(() => _passengerStep = PassengerRideStep.chooseRouteOption);
+                setState(
+                  () => _passengerStep = PassengerRideStep.chooseRouteOption,
+                );
                 ref.read(savedRoutesProvider.notifier).loadMyRoutes();
               },
               onChooseMapOption: () {
@@ -989,7 +1001,8 @@ class _HomePageState extends ConsumerState<HomePage> {
                 ),
               ),
 
-              const SizedBox(height: 18),
+              const SizedBox(height: 16),
+
               const Divider(color: AppColors.neutralLight),
               const SizedBox(height: 10),
               _buildProfileRow('Telefone', user.phone.toString()),

@@ -1,10 +1,16 @@
 // Autor: Cristian Eduardo Fava - RA 25000636
+// Coautor: Allan Giovanni Matias Paes - RA 25008211
 
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../../core/network/api_exception.dart';
 import '../../../core/services/auth/auth_providers.dart';
 import '../../../core/services/auth/auth_service.dart';
+// ---
+import '../data/models/cpf_validation_result.dart';
+import '../data/models/driver_license_input.dart';
+import '../data/models/pix_key_type.dart';
+// ---
 import '../data/models/user_model.dart';
 import '../data/repository/auth_repository.dart';
 import '../data/repository/auth_repository_impl.dart';
@@ -83,6 +89,59 @@ class AuthController extends AsyncNotifier<AuthSession> {
     if (user == null) return;
     state = AsyncData(await _loadSession(user));
   }
+
+  /// Atualiza a chave PIX do usuário autenticado (`PUT /users/me`).
+  Future<UserModel> updatePixKey({
+    required String pixKey,
+    required PixKeyType pixKeyType,
+  }) async {
+    final currentSession = state.value;
+    if (currentSession is! Authenticated) {
+      throw const AuthException(
+        'not-authenticated',
+        'Usuário não autenticado.',
+      );
+    }
+    final user = currentSession.user;
+    final phone = _normalizePhone(user.phone);
+    final updated = await _repository.updateProfile(
+      name: user.name,
+      phone: phone,
+      photoUrl: user.photoUrl,
+      pixKey: pixKey,
+      pixKeyType: pixKeyType,
+    );
+    state = AsyncData(Authenticated(updated));
+    return updated;
+  }
+
+  static String _normalizePhone(String raw) {
+    final digits = raw.replaceAll(RegExp(r'\D'), '');
+    if (digits.length == 11) {
+      return '(${digits.substring(0, 2)}) ${digits.substring(2, 7)}-${digits.substring(7)}';
+    } else if (digits.length == 10) {
+      return '(${digits.substring(0, 2)}) ${digits.substring(2, 6)}-${digits.substring(6)}';
+    }
+    return raw;
+  }
+
+  /// Envia a Carteira de Motorista (`POST /users/me/driver-license`).
+  Future<UserModel> submitDriverLicense(DriverLicenseInput license) async {
+    final updated = await _repository.submitDriverLicense(license);
+    state = AsyncData(Authenticated(updated));
+    return updated;
+  }
+
+  /// Promove o usuário autenticado a motorista chamando `POST /users/me/driver`.
+  Future<UserModel> becomeDriver() async {
+    final updated = await _repository.becomeDriver();
+    state = AsyncData(Authenticated(updated));
+    return updated;
+  }
+
+  /// Valida o CPF através do Socket Server TCP via backend.
+  Future<CpfValidationResult> validateCpf(String cpf) =>
+      _repository.validateCpf(cpf);
 
   Future<void> sendPasswordResetEmail(String email) =>
       _auth.sendPasswordResetEmail(email);

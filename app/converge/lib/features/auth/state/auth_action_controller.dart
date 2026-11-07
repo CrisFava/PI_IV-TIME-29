@@ -1,5 +1,7 @@
 // Autor: Cristian Eduardo Fava - RA 25000636
 
+// Coautor: Allan Giovanni Matias Paes - RA 25008211 (métodos: becomeDriver())
+
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../../core/network/api_exception.dart';
@@ -32,6 +34,8 @@ class AuthActionController extends Notifier<AsyncValue<void>> {
 
   Future<bool> completeProfile(ProfileInput profile) =>
       _run(() => _session.completeProfile(profile));
+
+  Future<bool> becomeDriver() => _run(_session.becomeDriver);
 
   Future<bool> sendPasswordResetEmail(String email) =>
       _run(() => _session.sendPasswordResetEmail(email));

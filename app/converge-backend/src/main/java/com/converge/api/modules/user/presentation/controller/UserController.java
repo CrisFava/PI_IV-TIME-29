@@ -3,11 +3,10 @@
 package com.converge.api.modules.user.presentation.controller;
 
 import com.converge.api.modules.user.application.CreateUserUseCase;
+import com.converge.api.modules.user.application.dto.*;
 import com.converge.api.modules.user.domain.model.user.User;
-import com.converge.api.modules.user.application.dto.CreateUserRequestDTO;
-import com.converge.api.modules.user.application.dto.CreateUserResponseDTO;
-import com.converge.api.modules.user.application.dto.SubmitDriverLicenseCommand;
 import com.converge.api.modules.user.application.mapper.UserMapper;
+import com.converge.api.modules.user.application.ValidateCpfUseCase;
 import com.converge.api.shared.application.UserUtils;
 import com.converge.api.shared.infrastructure.config.auth.AuthenticatedUser;
 import com.converge.api.shared.presentation.exception.ApplicationException;
@@ -24,14 +23,11 @@ import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RestController;
 import com.converge.api.modules.user.application.UpdateUserUseCase;
-import com.converge.api.modules.user.application.dto.UpdateUserRequestDTO;
-import com.converge.api.modules.user.application.dto.UpdateUserCommand;
 import org.springframework.web.bind.annotation.PutMapping;
 import com.converge.api.modules.user.application.DeleteUserUseCase;
 import org.springframework.web.bind.annotation.DeleteMapping;
 import com.converge.api.modules.user.application.BecomeDriverUseCase;
 import com.converge.api.modules.user.application.SubmitDriverLicenseUseCase;
-import com.converge.api.modules.user.application.dto.DriverLicenseRequestDTO;
 
 @RestController
 @RequestMapping("/api/v1/users")
@@ -45,6 +41,7 @@ public class UserController {
     private final DeleteUserUseCase deleteUser;
     private final BecomeDriverUseCase becomeDriver;
     private final SubmitDriverLicenseUseCase submitDriverLicense;
+    private final ValidateCpfUseCase validateCpf;
 
     @PostMapping
     public ResponseEntity<ApplicationResponse<CreateUserResponseDTO>> createUser(
@@ -132,5 +129,13 @@ public class UserController {
         User user = submitDriverLicense.execute(new SubmitDriverLicenseCommand(principal.uid(), request));
 
         return ResponseEntity.ok(ApplicationResponse.success(mapper.toResponse(user)));
+    }
+
+    @PostMapping("/validate-cpf")
+    public ResponseEntity<ApplicationResponse<CpfValidationResponseDTO>> validateCpf(
+            @Valid @RequestBody CpfValidationRequestDTO request
+    ) {
+        CpfValidationResponseDTO result = validateCpf.execute(request);
+        return ResponseEntity.ok(ApplicationResponse.success(result));
     }
 }
