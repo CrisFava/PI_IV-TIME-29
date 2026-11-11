@@ -10,6 +10,9 @@ import jakarta.validation.Valid;
 
 import java.time.LocalDateTime;
 
+/**
+ * Estrutura agregada de reputação do usuário separada por papel (motorista e passageiro).
+ */
 public record Reputation(
         @Valid
         DriverReputation driver,
@@ -26,5 +29,26 @@ public record Reputation(
                 new DriverReputation(null, 0.0, 0, driverWindow, now),
                 new PassengerReputation(null, 0.0, 0, passengerWindow, now)
         );
+    }
+
+    public Reputation withDriverCancellation(LocalDateTime now) {
+        DriverReputation currentDriver = driver != null
+                ? driver
+                : defaultInitial().driver();
+        return new Reputation(currentDriver.recordCancellation(now), passenger);
+    }
+
+    public Reputation withPassengerLateCancellation(LocalDateTime now) {
+        PassengerReputation currentPassenger = passenger != null
+                ? passenger
+                : defaultInitial().passenger();
+        return new Reputation(driver, currentPassenger.recordLateCancellation(now));
+    }
+
+    public Reputation withPassengerNoShow(LocalDateTime now) {
+        PassengerReputation currentPassenger = passenger != null
+                ? passenger
+                : defaultInitial().passenger();
+        return new Reputation(driver, currentPassenger.recordNoShow(now));
     }
 }

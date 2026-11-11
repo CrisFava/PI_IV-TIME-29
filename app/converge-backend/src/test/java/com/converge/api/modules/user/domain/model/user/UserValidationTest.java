@@ -2,13 +2,21 @@
 
 package com.converge.api.modules.user.domain.model.user;
 
+import com.converge.api.modules.user.domain.enums.user.Badge;
 import com.converge.api.modules.user.domain.enums.user.DriverLicenseCategory;
 import com.converge.api.modules.user.domain.enums.user.ParticipationRole;
 import com.converge.api.modules.user.domain.enums.user.PixKeyType;
+import com.converge.api.modules.user.domain.enums.user.ReputationLevel;
 import com.converge.api.modules.user.domain.enums.user.VerificationMethod;
 import com.converge.api.modules.user.domain.enums.user.VerificationStatus;
 import com.converge.api.modules.user.domain.model.user.subtypes.AcademicRecord;
+import com.converge.api.modules.user.domain.model.user.subtypes.Reputation;
+import com.converge.api.modules.user.domain.model.user.subtypes.UserBadge;
 import com.converge.api.modules.user.domain.model.user.subtypes.driver.DriverLicense;
+import com.converge.api.modules.user.domain.model.user.subtypes.driver.DriverReputation;
+import com.converge.api.modules.user.domain.model.user.subtypes.driver.DriverWindow;
+import com.converge.api.modules.user.domain.model.user.subtypes.passenger.PassengerReputation;
+import com.converge.api.modules.user.domain.model.user.subtypes.passenger.PassengerWindow;
 import jakarta.validation.*;
 import org.junit.jupiter.api.BeforeAll;
 import org.junit.jupiter.api.DisplayName;
@@ -230,5 +238,59 @@ class UserValidationTest {
         Set<ConstraintViolation<User>> violations = validator.validate(user);
 
         assertThat(violations).anyMatch(v -> v.getMessage().equals("INVALID_VERIFICATION_DATE"));
+    }
+
+    @Test
+    @DisplayName("Deve incrementar cancelamentos do motorista e revogar selo TRUST ao ultrapassar limite")
+    void shouldIncrementDriverCancellationsAndRevokeTrustBadgeWhenExceedingLimit() {
+        User user = createValidUser();
+        LocalDateTime now = LocalDateTime.now();
+        user.setReputation(new Reputation(
+                new DriverReputation(ReputationLevel.HIGH, 4.8, 12, new DriverWindow(15, 2, 0, 0), now),
+                new PassengerReputation(ReputationLevel.HIGH, 4.5, 6, new PassengerWindow(6, 0, 0, 0, 0), now)
+        ));
+        user.addBadge(new UserBadge(Badge.TRUST, now.minusDays(5)));
+
+        user.recordDriverCancellation(now);
+
+        assertThat(user.getReputation().driver().window().driverInitiatedCancellations()).isEqualTo(3);
+        assertThat(user.getReputation().driver().level()).isEqualTo(ReputationLevel.LOW);
+        assertThat(user.getBadges()).noneMatch(b -> b.badge() == Badge.TRUST);
+    }
+
+    @Test
+    @DisplayName("Deve incrementar cancelamentos tardios do passageiro e revogar selo TRUST ao ultrapassar limite")
+    void shouldIncrementPassengerLateCancellationsAndRevokeTrustBadgeWhenExceedingLimit() {
+        User user = createValidUser();
+        LocalDateTime now = LocalDateTime.now();
+        user.setReputation(new Reputation(
+                new DriverReputation(null, 0.0, 0, new DriverWindow(0, 0, 0, 0), now),
+                new PassengerReputation(ReputationLevel.HIGH, 4.5, 6, new PassengerWindow(6, 2, 0, 0, 0), now)
+        ));
+        user.addBadge(new UserBadge(Badge.TRUST, now.minusDays(5)));
+
+        user.recordPassengerLateCancellation(now);
+
+        assertThat(user.getReputation().passenger().window().lateCancellations()).isEqualTo(3);
+        assertThat(user.getReputation().passenger().level()).isEqualTo(ReputationLevel.LOW);
+        assertThat(user.getBadges()).noneMatch(b -> b.badge() == Badge.TRUST);
+    }
+
+    @Test
+    @DisplayName("Deve incrementar ausências do passageiro e revogar selo TRUST ao ultrapassar limite")
+    void shouldIncrementPassengerNoShowsAndRevokeTrustBadgeWhenExceedingLimit() {
+        User user = createValidUser();
+        LocalDateTime now = LocalDateTime.now();
+        user.setReputation(new Reputation(
+                new DriverReputation(null, 0.0, 0, new DriverWindow(0, 0, 0, 0), now),
+                new PassengerReputation(ReputationLevel.HIGH, 4.5, 6, new PassengerWindow(6, 0, 1, 0, 0), now)
+        ));
+        user.addBadge(new UserBadge(Badge.TRUST, now.minusDays(5)));
+
+        user.recordPassengerNoShow(now);
+
+        assertThat(user.getReputation().passenger().window().noShows()).isEqualTo(2);
+        assertThat(user.getReputation().passenger().level()).isEqualTo(ReputationLevel.LOW);
+        assertThat(user.getBadges()).noneMatch(b -> b.badge() == Badge.TRUST);
     }
 }
