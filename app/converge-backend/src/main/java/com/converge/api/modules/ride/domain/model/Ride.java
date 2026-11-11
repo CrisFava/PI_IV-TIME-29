@@ -39,8 +39,12 @@ import java.util.ArrayList;
 import java.util.Collections;
 import java.util.HashSet;
 import java.util.List;
+import java.util.Map;
 import java.util.Set;
 
+/**
+ * Entidade raiz que representa uma viagem compartilhada, seus participantes, custos e ciclo de vida.
+ */
 @Document(collection = "rides")
 @NoArgsConstructor(access = AccessLevel.PROTECTED)
 @Getter
@@ -186,6 +190,18 @@ public class Ride {
         return Collections.unmodifiableSet(this.weekDays);
     }
 
+    public boolean isFull() {
+        return this.availableSeats == 0;
+    }
+
+    public List<String> confirmedPassengerIds() {
+        return this.participants.stream()
+                .filter(participant -> participant.getRole() == ParticipationRole.PASSENGER)
+                .filter(participant -> participant.getStatus() == ParticipantStatus.CONFIRMED)
+                .map(Participant::getUserId)
+                .toList();
+    }
+
     private void validateSequentialNumber(int sequentialNumber) {
         if (sequentialNumber < 1) {
             throw new ApplicationException(
@@ -254,7 +270,7 @@ public class Ride {
                 .forEach(participant -> participant.cancel(reason, false, now));
     }
 
-    public void leave(String passengerId, @Nullable String reason) {
+    public boolean leave(String passengerId, @Nullable String reason) {
         if (this.status != RideStatus.AWAITING_CONFIRMATION && this.status != RideStatus.CONFIRMED) {
             throw new ApplicationException(
                     ErrorCode.BAD_REQUEST,
@@ -263,7 +279,23 @@ public class Ride {
             );
         }
 
-        Participant passenger = this.participants.stream()
+        Participant passenger = findActivePassenger(passengerId);
+        LocalDateTime now = LocalDateTime.now();
+        boolean wasConfirmed = passenger.getStatus() == ParticipantStatus.CONFIRMED;
+        boolean late = wasConfirmed && isWithinLateWindow(now);
+
+        passenger.cancel(reason, late, now);
+
+        if (wasConfirmed) {
+            this.availableSeats++;
+        }
+
+        downgradeToAwaitingIfNoConfirmedLeft();
+        return late;
+    }
+
+    private Participant findActivePassenger(String passengerId) {
+        return this.participants.stream()
                 .filter(participant -> participant.getRole() == ParticipationRole.PASSENGER)
                 .filter(participant -> participant.getUserId().equals(passengerId))
                 .filter(this::isActive)
@@ -273,17 +305,13 @@ public class Ride {
                         "Você não tem participação ativa nesta viagem como passageiro.",
                         Set.of("passengerId")
                 ));
+    }
 
-        LocalDateTime now = LocalDateTime.now();
-        boolean wasConfirmed = passenger.getStatus() == ParticipantStatus.CONFIRMED;
-        boolean late = wasConfirmed && now.isAfter(this.departureDateTime.minusHours(2));
+    private boolean isWithinLateWindow(LocalDateTime now) {
+        return now.isAfter(this.departureDateTime.minusHours(2));
+    }
 
-        passenger.cancel(reason, late, now);
-
-        if (wasConfirmed) {
-            this.availableSeats++;
-        }
-
+    private void downgradeToAwaitingIfNoConfirmedLeft() {
         boolean hasConfirmedPassenger = this.participants.stream()
                 .anyMatch(participant -> participant.getRole() == ParticipationRole.PASSENGER
                         && participant.getStatus() == ParticipantStatus.CONFIRMED);
@@ -345,6 +373,46 @@ public class Ride {
         this.completedAt = now;
     }
 
+    public void applyCostEstimates(RideCosts updatedCosts, Map<String, BigDecimal> estimatesByPassenger) {
+        if (updatedCosts != null) {
+            this.costs = updatedCosts;
+        }
+        if (estimatesByPassenger == null || estimatesByPassenger.isEmpty()) {
+            return;
+        }
+
+        LocalDateTime now = LocalDateTime.now();
+        this.participants.stream()
+                .filter(participant -> participant.getRole() == ParticipationRole.PASSENGER)
+                .filter(participant -> participant.getStatus() == ParticipantStatus.CONFIRMED)
+                .forEach(participant -> {
+                    BigDecimal amount = estimatesByPassenger.get(participant.getUserId());
+                    if (amount != null) {
+                        participant.updateEstimatedAmount(amount, now);
+                    }
+                });
+    }
+
+    public void applyFinalAmounts(RideCosts finalCosts, Map<String, BigDecimal> finalAmountsByPassenger) {
+        if (finalCosts != null) {
+            this.costs = finalCosts;
+        }
+        if (finalAmountsByPassenger == null || finalAmountsByPassenger.isEmpty()) {
+            return;
+        }
+
+        LocalDateTime now = LocalDateTime.now();
+        this.participants.stream()
+                .filter(participant -> participant.getRole() == ParticipationRole.PASSENGER
+                        && participant.getStatus() == ParticipantStatus.COMPLETED)
+                .forEach(participant -> {
+                    BigDecimal amount = finalAmountsByPassenger.get(participant.getUserId());
+                    if (amount != null) {
+                        participant.defineFinalAmount(amount, now);
+                    }
+                });
+    }
+
     private void validateInProgress() {
         if (this.status != RideStatus.IN_PROGRESS) {
             throw new ApplicationException(
@@ -385,6 +453,18 @@ public class Ride {
             Place boardingLocation,
             Place dropOffLocation
     ) {
+        validateCanRequestSeat(passengerId);
+
+        this.participants.add(Participant.passengerRequest(
+                passengerId,
+                passengerRouteId,
+                boardingLocation,
+                dropOffLocation,
+                LocalDateTime.now()
+        ));
+    }
+
+    private void validateCanRequestSeat(String passengerId) {
         if (this.status != RideStatus.AWAITING_CONFIRMATION && this.status != RideStatus.CONFIRMED) {
             throw new ApplicationException(
                     ErrorCode.BAD_REQUEST,
@@ -441,27 +521,18 @@ public class Ride {
                     Set.of("availableSeats")
             );
         }
-
-        this.participants.add(Participant.passengerRequest(
-                passengerId,
-                passengerRouteId,
-                boardingLocation,
-                dropOffLocation,
-                LocalDateTime.now()
-        ));
     }
 
     public void acceptPassenger(String passengerId) {
-        this.validateCanRespondToRequests();
+        acceptPassenger(passengerId, null, null);
+    }
 
-        if (this.departureDateTime.isBefore(LocalDateTime.now())) {
-            throw new ApplicationException(
-                    ErrorCode.BAD_REQUEST,
-                    "O horário de saída já passou e não é mais possível aceitar passageiros.",
-                    Set.of("departureDateTime")
-            );
-        }
-
+    public void acceptPassenger(
+            String passengerId,
+            @Nullable Double detourGeneratedKm,
+            @Nullable BigDecimal maxAmount
+    ) {
+        validateCanAccept();
         Participant passenger = this.findRequestedPassenger(passengerId);
 
         if (this.availableSeats < 1) {
@@ -472,20 +543,49 @@ public class Ride {
             );
         }
 
-        passenger.confirm(LocalDateTime.now());
+        passenger.confirm(detourGeneratedKm, maxAmount, LocalDateTime.now());
         this.availableSeats--;
         this.status = RideStatus.CONFIRMED;
+        openChatRoomIfNeeded();
+    }
 
+    private void validateCanAccept() {
+        this.validateCanRespondToRequests();
+
+        if (this.departureDateTime.isBefore(LocalDateTime.now())) {
+            throw new ApplicationException(
+                    ErrorCode.BAD_REQUEST,
+                    "O horário de saída já passou e não é mais possível aceitar passageiros.",
+                    Set.of("departureDateTime")
+            );
+        }
+    }
+
+    private void openChatRoomIfNeeded() {
         if (this.chatRoomId == null && this.id != null) {
             this.chatRoomId = "ride_" + this.id.toHexString();
         }
     }
 
-    public void rejectPassenger(String passengerId, @Nullable String reason) {
+    public boolean rejectPassenger(String passengerId, @Nullable String reason) {
         this.validateCanRespondToRequests();
-        Participant passenger = this.findRequestedPassenger(passengerId);
+        Participant passenger = findActivePassengerForDriverAction(passengerId);
+        LocalDateTime now = LocalDateTime.now();
 
-        passenger.reject(reason, LocalDateTime.now());
+        if (passenger.getStatus() == ParticipantStatus.CONFIRMED) {
+            passenger.cancel(reason, false, now);
+            this.availableSeats++;
+            downgradeToAwaitingIfNoConfirmedLeft();
+            return true;
+        }
+
+        passenger.reject(reason, now);
+        return false;
+    }
+
+    public void expireRequest(String passengerId) {
+        Participant passenger = findRequestedPassenger(passengerId);
+        passenger.expire(LocalDateTime.now());
     }
 
     private void validateCanRespondToRequests() {
@@ -496,6 +596,19 @@ public class Ride {
                     Set.of("status")
             );
         }
+    }
+
+    private Participant findActivePassengerForDriverAction(String passengerId) {
+        return this.participants.stream()
+                .filter(participant -> participant.getRole() == ParticipationRole.PASSENGER)
+                .filter(participant -> participant.getUserId().equals(passengerId))
+                .filter(this::isActive)
+                .findFirst()
+                .orElseThrow(() -> new ApplicationException(
+                        ErrorCode.BAD_REQUEST,
+                        "Não há pedido de vaga pendente deste passageiro.",
+                        Set.of("passengerId")
+                ));
     }
 
     private Participant findRequestedPassenger(String passengerId) {
@@ -509,5 +622,4 @@ public class Ride {
                         Set.of("passengerId")
                 ));
     }
-
 }
