@@ -14,6 +14,7 @@ import com.converge.api.modules.ride.domain.enums.RideStatus;
 import com.converge.api.modules.ride.domain.model.Ride;
 import com.converge.api.modules.ride.domain.model.subtypes.VehicleSnapshot;
 import com.converge.api.modules.ride.domain.repository.RideRepository;
+import com.converge.api.modules.ride.infrastructure.RideCostCalculator;
 import com.converge.api.modules.route.domain.model.subtypes.Coordinates;
 import com.converge.api.modules.route.domain.model.subtypes.Place;
 import com.converge.api.modules.user.application.RecordReputationPenaltyUseCase;

@@ -1,6 +1,6 @@
 // Autor: Allan Giovanni Matias Paes - RA 25008211
 
-package com.converge.api.modules.ride.application;
+package com.converge.api.modules.ride.infrastructure;
 
 import com.converge.api.modules.ride.domain.model.Ride;
 import com.converge.api.modules.ride.domain.model.subtypes.Participant;
@@ -15,6 +15,10 @@ import com.converge.api.modules.user.domain.enums.vehicle.EnergySource;
 import com.converge.api.modules.user.domain.enums.vehicle.VehicleType;
 import com.converge.api.modules.user.domain.model.vehicle.Vehicle;
 import com.converge.api.modules.user.domain.model.vehicle.subtypes.FuelSource;
+import com.converge.socket.core.SocketServer;
+import com.converge.socket.handler.ride.RideCostHandler;
+import com.converge.socket.handler.ride.RideCostRequest;
+import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
@@ -23,6 +27,7 @@ import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 
 import java.math.BigDecimal;
+import java.net.ServerSocket;
 import java.time.DayOfWeek;
 import java.time.LocalDateTime;
 import java.util.List;
@@ -33,7 +38,7 @@ import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.Mockito.when;
 
 /**
- * Testes unitários para cálculo de desvio de rota, valor máximo (teto) e rateio de custos da viagem.
+ * Testes de integração entre RideCostCalculator na camada de infraestrutura e o Socket Server TCP (RideCostHandler).
  */
 @ExtendWith(MockitoExtension.class)
 class RideCostCalculatorTest {
@@ -44,6 +49,7 @@ class RideCostCalculatorTest {
     @Mock
     private VehicleAccess vehicleAccess;
 
+    private SocketServer server;
     private RideCostCalculator calculator;
 
     private final Place driverOrigin = Place.of("Origem Motorista", "Centro", "Campinas", new Coordinates(-22.90, -47.06));
@@ -52,8 +58,26 @@ class RideCostCalculatorTest {
     private final Place dropOff = Place.of("Desembarque Passageiro", "Barão Geraldo", "Campinas", new Coordinates(-22.84, -47.05));
 
     @BeforeEach
-    void setUp() {
-        calculator = new RideCostCalculator(routeGeometryService, vehicleAccess);
+    void setUp() throws Exception {
+        int testPort = findFreePort();
+        server = new SocketServer(testPort);
+        server.registerHandler(RideCostRequest.class, new RideCostHandler());
+        server.start();
+
+        calculator = new RideCostCalculator(routeGeometryService, vehicleAccess, "localhost", testPort);
+    }
+
+    @AfterEach
+    void tearDown() {
+        if (server != null && server.isRunning()) {
+            server.stop();
+        }
+    }
+
+    private int findFreePort() throws Exception {
+        try (ServerSocket socket = new ServerSocket(0)) {
+            return socket.getLocalPort();
+        }
     }
 
     private Vehicle sampleVehicle() {
@@ -89,8 +113,8 @@ class RideCostCalculatorTest {
     }
 
     @Test
-    @DisplayName("Deve calcular o desvio gerado e o valor máximo (metade do custo da rota com o desvio)")
-    void shouldComputeDetourAndMaxAmountOnConfirmationQuote() {
+    @DisplayName("Deve calcular via Socket Server o desvio gerado e o valor máximo na confirmação")
+    void shouldComputeDetourAndMaxAmountOnConfirmationQuoteViaSocketServer() {
         Ride ride = sampleRide(new BigDecimal("4.00"), BigDecimal.ZERO);
         ride.requestSeat("passenger-1", "route-p1", boarding, dropOff);
 
@@ -107,8 +131,8 @@ class RideCostCalculatorTest {
     }
 
     @Test
-    @DisplayName("Deve recalcular o valor estimado dividindo entre motorista e passageiros confirmados e reduzindo com novo passageiro")
-    void shouldRecalculateEstimatedSharesWhenPassengersJoinOrLeave() {
+    @DisplayName("Deve recalcular via Socket Server o valor estimado dividindo entre motorista e passageiros confirmados")
+    void shouldRecalculateEstimatedSharesWhenPassengersJoinOrLeaveViaSocketServer() {
         Ride ride = sampleRide(new BigDecimal("4.00"), BigDecimal.ZERO);
         ride.requestSeat("passenger-1", "route-p1", boarding, dropOff);
         ride.requestSeat("passenger-2", "route-p2", boarding, dropOff);
@@ -136,8 +160,8 @@ class RideCostCalculatorTest {
     }
 
     @Test
-    @DisplayName("Deve calcular os valores finais na conclusão respeitando o valor máximo de cada passageiro")
-    void shouldCalculateFinalSharesRespectingMaxAmount() {
+    @DisplayName("Deve calcular via Socket Server os valores finais na conclusão respeitando o valor máximo")
+    void shouldCalculateFinalSharesRespectingMaxAmountViaSocketServer() {
         Ride ride = sampleRide(new BigDecimal("10.00"), BigDecimal.ZERO);
         ride.requestSeat("passenger-1", "route-p1", boarding, dropOff);
         ride.acceptPassenger("passenger-1", 2.0, new BigDecimal("6.00"));

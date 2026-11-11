@@ -5,6 +5,7 @@ package com.converge.api.modules.ride.application;
 import com.converge.api.modules.ride.application.dto.PassengerRequestCommand;
 import com.converge.api.modules.ride.domain.model.Ride;
 import com.converge.api.modules.ride.domain.repository.RideRepository;
+import com.converge.api.modules.ride.infrastructure.RideCostCalculator;
 import com.converge.api.modules.user.application.RecordReputationPenaltyUseCase;
 import com.converge.api.shared.application.AuditLogService;
 import com.converge.api.shared.application.UseCase;

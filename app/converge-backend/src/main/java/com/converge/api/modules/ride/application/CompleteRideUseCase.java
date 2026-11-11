@@ -6,6 +6,7 @@ import com.converge.api.modules.ride.application.dto.RideRefCommand;
 import com.converge.api.modules.ride.domain.enums.RideStatus;
 import com.converge.api.modules.ride.domain.model.Ride;
 import com.converge.api.modules.ride.domain.repository.RideRepository;
+import com.converge.api.modules.ride.infrastructure.RideCostCalculator;
 import com.converge.api.shared.application.UseCase;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
