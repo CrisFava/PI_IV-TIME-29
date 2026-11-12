@@ -15,6 +15,7 @@ public class CompleteRideUseCase implements UseCase<RideRefCommand, Ride> {
 
     private final RideAccess rideAccess;
     private final RideRepository rideRepository;
+    private final RideCompletionPublisher completionPublisher;
 
     @Override
     public Ride execute(RideRefCommand command) {
@@ -22,6 +23,9 @@ public class CompleteRideUseCase implements UseCase<RideRefCommand, Ride> {
 
         ride.complete();
 
-        return rideRepository.save(ride);
+        Ride saved = rideRepository.save(ride);
+        completionPublisher.publish(saved);
+
+        return saved;
     }
 }
