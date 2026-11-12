@@ -21,6 +21,8 @@ public interface RideRepository extends MongoRepository<Ride, ObjectId> {
 
     List<Ride> findByParticipantsUserId(String userId);
 
+    List<Ride> findByStatusAndCompletedAtAfter(RideStatus status, LocalDateTime completedAfter);
+
     Optional<Ride> findByDriverRouteIdAndDepartureDateTimeAndStatusNot(
         String driverRouteId, LocalDateTime departureDateTime, RideStatus status);
 }

@@ -12,6 +12,7 @@ import lombok.Getter;
 
 import java.io.ObjectInputStream;
 import java.io.ObjectOutputStream;
+import java.net.InetSocketAddress;
 import java.net.Socket;
 
 @Getter
@@ -30,11 +31,19 @@ public class SocketClient implements AutoCloseable {
     }
 
     public SocketClient(String host, int port) throws ServerException {
+        this(host, port, 0);
+    }
+
+    // timeoutMillis > 0 limita a conexão e cada leitura; 0 mantém a espera sem limite.
+    public SocketClient(String host, int port, int timeoutMillis) throws ServerException {
         this.host = host != null ? host : DEFAULT_HOST;
         this.port = port > 0 ? port : DEFAULT_PORT;
 
         try {
-            this.socket = new Socket(this.host, this.port);
+            this.socket = new Socket();
+            this.socket.connect(new InetSocketAddress(this.host, this.port), Math.max(timeoutMillis, 0));
+            // Antes de criar os streams: o ObjectInputStream já lê o cabeçalho do servidor.
+            this.socket.setSoTimeout(Math.max(timeoutMillis, 0));
 
             // Transmissor deve dar flush primeiro pra enviar o header
             ObjectOutputStream transmitter = new ObjectOutputStream(this.socket.getOutputStream());

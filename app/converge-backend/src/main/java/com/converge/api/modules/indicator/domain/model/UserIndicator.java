@@ -54,6 +54,10 @@ public class UserIndicator {
 
     private Instant updatedAt;
 
+    // Viagens já somadas neste documento: impede contar a mesma viagem duas vezes ao reprocessar.
+    // Mantido aqui para um save() da entidade não apagar a lista gravada pelo IndicatorStore.
+    private List<String> appliedRideIds = new ArrayList<>();
+
     // Cria um indicador zerado para um usuário/período.
     public UserIndicator(String userId, IndicatorPeriod period, String reference) {
         validateIdentity(userId, period, reference);

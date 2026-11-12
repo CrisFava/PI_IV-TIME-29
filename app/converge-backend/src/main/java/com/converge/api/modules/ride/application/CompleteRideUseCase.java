@@ -7,14 +7,17 @@ import com.converge.api.modules.ride.domain.model.Ride;
 import com.converge.api.modules.ride.domain.repository.RideRepository;
 import com.converge.api.shared.application.UseCase;
 import lombok.RequiredArgsConstructor;
+import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
 
+@Slf4j
 @Service
 @RequiredArgsConstructor
 public class CompleteRideUseCase implements UseCase<RideRefCommand, Ride> {
 
     private final RideAccess rideAccess;
     private final RideRepository rideRepository;
+    private final RideCompletionPublisher completionPublisher;
 
     @Override
     public Ride execute(RideRefCommand command) {
@@ -22,6 +25,16 @@ public class CompleteRideUseCase implements UseCase<RideRefCommand, Ride> {
 
         ride.complete();
 
-        return rideRepository.save(ride);
+        Ride saved = rideRepository.save(ride);
+
+        // A viagem já está gravada como concluída, que é o registro durável. Se os indicadores
+        // falharem aqui, o CompletedRidesIndicatorReconciler reprocessa a viagem depois.
+        try {
+            completionPublisher.publish(saved);
+        } catch (RuntimeException e) {
+            log.warn("Indicadores da viagem {} ficam para o reprocessamento: {}", command.rideId(), e.getMessage());
+        }
+
+        return saved;
     }
 }

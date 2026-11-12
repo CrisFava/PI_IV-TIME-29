@@ -47,14 +47,15 @@ class DefaultFirebaseOptions {
     appId: '1:292298986011:android:f4adc5989ea1bfa2d65ebe',
     messagingSenderId: '292298986011',
     projectId: 'es-pi-iv-2026',
+    databaseURL: 'https://es-pi-iv-2026-default-rtdb.firebaseio.com',
     storageBucket: 'es-pi-iv-2026.firebasestorage.app',
   );
-
   static const FirebaseOptions ios = FirebaseOptions(
     apiKey: 'AIzaSyD2lyaZ2ea58Dr5MgLHZKiE969sB6Cm8Ik',
     appId: '1:292298986011:ios:8a559cb27ff744f6d65ebe',
     messagingSenderId: '292298986011',
     projectId: 'es-pi-iv-2026',
+    databaseURL: 'https://es-pi-iv-2026-default-rtdb.firebaseio.com',
     storageBucket: 'es-pi-iv-2026.firebasestorage.app',
     iosBundleId: 'br.edu.puccampinas.converge',
   );

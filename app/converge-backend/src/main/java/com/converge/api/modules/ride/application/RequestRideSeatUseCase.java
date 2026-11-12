@@ -156,7 +156,7 @@ public class RequestRideSeatUseCase implements UseCase<RequestRideSeatCommand, R
             arrival = arrival.plusDays(1);
         }
 
-        return new Ride(
+        Ride ride = new Ride(
                 nextSequentialNumber(driverId),
                 driverId,
                 vehicle.getId().toHexString(),
@@ -171,6 +171,13 @@ public class RequestRideSeatUseCase implements UseCase<RequestRideSeatCommand, R
                 driverRoute.getToll(),
                 driverRoute.getParking()
         );
+
+        vehicle.getFuelSources().stream()
+                .findFirst()
+                .ifPresent(fuel -> ride.recordFuel(
+                        fuel.energySource(), fuel.averageConsumption(), fuel.currentEnergyPrice()));
+
+        return ride;
     }
 
     private Vehicle loadVehicle(Route route, String driverId) {
