@@ -84,6 +84,28 @@ class PixPayloadHandlerTest {
     }
 
     @Test
+    @DisplayName("Deve recusar valor com fração de centavo em vez de arredondar")
+    void shouldRejectFractionOfCent() {
+        assertThrows(ServerException.class, () -> payloadOf("12345678909", "10.005", "Ana Lima", "Campinas"));
+    }
+
+    @Test
+    @DisplayName("Valor com zeros sobrando nas casas decimais continua válido")
+    void shouldAcceptTrailingZeros() throws ServerException {
+        String payload = payloadOf("12345678909", "10.5000", "Ana Lima", "Campinas");
+
+        assertTrue(payload.contains("540510.50"));
+    }
+
+    @Test
+    @DisplayName("Nome sem letras latinas usa o nome padrão do recebedor")
+    void shouldUseFallbackNameWhenNothingIsLeftAfterSanitizing() throws ServerException {
+        String payload = payloadOf("12345678909", "10.00", "山田太郎", "Campinas");
+
+        assertTrue(payload.contains("5918MOTORISTA CONVERGE"));
+    }
+
+    @Test
     @DisplayName("Deve recusar chave PIX ou nome do recebedor em branco")
     void shouldRejectBlankKeyOrReceiverName() {
         assertThrows(ServerException.class, () -> payloadOf(" ", "5.00", "Ana Lima", "Campinas"));

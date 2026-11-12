@@ -31,6 +31,8 @@ public class PixPayloadHandler implements RequestHandler<PixPayloadRequest, PixP
     private static final int MAX_CITY_LENGTH = 15;
     private static final int MAX_KEY_LENGTH = 77;
     private static final String DEFAULT_CITY = "BRASIL";
+    // Usado quando o nome existe mas não sobra nenhuma letra latina depois de limpar (ex.: só ideogramas).
+    private static final String FALLBACK_RECEIVER_NAME = "MOTORISTA CONVERGE";
     private static final BigDecimal MAX_AMOUNT = new BigDecimal("999999.99");
 
     @Override
@@ -48,10 +50,19 @@ public class PixPayloadHandler implements RequestHandler<PixPayloadRequest, PixP
         if (amount == null || amount.signum() <= 0 || amount.compareTo(MAX_AMOUNT) > 0) {
             throw invalid("O valor da cobrança deve ser maior que zero e de no máximo " + MAX_AMOUNT + ".");
         }
+        // Frações de centavo não existem no PIX: recusa em vez de arredondar sem avisar.
+        if (amount.stripTrailingZeros().scale() > 2) {
+            throw invalid("O valor da cobrança deve ter no máximo 2 casas decimais.");
+        }
 
-        String name = sanitize(request.getReceiverName(), MAX_NAME_LENGTH);
-        if (name.isEmpty()) {
+        String rawName = request.getReceiverName();
+        if (rawName == null || rawName.isBlank()) {
             throw invalid("O nome do recebedor é obrigatório.");
+        }
+
+        String name = sanitize(rawName, MAX_NAME_LENGTH);
+        if (name.isEmpty()) {
+            name = FALLBACK_RECEIVER_NAME;
         }
 
         String city = sanitize(request.getReceiverCity(), MAX_CITY_LENGTH);
@@ -63,7 +74,7 @@ public class PixPayloadHandler implements RequestHandler<PixPayloadRequest, PixP
                 + field("26", field("00", PIX_GUI) + field("01", key))
                 + MERCHANT_CATEGORY_CODE
                 + CURRENCY_BRL
-                + field("54", amount.setScale(2, RoundingMode.HALF_EVEN).toPlainString())
+                + field("54", amount.setScale(2, RoundingMode.UNNECESSARY).toPlainString())
                 + COUNTRY_BR
                 + field("59", name)
                 + field("60", city)
