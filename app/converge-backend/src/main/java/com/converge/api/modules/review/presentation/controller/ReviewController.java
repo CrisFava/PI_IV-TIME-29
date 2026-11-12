@@ -3,6 +3,8 @@
 package com.converge.api.modules.review.presentation.controller;
 
 import com.converge.api.modules.review.application.CreateReviewUseCase;
+import com.converge.api.modules.review.application.ListReviewsGivenInRideQuery;
+import com.converge.api.modules.review.application.ListReviewsGivenInRideUseCase;
 import com.converge.api.modules.review.application.ListReviewsReceivedUseCase;
 import com.converge.api.modules.review.application.dto.CreateReviewRequestDTO;
 import com.converge.api.modules.review.application.dto.ReviewResponseDTO;
@@ -34,6 +36,7 @@ public class ReviewController {
 
     private final CreateReviewUseCase createReview;
     private final ListReviewsReceivedUseCase listReviewsReceived;
+    private final ListReviewsGivenInRideUseCase listReviewsGivenInRide;
     private final UserUtils userUtils;
 
     // Cria uma avaliação. Quem avalia é o usuário logado.
@@ -59,6 +62,21 @@ public class ReviewController {
     ) {
         List<ReviewResponseDTO> reviews = listReviewsReceived
                 .execute(new ListReviewsReceivedUseCase.Query(userId, role))
+                .stream()
+                .map(ReviewResponseDTO::from)
+                .toList();
+        return ResponseEntity.ok(ApplicationResponse.success(reviews));
+    }
+
+    // Lista as avaliações que o usuário logado já fez em uma viagem.
+    // Ex.: GET /api/v1/reviews/given?rideId={rideId}
+    @GetMapping("/given")
+    public ResponseEntity<ApplicationResponse<List<ReviewResponseDTO>>> listGivenInRide(
+            @AuthenticationPrincipal AuthenticatedUser principal,
+            @RequestParam String rideId
+    ) {
+        List<ReviewResponseDTO> reviews = listReviewsGivenInRide
+                .execute(new ListReviewsGivenInRideQuery(rideId, currentUserId(principal)))
                 .stream()
                 .map(ReviewResponseDTO::from)
                 .toList();
