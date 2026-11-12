@@ -62,6 +62,12 @@ abstract final class AppColors {
   static const Color mapWater = Color(0xFFB0B6BF); // Água em cinza grafite médio
   static const Color driverApproachRoute = Color(0xFF94A3B8); // Cinza suave para trajeto do motorista
 
+  // Chat e Avaliações
+  static const Color chatBubbleMine = Color(0xFF111111);
+  static const Color chatBubbleOther = Color(0xFFF1F5F9);
+  static const Color ratingStar = Color(0xFFF59E0B);
+  static const Color ratingStarEmpty = Color(0xFFCBD5E1);
+
   // Itens de Navegação (Dock)
   static const Color dockItemActive = Colors.white;
   static const Color dockItemInactive = Color(0xFFA1A1AA); // Mais claro e legível quando não selecionado

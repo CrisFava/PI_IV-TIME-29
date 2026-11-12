@@ -7,6 +7,8 @@
 > Coordenadas geográficas são armazenadas no formato **GeoJSON `Point`** exigido pelo índice `2dsphere` do MongoDB: `{ "type": "Point", "coordinates": [longitude, latitude] }` — **longitude sempre antes da latitude**.
 > **Datas e horas:** todos os campos `ISODate` são armazenados em **UTC**. Campos de hora recorrente (`departureTime`, `estimatedArrivalTime`) são `String "HH:mm"` interpretados no fuso oficial da aplicação (**America/Sao_Paulo**). Ao combinar uma data concreta com um horário recorrente para gerar `departureDateTime`, a conversão para UTC deve usar explicitamente America/Sao_Paulo — nunca o fuso do servidor.
 > **Chat:** as mensagens entre participantes **não ficam no MongoDB** — vivem no **Firebase Realtime Database**, conforme a arquitetura do projeto (comunicação em tempo real). O MongoDB guarda apenas o identificador da sala de conversa quando necessário (ex.: um `chatRoomId` na viagem para localizar o histórico no Firebase). Por isso não há coleção `messages`/`chat` nesta modelagem.
+>
+> Estrutura no Realtime Database: `chats/{chatRoomId}/{passengerId}/messages/{pushId}`, com os campos `senderId`, `senderName`, `senderUid`, `type` (`TEXT`, `PAYMENT_REQUEST`, `PAYMENT_CONFIRMED`, `SYSTEM`), `text`, `amount` e `sentAt` (horário do servidor). O `chatRoomId` é criado quando o motorista aceita o primeiro passageiro, e cada passageiro aceito tem uma conversa particular com o motorista. As mensagens de pagamento e de viagem são só avisos: a fonte de verdade continua sendo a API. As regras de acesso ficam em `app/converge/database.rules.json`.
 > **Pagamento PIX:** no MVP o pagamento usa **QR Code PIX estático** ("Pix Copia e Cola"), gerado pelo próprio backend, sem gateway e sem API externa. O valor da cobrança vai travado dentro do payload e o dinheiro vai direto da conta do passageiro para a do motorista — o Converge nunca toca no dinheiro. Como o banco não devolve nenhuma confirmação ao servidor, a confirmação de recebimento é **manual** (o motorista marca que recebeu). A verificação automática via gateway (QR Code dinâmico + webhook) fica como evolução futura.
 
 ---
@@ -426,6 +428,9 @@ Quando `active = false` (conta suspensa ou excluída):
       "finalAmount": "Decimal128 | null",
       "paymentStatus": "PENDING | AWAITING_DRIVER_CONFIRMATION | PAID | NOT_APPLICABLE",
       "paymentConfirmedByDriver": "Boolean",
+      "requestedAmount": "Decimal128 | null (valor combinado no chat)",
+      "paymentRequestedAt": "ISODate | null",
+      "paidAt": "ISODate | null",
       "confirmedAt": "ISODate",
       "cancelledAt": "ISODate | null",
       "updatedAt": "ISODate"
@@ -465,6 +470,17 @@ Quando `active = false` (conta suspensa ou excluída):
 - Todo pagamento no Converge é **por viagem**, via PIX, incluindo as viagens de passageiros com vínculo recorrente. Não há cobrança mensal consolidada nem valor fixo pré-combinado.
 - A chave PIX do motorista (`users.pixKey`) e o valor de cada participante são exibidos ao fim da viagem. O passageiro paga e o motorista confirma o recebimento (`participants[].paymentConfirmedByDriver`).
 - O prazo para pagar cada viagem é de **3 dias**; depois disso a cobrança vira dívida vencida (ver regra de inadimplência na coleção `users`).
+
+### Cobrança combinada no chat (MVP)
+
+Depois que o motorista aceita o passageiro, os dois combinam o valor no chat. A cobrança segue estes passos:
+
+1. **Solicitar pagamento** — `POST /rides/{rideId}/passengers/{passengerId}/payment/request` com `{ "amount": "12.50" }`. Só o motorista da viagem, com chave PIX cadastrada. Grava `requestedAmount` e `paymentRequestedAt` e deixa `paymentStatus = PENDING`. O valor não pode passar do `maxAmount` quando este estiver definido. Pode ser repetido para corrigir o valor enquanto não estiver pago.
+2. **Pix Copia e Cola** — gerado sob demanda pelo **Servidor Java de sockets** (`PixPayloadHandler`, padrão BR Code com CRC16) a partir da chave do motorista e do `requestedAmount`. Nada é armazenado; se o servidor estiver fora do ar, o backend executa o mesmo handler localmente.
+3. **Passageiro já pagou** — `POST /rides/{rideId}/passengers/{passengerId}/payment/confirm`. Só o motorista. Grava `paymentStatus = PAID`, `paymentConfirmedByDriver = true` e `paidAt`.
+4. **Consulta** — `GET /rides/{rideId}/passengers/{passengerId}/payment`. Só o motorista e o próprio passageiro. O código PIX só vem enquanto a cobrança está em aberto.
+
+A cobrança é aceita com a viagem `CONFIRMED`, `IN_PROGRESS` ou `COMPLETED`, sempre de um passageiro com vaga (`CONFIRMED` ou `COMPLETED`). Passageiro ausente (`NO_SHOW`) não é cobrado.
 
 ### Geração do PIX Copia e Cola
 
