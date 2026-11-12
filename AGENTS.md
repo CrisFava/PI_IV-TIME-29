@@ -4,6 +4,24 @@
 
 ---
 
+## 0. Leitura Obrigatória de Todos os `.md` do Projeto
+
+> ⚠️ **REGRA INEGOCIÁVEL**: Antes de realizar **qualquer ação** neste repositório (planejar, responder sobre o código, criar, alterar ou remover arquivos, rodar comandos que mudem algo), o agente **DEVE ler todos os arquivos `.md` do projeto**, não só este.
+
+As regras do projeto estão espalhadas nesses arquivos e valem tanto quanto este documento: arquitetura, modelagem do banco, requisitos e guias locais de cada módulo. Um exemplo é o guia de handlers do servidor de sockets (`app/server/src/main/java/com/converge/socket/handler/LEIA_ANTES_DE_CRIAR_HANDLER.md`).
+
+Para listar todos os `.md` versionados:
+
+```bash
+git ls-files '*.md'
+```
+
+Arquivos `.md` novos que ainda não foram commitados também contam (`git ls-files --others --exclude-standard '*.md'`). A pasta `graphify-out/` é gerada automaticamente e fica de fora.
+
+Se um `.md` contradisser outro, siga o mais específico para a pasta em que você está trabalhando e avise o usuário sobre a divergência.
+
+---
+
 ## 1. Documentação de Arquitetura Obrigatória
 
 Antes de planejar, criar ou modificar qualquer funcionalidade de frontend, o agente **DEVE consultar e seguir estritamente a documentação de arquitetura localizada em**:
