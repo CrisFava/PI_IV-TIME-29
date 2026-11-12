@@ -3,6 +3,13 @@ spring:
     name: converge-backend
   profiles:
     active: dev
+  # Lê as variáveis do .env sem precisar exportá-las no terminal (funciona em qualquer SO e IDE).
+  # O primeiro caminho vale ao rodar dentro de converge-backend; o segundo, a partir da raiz do repositório.
+  # Variáveis de ambiente já definidas continuam tendo prioridade sobre o arquivo.
+  config:
+    import:
+      - optional:file:.env[.properties]
+      - optional:file:app/converge-backend/.env[.properties]
   docker:
     compose:
       enabled: false
