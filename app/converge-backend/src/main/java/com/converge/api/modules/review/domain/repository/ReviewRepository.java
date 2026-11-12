@@ -19,4 +19,7 @@ public interface ReviewRepository extends MongoRepository<Review, ObjectId> {
 
     // Avaliações recebidas por um usuário em um papel (base do histórico e da reputação).
     List<Review> findByReviewedIdAndReviewedRole(String reviewedId, ReviewedRole reviewedRole);
+
+    // Avaliações que um usuário já fez em uma viagem (para saber quem ainda falta avaliar).
+    List<Review> findByRideIdAndReviewerId(String rideId, String reviewerId);
 }

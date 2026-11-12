@@ -81,6 +81,17 @@ public class Participant {
 
     private boolean paymentConfirmedByDriver = false;
 
+    // Valor combinado no chat e cobrado pelo motorista em "Solicitar pagamento"
+    @Nullable
+    @PositiveOrZero
+    private BigDecimal requestedAmount;
+
+    @Nullable
+    private LocalDateTime paymentRequestedAt;
+
+    @Nullable
+    private LocalDateTime paidAt;
+
     @Nullable
     private LocalDateTime confirmedAt;
 
@@ -144,6 +155,21 @@ public class Participant {
         this.status = ParticipantStatus.NO_SHOW;
         this.finalAmount = BigDecimal.ZERO;
         this.paymentStatus = ParticipantPaymentStatus.NOT_APPLICABLE;
+        this.updatedAt = now;
+    }
+
+    public void requestPayment(BigDecimal amount, LocalDateTime now) {
+        this.requestedAmount = amount;
+        this.paymentRequestedAt = now;
+        this.paymentStatus = ParticipantPaymentStatus.PENDING;
+        this.paymentConfirmedByDriver = false;
+        this.updatedAt = now;
+    }
+
+    public void confirmPayment(LocalDateTime now) {
+        this.paymentStatus = ParticipantPaymentStatus.PAID;
+        this.paymentConfirmedByDriver = true;
+        this.paidAt = now;
         this.updatedAt = now;
     }
 

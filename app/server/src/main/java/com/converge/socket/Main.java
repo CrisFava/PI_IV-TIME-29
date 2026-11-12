@@ -9,6 +9,8 @@ import com.converge.socket.handler.math.MathOperationHandler;
 import com.converge.socket.handler.math.MathOperationRequest;
 import com.converge.socket.handler.ride.RideCostHandler;
 import com.converge.socket.handler.ride.RideCostRequest;
+import com.converge.socket.handler.pix.PixPayloadHandler;
+import com.converge.socket.handler.pix.PixPayloadRequest;
 
 import java.util.Scanner;
 
@@ -17,6 +19,7 @@ public class Main {
     private static void registerHandlers(SocketServer server){
         server.registerHandler(MathOperationRequest.class, new MathOperationHandler());
         server.registerHandler(ValidateCpfRequest.class, new ValidateCpfHandler());
+        server.registerHandler(PixPayloadRequest.class, new PixPayloadHandler());
         server.registerHandler(RideCostRequest.class, new RideCostHandler());
     }
     

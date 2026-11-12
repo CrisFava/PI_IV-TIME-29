@@ -7,6 +7,7 @@ import com.converge.api.modules.ride.application.event.RideNotificationEvent;
 import com.converge.api.modules.ride.domain.model.Ride;
 import com.converge.api.modules.ride.domain.repository.RideRepository;
 import com.converge.api.modules.ride.infrastructure.RideCostCalculator;
+import com.converge.api.shared.application.SafeActionHandler;
 import com.converge.api.shared.application.UseCase;
 import com.converge.api.shared.domain.enums.NotificationType;
 import lombok.RequiredArgsConstructor;
@@ -59,17 +60,14 @@ public class AcceptPassengerUseCase implements UseCase<PassengerRequestCommand, 
     }
 
     private void notifyConfirmedPassenger(String passengerId, String rideId) {
-        try {
-            eventPublisher.publishEvent(new RideNotificationEvent(
-                    List.of(passengerId),
-                    NotificationType.RIDE_CONFIRMED,
-                    "Carona confirmada",
-                    "O motorista aceitou sua solicitação de vaga.",
-                    rideId
-            ));
-        } catch (Exception e) {
-            log.error("Falha ao publicar evento de notificação para o passageiro {} na carona {}: {}",
-                    passengerId, rideId, e.getMessage(), e);
-        }
+        SafeActionHandler.run(log, "publicar evento de confirmação de carona", () ->
+                eventPublisher.publishEvent(new RideNotificationEvent(
+                        List.of(passengerId),
+                        NotificationType.RIDE_CONFIRMED,
+                        "Carona confirmada",
+                        "O motorista aceitou sua solicitação de vaga.",
+                        rideId
+                ))
+        );
     }
 }

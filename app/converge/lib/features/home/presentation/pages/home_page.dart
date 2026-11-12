@@ -28,6 +28,7 @@ import '../../../ride/data/models/mock_driver_model.dart';
 import '../../../auth/state/auth_action_controller.dart';
 import '../../../auth/state/auth_controller.dart';
 import '../../../auth/state/session/auth_session.dart';
+import '../../../chat/presentation/widgets/conversations_tab.dart';
 
 class HomePage extends ConsumerStatefulWidget {
   const HomePage({super.key});
@@ -888,97 +889,9 @@ class _HomePageState extends ConsumerState<HomePage> {
   }
 
   // --- ABA 2: CHAT ---
+  // As conversas reais das caronas aceitas ficam na feature de chat.
   Widget _buildChatTab(double bottomPadding) {
-    return ListView(
-      padding: EdgeInsets.fromLTRB(16, 16, 16, 120 + bottomPadding),
-      children: [
-        const Text(
-          'Mensagens das Caronas',
-          style: TextStyle(
-            fontSize: 16,
-            fontWeight: FontWeight.w700,
-            color: AppColors.textPrimary,
-          ),
-        ),
-        const SizedBox(height: 12),
-        _buildChatThread(
-          nome: 'Lucas Silveira (Motorista)',
-          ultimaMensagem: 'Chegando no ponto de encontro em 3 minutos!',
-          horario: '07:42',
-          unread: true,
-        ),
-      ],
-    );
-  }
-
-  Widget _buildChatThread({
-    required String nome,
-    required String ultimaMensagem,
-    required String horario,
-    required bool unread,
-  }) {
-    return Container(
-      padding: const EdgeInsets.all(14),
-      decoration: BoxDecoration(
-        color: AppColors.cardBackground,
-        borderRadius: BorderRadius.circular(18),
-        border: Border.all(color: AppColors.borderSubtle),
-      ),
-      child: Row(
-        children: [
-          const CircleAvatar(
-            radius: 20,
-            backgroundColor: AppColors.neutralLight,
-            child: Icon(
-              Icons.forum_rounded,
-              color: AppColors.textPrimary,
-              size: 20,
-            ),
-          ),
-          const SizedBox(width: 12),
-          Expanded(
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Row(
-                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                  children: [
-                    Text(
-                      nome,
-                      style: TextStyle(
-                        fontWeight: unread ? FontWeight.w800 : FontWeight.w600,
-                        fontSize: 14,
-                        color: AppColors.textPrimary,
-                      ),
-                    ),
-                    Text(
-                      horario,
-                      style: const TextStyle(
-                        fontSize: 11,
-                        color: AppColors.textMuted,
-                      ),
-                    ),
-                  ],
-                ),
-                const SizedBox(height: 4),
-                Text(
-                  ultimaMensagem,
-                  maxLines: 1,
-                  overflow: TextOverflow.ellipsis,
-                  style: TextStyle(
-                    fontSize: 12.5,
-                    color: unread
-                        ? AppColors.textPrimary
-                        : AppColors.textSecondary,
-                    fontWeight: unread ? FontWeight.w600 : FontWeight.w400,
-                  ),
-                ),
-              ],
-            ),
-          ),
-        ],
-      ),
-    );
+    return ConversationsTab(bottomPadding: bottomPadding);
   }
 
   // --- ABA 3: PERFIL ---

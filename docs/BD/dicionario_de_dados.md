@@ -22,6 +22,7 @@
 | 11/10/2026 | Sara Monteiro | 1.2.0 | Detalhamento do pagamento PIX: campo `pixKeyType` e enum no Usuário; regras da chave PIX; geração do QR Code "Pix Copia e Cola" estático (sem gateway); confirmação manual pelo motorista |
 | 21/10/2026 | Gustavo Alves de Siqueira Costa | 1.3.0 | `encodedPolyline` no Trajeto; `routeDistanceKm` calculada pela Routes API, com Haversine como alternativa |
 | 05/11/2026 | Daniela Mikie Kikuchi Gonçalves | 1.4.0 | Indicador por usuário (`indicators`) ajustado para a versão enxuta do MVP (campos planos, `carsAvoided`); `financial` e `series` marcados como evolução futura |
+| 12/11/2026 | Cristian Eduardo Fava | 1.5.0 | Cobrança combinada no chat na Participação (`requestedAmount`, `paymentRequestedAt`, `paidAt`); estrutura do chat no Firebase Realtime Database; indicadores atualizados ao concluir a viagem |
 
 ---
 
@@ -545,6 +546,9 @@ Estrutura composta e multivalorada que representa cada participante de uma viage
 | `finalAmount` | Número decimal monetário | Não | `Decimal128`. Calculado somente ao concluir a viagem. Nulo até a conclusão. |
 | `paymentStatus` | Elemento de lista enumerada | Sim | Valores: `PENDING`, `AWAITING_DRIVER_CONFIRMATION`, `PAID`, `NOT_APPLICABLE`. Em `AWAITING_DRIVER_CONFIRMATION` o relógio da dívida fica **pausado** (a viagem não vira vencida enquanto espera o motorista confirmar). |
 | `paymentConfirmedByDriver` | Booleano | Sim | `false` por padrão. Atualizado pelo motorista ao confirmar recebimento. |
+| `requestedAmount` | Número decimal monetário | Não | `Decimal128`. Valor combinado no chat e cobrado pelo motorista em "Solicitar pagamento". Nunca ultrapassa o `maxAmount` quando este estiver definido. Nulo até a primeira cobrança; pode ser alterado enquanto o pagamento não for confirmado. |
+| `paymentRequestedAt` | Data e hora | Não | Momento da última cobrança. Nulo até a primeira cobrança. |
+| `paidAt` | Data e hora | Não | Momento em que o motorista confirmou o recebimento ("Passageiro já pagou"). |
 | `confirmedAt` | Data e hora | Sim | Timestamp de entrada do participante na viagem. |
 | `cancelledAt` | Data e hora | Não | Nulo enquanto não cancelar. |
 | `updatedAt` | Data e hora | Sim | Atualizado a cada mudança no subdocumento. |

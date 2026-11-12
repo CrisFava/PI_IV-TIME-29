@@ -77,6 +77,7 @@ class RideUseCasesTest {
 
     @Mock
     private ApplicationEventPublisher eventPublisher;
+    private RideCompletionPublisher completionPublisher;
 
     @Mock
     private User user;
@@ -463,7 +464,11 @@ class RideUseCasesTest {
     @DisplayName("O motorista deve iniciar e concluir a própria viagem calculando o valor final dos passageiros")
     void shouldStartAndCompleteRideWhenUserIsTheDriver() {
         StartRideUseCase startRide = new StartRideUseCase(rideAccess, rideRepository);
+<<<<<<< HEAD
         CompleteRideUseCase completeRide = new CompleteRideUseCase(rideAccess, rideCostCalculator, rideRepository);
+=======
+        CompleteRideUseCase completeRide = new CompleteRideUseCase(rideAccess, rideRepository, completionPublisher);
+>>>>>>> 6fa7221d2031a7e9b37d174675aa71f403f0d0f9
         Ride ride = rideOf(userObjectId.toHexString(), LocalDateTime.now().plusDays(1));
         ride.requestSeat("passenger-456", "route-456", place("Rua A"), place("Campus PUC"));
         ride.acceptPassenger("passenger-456");
@@ -474,7 +479,30 @@ class RideUseCasesTest {
 
         assertThat(startRide.execute(command).getStatus()).isEqualTo(RideStatus.IN_PROGRESS);
         assertThat(completeRide.execute(command).getStatus()).isEqualTo(RideStatus.COMPLETED);
+<<<<<<< HEAD
         verify(rideCostCalculator).calculateFinalShares(ride);
+=======
+        verify(completionPublisher).publish(ride);
+    }
+
+    @Test
+    @DisplayName("Falha ao contabilizar os indicadores não deve falhar a conclusão já gravada")
+    void shouldCompleteRideEvenWhenIndicatorPublishingFails() {
+        CompleteRideUseCase completeRide = new CompleteRideUseCase(rideAccess, rideRepository, completionPublisher);
+        Ride ride = rideOf(userObjectId.toHexString(), LocalDateTime.now().plusDays(1));
+        ride.requestSeat("passenger-456", "route-456", place("Rua A"), place("Campus PUC"));
+        ride.acceptPassenger("passenger-456");
+        ride.start();
+        currentUserIs(userObjectId);
+        when(rideRepository.findById(rideObjectId)).thenReturn(Optional.of(ride));
+        when(rideRepository.save(any(Ride.class))).thenAnswer(invocation -> invocation.getArgument(0));
+        doThrow(new IllegalStateException("Banco indisponível")).when(completionPublisher).publish(any());
+
+        Ride completed = completeRide.execute(new RideRefCommand(rideObjectId.toHexString(), UID));
+
+        assertThat(completed.getStatus()).isEqualTo(RideStatus.COMPLETED);
+        verify(rideRepository).save(ride);
+>>>>>>> 6fa7221d2031a7e9b37d174675aa71f403f0d0f9
     }
 
     @Test
