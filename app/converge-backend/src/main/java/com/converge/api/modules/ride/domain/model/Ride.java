@@ -2,6 +2,7 @@
 
 package com.converge.api.modules.ride.domain.model;
 
+import com.converge.api.modules.ride.domain.enums.ParticipantPaymentStatus;
 import com.converge.api.modules.ride.domain.enums.ParticipantStatus;
 import com.converge.api.modules.ride.domain.enums.RideStatus;
 import com.converge.api.modules.ride.domain.model.subtypes.Participant;
@@ -33,6 +34,7 @@ import org.springframework.data.mongodb.core.index.Indexed;
 import org.springframework.data.mongodb.core.mapping.Document;
 
 import java.math.BigDecimal;
+import java.math.RoundingMode;
 import java.time.DayOfWeek;
 import java.time.LocalDateTime;
 import java.util.ArrayList;
@@ -343,6 +345,87 @@ public class Ride {
 
         this.status = RideStatus.COMPLETED;
         this.completedAt = now;
+    }
+
+    // Cobrança do valor combinado no chat: só o motorista pede, e só de quem tem vaga confirmada.
+    public void requestPayment(String passengerId, BigDecimal amount) {
+        this.validateCanCharge();
+
+        if (amount == null || amount.signum() <= 0) {
+            throw new ApplicationException(
+                    ErrorCode.BAD_REQUEST,
+                    "O valor da cobrança deve ser maior que zero.",
+                    Set.of("amount")
+            );
+        }
+
+        Participant passenger = this.findChargeablePassenger(passengerId);
+        this.validateNotPaid(passenger);
+
+        BigDecimal maxAmount = passenger.getMaxAmount();
+        if (maxAmount != null && maxAmount.signum() > 0 && amount.compareTo(maxAmount) > 0) {
+            throw new ApplicationException(
+                    ErrorCode.BAD_REQUEST,
+                    "O valor cobrado não pode passar do valor máximo informado ao passageiro.",
+                    Set.of("amount")
+            );
+        }
+
+        passenger.requestPayment(amount.setScale(2, RoundingMode.HALF_EVEN), LocalDateTime.now());
+    }
+
+    // "Passageiro já pagou": o banco não avisa o servidor, então quem confirma é o motorista.
+    public void confirmPayment(String passengerId) {
+        this.validateCanCharge();
+
+        Participant passenger = this.findChargeablePassenger(passengerId);
+        this.validateNotPaid(passenger);
+
+        if (passenger.getRequestedAmount() == null) {
+            throw new ApplicationException(
+                    ErrorCode.BAD_REQUEST,
+                    "Solicite o pagamento antes de confirmar o recebimento.",
+                    Set.of("paymentStatus")
+            );
+        }
+
+        passenger.confirmPayment(LocalDateTime.now());
+    }
+
+    private void validateCanCharge() {
+        if (this.status != RideStatus.CONFIRMED
+                && this.status != RideStatus.IN_PROGRESS
+                && this.status != RideStatus.COMPLETED) {
+            throw new ApplicationException(
+                    ErrorCode.BAD_REQUEST,
+                    "O pagamento só pode ser tratado em uma viagem com passageiro confirmado.",
+                    Set.of("status")
+            );
+        }
+    }
+
+    private Participant findChargeablePassenger(String passengerId) {
+        return this.participants.stream()
+                .filter(participant -> participant.getRole() == ParticipationRole.PASSENGER)
+                .filter(participant -> participant.getUserId().equals(passengerId))
+                .filter(participant -> participant.getStatus() == ParticipantStatus.CONFIRMED
+                        || participant.getStatus() == ParticipantStatus.COMPLETED)
+                .findFirst()
+                .orElseThrow(() -> new ApplicationException(
+                        ErrorCode.BAD_REQUEST,
+                        "Não há passageiro com vaga confirmada com este id nesta viagem.",
+                        Set.of("passengerId")
+                ));
+    }
+
+    private void validateNotPaid(Participant passenger) {
+        if (passenger.getPaymentStatus() == ParticipantPaymentStatus.PAID) {
+            throw new ApplicationException(
+                    ErrorCode.BAD_REQUEST,
+                    "O pagamento deste passageiro já foi confirmado.",
+                    Set.of("paymentStatus")
+            );
+        }
     }
 
     private void validateInProgress() {
