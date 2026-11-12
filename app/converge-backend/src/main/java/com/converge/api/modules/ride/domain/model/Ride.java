@@ -10,6 +10,7 @@ import com.converge.api.modules.ride.domain.model.subtypes.RideCosts;
 import com.converge.api.modules.ride.domain.model.subtypes.VehicleSnapshot;
 import com.converge.api.modules.route.domain.model.subtypes.Place;
 import com.converge.api.modules.user.domain.enums.user.ParticipationRole;
+import com.converge.api.modules.user.domain.enums.vehicle.EnergySource;
 import com.converge.api.shared.presentation.exception.ApplicationException;
 import com.converge.api.shared.presentation.exception.ErrorCode;
 import jakarta.annotation.Nullable;
@@ -345,6 +346,25 @@ public class Ride {
 
         this.status = RideStatus.COMPLETED;
         this.completedAt = now;
+    }
+
+    // Registra a fonte de energia do veículo no momento da viagem, para os indicadores não
+    // dependerem do cadastro do veículo, que pode mudar depois.
+    public void recordFuel(EnergySource energySource, Double averageConsumption, BigDecimal energyPrice) {
+        RideCosts current = this.costs != null ? this.costs : RideCosts.withExtras(null, null);
+
+        this.costs = new RideCosts(
+                current.routeDistanceKm(),
+                current.totalDistanceWithDetoursKm(),
+                energySource,
+                averageConsumption,
+                energyPrice,
+                current.energyCost(),
+                current.toll(),
+                current.parking(),
+                current.totalCost(),
+                current.totalShared()
+        );
     }
 
     // Cobrança do valor combinado no chat: só o motorista pede, e só de quem tem vaga confirmada.
