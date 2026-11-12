@@ -9,6 +9,7 @@ import org.springframework.data.mongodb.repository.MongoRepository;
 import org.springframework.stereotype.Repository;
 
 import java.time.LocalDateTime;
+import java.util.Collection;
 import java.util.List;
 import java.util.Optional;
 
@@ -20,6 +21,8 @@ public interface RideRepository extends MongoRepository<Ride, ObjectId> {
     List<Ride> findByDriverIdOrderByDepartureDateTimeDesc(String driverId);
 
     List<Ride> findByParticipantsUserId(String userId);
+
+    List<Ride> findByDriverRouteIdAndStatusIn(String driverRouteId, Collection<RideStatus> statuses);
 
     List<Ride> findByStatusAndCompletedAtAfter(RideStatus status, LocalDateTime completedAfter);
 
