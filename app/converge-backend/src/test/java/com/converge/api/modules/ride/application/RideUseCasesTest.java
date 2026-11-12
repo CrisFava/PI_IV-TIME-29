@@ -31,10 +31,16 @@ import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
+import org.junit.jupiter.params.ParameterizedTest;
+import org.junit.jupiter.params.provider.ValueSource;
 import org.mockito.ArgumentCaptor;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 import org.springframework.context.ApplicationEventPublisher;
+import org.springframework.transaction.PlatformTransactionManager;
+import org.springframework.transaction.TransactionStatus;
+import org.springframework.transaction.annotation.AnnotationTransactionAttributeSource;
+import org.springframework.transaction.interceptor.TransactionProxyFactoryBean;
 
 import java.math.BigDecimal;
 import java.time.DayOfWeek;
@@ -49,6 +55,7 @@ import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.doThrow;
 import static org.mockito.Mockito.never;
+import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
@@ -77,6 +84,8 @@ class RideUseCasesTest {
 
     @Mock
     private ApplicationEventPublisher eventPublisher;
+
+    @Mock
     private RideCompletionPublisher completionPublisher;
 
     @Mock
@@ -368,6 +377,46 @@ class RideUseCasesTest {
         verify(eventPublisher).publishEvent(any(RideNotificationEvent.class));
     }
 
+    @ParameterizedTest
+    @ValueSource(booleans = {true, false})
+    @DisplayName("Falha na penalidade ou auditoria deve reverter a remoção do passageiro")
+    void shouldRollBackConfirmedRemovalWhenRequiredEffectFails(boolean penaltyFails) {
+        RejectPassengerUseCase target = new RejectPassengerUseCase(
+                rideAccess, rideCostCalculator, rideRepository, recordReputationPenalty, auditLogService, eventPublisher);
+        PlatformTransactionManager transactionManager = mock(PlatformTransactionManager.class);
+        TransactionStatus transactionStatus = mock(TransactionStatus.class);
+        when(transactionManager.getTransaction(any())).thenReturn(transactionStatus);
+        TransactionProxyFactoryBean proxyFactory = new TransactionProxyFactoryBean();
+        proxyFactory.setTarget(target);
+        proxyFactory.setProxyTargetClass(true);
+        proxyFactory.setTransactionManager(transactionManager);
+        proxyFactory.setTransactionAttributeSource(new AnnotationTransactionAttributeSource());
+        proxyFactory.afterPropertiesSet();
+        RejectPassengerUseCase rejectPassenger = (RejectPassengerUseCase) proxyFactory.getObject();
+        String driverId = userObjectId.toHexString();
+        Ride ride = rideOf(driverId, LocalDateTime.now().plusDays(1));
+        ride.requestSeat("passenger-456", "route-456", place("Rua A"), place("Campus PUC"));
+        ride.acceptPassenger("passenger-456", 1.5, new BigDecimal("6.00"));
+        currentUserIs(userObjectId);
+        when(rideRepository.findById(rideObjectId)).thenReturn(Optional.of(ride));
+        when(rideRepository.save(any(Ride.class))).thenAnswer(invocation -> invocation.getArgument(0));
+        RuntimeException failure = new IllegalStateException("Persistence failure");
+        if (penaltyFails) {
+            doThrow(failure).when(recordReputationPenalty).recordDriverCancellation(driverId);
+        } else {
+            doThrow(failure).when(auditLogService).record(any(), any(), any(), any(), any(), any());
+        }
+
+        assertThat(assertThrows(IllegalStateException.class, () -> rejectPassenger.execute(
+                new RejectPassengerCommand(rideObjectId.toHexString(), "passenger-456", UID,
+                        new RejectPassengerRequestDTO("Mudança de horário"))))).isSameAs(failure);
+
+        verify(rideRepository).save(ride);
+        verify(transactionManager).rollback(transactionStatus);
+        verify(transactionManager, never()).commit(any());
+        verify(eventPublisher, never()).publishEvent(any(RideNotificationEvent.class));
+    }
+
     @Test
     @DisplayName("O passageiro deve conseguir sair antecipadamente sem penalidade")
     void shouldLetPassengerLeaveRide() {
@@ -464,11 +513,8 @@ class RideUseCasesTest {
     @DisplayName("O motorista deve iniciar e concluir a própria viagem calculando o valor final dos passageiros")
     void shouldStartAndCompleteRideWhenUserIsTheDriver() {
         StartRideUseCase startRide = new StartRideUseCase(rideAccess, rideRepository);
-<<<<<<< HEAD
-        CompleteRideUseCase completeRide = new CompleteRideUseCase(rideAccess, rideCostCalculator, rideRepository);
-=======
-        CompleteRideUseCase completeRide = new CompleteRideUseCase(rideAccess, rideRepository, completionPublisher);
->>>>>>> 6fa7221d2031a7e9b37d174675aa71f403f0d0f9
+        CompleteRideUseCase completeRide = new CompleteRideUseCase(
+                rideAccess, rideCostCalculator, rideRepository, completionPublisher);
         Ride ride = rideOf(userObjectId.toHexString(), LocalDateTime.now().plusDays(1));
         ride.requestSeat("passenger-456", "route-456", place("Rua A"), place("Campus PUC"));
         ride.acceptPassenger("passenger-456");
@@ -479,16 +525,14 @@ class RideUseCasesTest {
 
         assertThat(startRide.execute(command).getStatus()).isEqualTo(RideStatus.IN_PROGRESS);
         assertThat(completeRide.execute(command).getStatus()).isEqualTo(RideStatus.COMPLETED);
-<<<<<<< HEAD
         verify(rideCostCalculator).calculateFinalShares(ride);
-=======
         verify(completionPublisher).publish(ride);
     }
 
     @Test
     @DisplayName("Falha ao contabilizar os indicadores não deve falhar a conclusão já gravada")
     void shouldCompleteRideEvenWhenIndicatorPublishingFails() {
-        CompleteRideUseCase completeRide = new CompleteRideUseCase(rideAccess, rideRepository, completionPublisher);
+        CompleteRideUseCase completeRide = new CompleteRideUseCase(rideAccess, rideCostCalculator, rideRepository, completionPublisher);
         Ride ride = rideOf(userObjectId.toHexString(), LocalDateTime.now().plusDays(1));
         ride.requestSeat("passenger-456", "route-456", place("Rua A"), place("Campus PUC"));
         ride.acceptPassenger("passenger-456");
@@ -502,7 +546,6 @@ class RideUseCasesTest {
 
         assertThat(completed.getStatus()).isEqualTo(RideStatus.COMPLETED);
         verify(rideRepository).save(ride);
->>>>>>> 6fa7221d2031a7e9b37d174675aa71f403f0d0f9
     }
 
     @Test

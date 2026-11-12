@@ -18,6 +18,7 @@ import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.context.ApplicationEventPublisher;
 import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Transactional;
 
 import java.util.List;
 import java.util.Map;
@@ -38,6 +39,7 @@ public class RejectPassengerUseCase implements UseCase<RejectPassengerCommand, R
     private final ApplicationEventPublisher eventPublisher;
 
     @Override
+    @Transactional(transactionManager = "mongoTransactionManager")
     public Ride execute(RejectPassengerCommand command) {
         Ride ride = rideAccess.getOwnedRide(command.rideId(), command.firebaseUid());
         String reason = command.request().reason();
@@ -62,18 +64,16 @@ public class RejectPassengerUseCase implements UseCase<RejectPassengerCommand, R
             String rideId,
             @Nullable String reason
     ) {
-        SafeActionHandler.run(log, "registrar penalidade de cancelamento do motorista",
-                () -> recordReputationPenalty.recordDriverCancellation(driverId));
+        recordReputationPenalty.recordDriverCancellation(driverId);
 
-        SafeActionHandler.run(log, "registrar trilha de auditoria para remoção de passageiro confirmado",
-                () -> auditLogService.record(
-                        AuditAction.RIDE_CANCELLED,
-                        driverId,
-                        passengerId,
-                        "RIDE",
-                        rideId,
-                        Map.of("reason", reason != null ? reason : "", "removedConfirmedPassenger", true)
-                ));
+        auditLogService.record(
+                AuditAction.RIDE_CANCELLED,
+                driverId,
+                passengerId,
+                "RIDE",
+                rideId,
+                Map.of("reason", reason != null ? reason : "", "removedConfirmedPassenger", true)
+        );
 
         SafeActionHandler.run(log, "publicar evento de notificação de cancelamento para o passageiro",
                 () -> eventPublisher.publishEvent(new RideNotificationEvent(
