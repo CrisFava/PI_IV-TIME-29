@@ -3,11 +3,10 @@
 package com.converge.api.modules.indicator.application;
 
 import com.converge.api.modules.indicator.application.dto.CompletedRideCommand;
+import com.converge.api.modules.indicator.application.gateway.IndicatorStore;
 import com.converge.api.modules.indicator.domain.enums.IndicatorPeriod;
 import com.converge.api.modules.indicator.domain.model.PlatformIndicator;
-import com.converge.api.modules.indicator.domain.model.UserIndicator;
 import com.converge.api.modules.indicator.domain.repository.PlatformIndicatorRepository;
-import com.converge.api.modules.indicator.domain.repository.UserIndicatorRepository;
 import com.converge.api.modules.indicator.domain.service.IndicatorReference;
 import com.converge.api.modules.indicator.domain.service.SustainabilityCalculator;
 import com.converge.api.shared.application.UseCase;
@@ -17,7 +16,6 @@ import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
 
 import java.time.LocalDate;
-import java.util.ArrayList;
 import java.util.List;
 import java.util.Set;
 
@@ -30,7 +28,10 @@ import java.util.Set;
  *  - cada participante: +1 viagem no seu papel, +D km e a sua fração do CO2, dividido por P + 1 (RF54);
  *  - carros evitados por pessoa: o passageiro conta o próprio carro (1) e o motorista conta os P que levou.
  *
- * Devolve o indicador acumulado (ALL_TIME) da plataforma já atualizado.
+ * Pode ser chamado mais de uma vez para a mesma viagem (reprocessamento): o IndicatorStore só aplica
+ * cada soma uma vez por rideId, e a viagem é marcada como registrada só no final.
+ *
+ * Devolve o indicador acumulado (ALL_TIME) da plataforma.
  */
 @Service
 @RequiredArgsConstructor
@@ -39,110 +40,58 @@ public class RegisterCompletedRideUseCase implements UseCase<CompletedRideComman
     private static final List<IndicatorPeriod> USER_PERIODS =
             List.of(IndicatorPeriod.WEEKLY, IndicatorPeriod.MONTHLY, IndicatorPeriod.SEMESTERLY);
 
-    private final UserIndicatorRepository userIndicatorRepository;
+    private final IndicatorStore indicatorStore;
     private final PlatformIndicatorRepository platformIndicatorRepository;
 
     @Override
     public PlatformIndicator execute(CompletedRideCommand command) {
         validate(command);
 
+        if (!indicatorStore.isRideRegistered(command.rideId())) {
+            register(command);
+        }
+
+        return platformIndicatorRepository
+                .findByPeriodAndReference(IndicatorPeriod.ALL_TIME, PlatformIndicator.ALL_TIME_REFERENCE)
+                .orElseGet(() -> new PlatformIndicator(IndicatorPeriod.ALL_TIME, PlatformIndicator.ALL_TIME_REFERENCE));
+    }
+
+    private void register(CompletedRideCommand command) {
+        String rideId = command.rideId();
         List<String> passengerIds = command.passengerIds().stream().distinct().toList();
         int carsAvoided = SustainabilityCalculator.carsAvoided(passengerIds.size());
         double distanceKm = command.distanceKm();
 
-        double energySaved = 
-            SustainabilityCalculator.energySaved(distanceKm, command.averageConsumption(), carsAvoided);
-        double co2AvoidedKg = 
-            SustainabilityCalculator.co2AvoidedKg(energySaved, command.energySource());
-            
+        double energySaved =
+                SustainabilityCalculator.energySaved(distanceKm, command.averageConsumption(), carsAvoided);
+        double co2AvoidedKg = SustainabilityCalculator.co2AvoidedKg(energySaved, command.energySource());
         double co2SharePerParticipant = co2AvoidedKg / (passengerIds.size() + 1);
-
-        List<String> participantIds = new ArrayList<>(passengerIds);
-        participantIds.add(command.driverId());
-
-        // Precisa ser contado antes de gravar os indicadores desta viagem.
-        int firstTimeUsers = (int) participantIds.stream()
-                .filter(userId -> !userIndicatorRepository.existsByUserId(userId))
-                .count();
 
         LocalDate date = command.completedAt().toLocalDate();
 
         for (IndicatorPeriod period : USER_PERIODS) {
             String reference = IndicatorReference.of(period, date);
-            int newUsersInPeriod = 0;
 
-            if (addToUser(command.driverId(), period, reference, 1, 0, distanceKm, carsAvoided, co2SharePerParticipant)) {
-                newUsersInPeriod++;
-            }
+            indicatorStore.addToUser(rideId, command.driverId(), period, reference,
+                    1, 0, distanceKm, carsAvoided, co2SharePerParticipant);
 
             for (String passengerId : passengerIds) {
-                if (addToUser(passengerId, period, reference, 0, 1, distanceKm, 1, co2SharePerParticipant)) {
-                    newUsersInPeriod++;
-                }
+                indicatorStore.addToUser(rideId, passengerId, period, reference,
+                        0, 1, distanceKm, 1, co2SharePerParticipant);
             }
 
-            addToPlatform(period, reference, distanceKm, carsAvoided, co2AvoidedKg, newUsersInPeriod);
+            indicatorStore.addToPlatform(rideId, period, reference, distanceKm, carsAvoided, co2AvoidedKg);
+            indicatorStore.refreshActiveUsers(period, reference);
         }
 
-        return addToPlatform(
-                IndicatorPeriod.ALL_TIME,
-                PlatformIndicator.ALL_TIME_REFERENCE,
-                distanceKm,
-                carsAvoided,
-                co2AvoidedKg,
-                firstTimeUsers
-        );
-    }
-
-    // Devolve true quando este é o primeiro registro do usuário no período.
-    private boolean addToUser(
-            String userId,
-            IndicatorPeriod period,
-            String reference,
-            int ridesAsDriver,
-            int ridesAsPassenger,
-            double sharedKm,
-            int carsAvoided,
-            double co2AvoidedKg
-    ) {
-        var existing = userIndicatorRepository.findByUserIdAndPeriodAndReference(userId, period, reference);
-        UserIndicator indicator = existing.orElseGet(() -> new UserIndicator(userId, period, reference));
-
-        indicator.updateTotals(
-                indicator.getRidesAsDriver() + ridesAsDriver,
-                indicator.getRidesAsPassenger() + ridesAsPassenger,
-                indicator.getSharedKm() + sharedKm,
-                indicator.getCarsAvoided() + carsAvoided,
-                indicator.getCo2AvoidedKg() + co2AvoidedKg
-        );
-        userIndicatorRepository.save(indicator);
-
-        return existing.isEmpty();
-    }
-
-    private PlatformIndicator addToPlatform(
-            IndicatorPeriod period,
-            String reference,
-            double sharedKm,
-            int carsAvoided,
-            double co2AvoidedKg,
-            int newActiveUsers
-    ) {
-        PlatformIndicator indicator = platformIndicatorRepository.findByPeriodAndReference(period, reference)
-                .orElseGet(() -> new PlatformIndicator(period, reference));
-
-        indicator.updateTotals(
-                indicator.getTotalRides() + 1,
-                indicator.getTotalSharedKm() + sharedKm,
-                indicator.getTotalCarsAvoided() + carsAvoided,
-                indicator.getTotalCo2AvoidedKg() + co2AvoidedKg,
-                indicator.getActiveUsers() + newActiveUsers
-        );
-
-        return platformIndicatorRepository.save(indicator);
+        indicatorStore.refreshAllTime();
+        indicatorStore.markRideRegistered(rideId);
     }
 
     private void validate(CompletedRideCommand command) {
+        if (command.rideId() == null || command.rideId().isBlank()) {
+            throw new ApplicationException(ErrorCode.BAD_REQUEST, "Ride is required.", Set.of("rideId"));
+        }
         if (command.driverId() == null || command.driverId().isBlank()) {
             throw new ApplicationException(ErrorCode.BAD_REQUEST, "Driver is required.", Set.of("driverId"));
         }

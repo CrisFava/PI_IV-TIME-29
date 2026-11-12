@@ -47,6 +47,10 @@ public class PlatformIndicator {
 
     private Instant calculatedAt;
 
+    // Viagens já somadas neste documento: impede contar a mesma viagem duas vezes ao reprocessar.
+    // Mantido aqui para um save() da entidade não apagar a lista gravada pelo IndicatorStore.
+    private List<String> appliedRideIds = new ArrayList<>();
+
     // Cria um indicador zerado para um período.
     public PlatformIndicator(IndicatorPeriod period, String reference) {
         validateIdentity(period, reference);

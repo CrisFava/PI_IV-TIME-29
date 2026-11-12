@@ -7,6 +7,7 @@ import com.converge.api.modules.indicator.domain.model.PlatformIndicator;
 
 import java.time.LocalDate;
 import java.time.temporal.IsoFields;
+import java.util.Locale;
 
 /**
  * Converte uma data na referência do período, no formato da modelagem:
@@ -19,13 +20,16 @@ public final class IndicatorReference {
 
     public static String of(IndicatorPeriod period, LocalDate date) {
         return switch (period) {
+            // Locale.ROOT: a referência gravada é sempre ASCII, qualquer que seja o idioma do servidor.
             case WEEKLY -> String.format(
+                    Locale.ROOT,
                     "%d-W%02d",
                     date.get(IsoFields.WEEK_BASED_YEAR),
                     date.get(IsoFields.WEEK_OF_WEEK_BASED_YEAR)
             );
-            case MONTHLY -> String.format("%d-%02d", date.getYear(), date.getMonthValue());
-            case SEMESTERLY -> String.format("%d-S%d", date.getYear(), date.getMonthValue() <= 6 ? 1 : 2);
+            case MONTHLY -> String.format(Locale.ROOT, "%d-%02d", date.getYear(), date.getMonthValue());
+            case SEMESTERLY -> String.format(
+                    Locale.ROOT, "%d-S%d", date.getYear(), date.getMonthValue() <= 6 ? 1 : 2);
             case ALL_TIME -> PlatformIndicator.ALL_TIME_REFERENCE;
         };
     }

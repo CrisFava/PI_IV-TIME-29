@@ -154,6 +154,41 @@ class RideCompletionPublisherTest {
     }
 
     @Test
+    @DisplayName("Com o combustível gravado na viagem, não deve consultar o veículo atual")
+    void shouldUseFuelRecordedInTheRideInsteadOfCurrentVehicle() {
+        Ride ride = confirmedRide();
+        ride.recordFuel(EnergySource.ETHANOL, 9.5, new BigDecimal("4.20"));
+        ride.start();
+        ride.complete();
+        when(routeAccess.getOwnedRoute("route-123", "driver-123")).thenReturn(route);
+        when(route.getRouteDistanceKm()).thenReturn(14.2);
+
+        publisher.publish(ride);
+
+        RideCompletedEvent event = publishedEvent();
+        assertThat(event.energySource()).isEqualTo("ETHANOL");
+        assertThat(event.averageConsumption()).isEqualTo(9.5);
+        verify(vehicleAccess, never()).getActiveVehicleOf(any(), any());
+    }
+
+    @Test
+    @DisplayName("eventOf deve montar o mesmo evento sem publicar")
+    void shouldBuildEventWithoutPublishing() {
+        Ride ride = confirmedRide();
+        ride.recordFuel(EnergySource.GASOLINE, 12.0, new BigDecimal("6.00"));
+        ride.start();
+        ride.complete();
+        when(routeAccess.getOwnedRoute("route-123", "driver-123")).thenReturn(route);
+        when(route.getRouteDistanceKm()).thenReturn(14.2);
+
+        assertThat(publisher.eventOf(ride)).hasValueSatisfying(event -> {
+            assertThat(event.rideId()).isEqualTo(rideObjectId.toHexString());
+            assertThat(event.passengerIds()).containsExactly("passenger-1", "passenger-2");
+        });
+        verify(eventPublisher, never()).publishEvent(any());
+    }
+
+    @Test
     @DisplayName("Viagem que não foi concluída não deve gerar evento")
     void shouldNotPublishWhenRideIsNotCompleted() {
         Ride ride = confirmedRide();

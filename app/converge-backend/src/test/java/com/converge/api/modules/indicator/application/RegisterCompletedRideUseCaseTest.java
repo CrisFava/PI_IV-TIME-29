@@ -3,11 +3,11 @@
 package com.converge.api.modules.indicator.application;
 
 import com.converge.api.modules.indicator.application.dto.CompletedRideCommand;
+import com.converge.api.modules.indicator.application.fakes.FakeIndicatorStore;
 import com.converge.api.modules.indicator.domain.enums.IndicatorPeriod;
 import com.converge.api.modules.indicator.domain.model.PlatformIndicator;
 import com.converge.api.modules.indicator.domain.model.UserIndicator;
 import com.converge.api.modules.indicator.domain.repository.PlatformIndicatorRepository;
-import com.converge.api.modules.indicator.domain.repository.UserIndicatorRepository;
 import com.converge.api.shared.presentation.exception.ApplicationException;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
@@ -19,10 +19,7 @@ import org.mockito.junit.jupiter.MockitoSettings;
 import org.mockito.quality.Strictness;
 
 import java.time.LocalDateTime;
-import java.util.HashMap;
 import java.util.List;
-import java.util.Map;
-import java.util.Optional;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
@@ -39,57 +36,33 @@ class RegisterCompletedRideUseCaseTest {
     private static final double CO2_KG_PER_LITER_GASOLINE = 2.31;
 
     @Mock
-    private UserIndicatorRepository userIndicatorRepository;
-
-    @Mock
     private PlatformIndicatorRepository platformIndicatorRepository;
 
-    // Os mocks se comportam como um banco em memória, para a segunda viagem enxergar a primeira.
-    private final Map<String, UserIndicator> users = new HashMap<>();
-    private final Map<String, PlatformIndicator> platform = new HashMap<>();
-
+    private FakeIndicatorStore store;
     private RegisterCompletedRideUseCase registerCompletedRide;
 
     @BeforeEach
     void setUp() {
-        registerCompletedRide = new RegisterCompletedRideUseCase(userIndicatorRepository, platformIndicatorRepository);
-
-        when(userIndicatorRepository.findByUserIdAndPeriodAndReference(anyString(), any(), anyString()))
-                .thenAnswer(call -> Optional.ofNullable(
-                        users.get(key(call.getArgument(0), call.getArgument(1), call.getArgument(2)))));
-        when(userIndicatorRepository.existsByUserId(anyString()))
-                .thenAnswer(call -> users.values().stream()
-                        .anyMatch(indicator -> indicator.getUserId().equals(call.getArgument(0))));
-        when(userIndicatorRepository.save(any(UserIndicator.class))).thenAnswer(call -> {
-            UserIndicator indicator = call.getArgument(0);
-            users.put(key(indicator.getUserId(), indicator.getPeriod(), indicator.getReference()), indicator);
-            return indicator;
-        });
-
+        store = new FakeIndicatorStore();
+        registerCompletedRide = new RegisterCompletedRideUseCase(store, platformIndicatorRepository);
         when(platformIndicatorRepository.findByPeriodAndReference(any(), anyString()))
-                .thenAnswer(call -> Optional.ofNullable(
-                        platform.get(key("platform", call.getArgument(0), call.getArgument(1)))));
-        when(platformIndicatorRepository.save(any(PlatformIndicator.class))).thenAnswer(call -> {
-            PlatformIndicator indicator = call.getArgument(0);
-            platform.put(key("platform", indicator.getPeriod(), indicator.getReference()), indicator);
-            return indicator;
-        });
+                .thenAnswer(call -> store.findPlatform(call.getArgument(0), call.getArgument(1)));
     }
 
-    private static String key(String owner, IndicatorPeriod period, String reference) {
-        return owner + "|" + period + "|" + reference;
+    private CompletedRideCommand ride(String rideId, String driverId, List<String> passengerIds, double distanceKm) {
+        return new CompletedRideCommand(rideId, driverId, passengerIds, distanceKm, "GASOLINE", 12.0, COMPLETED_AT);
     }
 
     private CompletedRideCommand ride(String driverId, List<String> passengerIds, double distanceKm) {
-        return new CompletedRideCommand("ride-1", driverId, passengerIds, distanceKm, "GASOLINE", 12.0, COMPLETED_AT);
+        return ride("ride-1", driverId, passengerIds, distanceKm);
     }
 
     private UserIndicator userIndicator(String userId, IndicatorPeriod period, String reference) {
-        return users.get(key(userId, period, reference));
+        return store.user(userId, period, reference);
     }
 
     private PlatformIndicator platformIndicator(IndicatorPeriod period, String reference) {
-        return platform.get(key("platform", period, reference));
+        return store.platform(period, reference);
     }
 
     @Test
@@ -100,7 +73,7 @@ class RegisterCompletedRideUseCaseTest {
         // 2 carros evitados x 24 km / 12 km/l = 4 litros poupados
         double co2 = 4.0 * CO2_KG_PER_LITER_GASOLINE;
 
-        assertThat(platform).hasSize(4);
+        assertThat(store.platform).hasSize(4);
         for (PlatformIndicator indicator : List.of(
                 platformIndicator(IndicatorPeriod.WEEKLY, "2026-W46"),
                 platformIndicator(IndicatorPeriod.MONTHLY, "2026-11"),
@@ -122,7 +95,7 @@ class RegisterCompletedRideUseCaseTest {
 
         double co2Share = 4.0 * CO2_KG_PER_LITER_GASOLINE / 3;
 
-        assertThat(users).hasSize(9);
+        assertThat(store.users).hasSize(9);
 
         UserIndicator driver = userIndicator("driver", IndicatorPeriod.MONTHLY, "2026-11");
         assertThat(driver.getRidesAsDriver()).isEqualTo(1);
@@ -157,9 +130,9 @@ class RegisterCompletedRideUseCaseTest {
     @Test
     @DisplayName("Uma segunda viagem deve somar nos mesmos documentos e contar só os usuários novos")
     void shouldAccumulateSecondRideAndCountOnlyNewUsers() {
-        registerCompletedRide.execute(ride("driver", List.of("p1", "p2"), 24.0));
+        registerCompletedRide.execute(ride("ride-1", "driver", List.of("p1", "p2"), 24.0));
 
-        registerCompletedRide.execute(ride("driver", List.of("p1", "p3"), 10.0));
+        registerCompletedRide.execute(ride("ride-2", "driver", List.of("p1", "p3"), 10.0));
 
         PlatformIndicator allTime = platformIndicator(IndicatorPeriod.ALL_TIME, "ALL_TIME");
         assertThat(allTime.getTotalRides()).isEqualTo(2);
@@ -180,7 +153,7 @@ class RegisterCompletedRideUseCaseTest {
     @Test
     @DisplayName("Viagem em outro mês deve abrir novos documentos de período sem recontar o usuário no acumulado")
     void shouldOpenNewPeriodDocumentsWithoutRecountingAllTimeUsers() {
-        registerCompletedRide.execute(ride("driver", List.of("p1"), 24.0));
+        registerCompletedRide.execute(ride("ride-1", "driver", List.of("p1"), 24.0));
 
         registerCompletedRide.execute(new CompletedRideCommand(
                 "ride-2", "driver", List.of("p1"), 24.0, "GASOLINE", 12.0, LocalDateTime.of(2026, 12, 3, 8, 0)));
@@ -192,6 +165,43 @@ class RegisterCompletedRideUseCaseTest {
         assertThat(platformIndicator(IndicatorPeriod.SEMESTERLY, "2026-S2").getActiveUsers()).isEqualTo(2);
         assertThat(platformIndicator(IndicatorPeriod.ALL_TIME, "ALL_TIME").getTotalRides()).isEqualTo(2);
         assertThat(platformIndicator(IndicatorPeriod.ALL_TIME, "ALL_TIME").getActiveUsers()).isEqualTo(2);
+    }
+
+    @Test
+    @DisplayName("Registrar a mesma viagem de novo não deve contar nada duas vezes")
+    void shouldIgnoreRideAlreadyRegistered() {
+        registerCompletedRide.execute(ride("driver", List.of("p1", "p2"), 24.0));
+
+        registerCompletedRide.execute(ride("driver", List.of("p1", "p2"), 24.0));
+
+        assertThat(platformIndicator(IndicatorPeriod.ALL_TIME, "ALL_TIME").getTotalRides()).isEqualTo(1);
+        assertThat(platformIndicator(IndicatorPeriod.WEEKLY, "2026-W46").getTotalRides()).isEqualTo(1);
+        assertThat(userIndicator("driver", IndicatorPeriod.MONTHLY, "2026-11").getRidesAsDriver()).isEqualTo(1);
+    }
+
+    @Test
+    @DisplayName("Reprocessar uma viagem que falhou no meio deve completar sem contar em dobro")
+    void shouldCompletePartiallyRegisteredRideOnRetry() {
+        store.failOnPlatformWrite = 1; // falha na plataforma do mês, depois da semana já gravada
+
+        assertThatThrownBy(() -> registerCompletedRide.execute(ride("driver", List.of("p1"), 24.0)))
+                .isInstanceOf(IllegalStateException.class);
+        assertThat(store.isRideRegistered("ride-1")).isFalse();
+
+        registerCompletedRide.execute(ride("driver", List.of("p1"), 24.0));
+
+        assertThat(store.isRideRegistered("ride-1")).isTrue();
+        for (IndicatorPeriod period : List.of(IndicatorPeriod.WEEKLY, IndicatorPeriod.MONTHLY, IndicatorPeriod.SEMESTERLY)) {
+            String reference = switch (period) {
+                case WEEKLY -> "2026-W46";
+                case MONTHLY -> "2026-11";
+                default -> "2026-S2";
+            };
+            assertThat(platformIndicator(period, reference).getTotalRides()).as(period.name()).isEqualTo(1);
+            assertThat(userIndicator("driver", period, reference).getRidesAsDriver()).as(period.name()).isEqualTo(1);
+            assertThat(userIndicator("p1", period, reference).getRidesAsPassenger()).as(period.name()).isEqualTo(1);
+        }
+        assertThat(platformIndicator(IndicatorPeriod.ALL_TIME, "ALL_TIME").getTotalRides()).isEqualTo(1);
     }
 
     @Test
@@ -221,22 +231,24 @@ class RegisterCompletedRideUseCaseTest {
         assertThatThrownBy(() -> registerCompletedRide.execute(ride("driver", List.of(), 24.0)))
                 .isInstanceOf(ApplicationException.class);
 
-        assertThat(users).isEmpty();
-        assertThat(platform).isEmpty();
+        assertThat(store.users).isEmpty();
+        assertThat(store.platform).isEmpty();
     }
 
     @Test
-    @DisplayName("Deve recusar distância negativa e viagem sem motorista ou sem data de conclusão")
+    @DisplayName("Deve recusar viagem sem id, sem motorista, sem data de conclusão ou com distância negativa")
     void shouldRejectInvalidCommand() {
         assertThatThrownBy(() -> registerCompletedRide.execute(ride("driver", List.of("p1"), -1.0)))
                 .isInstanceOf(ApplicationException.class);
         assertThatThrownBy(() -> registerCompletedRide.execute(ride(" ", List.of("p1"), 24.0)))
                 .isInstanceOf(ApplicationException.class);
+        assertThatThrownBy(() -> registerCompletedRide.execute(ride(null, "driver", List.of("p1"), 24.0)))
+                .isInstanceOf(ApplicationException.class);
         assertThatThrownBy(() -> registerCompletedRide.execute(new CompletedRideCommand(
                 "ride-1", "driver", List.of("p1"), 24.0, "GASOLINE", 12.0, null)))
                 .isInstanceOf(ApplicationException.class);
 
-        assertThat(users).isEmpty();
-        assertThat(platform).isEmpty();
+        assertThat(store.users).isEmpty();
+        assertThat(store.platform).isEmpty();
     }
 }

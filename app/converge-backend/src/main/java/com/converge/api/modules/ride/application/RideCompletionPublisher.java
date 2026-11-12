@@ -25,6 +25,9 @@ import java.util.Optional;
 /**
  * Avisa os outros módulos que uma viagem foi concluída, publicando o RideCompletedEvent.
  * Viagem que terminou sem passageiro efetivo vira CANCELLED e não gera evento (RF49).
+ *
+ * A fonte de energia vem do que foi gravado na viagem ao criá-la; o cadastro atual do veículo
+ * só é consultado para viagens antigas, criadas antes desse registro.
  */
 @Component
 @RequiredArgsConstructor
@@ -35,8 +38,13 @@ public class RideCompletionPublisher {
     private final VehicleAccess vehicleAccess;
 
     public void publish(Ride ride) {
+        eventOf(ride).ifPresent(eventPublisher::publishEvent);
+    }
+
+    // O evento da viagem concluída, ou vazio se ela não conta para os indicadores.
+    public Optional<RideCompletedEvent> eventOf(Ride ride) {
         if (ride.getStatus() != RideStatus.COMPLETED) {
-            return;
+            return Optional.empty();
         }
 
         List<String> passengerIds = ride.getParticipants().stream()
@@ -46,21 +54,26 @@ public class RideCompletionPublisher {
                 .toList();
 
         if (passengerIds.isEmpty()) {
-            return;
+            return Optional.empty();
         }
 
-        Optional<FuelSource> fuel = fuelOf(ride);
         RideCosts costs = ride.getCosts();
+        boolean fuelRecorded = costs != null
+                && costs.energySourceUsed() != null
+                && costs.averageConsumptionUsed() != null;
 
-        String energySource = costs != null && costs.energySourceUsed() != null
-                ? costs.energySourceUsed().name()
-                : fuel.map(source -> source.energySource().name()).orElse(null);
+        String energySource;
+        Double averageConsumption;
+        if (fuelRecorded) {
+            energySource = costs.energySourceUsed().name();
+            averageConsumption = costs.averageConsumptionUsed();
+        } else {
+            Optional<FuelSource> fuel = currentVehicleFuelOf(ride);
+            energySource = fuel.map(source -> source.energySource().name()).orElse(null);
+            averageConsumption = fuel.map(FuelSource::averageConsumption).orElse(null);
+        }
 
-        Double averageConsumption = costs != null && costs.averageConsumptionUsed() != null
-                ? costs.averageConsumptionUsed()
-                : fuel.map(FuelSource::averageConsumption).orElse(null);
-
-        eventPublisher.publishEvent(new RideCompletedEvent(
+        return Optional.of(new RideCompletedEvent(
                 ride.getId() != null ? ride.getId().toHexString() : null,
                 ride.getDriverId(),
                 passengerIds,
@@ -93,8 +106,8 @@ public class RideCompletionPublisher {
         return HaversineCalculator.distanceKm(ride.getOrigin().coordinates(), ride.getDestination().coordinates());
     }
 
-    // Fonte de energia principal do veículo; vazio se o veículo foi desativado depois da viagem.
-    private Optional<FuelSource> fuelOf(Ride ride) {
+    // Só para viagens antigas: fonte principal do veículo hoje; vazio se ele foi desativado.
+    private Optional<FuelSource> currentVehicleFuelOf(Ride ride) {
         try {
             return vehicleAccess.getActiveVehicleOf(ride.getVehicleId(), ride.getDriverId())
                     .getFuelSources()

@@ -7,6 +7,7 @@ import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 
 import java.time.LocalDate;
+import java.util.Locale;
 
 import static org.assertj.core.api.Assertions.assertThat;
 
@@ -38,6 +39,21 @@ class IndicatorReferenceTest {
     void shouldUseWeekBasedYearAroundNewYear() {
         // 1º de janeiro de 2027 é sexta-feira: ainda pertence à semana 53 de 2026.
         assertThat(IndicatorReference.of(IndicatorPeriod.WEEKLY, LocalDate.of(2027, 1, 1))).isEqualTo("2026-W53");
+    }
+
+    @Test
+    @DisplayName("A referência continua em ASCII mesmo com o servidor em outro idioma")
+    void shouldKeepAsciiDigitsWhateverTheDefaultLocale() {
+        Locale original = Locale.getDefault();
+        try {
+            Locale.setDefault(Locale.forLanguageTag("ar-EG-u-nu-arab"));
+
+            assertThat(IndicatorReference.of(IndicatorPeriod.MONTHLY, LocalDate.of(2026, 11, 12))).isEqualTo("2026-11");
+            assertThat(IndicatorReference.of(IndicatorPeriod.WEEKLY, LocalDate.of(2026, 11, 12))).isEqualTo("2026-W46");
+            assertThat(IndicatorReference.of(IndicatorPeriod.SEMESTERLY, LocalDate.of(2026, 11, 12))).isEqualTo("2026-S2");
+        } finally {
+            Locale.setDefault(original);
+        }
     }
 
     @Test

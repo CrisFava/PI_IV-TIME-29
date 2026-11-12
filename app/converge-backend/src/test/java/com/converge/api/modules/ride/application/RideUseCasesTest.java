@@ -269,6 +269,25 @@ class RideUseCasesTest {
     }
 
     @Test
+    @DisplayName("Falha ao contabilizar os indicadores não deve falhar a conclusão já gravada")
+    void shouldCompleteRideEvenWhenIndicatorPublishingFails() {
+        CompleteRideUseCase completeRide = new CompleteRideUseCase(rideAccess, rideRepository, completionPublisher);
+        Ride ride = rideOf(userObjectId.toHexString(), LocalDateTime.now().plusDays(1));
+        ride.requestSeat("passenger-456", "route-456", place("Rua A"), place("Campus PUC"));
+        ride.acceptPassenger("passenger-456");
+        ride.start();
+        currentUserIs(userObjectId);
+        when(rideRepository.findById(rideObjectId)).thenReturn(Optional.of(ride));
+        when(rideRepository.save(any(Ride.class))).thenAnswer(invocation -> invocation.getArgument(0));
+        doThrow(new IllegalStateException("Banco indisponível")).when(completionPublisher).publish(any());
+
+        Ride completed = completeRide.execute(new RideRefCommand(rideObjectId.toHexString(), UID));
+
+        assertThat(completed.getStatus()).isEqualTo(RideStatus.COMPLETED);
+        verify(rideRepository).save(ride);
+    }
+
+    @Test
     @DisplayName("Quem não é o motorista não pode iniciar a viagem")
     void shouldNotStartRideWhenUserIsNotTheDriver() {
         StartRideUseCase startRide = new StartRideUseCase(rideAccess, rideRepository);
