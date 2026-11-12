@@ -3,6 +3,7 @@
 package com.converge.api.modules.route.application;
 
 import com.converge.api.modules.route.application.dto.PlaceRequestDTO;
+import com.converge.api.modules.route.application.event.RouteChangedEvent;
 import com.converge.api.modules.route.application.dto.RouteRefCommand;
 import com.converge.api.modules.route.application.dto.UpdateRouteCommand;
 import com.converge.api.modules.route.application.dto.UpdateRouteRequestDTO;
@@ -17,6 +18,7 @@ import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
+import org.springframework.context.ApplicationEventPublisher;
 
 import java.math.BigDecimal;
 import java.time.DayOfWeek;
@@ -37,6 +39,9 @@ class ManageRouteUseCasesTest {
     @Mock
     private RouteRepository routeRepository;
 
+    @Mock
+    private ApplicationEventPublisher eventPublisher;
+
     private ListMyRoutesUseCase listMyRoutes;
     private GetRouteUseCase getRoute;
     private UpdateRouteUseCase updateRoute;
@@ -49,9 +54,10 @@ class ManageRouteUseCasesTest {
         listMyRoutes = new ListMyRoutesUseCase(routeRepository);
         getRoute = new GetRouteUseCase(routeAccess);
         updateRoute = new UpdateRouteUseCase(
-                routeAccess, routeRepository, new RouteMapper(), new RouteGeometryService(new FakeMapsGateway())
+                routeAccess, routeRepository, new RouteMapper(), new RouteGeometryService(new FakeMapsGateway()),
+                eventPublisher
         );
-        deleteRoute = new DeleteRouteUseCase(routeAccess, routeRepository);
+        deleteRoute = new DeleteRouteUseCase(routeAccess, routeRepository, eventPublisher);
     }
 
     private void storedRoute(Route route) {
@@ -108,6 +114,7 @@ class ManageRouteUseCasesTest {
         assertThat(updated.getParking()).isEqualTo(new BigDecimal("15.00"));
         assertThat(updated.getRouteDistanceKm()).isEqualTo(FakeMapsGateway.GOOGLE_ROUTE.distanceKm());
         verify(routeRepository).save(route);
+        verify(eventPublisher).publishEvent(new RouteChangedEvent(ROUTE_ID));
     }
 
     @Test
@@ -120,5 +127,6 @@ class ManageRouteUseCasesTest {
 
         assertThat(route.getStatus()).isEqualTo(RouteStatus.INACTIVE);
         verify(routeRepository).save(route);
+        verify(eventPublisher).publishEvent(new RouteChangedEvent(ROUTE_ID));
     }
 }
