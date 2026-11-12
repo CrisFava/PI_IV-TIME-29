@@ -9,6 +9,12 @@ abstract class AppRoutes {
   static const String completeProfile = '/complete-profile';
   static const String home = '/';
 
+  /// Conversa entre o motorista e um passageiro de uma viagem.
+  static const String chat = '/chat/:rideId/:passengerId';
+
+  static String chatOf({required String rideId, required String passengerId}) =>
+      '/chat/$rideId/$passengerId';
+
   /// Rotas acessíveis sem sessão.
   static const Set<String> public = {welcome, login, register, forgotPassword};
 }
