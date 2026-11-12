@@ -10,6 +10,7 @@ import com.converge.api.modules.ride.infrastructure.RideCostCalculator;
 import com.converge.api.shared.application.UseCase;
 import com.converge.api.shared.domain.enums.NotificationType;
 import lombok.RequiredArgsConstructor;
+import lombok.extern.slf4j.Slf4j;
 import org.springframework.context.ApplicationEventPublisher;
 import org.springframework.stereotype.Service;
 
@@ -19,6 +20,7 @@ import java.util.List;
 /**
  * Caso de uso para o motorista aceitar a solicitação de vaga de um passageiro.
  */
+@Slf4j
 @Service
 @RequiredArgsConstructor
 public class AcceptPassengerUseCase implements UseCase<PassengerRequestCommand, Ride> {
@@ -57,12 +59,17 @@ public class AcceptPassengerUseCase implements UseCase<PassengerRequestCommand, 
     }
 
     private void notifyConfirmedPassenger(String passengerId, String rideId) {
-        eventPublisher.publishEvent(new RideNotificationEvent(
-                List.of(passengerId),
-                NotificationType.RIDE_CONFIRMED,
-                "Carona confirmada",
-                "O motorista aceitou sua solicitação de vaga.",
-                rideId
-        ));
+        try {
+            eventPublisher.publishEvent(new RideNotificationEvent(
+                    List.of(passengerId),
+                    NotificationType.RIDE_CONFIRMED,
+                    "Carona confirmada",
+                    "O motorista aceitou sua solicitação de vaga.",
+                    rideId
+            ));
+        } catch (Exception e) {
+            log.error("Falha ao publicar evento de notificação para o passageiro {} na carona {}: {}",
+                    passengerId, rideId, e.getMessage(), e);
+        }
     }
 }

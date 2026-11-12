@@ -208,6 +208,32 @@ class RideUseCasesTest {
         assertThat(accepted.getAvailableSeats()).isEqualTo(2);
         verify(rideCostCalculator).recalculateEstimatedShares(ride);
         verify(rideRepository).save(ride);
+        verify(eventPublisher).publishEvent(any(RideNotificationEvent.class));
+    }
+
+    @Test
+    @DisplayName("Aceitar passageiro deve isolar falhas de notificação e retornar carona salva com sucesso")
+    void shouldSucceedWhenNotificationFailsOnAcceptPassenger() {
+        AcceptPassengerUseCase acceptPassenger = new AcceptPassengerUseCase(
+                rideAccess, rideEligibility, rideCostCalculator, rideRepository, eventPublisher);
+        Ride ride = rideOf(userObjectId.toHexString(), LocalDateTime.now().plusDays(1));
+        ride.requestSeat("passenger-456", "route-456", place("Rua A"), place("Campus PUC"));
+        currentUserIs(userObjectId);
+        when(rideRepository.findById(rideObjectId)).thenReturn(Optional.of(ride));
+        when(rideCostCalculator.computeConfirmationQuote(ride, "passenger-456"))
+                .thenReturn(new RideCostCalculator.ConfirmationQuote(1.8, new BigDecimal("7.50")));
+        when(rideRepository.save(any(Ride.class))).thenAnswer(invocation -> invocation.getArgument(0));
+        doThrow(new RuntimeException("Database error saving notification"))
+                .when(eventPublisher).publishEvent(any(RideNotificationEvent.class));
+
+        Ride accepted = acceptPassenger.execute(
+                new PassengerRequestCommand(rideObjectId.toHexString(), "passenger-456", UID));
+
+        assertThat(accepted.getParticipants().get(1).getStatus()).isEqualTo(ParticipantStatus.CONFIRMED);
+        assertThat(accepted.getParticipants().get(1).getDetourGeneratedKm()).isEqualTo(1.8);
+        assertThat(accepted.getParticipants().get(1).getMaxAmount()).isEqualByComparingTo("7.50");
+        verify(rideRepository).save(ride);
+        verify(eventPublisher).publishEvent(any(RideNotificationEvent.class));
     }
 
     @Test
