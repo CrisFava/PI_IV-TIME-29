@@ -3,6 +3,7 @@
 package com.converge.api.modules.ride.presentation.exception;
 
 import com.converge.api.modules.ride.presentation.controller.RideController;
+import com.converge.api.modules.ride.presentation.controller.RidePaymentController;
 import com.converge.api.shared.infrastructure.exception.ErrorResponse;
 import com.converge.api.shared.presentation.dto.ApplicationResponse;
 import com.converge.api.shared.presentation.exception.ErrorCode;
@@ -14,7 +15,7 @@ import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.ExceptionHandler;
 import org.springframework.web.bind.annotation.RestControllerAdvice;
 
-@RestControllerAdvice(assignableTypes = RideController.class)
+@RestControllerAdvice(assignableTypes = {RideController.class, RidePaymentController.class})
 @Order(Ordered.HIGHEST_PRECEDENCE)
 public class RideExceptionHandler {
 
