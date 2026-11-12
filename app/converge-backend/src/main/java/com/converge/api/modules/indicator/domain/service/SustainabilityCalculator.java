@@ -21,6 +21,15 @@ public final class SustainabilityCalculator {
     private SustainabilityCalculator() {
     }
 
+    // Energia que deixou de ser gasta (litros ou kWh): cada carro evitado faria a mesma distância
+    // com o mesmo consumo médio do veículo da carona (RF54).
+    public static double energySaved(double distanceKm, Double averageConsumption, int carsAvoided) {
+        if (distanceKm <= 0 || averageConsumption == null || averageConsumption <= 0 || carsAvoided <= 0) {
+            return 0.0;
+        }
+        return carsAvoided * distanceKm / averageConsumption;
+    }
+
     // CO2 evitado = energia economizada x fator do combustível.
     public static double co2AvoidedKg(double energySaved, String energySource) {
         if (energySaved <= 0 || energySource == null) {
