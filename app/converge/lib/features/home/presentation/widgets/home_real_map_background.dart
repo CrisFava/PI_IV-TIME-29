@@ -9,7 +9,9 @@ import 'package:flutter/services.dart';
 import 'package:google_maps_flutter/google_maps_flutter.dart';
 
 import '../../../../core/config/styles.dart';
-import '../../../ride/data/models/mock_driver_model.dart';
+import '../../../../core/utils/currency_formatter.dart';
+import '../../../matching/data/models/match_model.dart';
+import 'campus_spots.dart';
 
 /// Tipo de pino central para o modo de arrasto estilo Uber
 enum CentralPinType {
@@ -140,8 +142,9 @@ class HomeRealMapBackground extends StatefulWidget {
   final bool isDriverMode;
   final double searchRadiusKm;
   final bool showDrivers;
-  final List<MockNearbyDriver> availableDrivers;
-  final MockNearbyDriver? acceptedDriver;
+  /// Motoristas compatíveis (matching), marcados no ponto de partida de cada um.
+  final List<MatchModel> availableDrivers;
+  final MatchModel? acceptedDriver;
   final LatLng? pickupLocation;
   final LatLng? destinationLocation;
   final String pickupAddress;
@@ -156,7 +159,7 @@ class HomeRealMapBackground extends StatefulWidget {
   final String pinLabel;
   final ValueChanged<LatLng>? onCameraCenterChanged;
 
-  final ValueChanged<MockNearbyDriver>? onDriverSelected;
+  final ValueChanged<MatchModel>? onDriverSelected;
   final VoidCallback? onMapTap;
   final String universityName;
 
@@ -237,13 +240,17 @@ class _HomeRealMapBackgroundState extends State<HomeRealMapBackground> {
     }
   }
 
+  // O motorista aparece no ponto de partida do trajeto dele
+  static LatLng _driverPosition(MatchModel driver) =>
+      LatLng(driver.origin.latitude, driver.origin.longitude);
+
   void _adjustCameraForCurrentState() {
     if (_mapController == null) return;
 
     // Se o motorista aceitou, enquadra motorista, embarque e destino
     if (widget.acceptedDriver != null && widget.pickupLocation != null) {
       final points = <LatLng>[
-        widget.acceptedDriver!.position,
+        _driverPosition(widget.acceptedDriver!),
         widget.pickupLocation!,
       ];
       if (widget.destinationLocation != null) {
@@ -301,7 +308,7 @@ class _HomeRealMapBackgroundState extends State<HomeRealMapBackground> {
 
   void _recenterMap() {
     HapticFeedback.lightImpact();
-    final target = widget.pickupLocation ?? mockCampusCoordinates;
+    final target = widget.pickupLocation ?? campusCoordinates;
     _mapController?.animateCamera(
       CameraUpdate.newCameraPosition(
         CameraPosition(
@@ -318,7 +325,7 @@ class _HomeRealMapBackgroundState extends State<HomeRealMapBackground> {
     return {
       Circle(
         circleId: const CircleId('driver_acceptance_radius'),
-        center: widget.pickupLocation ?? mockCampusCoordinates,
+        center: widget.pickupLocation ?? campusCoordinates,
         radius: widget.searchRadiusKm * 1000,
         strokeWidth: 1,
         strokeColor: AppColors.primary.withValues(alpha: 0.35),
@@ -334,7 +341,7 @@ class _HomeRealMapBackgroundState extends State<HomeRealMapBackground> {
     final isDraggingPickup = widget.isDraggingPin &&
         widget.centralPinType == CentralPinType.pickup;
     if (!isDraggingPickup) {
-      final pickupPos = widget.pickupLocation ?? mockCampusCoordinates;
+      final pickupPos = widget.pickupLocation ?? campusCoordinates;
       final pickupTitle = widget.pickupAddress.isNotEmpty
           ? 'Origem: ${widget.pickupAddress}'
           : 'Origem: Ponto de Embarque';
@@ -382,36 +389,33 @@ class _HomeRealMapBackgroundState extends State<HomeRealMapBackground> {
       final driver = widget.acceptedDriver!;
       markers.add(
         Marker(
-          markerId: MarkerId('accepted_driver_${driver.id}'),
-          position: driver.position,
+          markerId: MarkerId('accepted_driver_${driver.driverRouteId}'),
+          position: _driverPosition(driver),
           icon: _blackCarIcon ??
               BitmapDescriptor.defaultMarkerWithHue(BitmapDescriptor.hueAzure),
           anchor: const Offset(0.5, 0.5),
           infoWindow: InfoWindow(
-            title: '${driver.name} (A caminho)',
-            snippet: driver.vehicleModel,
+            title: '${driver.otherUserName} (carona confirmada)',
+            snippet: driver.vehicle?.description ?? driver.origin.address,
           ),
         ),
       );
     }
     // 4. Marcadores de Motoristas Disponíveis (Carrinho preto filled)
     else if (!widget.isDriverMode && widget.showDrivers) {
-      final driversToShow = widget.availableDrivers.isNotEmpty
-          ? widget.availableDrivers
-          : mockNearbyDriversList;
-
-      for (final driver in driversToShow) {
+      for (final driver in widget.availableDrivers) {
         markers.add(
           Marker(
-            markerId: MarkerId(driver.id),
-            position: driver.position,
+            markerId: MarkerId(driver.driverRouteId),
+            position: _driverPosition(driver),
             icon: _blackCarIcon ??
                 BitmapDescriptor.defaultMarkerWithHue(BitmapDescriptor.hueAzure),
             anchor: const Offset(0.5, 0.5),
             infoWindow: InfoWindow(
-              title: driver.name,
-              snippet:
-                  '${driver.vehicleModel} • R\$ ${driver.contributionAmount.toStringAsFixed(2)}',
+              title: '${driver.otherUserName} • ${driver.compatibilityLabel}',
+              snippet: driver.estimatedCostPerPassenger == null
+                  ? 'Sai às ${driver.departureTime}'
+                  : 'Sai às ${driver.departureTime} • ${CurrencyFormatter.format(driver.estimatedCostPerPassenger!)}',
               onTap: () => widget.onDriverSelected?.call(driver),
             ),
             onTap: () => widget.onDriverSelected?.call(driver),
@@ -497,7 +501,7 @@ class _HomeRealMapBackgroundState extends State<HomeRealMapBackground> {
           child: GoogleMap(
             style: _monochromeMapStyle,
             initialCameraPosition: CameraPosition(
-              target: widget.pickupLocation ?? mockCampusCoordinates,
+              target: widget.pickupLocation ?? campusCoordinates,
               zoom: 15.0,
             ),
             onMapCreated: _onMapCreated,
