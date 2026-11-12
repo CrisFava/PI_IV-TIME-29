@@ -23,4 +23,7 @@ public interface UserIndicatorRepository extends MongoRepository<UserIndicator, 
 
     // Todos os documentos mensais do usuário, usados para montar o acumulado histórico.
     List<UserIndicator> findByUserIdAndPeriod(String userId, IndicatorPeriod period);
+
+    // Se o usuário já tem algum indicador (para contar usuários ativos no acumulado da plataforma).
+    boolean existsByUserId(String userId);
 }
