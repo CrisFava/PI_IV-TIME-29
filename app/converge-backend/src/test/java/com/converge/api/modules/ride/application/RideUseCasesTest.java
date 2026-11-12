@@ -171,6 +171,33 @@ class RideUseCasesTest {
     }
 
     @Test
+    @DisplayName("Cancelar viagem deve isolar falhas nas etapas de penalidade, auditoria e notificação")
+    void shouldSucceedWhenSideEffectsFailOnCancelRideWithConfirmedPassengers() {
+        CancelRideUseCase cancelRide = new CancelRideUseCase(
+                rideAccess, rideRepository, recordReputationPenalty, auditLogService, eventPublisher);
+        String driverId = userObjectId.toHexString();
+        Ride ride = rideOf(driverId, LocalDateTime.now().plusDays(1));
+        ride.requestSeat("passenger-1", "route-1", place("Rua A"), place("Campus PUC"));
+        ride.acceptPassenger("passenger-1", 1.2, new BigDecimal("6.00"));
+        currentUserIs(userObjectId);
+        when(rideRepository.findById(rideObjectId)).thenReturn(Optional.of(ride));
+        when(rideRepository.save(any(Ride.class))).thenAnswer(invocation -> invocation.getArgument(0));
+
+        doThrow(new RuntimeException("Penalty error")).when(recordReputationPenalty).recordDriverCancellation(driverId);
+        doThrow(new RuntimeException("Audit error")).when(auditLogService).record(any(), any(), any(), any(), any(), any());
+        doThrow(new RuntimeException("Notification error")).when(eventPublisher).publishEvent(any(RideNotificationEvent.class));
+
+        Ride cancelled = cancelRide.execute(new CancelRideCommand(
+                rideObjectId.toHexString(), UID, new CancelRideRequestDTO("Carro quebrou")));
+
+        assertThat(cancelled.getStatus()).isEqualTo(RideStatus.CANCELLED);
+        verify(rideRepository).save(ride);
+        verify(recordReputationPenalty).recordDriverCancellation(driverId);
+        verify(auditLogService).record(any(), any(), any(), any(), any(), any());
+        verify(eventPublisher).publishEvent(any(RideNotificationEvent.class));
+    }
+
+    @Test
     @DisplayName("Quem não é o motorista não pode cancelar a viagem")
     void shouldNotCancelRideWhenUserIsNotTheDriver() {
         CancelRideUseCase cancelRide = new CancelRideUseCase(

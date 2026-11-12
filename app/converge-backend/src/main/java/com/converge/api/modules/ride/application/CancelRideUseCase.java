@@ -13,6 +13,7 @@ import com.converge.api.shared.domain.enums.AuditAction;
 import com.converge.api.shared.domain.enums.NotificationType;
 import jakarta.annotation.Nullable;
 import lombok.RequiredArgsConstructor;
+import lombok.extern.slf4j.Slf4j;
 import org.springframework.context.ApplicationEventPublisher;
 import org.springframework.stereotype.Service;
 
@@ -22,6 +23,7 @@ import java.util.Map;
 /**
  * Caso de uso para o motorista cancelar a viagem inteira antes de seu início.
  */
+@Slf4j
 @Service
 @RequiredArgsConstructor
 public class CancelRideUseCase implements UseCase<CancelRideCommand, Ride> {
@@ -56,24 +58,41 @@ public class CancelRideUseCase implements UseCase<CancelRideCommand, Ride> {
             List<String> confirmedPassengerIds,
             @Nullable String reason
     ) {
-        recordReputationPenalty.recordDriverCancellation(driverId);
-        auditLogService.record(
-                AuditAction.RIDE_CANCELLED,
-                driverId,
-                null,
-                "RIDE",
-                rideId,
-                Map.of(
-                        "confirmedPassengersCount", confirmedPassengerIds.size(),
-                        "reason", reason != null ? reason : ""
-                )
-        );
-        eventPublisher.publishEvent(new RideNotificationEvent(
-                confirmedPassengerIds,
-                NotificationType.RIDE_CANCELLED,
-                "Viagem cancelada pelo motorista",
-                "O motorista cancelou a carona em que você estava confirmado.",
-                rideId
-        ));
+        try {
+            recordReputationPenalty.recordDriverCancellation(driverId);
+        } catch (Exception e) {
+            log.error("Falha ao registrar penalidade de reputação para o motorista {} no cancelamento da carona {}: {}",
+                    driverId, rideId, e.getMessage(), e);
+        }
+
+        try {
+            auditLogService.record(
+                    AuditAction.RIDE_CANCELLED,
+                    driverId,
+                    null,
+                    "RIDE",
+                    rideId,
+                    Map.of(
+                            "confirmedPassengersCount", confirmedPassengerIds.size(),
+                            "reason", reason != null ? reason : ""
+                    )
+            );
+        } catch (Exception e) {
+            log.error("Falha ao registrar trilha de auditoria para o cancelamento da carona {}: {}",
+                    rideId, e.getMessage(), e);
+        }
+
+        try {
+            eventPublisher.publishEvent(new RideNotificationEvent(
+                    confirmedPassengerIds,
+                    NotificationType.RIDE_CANCELLED,
+                    "Viagem cancelada pelo motorista",
+                    "O motorista cancelou a carona em que você estava confirmado.",
+                    rideId
+            ));
+        } catch (Exception e) {
+            log.error("Falha ao publicar evento de notificação de cancelamento da carona {}: {}",
+                    rideId, e.getMessage(), e);
+        }
     }
 }
