@@ -8,7 +8,7 @@
 > **Datas e horas:** todos os campos `ISODate` são armazenados em **UTC**. Campos de hora recorrente (`departureTime`, `estimatedArrivalTime`) são `String "HH:mm"` interpretados no fuso oficial da aplicação (**America/Sao_Paulo**). Ao combinar uma data concreta com um horário recorrente para gerar `departureDateTime`, a conversão para UTC deve usar explicitamente America/Sao_Paulo — nunca o fuso do servidor.
 > **Chat:** as mensagens entre participantes **não ficam no MongoDB** — vivem no **Firebase Realtime Database**, conforme a arquitetura do projeto (comunicação em tempo real). O MongoDB guarda apenas o identificador da sala de conversa quando necessário (ex.: um `chatRoomId` na viagem para localizar o histórico no Firebase). Por isso não há coleção `messages`/`chat` nesta modelagem.
 >
-> Estrutura no Realtime Database: `chats/{chatRoomId}/{passengerId}/messages/{pushId}`, com os campos `senderId`, `senderName`, `senderUid`, `type` (`TEXT`, `PAYMENT_REQUEST`, `PAYMENT_CONFIRMED`, `SYSTEM`), `text`, `amount` e `sentAt` (horário do servidor). O `chatRoomId` é criado quando o motorista aceita o primeiro passageiro, e cada passageiro aceito tem uma conversa particular com o motorista. As mensagens de pagamento e de viagem são só avisos: a fonte de verdade continua sendo a API. As regras de acesso ficam em `app/converge/database.rules.json`.
+> Estrutura no Realtime Database: `chats/{chatRoomId}/{passengerId}/messages/{pushId}`, com os campos `senderId`, `senderName`, `senderUid` (uid do Firebase, conferido pelas regras; é ele que diz de quem é a mensagem), `type` (`TEXT`, `PAYMENT_REQUEST`, `PAYMENT_CONFIRMED`, `SYSTEM`), `text`, `amount` e `sentAt` (horário do servidor). O `chatRoomId` é criado quando o motorista aceita o primeiro passageiro, e cada passageiro aceito tem uma conversa particular com o motorista. As mensagens de pagamento e de viagem são só avisos: a fonte de verdade continua sendo a API. As regras de acesso ficam em `app/converge/database.rules.json`.
 > **Pagamento PIX:** no MVP o pagamento usa **QR Code PIX estático** ("Pix Copia e Cola"), gerado pelo próprio backend, sem gateway e sem API externa. O valor da cobrança vai travado dentro do payload e o dinheiro vai direto da conta do passageiro para a do motorista — o Converge nunca toca no dinheiro. Como o banco não devolve nenhuma confirmação ao servidor, a confirmação de recebimento é **manual** (o motorista marca que recebeu). A verificação automática via gateway (QR Code dinâmico + webhook) fica como evolução futura.
 
 ---
@@ -28,6 +28,7 @@
 | `matchings` | matching | Resultados calculados do algoritmo de compatibilidade |
 | `indicators` | indicator | Indicadores de mobilidade e sustentabilidade por usuário e período |
 | `platform_indicators` | indicator | Indicadores globais agregados da plataforma (RF51) |
+| `indicator_ride_registrations` | indicator | Viagens já contabilizadas nos indicadores (evita reprocessar) |
 | `audit_logs` | shared | Trilha de auditoria de ações sensíveis (moderação, pagamento, segurança) |
 | `universities` | shared | Lista de referência de universidades (padroniza o filtro de matching) |
 | `notifications` | shared | Avisos para o usuário (pagamento, cancelamento, solicitação de vaga) |
@@ -484,6 +485,8 @@ A cobrança é aceita com a viagem `CONFIRMED`, `IN_PROGRESS` ou `COMPLETED`, se
 
 ### Geração do PIX Copia e Cola
 
+> **MVP:** a cobrança segue o fluxo da seção anterior ("Cobrança combinada no chat"). O payload usa o `requestedAmount` combinado no chat, pode ser gerado a partir de `CONFIRMED` e é devolvido em `GET /rides/{rideId}/passengers/{passengerId}/payment`. O uso do `finalAmount` ao concluir a viagem, descrito abaixo, depende do cálculo de rateio no servidor de sockets e fica como evolução.
+
 O backend monta o payload sob demanda (padrão BR Code do Banco Central, CRC16 incluso). **Nada é armazenado**: o payload é derivado de dados que já existem.
 
 | Campo do payload | Origem |
@@ -691,6 +694,7 @@ O backend monta o payload sob demanda (padrão BR Code do Banco Central, CRC16 i
   "sharedKm": "Double",
   "carsAvoided": "Integer",
   "co2AvoidedKg": "Double",
+  "appliedRideIds": ["String (ref: rides._id — viagens já somadas neste documento)"],
   "updatedAt": "ISODate"
 }
 ```
@@ -732,6 +736,7 @@ A tela de Dados (ver wireframes `indicadores` e `indicadores ambientais`) exibe 
   "totalCarsAvoided": "Integer",
   "totalCo2AvoidedKg": "Double",
   "activeUsers": "Integer",
+  "appliedRideIds": ["String (ref: rides._id — só nos períodos WEEKLY, MONTHLY e SEMESTERLY)"],
   "calculatedAt": "ISODate"
 }
 ```
@@ -745,7 +750,9 @@ A tela de Dados (ver wireframes `indicadores` e `indicadores ambientais`) exibe 
 ### Regras de Negócio
 
 - Diferente de `indicators` (por usuário), aqui o `ALL_TIME` **é um documento armazenado** — como é um único documento global e pequeno (só totais, sem array `series`), não há risco do limite de 16 MB.
-- Atualizado por job agendado (ex: diário), não em tempo real, para não gerar concorrência de escrita no mesmo documento a cada viagem concluída.
+- Atualizado ao concluir cada viagem, sempre com operações atômicas do MongoDB, sem ler e regravar o documento: `$inc` para somar, e `$max` para os usuários ativos e para o `ALL_TIME`, que é a soma dos semestres. Assim, viagens concluídas ao mesmo tempo não perdem somas.
+- **Uma viagem é somada uma vez só em cada documento:** o update só casa se o `rideId` ainda não está em `appliedRideIds`, e o `$addToSet` registra a viagem no mesmo update. Quando a viagem termina de ser contabilizada, o `rideId` entra em `indicator_ride_registrations`. A mesma regra vale para a coleção `indicators`.
+- **Reprocessamento:** a viagem gravada como `COMPLETED` é o registro durável. Uma tarefa agendada (a cada 15 minutos) refaz a contabilização das viagens concluídas nos últimos 7 dias que ainda não estão em `indicator_ride_registrations`. Graças à regra acima, uma contabilização que parou no meio é completada sem contar nada em dobro.
 - Considera apenas viagens `COMPLETED` com ao menos um passageiro efetivo (RF49).
 
 ---
