@@ -20,11 +20,12 @@ class FakeChatRepository implements ChatRepository {
   List<ChatMessageModel> messagesOf(ChatThreadRef thread) =>
       List.unmodifiable(_messages[thread] ?? const []);
 
-  StreamController<List<ChatMessageModel>> _controllerOf(ChatThreadRef thread) =>
-      _controllers.putIfAbsent(
-        thread,
-        () => StreamController<List<ChatMessageModel>>.broadcast(),
-      );
+  StreamController<List<ChatMessageModel>> _controllerOf(
+    ChatThreadRef thread,
+  ) => _controllers.putIfAbsent(
+    thread,
+    () => StreamController<List<ChatMessageModel>>.broadcast(),
+  );
 
   @override
   Stream<List<ChatMessageModel>> watchMessages(ChatThreadRef thread) async* {
@@ -44,6 +45,8 @@ class FakeChatRepository implements ChatRepository {
     final stored = ChatMessageModel(
       id: 'message-${_nextId++}',
       senderId: message.senderId,
+      // No Firebase o repositório grava o uid de quem está logado.
+      senderUid: 'uid-${message.senderId}',
       senderName: message.senderName,
       type: message.type,
       text: message.text,

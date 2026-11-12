@@ -11,6 +11,7 @@ import '../../../review/state/ride_reviews_controller.dart';
 import '../../../ride/data/models/ride_status.dart';
 import '../../data/models/chat_conversation.dart';
 import '../../state/chat_actions_controller.dart';
+import '../../state/chat_providers.dart';
 import 'chat_panel_button.dart';
 import 'chat_panel_card.dart';
 
@@ -72,6 +73,26 @@ class ChatRidePanel extends ConsumerWidget {
         ? conversation.thread.passengerId
         : conversation.ride.driverId;
     final reviews = ref.watch(rideReviewsProvider(conversation.ride.id));
+
+    // Sem saber o que já foi avaliado, não mostra "Avaliar" como se fosse a primeira vez.
+    if (reviews.hasError && !reviews.hasValue) {
+      return ChatPanelCard(
+        icon: Icons.error_outline_rounded,
+        title: 'Viagem concluída',
+        subtitle:
+            'Não foi possível carregar suas avaliações. ${chatErrorMessage(reviews.error!)}',
+        actions: [
+          ChatPanelButton(
+            label: 'Tentar novamente',
+            icon: Icons.refresh_rounded,
+            primary: false,
+            onPressed: () =>
+                ref.invalidate(rideReviewsProvider(conversation.ride.id)),
+          ),
+        ],
+      );
+    }
+
     final ReviewModel? given = reviews.value
         ?.where((review) => review.reviewedId == reviewedId)
         .firstOrNull;

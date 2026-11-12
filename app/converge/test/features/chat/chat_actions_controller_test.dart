@@ -75,7 +75,10 @@ void main() {
       final state = container.read(chatActionsProvider(thread));
       expect(state.hasError, isTrue);
       expect(state.error, isA<ChatException>());
-      expect(chatErrorMessage(state.error!), 'Não foi possível enviar a mensagem.');
+      expect(
+        chatErrorMessage(state.error!),
+        'Não foi possível enviar a mensagem.',
+      );
     });
   });
 
@@ -93,7 +96,8 @@ void main() {
     });
 
     test('se a API recusar, nada é enviado ao chat', () async {
-      rides.failNextActionWith = 'O valor cobrado não pode passar do valor máximo.';
+      rides.failNextActionWith =
+          'O valor cobrado não pode passar do valor máximo.';
 
       final requested = await controller().requestPayment(999);
 
@@ -130,7 +134,8 @@ void main() {
     });
 
     test('se a API recusar, o chat não recebe confirmação', () async {
-      rides.failNextActionWith = 'Solicite o pagamento antes de confirmar o recebimento.';
+      rides.failNextActionWith =
+          'Solicite o pagamento antes de confirmar o recebimento.';
 
       final confirmed = await controller().confirmPayment();
 
@@ -152,16 +157,20 @@ void main() {
     });
 
     test('concluir avisa cada passageiro na sua própria conversa', () async {
+      Map<String, dynamic> secondPassenger(String status) => {
+        'userId': 'passenger-2',
+        'name': 'Bruno Lima',
+        'role': 'PASSENGER',
+        'status': status,
+      };
       rides.ride = fakeRide(
         status: 'IN_PROGRESS',
-        extraParticipants: [
-          {
-            'userId': 'passenger-2',
-            'name': 'Bruno Lima',
-            'role': 'PASSENGER',
-            'status': 'CONFIRMED',
-          },
-        ],
+        extraParticipants: [secondPassenger('CONFIRMED')],
+      );
+      rides.completedRide = fakeRide(
+        status: 'COMPLETED',
+        passengerStatus: 'COMPLETED',
+        extraParticipants: [secondPassenger('COMPLETED')],
       );
       const otherThread = ChatThreadRef(
         chatRoomId: 'ride_ride-1',
@@ -173,13 +182,16 @@ void main() {
 
       expect(completed, isTrue);
       expect(rides.ride.status, RideStatus.completed);
-      expect(chat.messagesOf(thread).single.type, ChatMessageType.system);
-      // O FakeRideRepository devolve a viagem concluída só com o primeiro passageiro.
-      expect(chat.messagesOf(otherThread), isEmpty);
+      for (final passengerThread in [thread, otherThread]) {
+        final notice = chat.messagesOf(passengerThread).single;
+        expect(notice.type, ChatMessageType.system);
+        expect(notice.text, 'Viagem concluída. Avalie como foi a carona.');
+      }
     });
 
     test('se a API recusar concluir, ninguém é avisado', () async {
-      rides.failNextActionWith = 'Esta ação só vale para uma viagem em andamento.';
+      rides.failNextActionWith =
+          'Esta ação só vale para uma viagem em andamento.';
 
       final completed = await controller().completeRide();
 

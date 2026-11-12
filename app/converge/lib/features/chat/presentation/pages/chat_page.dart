@@ -30,9 +30,6 @@ class ChatPage extends ConsumerStatefulWidget {
 }
 
 class _ChatPageState extends ConsumerState<ChatPage> {
-  /// Último aviso de pagamento ou de viagem já tratado, para não recarregar à toa.
-  String? _lastHandledEventId;
-
   @override
   Widget build(BuildContext context) {
     final viewer = ref.watch(chatViewerProvider);
@@ -76,25 +73,33 @@ class _ChatPageState extends ConsumerState<ChatPage> {
           );
         }
 
-        return _buildConversation(conversation, viewer.id);
+        return _buildConversation(conversation, viewer.firebaseUid);
       },
     );
   }
 
-  Widget _buildConversation(ChatConversation conversation, String viewerId) {
+  Widget _buildConversation(ChatConversation conversation, String viewerUid) {
     final thread = conversation.thread;
     final messages = ref.watch(chatMessagesProvider(thread));
     final busy = ref.watch(chatActionsProvider(thread)).isLoading;
 
     // Um aviso do outro participante (cobrança, pagamento, início ou fim da
     // viagem) significa que o estado mudou na API: recarrega o que a tela mostra.
+    // Olha todas as mensagens novas, porque uma atualização pode trazer várias.
     ref.listen(chatMessagesProvider(thread), (previous, next) {
-      final latest = next.value?.lastOrNull;
-      if (latest == null || !latest.type.changesRideState) return;
-      if (latest.id == _lastHandledEventId) return;
+      final before = previous?.value;
+      final after = next.value;
+      // Na primeira carga a tela já busca o estado atual da API.
+      if (before == null || after == null) return;
 
-      _lastHandledEventId = latest.id;
-      if (previous?.value == null || latest.isFrom(viewerId)) return;
+      final seen = {for (final message in before) message.id};
+      final stateChanged = after.any(
+        (message) =>
+            !seen.contains(message.id) &&
+            message.type.changesRideState &&
+            !message.isSentBy(viewerUid),
+      );
+      if (!stateChanged) return;
 
       ref.invalidate(ridePaymentProvider(thread.passenger));
       ref.invalidate(rideProvider(thread.rideId));
@@ -127,7 +132,7 @@ class _ChatPageState extends ConsumerState<ChatPage> {
                 onAction: () => ref.invalidate(chatMessagesProvider(thread)),
               ),
               data: (messages) =>
-                  ChatMessageList(messages: messages, viewerId: viewerId),
+                  ChatMessageList(messages: messages, viewerUid: viewerUid),
             ),
           ),
           ChatComposer(

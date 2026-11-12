@@ -22,9 +22,15 @@ void main() {
       expect(message.type, ChatMessageType.text);
       expect(message.text, 'Chego em 5 minutos');
       expect(message.amount, isNull);
-      expect(message.sentAt, DateTime.fromMillisecondsSinceEpoch(1794816000000));
-      expect(message.isFrom('driver-1'), isTrue);
-      expect(message.isFrom('passenger-1'), isFalse);
+      expect(
+        message.sentAt,
+        DateTime.fromMillisecondsSinceEpoch(1794816000000),
+      );
+      expect(message.senderUid, 'firebase-uid');
+      expect(message.isSentBy('firebase-uid'), isTrue);
+      expect(message.isSentBy('outro-uid'), isFalse);
+      // senderId é gravado pelo app e não decide de quem é a mensagem.
+      expect(message.isSentBy('driver-1'), isFalse);
     });
 
     test('lê o valor das mensagens de pagamento, inteiro ou decimal', () {
@@ -43,38 +49,55 @@ void main() {
       expect(integer.amount, 12.0);
     });
 
-    test('mensagem malformada vira texto vazio em vez de quebrar a conversa', () {
-      final message = ChatMessageModel.fromMap('x', const {
-        'type': 'TIPO_NOVO',
-        'text': 42,
-        'amount': 'doze',
-        'sentAt': 'ontem',
+    test(
+      'mensagem malformada vira texto vazio em vez de quebrar a conversa',
+      () {
+        final message = ChatMessageModel.fromMap('x', const {
+          'type': 'TIPO_NOVO',
+          'text': 42,
+          'amount': 'doze',
+          'sentAt': 'ontem',
+        });
+
+        expect(message.type, ChatMessageType.text);
+        expect(message.text, '');
+        expect(message.senderId, '');
+        expect(message.amount, isNull);
+        expect(message.sentAt, isNull);
+      },
+    );
+
+    test('sem senderUid a mensagem nunca é considerada minha', () {
+      final message = ChatMessageModel.fromMap('y', const {
+        'senderId': 'driver-1',
+        'type': 'TEXT',
+        'text': 'Oi',
       });
 
-      expect(message.type, ChatMessageType.text);
-      expect(message.text, '');
-      expect(message.senderId, '');
-      expect(message.amount, isNull);
-      expect(message.sentAt, isNull);
+      expect(message.senderUid, '');
+      expect(message.isSentBy(''), isFalse);
     });
   });
 
   group('ChatMessageModel.toMap', () {
-    test('grava só os campos da mensagem, sem valor quando não é pagamento', () {
-      const message = ChatMessageModel(
-        senderId: 'driver-1',
-        senderName: 'Lucas Silveira',
-        type: ChatMessageType.text,
-        text: 'Oi',
-      );
+    test(
+      'grava só os campos da mensagem, sem valor quando não é pagamento',
+      () {
+        const message = ChatMessageModel(
+          senderId: 'driver-1',
+          senderName: 'Lucas Silveira',
+          type: ChatMessageType.text,
+          text: 'Oi',
+        );
 
-      expect(message.toMap(), {
-        'senderId': 'driver-1',
-        'senderName': 'Lucas Silveira',
-        'type': 'TEXT',
-        'text': 'Oi',
-      });
-    });
+        expect(message.toMap(), {
+          'senderId': 'driver-1',
+          'senderName': 'Lucas Silveira',
+          'type': 'TEXT',
+          'text': 'Oi',
+        });
+      },
+    );
 
     test('a cobrança leva o valor, e nunca o código PIX', () {
       const message = ChatMessageModel(

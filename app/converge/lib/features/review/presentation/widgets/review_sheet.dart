@@ -117,7 +117,8 @@ class _ReviewSheetState extends ConsumerState<_ReviewSheet> {
   Widget build(BuildContext context) {
     final role = widget.reviewedIsDriver ? 'motorista' : 'passageiro';
 
-    return Padding(
+    // Rolável: com o teclado aberto em tela pequena, o botão continua alcançável.
+    return SingleChildScrollView(
       padding: EdgeInsets.fromLTRB(
         20,
         12,
@@ -150,7 +151,10 @@ class _ReviewSheetState extends ConsumerState<_ReviewSheet> {
           const SizedBox(height: 4),
           Text(
             'Como foi a carona com este $role?',
-            style: const TextStyle(fontSize: 13, color: AppColors.textSecondary),
+            style: const TextStyle(
+              fontSize: 13,
+              color: AppColors.textSecondary,
+            ),
           ),
           const SizedBox(height: 16),
           Row(
@@ -250,7 +254,10 @@ class _ReviewSheetState extends ConsumerState<_ReviewSheet> {
                   )
                 : const Text(
                     'Enviar avaliação',
-                    style: TextStyle(fontSize: 14.5, fontWeight: FontWeight.w700),
+                    style: TextStyle(
+                      fontSize: 14.5,
+                      fontWeight: FontWeight.w700,
+                    ),
                   ),
           ),
         ],

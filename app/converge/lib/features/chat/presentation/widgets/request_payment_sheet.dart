@@ -76,7 +76,8 @@ class _RequestPaymentSheetState extends State<_RequestPaymentSheet> {
 
   @override
   Widget build(BuildContext context) {
-    return Padding(
+    // Rolável: com o teclado aberto em tela pequena, o botão continua alcançável.
+    return SingleChildScrollView(
       padding: EdgeInsets.fromLTRB(
         20,
         12,

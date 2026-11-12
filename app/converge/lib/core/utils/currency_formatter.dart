@@ -19,8 +19,11 @@ abstract final class CurrencyFormatter {
   }
 
   /// Lê o que o usuário digitou (`12,5`, `12.50`, `R$ 1.234,56`).
-  /// Devolve `null` quando o texto não é um valor.
+  /// Devolve `null` quando o texto não é um valor, inclusive valores negativos.
   static double? parse(String input) {
+    // Recusa antes de limpar o texto, senão "-3,20" viraria 3,20.
+    if (input.contains('-')) return null;
+
     var text = input.replaceAll(RegExp(r'[^0-9,.]'), '');
     if (text.isEmpty) return null;
 

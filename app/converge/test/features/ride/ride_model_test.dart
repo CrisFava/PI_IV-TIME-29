@@ -33,7 +33,36 @@ void main() {
       final ride = fakeRide(status: 'NOVO_STATUS', passengerStatus: 'EXPIRED');
 
       expect(ride.status, RideStatus.unknown);
-      expect(ride.passengerOf(fakePassengerId)!.status, ParticipantStatus.unknown);
+      expect(
+        ride.passengerOf(fakePassengerId)!.status,
+        ParticipantStatus.unknown,
+      );
+    });
+
+    test('a lista de participantes não pode ser alterada por fora', () {
+      final participants = fakeRide().participants.toList();
+      final ride = RideModel(
+        id: fakeRideId,
+        sequentialNumber: 1,
+        driverId: fakeDriverId,
+        driverRouteId: 'route-1',
+        origin: fakeRide().origin,
+        destination: fakeRide().destination,
+        departureDateTime: null,
+        completedAt: null,
+        status: RideStatus.confirmed,
+        totalSeats: 3,
+        availableSeats: 2,
+        chatRoomId: 'ride_ride-1',
+        vehicleModel: null,
+        vehicleLicensePlate: null,
+        participants: participants,
+      );
+
+      participants.clear();
+
+      expect(ride.participants, hasLength(2));
+      expect(() => ride.participants.clear(), throwsUnsupportedError);
     });
 
     test('JSON vazio vira uma viagem com valores neutros', () {
@@ -78,26 +107,35 @@ void main() {
     test('passageiro que concluiu a viagem continua na lista', () {
       final ride = fakeRide(status: 'COMPLETED', passengerStatus: 'COMPLETED');
 
-      expect(ride.passengersWithSeat.single.status, ParticipantStatus.completed);
+      expect(
+        ride.passengersWithSeat.single.status,
+        ParticipantStatus.completed,
+      );
     });
   });
 
   group('RideModel.passengerOf', () {
-    test('prefere a participação com vaga quando a pessoa pediu mais de uma vez', () {
-      final ride = fakeRide(
-        passengerStatus: 'CANCELLED',
-        extraParticipants: [
-          {
-            'userId': fakePassengerId,
-            'name': 'Ana Souza',
-            'role': 'PASSENGER',
-            'status': 'CONFIRMED',
-          },
-        ],
-      );
+    test(
+      'prefere a participação com vaga quando a pessoa pediu mais de uma vez',
+      () {
+        final ride = fakeRide(
+          passengerStatus: 'CANCELLED',
+          extraParticipants: [
+            {
+              'userId': fakePassengerId,
+              'name': 'Ana Souza',
+              'role': 'PASSENGER',
+              'status': 'CONFIRMED',
+            },
+          ],
+        );
 
-      expect(ride.passengerOf(fakePassengerId)!.status, ParticipantStatus.confirmed);
-    });
+        expect(
+          ride.passengerOf(fakePassengerId)!.status,
+          ParticipantStatus.confirmed,
+        );
+      },
+    );
 
     test('devolve null para quem não é passageiro da viagem', () {
       final ride = fakeRide();

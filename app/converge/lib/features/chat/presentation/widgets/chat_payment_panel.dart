@@ -14,6 +14,7 @@ import '../../state/chat_actions_controller.dart';
 import '../../state/chat_providers.dart';
 import 'chat_panel_button.dart';
 import 'chat_panel_card.dart';
+import 'copy_pix_button.dart';
 import 'request_payment_sheet.dart';
 
 /// Faixa de pagamento da conversa.
@@ -145,14 +146,7 @@ class ChatPaymentPanel extends ConsumerWidget {
           ? 'O código PIX não está disponível no momento.'
           : 'Pague com o Pix Copia e Cola no app do seu banco. '
                 'O motorista confirma o recebimento.',
-      actions: [
-        if (pixCode != null)
-          ChatPanelButton(
-            label: 'Copiar código PIX',
-            icon: Icons.copy_rounded,
-            onPressed: () => _copyPixCode(context, pixCode),
-          ),
-      ],
+      actions: [if (pixCode != null) CopyPixButton(pixCode: pixCode)],
     );
   }
 
@@ -232,27 +226,5 @@ class ChatPaymentPanel extends ConsumerWidget {
     await ref
         .read(chatActionsProvider(conversation.thread).notifier)
         .confirmPayment();
-  }
-
-  Future<void> _copyPixCode(BuildContext context, String pixCode) async {
-    HapticFeedback.mediumImpact();
-    await Clipboard.setData(ClipboardData(text: pixCode));
-    if (!context.mounted) return;
-
-    ScaffoldMessenger.of(context)
-      ..hideCurrentSnackBar()
-      ..showSnackBar(
-        const SnackBar(
-          content: Text(
-            'Código PIX copiado. Cole no app do seu banco.',
-            style: TextStyle(
-              fontWeight: FontWeight.w600,
-              color: AppColors.textLight,
-            ),
-          ),
-          backgroundColor: AppColors.primary,
-          behavior: SnackBarBehavior.floating,
-        ),
-      );
   }
 }

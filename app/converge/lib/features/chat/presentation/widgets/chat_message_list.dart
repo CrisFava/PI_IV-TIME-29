@@ -9,12 +9,14 @@ import 'chat_notice.dart';
 /// Lista de mensagens da conversa, da mais antiga para a mais nova.
 class ChatMessageList extends StatelessWidget {
   final List<ChatMessageModel> messages;
-  final String viewerId;
+
+  /// Uid do Firebase de quem está logado.
+  final String viewerUid;
 
   const ChatMessageList({
     super.key,
     required this.messages,
-    required this.viewerId,
+    required this.viewerUid,
   });
 
   @override
@@ -37,7 +39,7 @@ class ChatMessageList extends StatelessWidget {
         return ChatMessageBubble(
           key: ValueKey(message.id),
           message: message,
-          isMine: message.isFrom(viewerId),
+          isMine: message.isSentBy(viewerUid),
         );
       },
     );

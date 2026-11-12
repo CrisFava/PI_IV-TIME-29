@@ -26,9 +26,11 @@ class RideModel {
   final String? chatRoomId;
   final String? vehicleModel;
   final String? vehicleLicensePlate;
+
+  /// Lista imutável: quem chamou o construtor não consegue alterá-la depois.
   final List<RideParticipantModel> participants;
 
-  const RideModel({
+  RideModel({
     required this.id,
     required this.sequentialNumber,
     required this.driverId,
@@ -43,8 +45,8 @@ class RideModel {
     required this.chatRoomId,
     required this.vehicleModel,
     required this.vehicleLicensePlate,
-    required this.participants,
-  });
+    required List<RideParticipantModel> participants,
+  }) : participants = List.unmodifiable(participants);
 
   bool isDrivenBy(String userId) => driverId == userId;
 

@@ -13,8 +13,12 @@ class ChatMessageModel {
   /// Chave gerada pelo Realtime Database. Vazia enquanto a mensagem não foi enviada.
   final String id;
 
-  /// Id do usuário no Converge (o mesmo da API).
+  /// Id do usuário no Converge (o mesmo da API). Gravado pelo app, serve só para exibição.
   final String senderId;
+
+  /// Uid do Firebase de quem enviou. As regras do banco garantem que é o de quem está
+  /// logado, então é este campo que decide se a mensagem é minha.
+  final String senderUid;
   final String senderName;
   final ChatMessageType type;
   final String text;
@@ -26,6 +30,7 @@ class ChatMessageModel {
   const ChatMessageModel({
     this.id = '',
     required this.senderId,
+    this.senderUid = '',
     required this.senderName,
     required this.type,
     required this.text,
@@ -33,7 +38,8 @@ class ChatMessageModel {
     this.sentAt,
   });
 
-  bool isFrom(String userId) => senderId == userId;
+  bool isSentBy(String firebaseUid) =>
+      senderUid.isNotEmpty && senderUid == firebaseUid;
 
   /// Lê o valor de um nó `messages/{id}`. Campos ausentes ou de tipo errado
   /// viram valores neutros, para uma mensagem malformada não derrubar a conversa.
@@ -48,6 +54,7 @@ class ChatMessageModel {
     return ChatMessageModel(
       id: id,
       senderId: text('senderId'),
+      senderUid: text('senderUid'),
       senderName: text('senderName'),
       type: ChatMessageType.fromValue(map['type']),
       text: text('text'),
@@ -59,7 +66,7 @@ class ChatMessageModel {
   }
 
   /// Campos gravados no Realtime Database. O horário e o uid de quem envia
-  /// são acrescentados pelo repositório.
+  /// (`senderUid`) são acrescentados pelo repositório.
   Map<String, Object?> toMap() => {
     'senderId': senderId,
     'senderName': senderName,

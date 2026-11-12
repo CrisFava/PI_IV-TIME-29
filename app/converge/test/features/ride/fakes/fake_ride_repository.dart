@@ -14,6 +14,9 @@ class FakeRideRepository implements RideRepository {
   RideModel ride;
   RidePaymentModel payment;
 
+  /// Viagem devolvida ao concluir. Sem ela, devolve a viagem padrão concluída.
+  RideModel? completedRide;
+
   /// Quando preenchido, a próxima ação do motorista falha com esta mensagem.
   String? failNextActionWith;
 
@@ -106,7 +109,9 @@ class FakeRideRepository implements RideRepository {
   Future<RideModel> completeRide(String rideId) async {
     calls.add('completeRide');
     _failIfRequested();
-    return ride = fakeRide(status: 'COMPLETED', passengerStatus: 'COMPLETED');
+    return ride =
+        completedRide ??
+        fakeRide(status: 'COMPLETED', passengerStatus: 'COMPLETED');
   }
 
   @override

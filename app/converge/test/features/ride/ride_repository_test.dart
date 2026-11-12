@@ -67,42 +67,57 @@ void main() {
     ]);
   });
 
-  test('requestSeat envia os trajetos e a data só com ano, mês e dia', () async {
-    respondWith(success(fakeRideJson(status: 'AWAITING_CONFIRMATION')), status: 201);
+  test(
+    'requestSeat envia os trajetos e a data só com ano, mês e dia',
+    () async {
+      respondWith(
+        success(fakeRideJson(status: 'AWAITING_CONFIRMATION')),
+        status: 201,
+      );
 
-    await repository.requestSeat(
-      driverRouteId: 'route-driver',
-      passengerRouteId: 'route-passenger',
-      date: DateTime(2026, 3, 9, 18, 45),
-    );
+      await repository.requestSeat(
+        driverRouteId: 'route-driver',
+        passengerRouteId: 'route-passenger',
+        date: DateTime(2026, 3, 9, 18, 45),
+      );
 
-    expect(requests.single.method, 'POST');
-    expect(requests.single.path, RideEndpoints.request);
-    expect(requests.single.data, {
-      'driverRouteId': 'route-driver',
-      'passengerRouteId': 'route-passenger',
-      'date': '2026-03-09',
-    });
-  });
+      expect(requests.single.method, 'POST');
+      expect(requests.single.path, RideEndpoints.request);
+      expect(requests.single.data, {
+        'driverRouteId': 'route-driver',
+        'passengerRouteId': 'route-passenger',
+        'date': '2026-03-09',
+      });
+    },
+  );
 
-  test('aceitar e recusar passageiro usam o endpoint de cada passageiro', () async {
-    respondWith(success(fakeRideJson()));
+  test(
+    'aceitar e recusar passageiro usam o endpoint de cada passageiro',
+    () async {
+      respondWith(success(fakeRideJson()));
 
-    await repository.acceptPassenger('ride-1', 'passenger-1');
-    await repository.rejectPassenger('ride-1', 'passenger-2', reason: 'Lotado');
+      await repository.acceptPassenger('ride-1', 'passenger-1');
+      await repository.rejectPassenger(
+        'ride-1',
+        'passenger-2',
+        reason: 'Lotado',
+      );
 
-    expect(requests[0].path, '/rides/ride-1/passengers/passenger-1/accept');
-    expect(requests[1].path, '/rides/ride-1/passengers/passenger-2/reject');
-    expect(requests[1].data, {'reason': 'Lotado'});
-  });
+      expect(requests[0].path, '/rides/ride-1/passengers/passenger-1/accept');
+      expect(requests[1].path, '/rides/ride-1/passengers/passenger-2/reject');
+      expect(requests[1].data, {'reason': 'Lotado'});
+    },
+  );
 
   test('iniciar e concluir a viagem devolvem a viagem atualizada', () async {
     respondWith(success(fakeRideJson(status: 'IN_PROGRESS')));
 
     final started = await repository.startRide('ride-1');
-    await repository.completeRide('ride-1');
+    respondWith(success(fakeRideJson(status: 'COMPLETED')));
+    final completed = await repository.completeRide('ride-1');
 
     expect(started.status, RideStatus.inProgress);
+    expect(completed.status, RideStatus.completed);
     expect(requests[0].path, '/rides/ride-1/start');
     expect(requests[1].path, '/rides/ride-1/complete');
   });
@@ -167,30 +182,33 @@ void main() {
     expect(requests[1].path, '/rides/ride-1/passengers/passenger-1/payment');
   });
 
-  test('erro do backend vira ApiException com a mensagem do envelope', () async {
-    respondWith({
-      'success': false,
-      'data': null,
-      'error': {
-        'code': 'BAD_REQUEST',
-        'message': 'Solicite o pagamento antes de confirmar o recebimento.',
-        'fields': ['paymentStatus'],
-      },
-      'timestamp': '2026-11-12T12:00:00Z',
-    }, status: 400);
+  test(
+    'erro do backend vira ApiException com a mensagem do envelope',
+    () async {
+      respondWith({
+        'success': false,
+        'data': null,
+        'error': {
+          'code': 'BAD_REQUEST',
+          'message': 'Solicite o pagamento antes de confirmar o recebimento.',
+          'fields': ['paymentStatus'],
+        },
+        'timestamp': '2026-11-12T12:00:00Z',
+      }, status: 400);
 
-    await expectLater(
-      repository.confirmPayment('ride-1', 'passenger-1'),
-      throwsA(
-        isA<ApiException>()
-            .having((e) => e.status, 'status', 400)
-            .having(
-              (e) => e.message,
-              'message',
-              'Solicite o pagamento antes de confirmar o recebimento.',
-            )
-            .having((e) => e.fields, 'fields', {'paymentStatus'}),
-      ),
-    );
-  });
+      await expectLater(
+        repository.confirmPayment('ride-1', 'passenger-1'),
+        throwsA(
+          isA<ApiException>()
+              .having((e) => e.status, 'status', 400)
+              .having(
+                (e) => e.message,
+                'message',
+                'Solicite o pagamento antes de confirmar o recebimento.',
+              )
+              .having((e) => e.fields, 'fields', {'paymentStatus'}),
+        ),
+      );
+    },
+  );
 }

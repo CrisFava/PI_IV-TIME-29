@@ -39,6 +39,12 @@ void main() {
       expect(CurrencyFormatter.parse('10,994'), 10.99);
     });
 
+    test('recusa valores negativos em vez de inverter o sinal', () {
+      expect(CurrencyFormatter.parse('-R\$ 3,20'), isNull);
+      expect(CurrencyFormatter.parse('R\$ -3,20'), isNull);
+      expect(CurrencyFormatter.parse('-12.5'), isNull);
+    });
+
     test('devolve null quando o texto não é um valor', () {
       expect(CurrencyFormatter.parse(''), isNull);
       expect(CurrencyFormatter.parse('abc'), isNull);
