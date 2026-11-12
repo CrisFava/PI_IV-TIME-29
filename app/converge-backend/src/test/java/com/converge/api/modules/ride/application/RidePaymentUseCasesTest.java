@@ -163,6 +163,23 @@ class RidePaymentUseCasesTest {
     }
 
     @Test
+    @DisplayName("Se o código PIX não puder ser gerado, a cobrança não deve ser gravada")
+    void shouldNotSaveChargeWhenPixGenerationFails() {
+        RidePaymentViewService failingView = new RidePaymentViewService(getUserPixInfo, charge -> {
+            throw new ApplicationException(ErrorCode.BAD_REQUEST, "Não foi possível gerar o código PIX.");
+        });
+        RequestPaymentUseCase requestPayment = new RequestPaymentUseCase(rideAccess, rideRepository, failingView);
+        currentUserIs(driverObjectId);
+        rideIsStored(rideWithConfirmedPassenger());
+        driverHasPixKey();
+
+        assertThatThrownBy(() -> requestPayment.execute(requestOf("12.50")))
+                .isInstanceOf(ApplicationException.class);
+
+        verify(rideRepository, never()).save(any());
+    }
+
+    @Test
     @DisplayName("Motorista sem chave PIX não pode solicitar pagamento")
     void shouldNotRequestPaymentWhenDriverHasNoPixKey() {
         RequestPaymentUseCase requestPayment = new RequestPaymentUseCase(rideAccess, rideRepository, paymentView);

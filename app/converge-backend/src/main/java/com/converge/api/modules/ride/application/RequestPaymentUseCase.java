@@ -29,6 +29,10 @@ public class RequestPaymentUseCase implements UseCase<RequestPaymentCommand, Pay
         paymentView.assertDriverCanCharge(ride.getDriverId());
         ride.requestPayment(command.passengerId(), command.request().amount());
 
-        return paymentView.view(rideRepository.save(ride), command.passengerId());
+        // Gera a resposta (e o PIX) antes de gravar: se o código não puder ser gerado, a cobrança não fica salva.
+        PaymentResponseDTO response = paymentView.view(ride, command.passengerId());
+        rideRepository.save(ride);
+
+        return response;
     }
 }

@@ -24,6 +24,9 @@ import java.util.Set;
 @Component
 public class SocketPixPayloadGateway implements PixPayloadGateway {
 
+    // Servidor travado não pode segurar a resposta: passado o limite, gera localmente.
+    private static final int SOCKET_TIMEOUT_MILLIS = 3000;
+
     @Override
     public String generate(PixCharge charge) {
         PixPayloadRequest request = new PixPayloadRequest(
@@ -33,7 +36,8 @@ public class SocketPixPayloadGateway implements PixPayloadGateway {
                 charge.receiverCity()
         );
 
-        try (SocketClient client = new SocketClient()) {
+        try (SocketClient client = new SocketClient(
+                SocketClient.DEFAULT_HOST, SocketClient.DEFAULT_PORT, SOCKET_TIMEOUT_MILLIS)) {
             Message response = client.send(request);
 
             if (response instanceof PixPayloadResponse payload) {
