@@ -116,6 +116,34 @@ class AuthController extends AsyncNotifier<AuthSession> {
     return updated;
   }
 
+  /// Atualiza nome, telefone e chave PIX do usuário autenticado (`PUT /users/me`).
+  /// A chave PIX atual é mantida quando não vier uma nova.
+  Future<UserModel> updateProfile({
+    required String name,
+    required String phone,
+    String? pixKey,
+    PixKeyType? pixKeyType,
+  }) async {
+    final currentSession = state.value;
+    if (currentSession is! Authenticated) {
+      throw const AuthException(
+        'not-authenticated',
+        'Usuário não autenticado.',
+      );
+    }
+    final user = currentSession.user;
+    final hasNewPix = pixKey != null && pixKey.trim().isNotEmpty;
+    final updated = await _repository.updateProfile(
+      name: name.trim(),
+      phone: _normalizePhone(phone),
+      photoUrl: user.photoUrl,
+      pixKey: hasNewPix ? pixKey.trim() : user.pixKey,
+      pixKeyType: hasNewPix ? pixKeyType : user.pixKeyType,
+    );
+    state = AsyncData(Authenticated(updated));
+    return updated;
+  }
+
   static String _normalizePhone(String raw) {
     final digits = raw.replaceAll(RegExp(r'\D'), '');
     if (digits.length == 11) {

@@ -2,4 +2,6 @@
 
 abstract final class VehicleEndpoints {
   static const String vehicles = '/vehicles';
+
+  static String vehicleById(String vehicleId) => '$vehicles/$vehicleId';
 }

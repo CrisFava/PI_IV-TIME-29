@@ -6,6 +6,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../../core/network/api_exception.dart';
 import '../../../core/services/auth/auth_exception.dart';
+import '../../vehicle/data/validation/invalid_vehicle_exception.dart';
 import 'auth_controller.dart';
 import 'inputs/profile_input.dart';
 import 'inputs/register_input.dart';
@@ -57,5 +58,6 @@ class AuthActionController extends Notifier<AsyncValue<void>> {
 String authErrorMessage(Object error) => switch (error) {
   AuthException(:final message) => message,
   ApiException(:final message) => message,
+  InvalidVehicleException(:final message) => message,
   _ => 'Algo deu errado. Tente novamente.',
 };

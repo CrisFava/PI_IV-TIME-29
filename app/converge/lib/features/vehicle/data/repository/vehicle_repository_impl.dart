@@ -6,7 +6,9 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../../../../core/network/api_exception_x.dart';
 import '../../../../core/network/api_response.dart';
 import '../../../../core/network/dio_client.dart';
-import '../models/vehicle_summary_model.dart';
+import '../models/create_vehicle_request.dart';
+import '../models/vehicle_model.dart';
+import '../validation/vehicle_validator.dart';
 import 'vehicle_endpoints.dart';
 import 'vehicle_repository.dart';
 
@@ -20,14 +22,65 @@ class VehicleRepositoryImpl implements VehicleRepository {
   VehicleRepositoryImpl(this._dio);
 
   @override
-  Future<List<VehicleSummaryModel>> listMyVehicles() async {
+  Future<List<VehicleModel>> listMyVehicles() async {
     try {
       final response = await _dio.get<dynamic>(VehicleEndpoints.vehicles);
-      return unwrapApiListResponse<VehicleSummaryModel>(
+      return unwrapApiListResponse<VehicleModel>(
         response.data,
-        VehicleSummaryModel.fromJson,
+        VehicleModel.fromJson,
         status: response.statusCode ?? 200,
       );
+    } on DioException catch (e) {
+      throw e.toApiException();
+    }
+  }
+
+  @override
+  Future<VehicleModel> createVehicle(CreateVehicleRequest request) async {
+    // Dados inválidos nem chegam à API
+    VehicleValidator.validate(request);
+
+    try {
+      final response = await _dio.post<dynamic>(
+        VehicleEndpoints.vehicles,
+        data: request.toJson(),
+      );
+      return unwrapApiResponse<VehicleModel>(
+        response.data,
+        VehicleModel.fromJson,
+        status: response.statusCode ?? 201,
+      );
+    } on DioException catch (e) {
+      throw e.toApiException();
+    }
+  }
+
+  @override
+  Future<VehicleModel> updateVehicle(
+    String vehicleId,
+    CreateVehicleRequest request,
+  ) async {
+    VehicleValidator.validate(request);
+
+    try {
+      final response = await _dio.put<dynamic>(
+        VehicleEndpoints.vehicleById(vehicleId),
+        data: request.toJson(),
+      );
+      return unwrapApiResponse<VehicleModel>(
+        response.data,
+        VehicleModel.fromJson,
+        status: response.statusCode ?? 200,
+      );
+    } on DioException catch (e) {
+      throw e.toApiException();
+    }
+  }
+
+  @override
+  Future<void> deleteVehicle(String vehicleId) async {
+    try {
+      await _dio.delete<dynamic>(VehicleEndpoints.vehicleById(vehicleId));
     } on DioException catch (e) {
       throw e.toApiException();
     }
