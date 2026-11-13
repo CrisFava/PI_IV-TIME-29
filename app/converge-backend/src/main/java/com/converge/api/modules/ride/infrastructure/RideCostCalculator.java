@@ -10,6 +10,8 @@ import com.converge.api.modules.route.application.RouteGeometryService;
 import com.converge.api.modules.route.domain.model.subtypes.Place;
 import com.converge.api.modules.user.application.VehicleAccess;
 import com.converge.api.modules.user.domain.enums.user.ParticipationRole;
+import com.converge.api.modules.user.domain.enums.vehicle.ConsumptionUnit;
+import com.converge.api.modules.user.domain.enums.vehicle.EnergySource;
 import com.converge.api.modules.user.domain.model.vehicle.Vehicle;
 import com.converge.api.modules.user.domain.model.vehicle.subtypes.FuelSource;
 import com.converge.api.shared.infrastructure.socket.SocketClient;
@@ -38,6 +40,8 @@ public class RideCostCalculator {
     private final VehicleAccess vehicleAccess;
     private final String socketHost;
     private final int socketPort;
+
+    private static final int SOCKET_TIMEOUT_MILLIS = 3000;
 
     @Autowired
     public RideCostCalculator(RouteGeometryService routeGeometryService, VehicleAccess vehicleAccess) {
@@ -144,7 +148,7 @@ public class RideCostCalculator {
     }
 
     private RideCostResponse executeOnServer(RideCostRequest request) {
-        try (SocketClient client = new SocketClient(socketHost, socketPort)) {
+        try (SocketClient client = new SocketClient(socketHost, socketPort, SOCKET_TIMEOUT_MILLIS)) {
             Message response = client.send(request);
             if (response instanceof RideCostResponse costResponse) {
                 return costResponse;
@@ -167,7 +171,12 @@ public class RideCostCalculator {
         return ride.getParticipants().stream()
                 .filter(p -> p.getRole() == ParticipationRole.PASSENGER)
                 .filter(p -> p.getUserId().equals(passengerId))
+                .filter(p -> p.getStatus() == ParticipantStatus.REQUESTED)
                 .findFirst()
+                .or(() -> ride.getParticipants().stream()
+                        .filter(p -> p.getRole() == ParticipationRole.PASSENGER)
+                        .filter(p -> p.getUserId().equals(passengerId))
+                        .findFirst())
                 .orElseThrow(() -> new ApplicationException(
                         ErrorCode.BAD_REQUEST,
                         "Passageiro não encontrado nesta viagem.",
@@ -183,8 +192,19 @@ public class RideCostCalculator {
     }
 
     private FuelSource primaryFuelSource(Ride ride) {
-        Vehicle vehicle = vehicleAccess.getActiveVehicleOf(ride.getVehicleId(), ride.getDriverId());
-        return vehicle.getFuelSources().getFirst();
+        try {
+            Vehicle vehicle = vehicleAccess.getActiveVehicleOf(ride.getVehicleId(), ride.getDriverId());
+            return vehicle.getFuelSources().getFirst();
+        } catch (ApplicationException e) {
+            RideCosts costs = ride.getCosts();
+            if (costs != null && costs.energySourceUsed() != null && costs.averageConsumptionUsed() != null && costs.energyPriceUsed() != null) {
+                ConsumptionUnit unit = costs.energySourceUsed() == EnergySource.ELECTRIC
+                        ? ConsumptionUnit.KM_PER_KWH
+                        : ConsumptionUnit.KM_PER_LITER;
+                return new FuelSource(costs.energySourceUsed(), costs.averageConsumptionUsed(), unit, costs.energyPriceUsed());
+            }
+            throw e;
+        }
     }
 
     private double resolveBaseDistanceKm(Ride ride) {

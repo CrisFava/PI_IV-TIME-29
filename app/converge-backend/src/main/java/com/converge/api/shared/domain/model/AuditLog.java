@@ -19,6 +19,7 @@ import org.springframework.data.mongodb.core.mapping.Document;
 
 import java.time.LocalDateTime;
 import java.util.Collections;
+import java.util.LinkedHashMap;
 import java.util.Map;
 
 /**
@@ -72,7 +73,7 @@ public class AuditLog {
         this.targetUserId = targetUserId;
         this.entityType = entityType;
         this.entityId = entityId;
-        this.metadata = metadata != null ? Collections.unmodifiableMap(metadata) : null;
+        this.metadata = metadata != null ? Collections.unmodifiableMap(new LinkedHashMap<>(metadata)) : null;
         this.createdAt = LocalDateTime.now();
     }
 }

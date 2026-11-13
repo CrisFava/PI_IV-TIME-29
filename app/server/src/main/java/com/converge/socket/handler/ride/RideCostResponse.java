@@ -44,8 +44,17 @@ public class RideCostResponse extends Message {
         this.sharesByPassenger = sharesByPassenger != null ? Map.copyOf(sharesByPassenger) : Map.of();
     }
 
+    public static RideCostResponse forDefault(){
+        return new RideCostResponse(0,
+                BigDecimal.ZERO, 0.0, 0.0, BigDecimal.ZERO, BigDecimal.ZERO, BigDecimal.ZERO, Map.of());
+    }
+
     public static RideCostResponse forConfirmationQuote(double detourGeneratedKm, BigDecimal maxAmount) {
-        return new RideCostResponse(detourGeneratedKm, maxAmount, 0.0, 0.0, BigDecimal.ZERO, BigDecimal.ZERO, BigDecimal.ZERO, Map.of());
+        return new RideCostResponse(detourGeneratedKm, maxAmount,
+                0.0, 0.0,
+                BigDecimal.ZERO, BigDecimal.ZERO, BigDecimal.ZERO,
+                Map.of()
+        );
     }
 
     public static RideCostResponse forCostSharing(

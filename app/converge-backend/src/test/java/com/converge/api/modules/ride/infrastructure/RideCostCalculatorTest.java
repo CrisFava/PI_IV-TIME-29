@@ -35,6 +35,9 @@ import java.util.Set;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.Mockito.atLeastOnce;
+import static org.mockito.Mockito.spy;
+import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
 /**
@@ -51,6 +54,7 @@ class RideCostCalculatorTest {
 
     private SocketServer server;
     private RideCostCalculator calculator;
+    private RideCostHandler handlerSpy;
 
     private final Place driverOrigin = Place.of("Origem Motorista", "Centro", "Campinas", new Coordinates(-22.90, -47.06));
     private final Place driverDest = Place.of("PUC-Campinas", " Barão Geraldo", "Campinas", new Coordinates(-22.83, -47.05));
@@ -61,7 +65,8 @@ class RideCostCalculatorTest {
     void setUp() throws Exception {
         int testPort = findFreePort();
         server = new SocketServer(testPort);
-        server.registerHandler(RideCostRequest.class, new RideCostHandler());
+        handlerSpy = spy(new RideCostHandler());
+        server.registerHandler(RideCostRequest.class, handlerSpy);
         server.start();
 
         calculator = new RideCostCalculator(routeGeometryService, vehicleAccess, "localhost", testPort);
@@ -114,7 +119,7 @@ class RideCostCalculatorTest {
 
     @Test
     @DisplayName("Deve calcular via Socket Server o desvio gerado e o valor máximo na confirmação")
-    void shouldComputeDetourAndMaxAmountOnConfirmationQuoteViaSocketServer() {
+    void shouldComputeDetourAndMaxAmountOnConfirmationQuoteViaSocketServer() throws Exception {
         Ride ride = sampleRide(new BigDecimal("4.00"), BigDecimal.ZERO);
         ride.requestSeat("passenger-1", "route-p1", boarding, dropOff);
 
@@ -128,11 +133,12 @@ class RideCostCalculatorTest {
 
         assertThat(quote.detourGeneratedKm()).isEqualTo(2.0);
         assertThat(quote.maxAmount()).isEqualByComparingTo("5.60");
+        verify(handlerSpy, atLeastOnce()).execute(any(RideCostRequest.class));
     }
 
     @Test
     @DisplayName("Deve recalcular via Socket Server o valor estimado dividindo entre motorista e passageiros confirmados")
-    void shouldRecalculateEstimatedSharesWhenPassengersJoinOrLeaveViaSocketServer() {
+    void shouldRecalculateEstimatedSharesWhenPassengersJoinOrLeaveViaSocketServer() throws Exception {
         Ride ride = sampleRide(new BigDecimal("4.00"), BigDecimal.ZERO);
         ride.requestSeat("passenger-1", "route-p1", boarding, dropOff);
         ride.requestSeat("passenger-2", "route-p2", boarding, dropOff);
@@ -157,11 +163,12 @@ class RideCostCalculatorTest {
         calculator.recalculateEstimatedShares(ride);
 
         assertThat(p1.getEstimatedAmount()).isEqualByComparingTo("5.60");
+        verify(handlerSpy, atLeastOnce()).execute(any(RideCostRequest.class));
     }
 
     @Test
     @DisplayName("Deve calcular via Socket Server os valores finais na conclusão respeitando o valor máximo")
-    void shouldCalculateFinalSharesRespectingMaxAmountViaSocketServer() {
+    void shouldCalculateFinalSharesRespectingMaxAmountViaSocketServer() throws Exception {
         Ride ride = sampleRide(new BigDecimal("10.00"), BigDecimal.ZERO);
         ride.requestSeat("passenger-1", "route-p1", boarding, dropOff);
         ride.acceptPassenger("passenger-1", 2.0, new BigDecimal("6.00"));
@@ -177,5 +184,6 @@ class RideCostCalculatorTest {
         assertThat(p1.getFinalAmount()).isEqualByComparingTo("6.00");
         assertThat(ride.getCosts().totalCost()).isEqualByComparingTo("17.20");
         assertThat(ride.getCosts().totalShared()).isEqualByComparingTo("6.00");
+        verify(handlerSpy, atLeastOnce()).execute(any(RideCostRequest.class));
     }
 }
