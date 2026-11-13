@@ -13,6 +13,7 @@ import com.converge.api.modules.route.application.RouteAccess;
 import com.converge.api.modules.route.domain.enums.RouteStatus;
 import com.converge.api.modules.route.domain.enums.RouteType;
 import com.converge.api.modules.route.domain.model.Route;
+import com.converge.api.modules.security.application.BlockAccess;
 import com.converge.api.shared.application.UseCase;
 import com.converge.api.shared.presentation.exception.ApplicationException;
 import com.converge.api.shared.presentation.exception.ErrorCode;
@@ -26,8 +27,9 @@ import java.util.Set;
 
 /**
  * Passageiros compatíveis com o trajeto de oferta do motorista logado: o "N passageiros x 1 motorista".
- * Ficam de fora: o próprio usuário, passageiros que não podem pedir vaga agora
- * e passageiros que o motorista já recusou numa viagem em aberto deste trajeto.
+ * Os candidatos vêm de uma consulta geoespacial (origem e destino perto dos do motorista).
+ * Ficam de fora: o próprio usuário, quem tem bloqueio com ele (RF47), passageiros que não podem
+ * pedir vaga agora (RF67) e passageiros que o motorista já recusou numa viagem em aberto deste trajeto.
  */
 @Service
 @RequiredArgsConstructor
@@ -37,6 +39,8 @@ public class FindPassengersForDriverUseCase implements UseCase<FindMatchesComman
     private final RideEligibility rideEligibility;
     private final RideRequestHistory rideRequestHistory;
     private final MatchCandidates matchCandidates;
+    private final BlockAccess blockAccess;
+    private final MatchingSearchRadius searchRadius;
     private final MatchingRouteFactory matchingRouteFactory;
     private final MatchingGateway matchingGateway;
     private final MatchingRecorder matchingRecorder;
@@ -49,11 +53,20 @@ public class FindPassengersForDriverUseCase implements UseCase<FindMatchesComman
         rideEligibility.assertCanOffer(command.userId(), "Você");
 
         Set<String> rejectedPassengerIds = rideRequestHistory.rejectedPassengerIds(command.routeId());
+        Set<String> blockedUserIds = blockAccess.blockedUserIdsOf(command.userId());
         Map<String, Boolean> canJoinByPassenger = new HashMap<>();
 
         Map<String, Route> searchesById = new HashMap<>();
-        List<MatchingRoute> candidates = routeAccess.listActiveByType(RouteType.SEARCH, offer.getWeekDays()).stream()
+        List<Route> nearbySearches = routeAccess.listActiveNear(
+                RouteType.SEARCH,
+                offer.getWeekDays(),
+                offer.getOrigin().coordinates(),
+                offer.getDestination().coordinates(),
+                searchRadius.forOffer(offer)
+        );
+        List<MatchingRoute> candidates = nearbySearches.stream()
                 .filter(search -> !search.isOwnedBy(command.userId()))
+                .filter(search -> !blockedUserIds.contains(search.getUserId()))
                 .filter(search -> !rejectedPassengerIds.contains(search.getUserId()))
                 .filter(search -> canJoinByPassenger.computeIfAbsent(search.getUserId(), matchCandidates::canJoin))
                 .map(search -> {

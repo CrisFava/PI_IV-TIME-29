@@ -21,11 +21,11 @@ class MatchingRepositoryImpl implements MatchingRepository {
 
   @override
   Future<List<MatchModel>> findDriversFor(String searchRouteId) =>
-      _find(MatchingEndpoints.passenger, searchRouteId);
+      _find(MatchingEndpoints.matchings, searchRouteId);
 
   @override
   Future<List<MatchModel>> findPassengersFor(String offerRouteId) =>
-      _find(MatchingEndpoints.driver, offerRouteId);
+      _find(MatchingEndpoints.matchings, offerRouteId);
 
   Future<List<MatchModel>> _find(String path, String routeId) async {
     try {

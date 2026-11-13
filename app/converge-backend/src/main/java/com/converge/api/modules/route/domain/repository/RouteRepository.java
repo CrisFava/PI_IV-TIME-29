@@ -10,17 +10,13 @@ import org.springframework.data.mongodb.repository.MongoRepository;
 import org.springframework.data.mongodb.repository.Query;
 import org.springframework.stereotype.Repository;
 
-import java.time.DayOfWeek;
 import java.util.Collection;
 import java.util.List;
 
 @Repository
-public interface RouteRepository extends MongoRepository<Route, ObjectId> {
+public interface RouteRepository extends MongoRepository<Route, ObjectId>, RouteRepositoryCustom {
 
     List<Route> findByUserIdAndStatusNot(String userId, RouteStatus status);
-
-    // Pré-filtro do matching: trajetos de um tipo e status que rodam em pelo menos um dos dias
-    List<Route> findByTypeAndStatusAndWeekDaysIn(RouteType type, RouteStatus status, Collection<DayOfWeek> weekDays);
 
     @Query(
             value = "{ 'userId': ?0, 'type': ?1, 'origin.address': ?2, 'destination.address': ?3, " +

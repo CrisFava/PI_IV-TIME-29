@@ -5,6 +5,7 @@ package com.converge.api.modules.route.application;
 import com.converge.api.modules.route.domain.enums.RouteStatus;
 import com.converge.api.modules.route.domain.enums.RouteType;
 import com.converge.api.modules.route.domain.model.Route;
+import com.converge.api.modules.route.domain.model.subtypes.Coordinates;
 import com.converge.api.modules.route.domain.repository.RouteRepository;
 import com.converge.api.shared.presentation.exception.ApplicationException;
 import com.converge.api.shared.presentation.exception.ErrorCode;
@@ -43,13 +44,22 @@ public class RouteAccess {
                 .orElseThrow(this::routeNotFound);
     }
 
-    // Trajetos ativos de um tipo que rodam em pelo menos um dos dias informados (candidatos do matching)
-    public List<Route> listActiveByType(RouteType type, Set<DayOfWeek> weekDays) {
-        if (type == null || weekDays == null || weekDays.isEmpty()) {
+    /**
+     * Candidatos do matching: trajetos ativos de um tipo, com pelo menos um dia em comum
+     * e com a origem e o destino a até radiusKm da origem e do destino informados.
+     */
+    public List<Route> listActiveNear(
+            RouteType type,
+            Set<DayOfWeek> weekDays,
+            Coordinates origin,
+            Coordinates destination,
+            double radiusKm
+    ) {
+        if (type == null || weekDays == null || weekDays.isEmpty() || radiusKm <= 0) {
             return List.of();
         }
 
-        return routeRepository.findByTypeAndStatusAndWeekDaysIn(type, RouteStatus.ACTIVE, weekDays);
+        return routeRepository.findActiveNear(type, weekDays, origin, destination, radiusKm);
     }
 
     private Optional<Route> findById(String routeId) {

@@ -11,6 +11,7 @@ import com.converge.api.modules.ride.application.RideRequestHistory;
 import com.converge.api.modules.route.application.RouteAccess;
 import com.converge.api.modules.route.domain.enums.RouteType;
 import com.converge.api.modules.route.domain.model.Route;
+import com.converge.api.modules.security.application.BlockAccess;
 import com.converge.api.shared.presentation.exception.ApplicationException;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
@@ -40,6 +41,7 @@ class FindPassengersForDriverUseCaseTest {
     @Mock private RideEligibility rideEligibility;
     @Mock private RideRequestHistory rideRequestHistory;
     @Mock private MatchCandidates matchCandidates;
+    @Mock private BlockAccess blockAccess;
     @Mock private MatchingGateway matchingGateway;
     @Mock private MatchingRecorder matchingRecorder;
     @Mock private MatchViewAssembler matchViewAssembler;
@@ -51,7 +53,8 @@ class FindPassengersForDriverUseCaseTest {
     @BeforeEach
     void setUp() {
         useCase = new FindPassengersForDriverUseCase(routeAccess, rideEligibility, rideRequestHistory,
-                matchCandidates, new MatchingRouteFactory(), matchingGateway, matchingRecorder, matchViewAssembler);
+                matchCandidates, blockAccess, new MatchingSearchRadius(50.0), new MatchingRouteFactory(),
+                matchingGateway, matchingRecorder, matchViewAssembler);
     }
 
     @Test
@@ -65,8 +68,14 @@ class FindPassengersForDriverUseCaseTest {
 
         when(routeAccess.getOwnedRoute(offerId, "driver-1")).thenReturn(offer);
         when(rideRequestHistory.rejectedPassengerIds(offerId)).thenReturn(Set.of("passenger-rejected"));
-        when(routeAccess.listActiveByType(RouteType.SEARCH, offer.getWeekDays()))
-                .thenReturn(List.of(ok, rejected, blocked, alsoOk));
+        when(blockAccess.blockedUserIdsOf("driver-1")).thenReturn(Set.of("passenger-user-blocked"));
+        when(routeAccess.listActiveNear(
+                org.mockito.ArgumentMatchers.eq(RouteType.SEARCH),
+                org.mockito.ArgumentMatchers.eq(offer.getWeekDays()),
+                org.mockito.ArgumentMatchers.eq(offer.getOrigin().coordinates()),
+                org.mockito.ArgumentMatchers.eq(offer.getDestination().coordinates()),
+                org.mockito.ArgumentMatchers.anyDouble()))
+                .thenReturn(List.of(ok, rejected, blocked, alsoOk, MatchingTestRoutes.search("passenger-user-blocked")));
         when(matchCandidates.canJoin("passenger-ok")).thenReturn(true);
         when(matchCandidates.canJoin("passenger-also-ok")).thenReturn(true);
         when(matchCandidates.canJoin("passenger-blocked")).thenReturn(false);

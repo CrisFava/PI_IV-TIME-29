@@ -157,20 +157,24 @@ class RouteAccessTest {
     }
 
     @Test
-    @DisplayName("listActiveByType: deve buscar os trajetos ativos do tipo nos dias informados")
-    void shouldListActiveRoutesByTypeAndDays() {
+    @DisplayName("listActiveNear: deve buscar os trajetos ativos do tipo perto da origem e do destino")
+    void shouldListActiveRoutesNearOriginAndDestination() {
         List<Route> offers = List.of(routeOwnedBy("motorista-456"));
         Set<DayOfWeek> days = Set.of(DayOfWeek.MONDAY, DayOfWeek.FRIDAY);
-        when(routeRepository.findByTypeAndStatusAndWeekDaysIn(RouteType.OFFER, RouteStatus.ACTIVE, days))
-                .thenReturn(offers);
+        Coordinates origin = new Coordinates(-22.90, -47.06);
+        Coordinates destination = new Coordinates(-22.83, -47.05);
+        when(routeRepository.findActiveNear(RouteType.OFFER, days, origin, destination, 12.0)).thenReturn(offers);
 
-        assertThat(routeAccess.listActiveByType(RouteType.OFFER, days)).isEqualTo(offers);
+        assertThat(routeAccess.listActiveNear(RouteType.OFFER, days, origin, destination, 12.0)).isEqualTo(offers);
     }
 
     @Test
-    @DisplayName("listActiveByType: sem dias não há candidatos e o banco nem é consultado")
-    void shouldReturnEmptyWithoutDays() {
-        assertThat(routeAccess.listActiveByType(RouteType.OFFER, Set.of())).isEmpty();
+    @DisplayName("listActiveNear: sem dias ou sem raio não há candidatos e o banco nem é consultado")
+    void shouldReturnEmptyWithoutDaysOrRadius() {
+        Coordinates point = new Coordinates(-22.90, -47.06);
+
+        assertThat(routeAccess.listActiveNear(RouteType.OFFER, Set.of(), point, point, 10.0)).isEmpty();
+        assertThat(routeAccess.listActiveNear(RouteType.OFFER, Set.of(DayOfWeek.MONDAY), point, point, 0.0)).isEmpty();
         verifyNoInteractions(routeRepository);
     }
 }

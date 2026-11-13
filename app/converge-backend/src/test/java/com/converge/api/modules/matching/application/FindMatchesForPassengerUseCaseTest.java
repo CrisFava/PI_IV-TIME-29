@@ -12,6 +12,7 @@ import com.converge.api.modules.ride.application.RideRequestHistory;
 import com.converge.api.modules.route.application.RouteAccess;
 import com.converge.api.modules.route.domain.enums.RouteType;
 import com.converge.api.modules.route.domain.model.Route;
+import com.converge.api.modules.security.application.BlockAccess;
 import com.converge.api.shared.presentation.exception.ApplicationException;
 import com.converge.api.shared.presentation.exception.ErrorCode;
 import org.junit.jupiter.api.BeforeEach;
@@ -32,6 +33,7 @@ import java.util.Set;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.ArgumentMatchers.anyDouble;
 import static org.mockito.ArgumentMatchers.anyList;
 import static org.mockito.ArgumentMatchers.anyMap;
 import static org.mockito.ArgumentMatchers.eq;
@@ -46,6 +48,7 @@ class FindMatchesForPassengerUseCaseTest {
     @Mock private RideEligibility rideEligibility;
     @Mock private RideRequestHistory rideRequestHistory;
     @Mock private MatchCandidates matchCandidates;
+    @Mock private BlockAccess blockAccess;
     @Mock private MatchingGateway matchingGateway;
     @Mock private MatchingRecorder matchingRecorder;
     @Mock private MatchViewAssembler matchViewAssembler;
@@ -57,7 +60,8 @@ class FindMatchesForPassengerUseCaseTest {
     @BeforeEach
     void setUp() {
         useCase = new FindMatchesForPassengerUseCase(routeAccess, rideEligibility, rideRequestHistory,
-                matchCandidates, new MatchingRouteFactory(), matchingGateway, matchingRecorder, matchViewAssembler);
+                matchCandidates, blockAccess, new MatchingSearchRadius(50.0), new MatchingRouteFactory(),
+                matchingGateway, matchingRecorder, matchViewAssembler);
     }
 
     private FindMatchesCommand command() {
@@ -71,7 +75,7 @@ class FindMatchesForPassengerUseCaseTest {
     }
 
     @Test
-    @DisplayName("Deve mandar ao cálculo só os motoristas elegíveis, que não são o usuário e não o recusaram")
+    @DisplayName("Deve mandar ao cálculo só os motoristas elegíveis, sem bloqueio, que não são o usuário e não o recusaram")
     void shouldFilterCandidatesBeforeMatching() {
         Route eligible = MatchingTestRoutes.offer("driver-ok");
         Route rejected = MatchingTestRoutes.offer("driver-rejected");
@@ -81,8 +85,9 @@ class FindMatchesForPassengerUseCaseTest {
         when(routeAccess.getOwnedRoute(MatchingTestRoutes.id(search), "passenger-1")).thenReturn(search);
         when(rideRequestHistory.rejectedDriverRouteIds("passenger-1"))
                 .thenReturn(Set.of(MatchingTestRoutes.id(rejected)));
-        when(routeAccess.listActiveByType(RouteType.OFFER, search.getWeekDays()))
-                .thenReturn(List.of(eligible, rejected, withoutLicense, own));
+        when(blockAccess.blockedUserIdsOf("passenger-1")).thenReturn(Set.of("driver-blocked"));
+        when(routeAccess.listActiveNear(eq(RouteType.OFFER), eq(search.getWeekDays()), any(), any(), anyDouble()))
+                .thenReturn(List.of(eligible, rejected, withoutLicense, own, MatchingTestRoutes.offer("driver-blocked")));
         when(matchCandidates.canOffer("driver-ok")).thenReturn(true);
         when(matchCandidates.canOffer("driver-without-license")).thenReturn(false);
         when(matchCandidates.vehicleOf(eligible)).thenReturn(Optional.of(MatchingTestRoutes.vehicle("driver-ok")));
@@ -107,7 +112,8 @@ class FindMatchesForPassengerUseCaseTest {
     void shouldPassOffersAndVehiclesToAssembler() {
         Route offer = MatchingTestRoutes.offer("driver-ok");
         when(routeAccess.getOwnedRoute(MatchingTestRoutes.id(search), "passenger-1")).thenReturn(search);
-        when(routeAccess.listActiveByType(RouteType.OFFER, search.getWeekDays())).thenReturn(List.of(offer));
+        when(routeAccess.listActiveNear(eq(RouteType.OFFER), eq(search.getWeekDays()), any(), any(), anyDouble()))
+                .thenReturn(List.of(offer));
         when(matchCandidates.canOffer("driver-ok")).thenReturn(true);
         when(matchCandidates.vehicleOf(offer)).thenReturn(Optional.empty());
         List<CompatibleMatch> matches = List.of(matchWith(offer, search));
@@ -119,6 +125,22 @@ class FindMatchesForPassengerUseCaseTest {
         ArgumentCaptor<Map<String, Route>> offers = ArgumentCaptor.forClass(Map.class);
         verify(matchViewAssembler).forPassenger(eq(matches), offers.capture(), anyMap());
         assertThat(offers.getValue()).containsEntry(MatchingTestRoutes.id(offer), offer);
+    }
+
+    @Test
+    @DisplayName("Deve buscar as ofertas perto da origem e do destino do passageiro, no raio de candidatos")
+    void shouldQueryOffersNearSearch() {
+        when(routeAccess.getOwnedRoute(MatchingTestRoutes.id(search), "passenger-1")).thenReturn(search);
+
+        useCase.execute(command());
+
+        verify(routeAccess).listActiveNear(
+                RouteType.OFFER,
+                search.getWeekDays(),
+                search.getOrigin().coordinates(),
+                search.getDestination().coordinates(),
+                50.0
+        );
     }
 
     @Test
