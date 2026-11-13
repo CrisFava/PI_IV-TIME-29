@@ -7,3 +7,6 @@
 # Saída gerada pelo graphify (grafo de conhecimento local)
 graphify-out/
 app/__pycache__
+# Ambiente Python dos scripts de desenvolvimento
+scripts/.venv/
+__pycache__/
