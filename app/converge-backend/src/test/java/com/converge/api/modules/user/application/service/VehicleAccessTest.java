@@ -56,6 +56,7 @@ class VehicleAccessTest {
                 "Gol Azul",
                 "Volkswagen Gol",
                 "ABC1234",
+                "14283256656",
                 "Azul",
                 VehicleType.HATCH,
                 5,

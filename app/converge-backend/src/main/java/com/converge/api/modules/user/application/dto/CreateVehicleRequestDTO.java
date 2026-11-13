@@ -25,6 +25,10 @@ public record CreateVehicleRequestDTO(
         @Pattern(regexp = PLATE_PATTERN, message = "A placa deve estar no formato ABC1234 ou ABC1D23.")
         String licensePlate,
 
+        @NotBlank(message = "RENAVAM é obrigatório")
+        @Pattern(regexp = RENAVAM_PATTERN, message = "O RENAVAM deve ter 11 dígitos.")
+        String renavam,
+
         @NotBlank(message = "Cor é obrigatória")
         String color,
 
@@ -41,4 +45,6 @@ public record CreateVehicleRequestDTO(
         List<FuelSourceRequestDTO> fuelSources
 ) {
     private static final String PLATE_PATTERN = "^[A-Za-z]{3}-?\\d[A-Za-z0-9]\\d{2}$";
+    // 11 dígitos, aceitando pontos, traço ou espaços na digitação
+    private static final String RENAVAM_PATTERN = "^\\D*(\\d\\D*){11}$";
 }

@@ -13,6 +13,7 @@ public record VehicleResponseDTO(
         String nickname,
         String model,
         String licensePlate,
+        String renavam,
         String color,
         VehicleType type,
         int totalCapacity,

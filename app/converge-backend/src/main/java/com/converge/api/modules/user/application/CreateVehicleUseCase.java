@@ -65,6 +65,7 @@ public class CreateVehicleUseCase implements UseCase<CreateVehicleCommand, Vehic
                 requested.getNickname(),
                 requested.getModel(),
                 requested.getLicensePlate(),
+                requested.getRenavam(),
                 requested.getColor(),
                 requested.getType(),
                 requested.getTotalCapacity(),

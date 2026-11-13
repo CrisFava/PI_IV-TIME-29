@@ -84,6 +84,7 @@ Veículo é o automóvel cadastrado por um motorista. Um usuário pode ter múlt
 | `nickname` | Texto | Não | Simples | `Gol Azul`, `Van da Manhã` | — | Facilita a seleção quando o motorista tem mais de um veículo. |
 | `model` | Texto | Sim | Simples | `Volkswagen Gol`, `Fiat Uno` | vazio | Exibido nos detalhes da viagem. |
 | `licensePlate` | Texto alfanumérico | Sim | Simples | `ABC1234`, `ABC1D23` | placa duplicada, vazio | Única por proprietário. Armazenada em maiúsculas sem hífen. |
+| `renavam` | Texto numérico | Sim | Simples | `14283256656` | `1428325665` (10 dígitos), `14283256657` (dígito verificador errado), `11111111111` | Registro Nacional de Veículos Automotores. 11 dígitos, guardados sem pontuação; o último é o dígito verificador (soma dos 10 primeiros com os pesos 3, 2, 9, 8, 7, 6, 5, 4, 3, 2; dígito = soma × 10 mod 11, com 10 virando 0). Pode faltar em veículos cadastrados antes do campo existir. |
 | `color` | Texto | Sim | Simples | `Branco`, `Prata`, `Azul` | vazio | Texto livre. Auxilia o passageiro a identificar o veículo. |
 | `type` | Elemento de lista enumerada | Sim | Simples | `HATCH`, `VAN`, `MOTORCYCLE` | valor fora do enum | Valores: `HATCH`, `SEDAN`, `SUV`, `PICKUP`, `VAN`, `MOTORCYCLE`, `OTHER`. Moto tem capacidade máxima de 1. |
 | `totalCapacity` | Número inteiro | Sim | Simples | `5`, `15`, `1` (moto) | `0`, negativo, maior que 15 | Inclui o motorista. Mínimo 1. Máximo 15. |
@@ -728,6 +729,7 @@ Estrutura composta que representa a CNH do motorista. Opcional — só preenchid
   "nickname": "Gol Azul",
   "model": "Volkswagen Gol",
   "licensePlate": "ABC1234",
+  "renavam": "14283256656",
   "color": "Azul",
   "type": "HATCH",
   "totalCapacity": 5,

@@ -51,7 +51,7 @@ final class MatchingTestRoutes {
     }
 
     static Vehicle vehicle(String ownerId) {
-        return new Vehicle(ownerId, "Gol Azul", "Volkswagen Gol", "ABC1234", "Azul", VehicleType.HATCH, 5,
+        return new Vehicle(ownerId, "Gol Azul", "Volkswagen Gol", "ABC1234", "14283256656", "Azul", VehicleType.HATCH, 5,
                 List.of(new FuelSource(EnergySource.GASOLINE, 12.0, ConsumptionUnit.KM_PER_LITER, new BigDecimal("6.00"))));
     }
 
