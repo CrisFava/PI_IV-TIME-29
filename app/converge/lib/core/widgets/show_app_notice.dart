@@ -23,6 +23,9 @@ void showAppNotice(
 
   hideAppNotice();
 
+  // Chave criada uma vez: o banner mantém a animação e o timer quando o
+  // overlay é reconstruído (ex.: mudança na área segura)
+  final bannerKey = UniqueKey();
   late final OverlayEntry entry;
   entry = OverlayEntry(
     builder: (context) => Positioned(
@@ -33,19 +36,20 @@ void showAppNotice(
         top: false,
         bottom: false,
         child: AppNoticeBanner(
-          key: UniqueKey(),
+          key: bannerKey,
           message: message,
           type: type,
           duration: duration,
           onDismissed: () {
             if (_currentNotice == entry) _currentNotice = null;
-            if (entry.mounted) entry.remove();
+            _removeNotice(entry);
           },
         ),
       ),
     ),
   );
   _currentNotice = entry;
+  _insertedNotices.add(entry);
   overlay.insert(entry);
 }
 
@@ -53,5 +57,17 @@ void showAppNotice(
 void hideAppNotice() {
   final current = _currentNotice;
   _currentNotice = null;
-  if (current != null && current.mounted) current.remove();
+  if (current != null) _removeNotice(current);
+}
+
+// Avisos inseridos e ainda não removidos. Não dá para confiar em `mounted`,
+// que só fica true depois do primeiro frame do aviso.
+final Set<OverlayEntry> _insertedNotices = {};
+
+/// Remove e descarta o aviso uma única vez.
+void _removeNotice(OverlayEntry entry) {
+  if (!_insertedNotices.remove(entry)) return;
+  entry
+    ..remove()
+    ..dispose();
 }

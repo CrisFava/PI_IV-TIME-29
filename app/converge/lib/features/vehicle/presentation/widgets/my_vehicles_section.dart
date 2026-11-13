@@ -22,7 +22,8 @@ class MyVehiclesSection extends ConsumerStatefulWidget {
 }
 
 class _MyVehiclesSectionState extends ConsumerState<MyVehiclesSection> {
-  String? _deletingId;
+  // Carros sendo apagados: cada um sai do conjunto quando a sua requisição termina
+  final Set<String> _deletingIds = {};
 
   void _showMessage(String message) =>
       showAppNotice(context, message, type: AppNoticeType.error);
@@ -35,21 +36,22 @@ class _MyVehiclesSectionState extends ConsumerState<MyVehiclesSection> {
       showEditVehicleSheet(context, vehicle);
 
   Future<void> _delete(VehicleModel vehicle, int total) async {
+    if (_deletingIds.contains(vehicle.id)) return;
     final isLast = total == 1;
     final confirmed = await confirmDeleteVehicle(
       context,
       vehicle: vehicle,
       isLastVehicle: isLast,
     );
-    if (!confirmed || !mounted) return;
+    if (!confirmed || !mounted || _deletingIds.contains(vehicle.id)) return;
 
-    setState(() => _deletingId = vehicle.id);
+    setState(() => _deletingIds.add(vehicle.id));
     try {
       await ref.read(myVehiclesProvider.notifier).remove(vehicle.id);
     } catch (e) {
       if (mounted) _showMessage(authErrorMessage(e));
     } finally {
-      if (mounted) setState(() => _deletingId = null);
+      if (mounted) setState(() => _deletingIds.remove(vehicle.id));
     }
   }
 
@@ -110,7 +112,7 @@ class _MyVehiclesSectionState extends ConsumerState<MyVehiclesSection> {
                   padding: const EdgeInsets.only(bottom: 8),
                   child: VehicleListTile(
                     vehicle: vehicle,
-                    isDeleting: _deletingId == vehicle.id,
+                    isDeleting: _deletingIds.contains(vehicle.id),
                     onEdit: () => _edit(vehicle),
                     onDelete: () => _delete(vehicle, value.length),
                   ),

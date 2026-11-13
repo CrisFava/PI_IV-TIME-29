@@ -515,15 +515,15 @@ class _CenterRideButtonState extends State<_CenterRideButton>
                     color: widget.pulseColor != null && !isExpanded
                         ? widget.pulseColor!
                         : Color.lerp(
-                            Colors.white.withValues(alpha: 0.24),
-                            Colors.white,
+                            AppColors.carButtonBorder,
+                            AppColors.carButtonBorderOpen,
                             progress,
                           )!,
                     width: 2.0 + (0.4 * progress),
                   ),
                   boxShadow: [
                     BoxShadow(
-                      color: Colors.black.withValues(
+                      color: AppColors.carButtonShadow.withValues(
                         alpha: 0.42 - (0.17 * progress),
                       ),
                       blurRadius: 18 - (12 * progress),
@@ -543,7 +543,7 @@ class _CenterRideButtonState extends State<_CenterRideButton>
                         isExpanded ? Icons.close : Icons.directions_car_rounded,
                         key: ValueKey(isExpanded),
                         size: 27,
-                        color: Colors.white,
+                        color: AppColors.carButtonIcon,
                       ),
                     ),
                   ),

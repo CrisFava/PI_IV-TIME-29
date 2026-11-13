@@ -77,9 +77,12 @@ class _EditProfileSheetState extends ConsumerState<EditProfileSheet> {
     final key = value?.trim() ?? '';
     // Motorista precisa de chave PIX para receber o rateio
     if (key.isEmpty) {
-      return widget.user.isDriver
-          ? 'Motoristas precisam de uma chave PIX.'
-          : null;
+      if (widget.user.isDriver) return 'Motoristas precisam de uma chave PIX.';
+      // Ainda não dá para remover a chave: salvar vazio manteria a atual
+      if (widget.user.pixKey?.trim().isNotEmpty ?? false) {
+        return 'Ainda não é possível remover a chave PIX. A chave atual será mantida.';
+      }
+      return null;
     }
     final digits = key.replaceAll(RegExp(r'\D'), '');
     return switch (_pixType) {

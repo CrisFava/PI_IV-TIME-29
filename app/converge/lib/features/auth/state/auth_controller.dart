@@ -140,6 +140,15 @@ class AuthController extends AsyncNotifier<AuthSession> {
       pixKey: hasNewPix ? pixKey.trim() : user.pixKey,
       pixKeyType: hasNewPix ? pixKeyType : user.pixKeyType,
     );
+    // A sessão pode ter mudado durante a requisição (logout, troca de conta):
+    // a resposta antiga não pode ser publicada como sessão atual
+    final latest = state.value;
+    if (latest is! Authenticated || latest.user.id != user.id) {
+      throw const AuthException(
+        'session-changed',
+        'Sua sessão mudou enquanto o perfil era salvo. Confira os dados e tente de novo.',
+      );
+    }
     state = AsyncData(Authenticated(updated));
     return updated;
   }

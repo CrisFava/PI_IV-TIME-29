@@ -24,11 +24,13 @@ class MyVehiclesController extends AsyncNotifier<List<VehicleModel>> {
     if (session is! Authenticated || !session.user.isDriver) return const [];
 
     final vehicles = await ref.read(vehicleRepositoryProvider).listMyVehicles();
-    return [
-      for (final vehicle in vehicles)
-        if (vehicle.active) vehicle,
-    ];
+    return _activeOnly(vehicles);
   }
+
+  static List<VehicleModel> _activeOnly(List<VehicleModel> vehicles) => [
+    for (final vehicle in vehicles)
+      if (vehicle.active) vehicle,
+  ];
 
   /// Cadastra um veículo. Lança `InvalidVehicleException` (dados inválidos, sem
   /// chamar a API) ou `ApiException` (recusado pelo backend); a lista só muda no sucesso.
@@ -40,11 +42,16 @@ class MyVehiclesController extends AsyncNotifier<List<VehicleModel>> {
     VehicleValidator.validate(request);
     await _ensureDriverRole();
 
-    final created = await ref
-        .read(vehicleRepositoryProvider)
-        .createVehicle(request);
-    final current = state.value ?? const <VehicleModel>[];
-    state = AsyncData([...current, created]);
+    final repository = ref.read(vehicleRepositoryProvider);
+    final created = await repository.createVehicle(request);
+    final current = state.value;
+    if (current != null) {
+      state = AsyncData([...current, created]);
+    } else {
+      // Sem a lista carregada (carregando ou com erro): busca a lista completa,
+      // para não publicar só o carro novo como se fosse o único
+      state = AsyncData(_activeOnly(await repository.listMyVehicles()));
+    }
     return created;
   }
 

@@ -117,6 +117,8 @@ class _VehicleFormState extends State<VehicleForm> {
       averageConsumption: VehicleValidator.parseDecimal(_consumption.text) ?? 0,
       currentEnergyPrice: VehicleValidator.parseDecimal(_price.text) ?? 0,
     ),
+    // Fontes que o formulário não edita seguem como estavam
+    otherFuelSources: widget.initial?.otherFuelSources ?? const [],
   );
 
   void _notifyChanged() => widget.onChanged?.call(_buildRequest());

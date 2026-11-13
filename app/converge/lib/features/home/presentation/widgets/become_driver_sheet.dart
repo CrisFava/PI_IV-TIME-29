@@ -57,9 +57,6 @@ class _BecomeDriverSheetState extends ConsumerState<BecomeDriverSheet> {
   // Passo 2: carro (guardado para não perder o que foi digitado ao trocar de passo)
   CreateVehicleRequest? _vehicleDraft;
 
-  // O papel de motorista já foi ativado: ao tentar de novo, só falta o carro
-  bool _driverActivated = false;
-
   // Passo 1: PIX
   final _pixFormKey = GlobalKey<FormState>();
   final _pixController = TextEditingController();
@@ -202,17 +199,15 @@ class _BecomeDriverSheetState extends ConsumerState<BecomeDriverSheet> {
     });
 
     try {
-      if (!_driverActivated) {
-        await ref
-            .read(becomeDriverProvider.notifier)
-            .activateDriverAtomic(
-              pixKey: _pixController.text.trim(),
-              pixKeyType: _selectedPixType,
-              license: licenseInput,
-              verificationDelay: const Duration(milliseconds: 2000),
-            );
-        _driverActivated = true;
-      }
+      // Numa nova tentativa, o controller só reenvia o que mudou
+      await ref
+          .read(becomeDriverProvider.notifier)
+          .activateDriverAtomic(
+            pixKey: _pixController.text.trim(),
+            pixKeyType: _selectedPixType,
+            license: licenseInput,
+            verificationDelay: const Duration(milliseconds: 2000),
+          );
     } catch (e, st) {
       debugPrint('[BecomeDriverSheet] Falha na ativação do motorista: $e\n$st');
       if (!mounted) return;

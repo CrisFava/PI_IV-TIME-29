@@ -48,12 +48,17 @@ class RideHistoryTile extends StatelessWidget {
         border: Border.all(color: AppColors.borderSubtle),
       ),
       child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
+        // stretch: o Wrap ocupa a largura toda e o status fica à direita
+        crossAxisAlignment: CrossAxisAlignment.stretch,
         children: [
-          Row(
+          // Wrap: em tela estreita ou com fonte grande, o status desce de linha
+          Wrap(
+            alignment: WrapAlignment.spaceBetween,
+            crossAxisAlignment: WrapCrossAlignment.center,
+            spacing: 8,
+            runSpacing: 6,
             children: [
               RideRoleTag(isDriver: isDriver),
-              const Spacer(),
               Container(
                 padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
                 decoration: BoxDecoration(

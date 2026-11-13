@@ -7,8 +7,9 @@ import '../../auth/state/session/auth_session.dart';
 import 'driver_access.dart';
 import 'my_vehicles_controller.dart';
 
-/// Acesso de motorista: só fica liberado com pelo menos um carro ativo.
-/// Enquanto a lista de carros carrega (ou se ela falhar), o motorista não é bloqueado.
+/// Acesso de motorista: só fica liberado com pelo menos um carro ativo confirmado.
+/// Enquanto a lista de carros carrega (ou se ela falhar), o acesso fica suspenso.
+/// Num recarregamento sem erro, vale a última lista conhecida.
 final driverAccessProvider = Provider<DriverAccess>((ref) {
   final session = ref.watch(authControllerProvider).value;
   if (session is! Authenticated || !session.user.isDriver) {
@@ -17,7 +18,11 @@ final driverAccessProvider = Provider<DriverAccess>((ref) {
 
   final vehicles = ref.watch(myVehiclesProvider);
   return switch (vehicles) {
-    AsyncData(:final value) when value.isEmpty => DriverAccess.needsVehicle,
-    _ => DriverAccess.ready,
+    // Falha na consulta: mesmo com uma lista antiga, não libera o motorista
+    AsyncError() => DriverAccess.unavailable,
+    AsyncValue(hasValue: true, :final value?) when value.isEmpty =>
+      DriverAccess.needsVehicle,
+    AsyncValue(hasValue: true) => DriverAccess.ready,
+    _ => DriverAccess.unavailable,
   };
 });

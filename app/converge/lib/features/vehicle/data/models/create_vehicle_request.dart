@@ -20,6 +20,10 @@ class CreateVehicleRequest {
   final String renavam;
   final FuelSourceModel fuelSource;
 
+  /// Demais fontes de energia do veículo (ex.: híbrido). O formulário só edita a
+  /// principal; estas são mantidas para a edição não apagá-las.
+  final List<FuelSourceModel> otherFuelSources;
+
   const CreateVehicleRequest({
     required this.model,
     required this.licensePlate,
@@ -29,6 +33,7 @@ class CreateVehicleRequest {
     required this.renavam,
     required this.fuelSource,
     this.nickname,
+    this.otherFuelSources = const [],
   });
 
   /// Preenche o formulário de edição com os dados atuais do veículo.
@@ -48,6 +53,9 @@ class CreateVehicleRequest {
                 averageConsumption: 0,
                 currentEnergyPrice: 0,
               ),
+        otherFuelSources: vehicle.fuelSources.length > 1
+            ? List.unmodifiable(vehicle.fuelSources.skip(1))
+            : const [],
       );
 
   Map<String, dynamic> toJson() => {
@@ -58,6 +66,9 @@ class CreateVehicleRequest {
     'type': type.apiValue,
     'totalCapacity': totalCapacity,
     'renavam': renavam.replaceAll(RegExp(r'\D'), ''),
-    'fuelSources': [fuelSource.toJson()],
+    'fuelSources': [
+      fuelSource.toJson(),
+      for (final other in otherFuelSources) other.toJson(),
+    ],
   };
 }

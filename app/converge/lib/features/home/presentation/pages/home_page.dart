@@ -41,6 +41,7 @@ import '../../../vehicle/presentation/widgets/add_vehicle_sheet.dart';
 import '../../../vehicle/presentation/widgets/my_vehicles_section.dart';
 import '../../../vehicle/state/driver_access.dart';
 import '../../../vehicle/state/driver_access_provider.dart';
+import '../../../vehicle/state/my_vehicles_controller.dart';
 import '../../../auth/presentation/widgets/edit_profile_sheet.dart';
 import '../widgets/campus_spots.dart';
 import '../widgets/passenger_ride_step.dart';
@@ -77,6 +78,14 @@ class _HomePageState extends ConsumerState<HomePage> {
   String _shiftDestinationAddress = '';
   LatLng? _shiftDestination;
   List<LatLng>? _shiftRoutePoints;
+
+  // Muda a cada expediente iniciado ou encerrado: a rota calculada para um
+  // expediente anterior é descartada
+  int _shiftGeneration = 0;
+
+  // Muda sempre que o rascunho do pedido de carona é fechado: um cálculo de rota
+  // que termine depois disso não reabre o painel
+  int _draftGeneration = 0;
 
   // Estado do fluxo Uber-like do passageiro (etapas graduais)
   PassengerRideStep _passengerStep = PassengerRideStep.idle;
@@ -161,6 +170,12 @@ class _HomePageState extends ConsumerState<HomePage> {
   }
 
   Future<void> _calculateRouteAndConfirm() async {
+    final generation = _draftGeneration;
+    final step = _passengerStep;
+    // O rascunho foi fechado (ou mudou de etapa) enquanto a rota era calculada
+    bool isStale() =>
+        !mounted || generation != _draftGeneration || step != _passengerStep;
+
     List<LatLng>? routePoints;
     if (_destinationLocation != null) {
       try {
@@ -169,15 +184,17 @@ class _HomePageState extends ConsumerState<HomePage> {
           destination: _destinationLocation!,
         );
       } on RoutesException catch (e) {
-        _showError(e.message);
+        if (!isStale()) _showError(e.message);
         return;
       } catch (e) {
-        _showError('Não foi possível calcular o trajeto. Tente de novo.');
+        if (!isStale()) {
+          _showError('Não foi possível calcular o trajeto. Tente de novo.');
+        }
         return;
       }
     }
 
-    if (mounted) {
+    if (!isStale()) {
       setState(() {
         _tripRoutePoints = routePoints;
         _passengerStep = PassengerRideStep.routeConfirmation;
@@ -305,6 +322,7 @@ class _HomePageState extends ConsumerState<HomePage> {
     }
 
     setState(() {
+      _draftGeneration++;
       _passengerSheetHidden = false;
       if (_passengerStep == PassengerRideStep.selectPickup) {
         _passengerStep = PassengerRideStep.chooseRouteOption;
@@ -416,10 +434,7 @@ class _HomePageState extends ConsumerState<HomePage> {
 
   void _onStartDriverShiftFromDock(bool canDrive) {
     setState(() => _isCarMenuOpen = false);
-    if (ref.read(driverAccessProvider).isBlockedByVehicle) {
-      _handleAddVehicle();
-      return;
-    }
+    if (_isDriverActionBlocked()) return;
     final latestSession = ref.read(authControllerProvider).value;
     final isDriverNow =
         canDrive ||
@@ -472,11 +487,6 @@ class _HomePageState extends ConsumerState<HomePage> {
       _passengerStep == PassengerRideStep.waitingDriver ||
       _passengerStep == PassengerRideStep.driverAccepted;
 
-  /// Ainda sem resposta do motorista: é a busca que o botão do carro mostra em azul.
-  bool get _isSearchingRide =>
-      _passengerStep == PassengerRideStep.driverList ||
-      _passengerStep == PassengerRideStep.waitingDriver;
-
   /// Fecha os painéis do mapa. Um pedido de carona em andamento só é escondido
   /// (a busca continua e volta pelo botão do carro). O expediente também continua.
   void _closeOpenSheets() {
@@ -493,7 +503,10 @@ class _HomePageState extends ConsumerState<HomePage> {
         _passengerSheetHidden = true;
         return;
       }
-      if (draftOpen) _passengerStep = PassengerRideStep.idle;
+      if (draftOpen) {
+        _draftGeneration++;
+        _passengerStep = PassengerRideStep.idle;
+      }
       _destinationLocation = null;
       _destinationAddress = '';
       _tripRoutePoints = null;
@@ -533,6 +546,7 @@ class _HomePageState extends ConsumerState<HomePage> {
 
   Future<void> _handleStartDriverShift(DriverShiftPayload payload) async {
     HapticFeedback.mediumImpact();
+    final generation = ++_shiftGeneration;
     setState(() {
       _isOnShift = true;
       _shiftDestinationAddress = _destinationAddress.isNotEmpty
@@ -552,7 +566,10 @@ class _HomePageState extends ConsumerState<HomePage> {
           origin: _pickupLocation,
           destination: destination,
         );
-        if (mounted && _isOnShift && points.isNotEmpty) {
+        if (mounted &&
+            _isOnShift &&
+            generation == _shiftGeneration &&
+            points.isNotEmpty) {
           setState(() => _shiftRoutePoints = points);
         }
       } catch (e) {
@@ -564,12 +581,16 @@ class _HomePageState extends ConsumerState<HomePage> {
   /// Encerra o expediente: fecha os painéis de motorista e volta ao mapa do passageiro.
   void _handleEndDriverShift() {
     setState(() {
+      _shiftGeneration++;
       _isOnShift = false;
       _showRideRequests = false;
       _currentMode = AppRideMode.passenger;
-      _destinationLocation = null;
-      _destinationAddress = '';
-      _tripRoutePoints = null;
+      // Um pedido de carona em andamento usa o mesmo destino e a mesma rota
+      if (!_hasActiveRideRequest) {
+        _destinationLocation = null;
+        _destinationAddress = '';
+        _tripRoutePoints = null;
+      }
       _shiftDestinationAddress = '';
       _shiftDestination = null;
       _shiftRoutePoints = null;
@@ -595,6 +616,7 @@ class _HomePageState extends ConsumerState<HomePage> {
   void _onDriverAccessChanged(DriverAccess? previous, DriverAccess next) {
     if (!next.isBlockedByVehicle || previous == next) return;
     setState(() {
+      _shiftGeneration++;
       _isOnShift = false;
       _showRideRequests = false;
       _shiftDestinationAddress = '';
@@ -604,12 +626,29 @@ class _HomePageState extends ConsumerState<HomePage> {
     });
   }
 
+  /// Bloqueia as ações de motorista sem carro confirmado: sem carro, abre o
+  /// cadastro; com a lista de carros indisponível, avisa e tenta carregar de novo.
+  bool _isDriverActionBlocked() {
+    final access = ref.read(driverAccessProvider);
+    if (access.isBlockedByVehicle) {
+      _handleAddVehicle();
+      return true;
+    }
+    if (access.isUnavailable) {
+      _showError(
+        'Não foi possível conferir seus carros agora. Tente de novo em instantes.',
+      );
+      if (ref.read(myVehiclesProvider).hasError) {
+        ref.invalidate(myVehiclesProvider);
+      }
+      return true;
+    }
+    return false;
+  }
+
   /// Mostra os pedidos de vaga no painel sobre o mapa, no modo motorista.
   void _openRideRequests() {
-    if (ref.read(driverAccessProvider).isBlockedByVehicle) {
-      _handleAddVehicle();
-      return;
-    }
+    if (_isDriverActionBlocked()) return;
     setState(() {
       _isCarMenuOpen = false;
       _currentMode = AppRideMode.driver;
@@ -876,11 +915,15 @@ class _HomePageState extends ConsumerState<HomePage> {
                     onEndDriverShift: _handleEndDriverShift,
                     needsVehicle: driverAccess.isBlockedByVehicle,
                     onAddVehicle: _handleAddVehicle,
-                    isSearchingRide: _isSearchingRide,
-                    rideSearchTitle:
-                        _passengerStep == PassengerRideStep.waitingDriver
-                        ? 'Aguardando o motorista'
-                        : 'Procurando motorista',
+                    // Pedido aceito também aparece: o menu reabre os detalhes da
+                    // carona em vez de começar um pedido novo
+                    isSearchingRide: _hasActiveRideRequest,
+                    rideSearchTitle: switch (_passengerStep) {
+                      PassengerRideStep.waitingDriver =>
+                        'Aguardando o motorista',
+                      PassengerRideStep.driverAccepted => 'Carona aceita',
+                      _ => 'Procurando motorista',
+                    },
                     rideSearchDestination: _destinationAddress,
                     onOpenRideSearch: _openRideSearch,
                     onCancelRideSearch: _handleCancelRideSearch,

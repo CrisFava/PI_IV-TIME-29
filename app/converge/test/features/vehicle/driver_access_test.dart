@@ -4,6 +4,8 @@ import 'package:converge/features/auth/data/models/participation_role.dart';
 import 'package:converge/features/auth/data/models/user_model.dart';
 import 'package:converge/features/auth/state/auth_controller.dart';
 import 'package:converge/features/vehicle/data/models/create_vehicle_request.dart';
+import 'package:converge/features/vehicle/data/models/energy_source.dart';
+import 'package:converge/features/vehicle/data/models/fuel_source_model.dart';
 import 'package:converge/features/vehicle/data/models/vehicle_model.dart';
 import 'package:converge/features/vehicle/data/models/vehicle_type.dart';
 import 'package:converge/features/vehicle/data/repository/vehicle_repository_impl.dart';
@@ -40,6 +42,8 @@ void main() {
     FakeVehicleRepository vehicles,
   ) {
     final container = ProviderContainer.test(
+      // Sem novas tentativas automáticas: a falha da listagem aparece na hora
+      retry: (_, _) => null,
       overrides: [
         authControllerProvider.overrideWith(
           () => auth = FakeSignedInAuthController(user),
@@ -53,9 +57,37 @@ void main() {
 
   Future<DriverAccess> settledAccess(ProviderContainer container) async {
     await container.read(authControllerProvider.future);
-    await container.read(myVehiclesProvider.future);
+    try {
+      await container.read(myVehiclesProvider.future);
+    } catch (_) {
+      // Listagem com falha: o acesso é conferido abaixo
+    }
     return container.read(driverAccessProvider);
   }
+
+  test('falha ao listar os carros não libera o motorista', () async {
+    final vehicles = FakeVehicleRepository([onix])..failList = true;
+    final container = containerFor(driver(), vehicles);
+
+    expect(await settledAccess(container), DriverAccess.unavailable);
+  });
+
+  test('cadastrar sem a lista carregada publica a lista completa', () async {
+    final vehicles = FakeVehicleRepository([onix])..failList = true;
+    final container = containerFor(driver(), vehicles);
+    await settledAccess(container);
+
+    vehicles.failList = false;
+    final created = await container
+        .read(myVehiclesProvider.notifier)
+        .add(validVehicleRequest());
+
+    expect(container.read(myVehiclesProvider).value!.map((v) => v.id), [
+      onix.id,
+      created.id,
+    ]);
+    expect(container.read(driverAccessProvider), DriverAccess.ready);
+  });
 
   test('quem não é motorista não consulta veículos', () async {
     final vehicles = FakeVehicleRepository();
@@ -184,5 +216,34 @@ void main() {
     expect(form.nickname, 'Carro da facul');
     expect(form.renavam, validRenavam);
     expect(form.licensePlate, 'ABC1D23');
+  });
+
+  test('editar um carro com duas fontes de energia mantém as duas', () {
+    const gasoline = FuelSourceModel(
+      energySource: EnergySource.gasoline,
+      averageConsumption: 12,
+      currentEnergyPrice: 6,
+    );
+    const electric = FuelSourceModel(
+      energySource: EnergySource.electric,
+      averageConsumption: 7,
+      currentEnergyPrice: 1,
+    );
+    const hybrid = VehicleModel(
+      id: 'vehicle-h',
+      model: 'Corolla Hybrid',
+      licensePlate: 'ABC1D23',
+      color: 'Prata',
+      type: VehicleType.sedan,
+      totalCapacity: 5,
+      fuelSources: [gasoline, electric],
+    );
+
+    final json = CreateVehicleRequest.fromVehicle(hybrid).toJson();
+
+    expect((json['fuelSources'] as List).map((f) => f['energySource']), [
+      'GASOLINE',
+      'ELECTRIC',
+    ]);
   });
 }

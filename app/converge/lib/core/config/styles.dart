@@ -9,6 +9,10 @@ abstract final class AppColors {
   static const Color dockBackground = Color(0xFF111111);
   static const Color carButtonResting = Color(0xFF14171A);
   static const Color carButtonDepressed = Color(0xFF1E232A);
+  static const Color carButtonBorder = Color(0x3DFFFFFF); // Borda do botão do carro fechado
+  static const Color carButtonBorderOpen = Colors.white; // Borda do botão do carro aberto
+  static const Color carButtonIcon = Colors.white;
+  static const Color carButtonShadow = Colors.black; // A opacidade é aplicada na sombra
 
   // Fundos e Superfícies Claras
   static const Color scaffoldBackground = Color(0xFFF8FAFC);

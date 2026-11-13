@@ -10,12 +10,16 @@ class FakeVehicleRepository implements VehicleRepository {
   final List<VehicleModel> vehicles;
   final List<String> calls = [];
 
+  /// Faz a listagem falhar, como numa queda de rede.
+  bool failList = false;
+
   FakeVehicleRepository([List<VehicleModel>? initial])
     : vehicles = [...?initial];
 
   @override
   Future<List<VehicleModel>> listMyVehicles() async {
     calls.add('list');
+    if (failList) throw Exception('falha ao listar');
     return [...vehicles];
   }
 
@@ -30,6 +34,9 @@ class FakeVehicleRepository implements VehicleRepository {
       color: request.color,
       type: request.type,
       totalCapacity: request.totalCapacity,
+      nickname: request.nickname,
+      renavam: request.renavam,
+      fuelSources: [request.fuelSource, ...request.otherFuelSources],
     );
     vehicles.add(created);
     return created;
@@ -49,6 +56,9 @@ class FakeVehicleRepository implements VehicleRepository {
       color: request.color,
       type: request.type,
       totalCapacity: request.totalCapacity,
+      nickname: request.nickname,
+      renavam: request.renavam,
+      fuelSources: [request.fuelSource, ...request.otherFuelSources],
     );
     final index = vehicles.indexWhere((vehicle) => vehicle.id == vehicleId);
     if (index >= 0) vehicles[index] = updated;
