@@ -6,18 +6,14 @@ import com.converge.api.shared.domain.enums.IdempotencyStatus;
 import com.converge.api.shared.domain.model.IdempotencyKey;
 import com.converge.api.shared.domain.repository.IdempotencyKeyRepository;
 import com.converge.api.shared.infrastructure.config.auth.AuthenticatedUser;
-import com.converge.api.shared.infrastructure.exception.ErrorResponse;
-import com.converge.api.shared.presentation.dto.ApplicationResponse;
 import com.converge.api.shared.presentation.exception.ErrorCode;
 import jakarta.servlet.FilterChain;
-import jakarta.servlet.ReadListener;
 import jakarta.servlet.ServletException;
-import jakarta.servlet.ServletInputStream;
 import jakarta.servlet.http.HttpServletRequest;
-import jakarta.servlet.http.HttpServletRequestWrapper;
 import jakarta.servlet.http.HttpServletResponse;
-import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
+import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.beans.factory.annotation.Value;
 import org.springframework.dao.DuplicateKeyException;
 import org.springframework.http.MediaType;
 import org.springframework.security.core.Authentication;
@@ -25,16 +21,9 @@ import org.springframework.security.core.context.SecurityContextHolder;
 import org.springframework.stereotype.Component;
 import org.springframework.web.filter.OncePerRequestFilter;
 import org.springframework.web.util.ContentCachingResponseWrapper;
-import tools.jackson.databind.ObjectMapper;
 
-import java.io.BufferedReader;
-import java.io.ByteArrayInputStream;
 import java.io.IOException;
-import java.io.InputStreamReader;
 import java.nio.charset.StandardCharsets;
-import java.security.MessageDigest;
-import java.security.NoSuchAlgorithmException;
-import java.util.HexFormat;
 import java.util.Objects;
 import java.util.Optional;
 import java.util.Set;
@@ -44,15 +33,30 @@ import java.util.Set;
  */
 @Slf4j
 @Component
-@RequiredArgsConstructor
 public class IdempotencyFilter extends OncePerRequestFilter {
 
     public static final String IDEMPOTENCY_KEY_HEADER = "Idempotency-Key";
+    static final int DEFAULT_MAX_BODY_BYTES = 1024 * 1024;
+    private static final int PAYLOAD_TOO_LARGE_STATUS = 413;
     private static final Set<String> MUTATING_METHODS = Set.of("POST", "PUT", "PATCH");
     private static final String RIDES_PATH_PREFIX = "/api/v1/rides";
 
     private final IdempotencyKeyRepository idempotencyKeyRepository;
-    private final ObjectMapper objectMapper = new ObjectMapper();
+    private final int maxBodyBytes;
+    private final IdempotencyResponseWriter responseWriter = new IdempotencyResponseWriter();
+
+    public IdempotencyFilter(IdempotencyKeyRepository idempotencyKeyRepository) {
+        this(idempotencyKeyRepository, DEFAULT_MAX_BODY_BYTES);
+    }
+
+    @Autowired
+    public IdempotencyFilter(
+            IdempotencyKeyRepository idempotencyKeyRepository,
+            @Value("${app.idempotency.max-body-bytes:" + DEFAULT_MAX_BODY_BYTES + "}") int maxBodyBytes
+    ) {
+        this.idempotencyKeyRepository = idempotencyKeyRepository;
+        this.maxBodyBytes = maxBodyBytes;
+    }
 
     @Override
     protected boolean shouldNotFilter(HttpServletRequest request) {
@@ -85,8 +89,18 @@ public class IdempotencyFilter extends OncePerRequestFilter {
         String key = rawKey.trim();
         String method = request.getMethod().toUpperCase();
         String path = request.getRequestURI();
-        CachedBodyHttpServletRequest cachedRequest = new CachedBodyHttpServletRequest(request);
-        String fingerprint = computeFingerprint(method, path, cachedRequest.getQueryString(), cachedRequest.getCachedBody());
+
+        CachedBodyHttpServletRequest cachedRequest;
+        try {
+            cachedRequest = new CachedBodyHttpServletRequest(request, maxBodyBytes);
+        } catch (PayloadTooLargeException ex) {
+            responseWriter.writeError(response, PAYLOAD_TOO_LARGE_STATUS, ErrorCode.BAD_REQUEST,
+                    "Corpo da requisição excede o limite máximo permitido.");
+            return;
+        }
+
+        String fingerprint = RequestFingerprint.compute(
+                method, path, cachedRequest.getQueryString(), cachedRequest.getCachedBody());
 
         IdempotencyKey entry;
         try {
@@ -98,6 +112,16 @@ public class IdempotencyFilter extends OncePerRequestFilter {
             return;
         }
 
+        executeAndRecordOutcome(cachedRequest, response, filterChain, key, entry);
+    }
+
+    private void executeAndRecordOutcome(
+            CachedBodyHttpServletRequest cachedRequest,
+            HttpServletResponse response,
+            FilterChain filterChain,
+            String key,
+            IdempotencyKey entry
+    ) throws ServletException, IOException {
         ContentCachingResponseWrapper responseWrapper = new ContentCachingResponseWrapper(response);
         boolean handlerReturned = false;
         int status = HttpServletResponse.SC_INTERNAL_SERVER_ERROR;
@@ -155,64 +179,43 @@ public class IdempotencyFilter extends OncePerRequestFilter {
     ) throws IOException {
         Optional<IdempotencyKey> existingOpt = idempotencyKeyRepository.findByKey(key);
         if (existingOpt.isEmpty()) {
-            writeError(response, ErrorCode.RIDE_CONFLICT, "Requisição já está em processamento. Tente novamente.");
+            responseWriter.writeError(response, ErrorCode.RIDE_CONFLICT,
+                    "Requisição já está em processamento. Tente novamente.");
             return;
         }
 
         IdempotencyKey existing = existingOpt.get();
-        if (!userId.equals(existing.getUserId())
-                || !method.equals(existing.getMethod())
-                || !path.equals(existing.getPath())
-                || !Objects.equals(fingerprint, existing.getRequestFingerprint())) {
-            writeError(response, ErrorCode.BAD_REQUEST, "Chave de idempotência já utilizada em outra requisição.");
+        if (!matchesRequest(existing, userId, method, path, fingerprint)) {
+            responseWriter.writeError(response, ErrorCode.BAD_REQUEST,
+                    "Chave de idempotência já utilizada em outra requisição.");
             return;
         }
 
         if (existing.getStatus() == IdempotencyStatus.COMPLETED) {
-            response.setStatus(existing.getResponseStatus());
-            response.setContentType(existing.getContentType() != null
-                    ? existing.getContentType()
-                    : MediaType.APPLICATION_JSON_VALUE);
-            response.setCharacterEncoding(StandardCharsets.UTF_8.name());
-            if (existing.getResponseBody() != null) {
-                response.getWriter().write(existing.getResponseBody());
-            }
+            responseWriter.replay(response, existing);
             return;
         }
 
         if (existing.getStatus() == IdempotencyStatus.UNKNOWN_OUTCOME) {
-            writeError(response, ErrorCode.RIDE_CONFLICT,
+            responseWriter.writeError(response, ErrorCode.RIDE_CONFLICT,
                     "Requisição anterior teve desfecho desconhecido; consulte o estado da viagem antes de tentar novamente.");
             return;
         }
 
-        writeError(response, ErrorCode.RIDE_CONFLICT, "Requisição já está em processamento.");
+        responseWriter.writeError(response, ErrorCode.RIDE_CONFLICT, "Requisição já está em processamento.");
     }
 
-    private String computeFingerprint(String method, String path, String queryString, byte[] body) {
-        try {
-            MessageDigest digest = MessageDigest.getInstance("SHA-256");
-            digest.update(method.getBytes(StandardCharsets.UTF_8));
-            digest.update((byte) '\n');
-            digest.update(path.getBytes(StandardCharsets.UTF_8));
-            digest.update((byte) '\n');
-            if (queryString != null) {
-                digest.update(queryString.getBytes(StandardCharsets.UTF_8));
-            }
-            digest.update((byte) '\n');
-            digest.update(body);
-            return HexFormat.of().formatHex(digest.digest());
-        } catch (NoSuchAlgorithmException ex) {
-            throw new IllegalStateException("Algoritmo SHA-256 indisponível", ex);
-        }
-    }
-
-    private void writeError(HttpServletResponse response, ErrorCode errorCode, String message) throws IOException {
-        response.setStatus(errorCode.getStatus().value());
-        response.setContentType(MediaType.APPLICATION_JSON_VALUE);
-        response.setCharacterEncoding(StandardCharsets.UTF_8.name());
-        ApplicationResponse<Void> body = ApplicationResponse.failure(new ErrorResponse(errorCode, message));
-        response.getWriter().write(objectMapper.writeValueAsString(body));
+    private boolean matchesRequest(
+            IdempotencyKey existing,
+            String userId,
+            String method,
+            String path,
+            String fingerprint
+    ) {
+        return userId.equals(existing.getUserId())
+                && method.equals(existing.getMethod())
+                && path.equals(existing.getPath())
+                && Objects.equals(fingerprint, existing.getRequestFingerprint());
     }
 
     private void safeDeleteKey(String key) {
@@ -220,51 +223,6 @@ public class IdempotencyFilter extends OncePerRequestFilter {
             idempotencyKeyRepository.deleteByKey(key);
         } catch (Exception ex) {
             log.warn("Falha ao remover chave de idempotência {}: {}", key, ex.getMessage());
-        }
-    }
-
-    private static final class CachedBodyHttpServletRequest extends HttpServletRequestWrapper {
-
-        private final byte[] cachedBody;
-
-        private CachedBodyHttpServletRequest(HttpServletRequest request) throws IOException {
-            super(request);
-            this.cachedBody = request.getInputStream().readAllBytes();
-        }
-
-        private byte[] getCachedBody() {
-            return cachedBody;
-        }
-
-        @Override
-        public ServletInputStream getInputStream() {
-            ByteArrayInputStream inputStream = new ByteArrayInputStream(cachedBody);
-            return new ServletInputStream() {
-                @Override
-                public boolean isFinished() {
-                    return inputStream.available() == 0;
-                }
-
-                @Override
-                public boolean isReady() {
-                    return true;
-                }
-
-                @Override
-                public void setReadListener(ReadListener readListener) {
-                    // Leitura síncrona a partir do buffer em memória.
-                }
-
-                @Override
-                public int read() {
-                    return inputStream.read();
-                }
-            };
-        }
-
-        @Override
-        public BufferedReader getReader() {
-            return new BufferedReader(new InputStreamReader(getInputStream(), StandardCharsets.UTF_8));
         }
     }
 }

@@ -30,6 +30,7 @@ import java.util.Optional;
 import java.util.concurrent.atomic.AtomicReference;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.Mockito.doAnswer;
 import static org.mockito.Mockito.never;
@@ -243,6 +244,22 @@ class IdempotencyFilterTest {
         filter.doFilter(request, response, filterChain);
 
         verify(repository).deleteByKey("uuid-500");
+    }
+
+    @Test
+    @DisplayName("Deve retornar 413 quando o corpo da requisição exceder o limite configurado")
+    void shouldReturn413WhenBodyExceedsMaxBodyBytes() throws ServletException, IOException {
+        IdempotencyFilter smallLimitFilter = new IdempotencyFilter(repository, 16);
+        MockHttpServletRequest request = new MockHttpServletRequest("POST", "/api/v1/rides/request");
+        request.addHeader("Idempotency-Key", "uuid-too-large");
+        request.setContent("0123456789abcdef_overflow".getBytes(StandardCharsets.UTF_8));
+        MockHttpServletResponse response = new MockHttpServletResponse();
+
+        smallLimitFilter.doFilter(request, response, filterChain);
+
+        assertEquals(413, response.getStatus());
+        verify(repository, never()).save(any());
+        verify(filterChain, never()).doFilter(any(), any());
     }
 
     @Test
