@@ -15,6 +15,9 @@ import '../../../auth/state/auth_action_controller.dart';
 import '../../../auth/state/auth_controller.dart';
 import '../../../auth/state/become_driver_controller.dart';
 import '../../../auth/state/session/auth_session.dart';
+import '../../../vehicle/data/models/create_vehicle_request.dart';
+import '../../../vehicle/presentation/widgets/vehicle_form.dart';
+import '../../../vehicle/state/my_vehicles_controller.dart';
 
 /// Exibe o BottomSheet contextual para ativação atômica do modo motorista.
 Future<bool?> showBecomeDriverSheet({
@@ -31,13 +34,14 @@ Future<bool?> showBecomeDriverSheet({
   );
 }
 
-enum _DriverSetupStep { pix, license, verification, success }
+enum _DriverSetupStep { license, vehicle, pix, verification, success }
 
 /// BottomSheet com fluxo atômico em etapas:
-/// 1. Configuração da chave PIX
-/// 2. Dados da Carteira de Motorista (CNH)
-/// 3. Simulação de aprovação e ativação via backend
-/// 4. Sucesso e liberação imediata
+/// 1. Dados da Carteira de Motorista (CNH)
+/// 2. Dados do carro (validados antes de seguir)
+/// 3. Configuração da chave PIX
+/// 4. Ativação via backend: só conclui com o carro aceito
+/// 5. Sucesso e liberação imediata
 class BecomeDriverSheet extends ConsumerStatefulWidget {
   final VoidCallback? onSuccess;
 
@@ -48,7 +52,10 @@ class BecomeDriverSheet extends ConsumerStatefulWidget {
 }
 
 class _BecomeDriverSheetState extends ConsumerState<BecomeDriverSheet> {
-  _DriverSetupStep _currentStep = _DriverSetupStep.pix;
+  _DriverSetupStep _currentStep = _DriverSetupStep.license;
+
+  // Passo 2: carro (guardado para não perder o que foi digitado ao trocar de passo)
+  CreateVehicleRequest? _vehicleDraft;
 
   // Passo 1: PIX
   final _pixFormKey = GlobalKey<FormState>();
@@ -126,15 +133,35 @@ class _BecomeDriverSheetState extends ConsumerState<BecomeDriverSheet> {
       }
     }
 
+    // O PIX é o último passo: com ele válido, ativa o modo motorista
+    await _startAtomicActivation();
+  }
+
+  /// CNH válida: segue para o cadastro do carro.
+  void _onNextToVehicle() {
+    if (!_cnhFormKey.currentState!.validate()) return;
     HapticFeedback.lightImpact();
     setState(() {
-      _currentStep = _DriverSetupStep.license;
+      _currentStep = _DriverSetupStep.vehicle;
+      _errorMessage = null;
+    });
+  }
+
+  /// Carro válido: segue para a chave PIX.
+  void _onVehicleConfirmed(CreateVehicleRequest request) {
+    setState(() {
+      _vehicleDraft = request;
+      _currentStep = _DriverSetupStep.pix;
       _errorMessage = null;
     });
   }
 
   Future<void> _startAtomicActivation() async {
-    if (!_cnhFormKey.currentState!.validate()) return;
+    final vehicle = _vehicleDraft;
+    if (vehicle == null) {
+      setState(() => _currentStep = _DriverSetupStep.vehicle);
+      return;
+    }
     HapticFeedback.mediumImpact();
 
     setState(() {
@@ -172,6 +199,7 @@ class _BecomeDriverSheetState extends ConsumerState<BecomeDriverSheet> {
     });
 
     try {
+      // Numa nova tentativa, o controller só reenvia o que mudou
       await ref
           .read(becomeDriverProvider.notifier)
           .activateDriverAtomic(
@@ -180,6 +208,26 @@ class _BecomeDriverSheetState extends ConsumerState<BecomeDriverSheet> {
             license: licenseInput,
             verificationDelay: const Duration(milliseconds: 2000),
           );
+    } catch (e, st) {
+      debugPrint('[BecomeDriverSheet] Falha na ativação do motorista: $e\n$st');
+      if (!mounted) return;
+      setState(() {
+        _errorMessage = authErrorMessage(e);
+        _currentStep = _DriverSetupStep.license;
+      });
+      return;
+    }
+
+    if (mounted) {
+      setState(() {
+        _simulationProgress = 0.95;
+        _simulationMessage = 'Validando e cadastrando o seu carro...';
+      });
+    }
+
+    try {
+      // Sem um carro válido, o cadastro não termina e o modo motorista fica bloqueado
+      await ref.read(myVehiclesProvider.notifier).add(vehicle);
 
       if (!mounted) return;
 
@@ -189,12 +237,12 @@ class _BecomeDriverSheetState extends ConsumerState<BecomeDriverSheet> {
         _simulationProgress = 1.0;
       });
     } catch (e, st) {
-      debugPrint('[BecomeDriverSheet] Falha na ativação do motorista: $e\n$st');
+      debugPrint('[BecomeDriverSheet] Carro recusado: $e\n$st');
       if (!mounted) return;
-      final msg = authErrorMessage(e);
+      HapticFeedback.heavyImpact();
       setState(() {
-        _errorMessage = msg;
-        _currentStep = _DriverSetupStep.license;
+        _errorMessage = authErrorMessage(e);
+        _currentStep = _DriverSetupStep.vehicle;
       });
     }
   }
@@ -274,8 +322,9 @@ class _BecomeDriverSheetState extends ConsumerState<BecomeDriverSheet> {
 
               // Conteúdo dinâmico de cada etapa
               switch (_currentStep) {
-                _DriverSetupStep.pix => _buildPixStep(),
                 _DriverSetupStep.license => _buildLicenseStep(),
+                _DriverSetupStep.vehicle => _buildVehicleStep(),
+                _DriverSetupStep.pix => _buildPixStep(),
                 _DriverSetupStep.verification => _buildVerificationStep(),
                 _DriverSetupStep.success => _buildSuccessStep(),
               },
@@ -337,23 +386,21 @@ class _BecomeDriverSheetState extends ConsumerState<BecomeDriverSheet> {
         Row(
           children: [
             _buildStepIndicator(
-              label: '1. Chave PIX',
-              isActive: _currentStep == _DriverSetupStep.pix,
-              isCompleted: _currentStep != _DriverSetupStep.pix,
-            ),
-            const SizedBox(width: 8),
-            _buildStepIndicator(
-              label: '2. CNH',
+              label: '1. CNH',
               isActive: _currentStep == _DriverSetupStep.license,
-              isCompleted:
-                  _currentStep == _DriverSetupStep.verification ||
-                  _currentStep == _DriverSetupStep.success,
+              isCompleted: _currentStep.index > _DriverSetupStep.license.index,
             ),
             const SizedBox(width: 8),
             _buildStepIndicator(
-              label: '3. Aprovação',
-              isActive: _currentStep == _DriverSetupStep.verification,
-              isCompleted: _currentStep == _DriverSetupStep.success,
+              label: '2. Carro',
+              isActive: _currentStep == _DriverSetupStep.vehicle,
+              isCompleted: _currentStep.index > _DriverSetupStep.vehicle.index,
+            ),
+            const SizedBox(width: 8),
+            _buildStepIndicator(
+              label: '3. PIX',
+              isActive: _currentStep == _DriverSetupStep.pix,
+              isCompleted: _currentStep.index > _DriverSetupStep.pix.index,
             ),
           ],
         ),
@@ -362,9 +409,10 @@ class _BecomeDriverSheetState extends ConsumerState<BecomeDriverSheet> {
   }
 
   String _stepSubtitle() => switch (_currentStep) {
-    _DriverSetupStep.pix => 'Passo 1 de 2: Cadastre sua chave de rateio.',
     _DriverSetupStep.license =>
-      'Passo 2 de 2: Informe os dados da habilitação.',
+      'Passo 1 de 3: Informe os dados da habilitação.',
+    _DriverSetupStep.vehicle => 'Passo 2 de 3: Cadastre o carro das caronas.',
+    _DriverSetupStep.pix => 'Passo 3 de 3: Cadastre sua chave de rateio.',
     _DriverSetupStep.verification => 'Processando verificação de segurança...',
     _DriverSetupStep.success => 'Perfil habilitado com sucesso!',
   };
@@ -557,44 +605,76 @@ class _BecomeDriverSheetState extends ConsumerState<BecomeDriverSheet> {
 
           const SizedBox(height: 24),
 
-          SizedBox(
-            width: double.infinity,
-            height: 52,
-            child: FilledButton(
-              onPressed: _isValidatingCpf ? null : _onNextToCnh,
-              style: FilledButton.styleFrom(
-                backgroundColor: AppColors.primary,
-                foregroundColor: AppColors.dockItemActive,
-                disabledBackgroundColor: AppColors.primary,
-                disabledForegroundColor: AppColors.dockItemActive,
-                elevation: 0,
-                shape: RoundedRectangleBorder(
+          Row(
+            children: [
+              Container(
+                width: 52,
+                height: 52,
+                decoration: BoxDecoration(
+                  color: AppColors.neutralLight,
                   borderRadius: BorderRadius.circular(14),
+                  border: Border.all(color: AppColors.borderSubtle),
+                ),
+                child: IconButton(
+                  onPressed: _isValidatingCpf
+                      ? null
+                      : () {
+                          HapticFeedback.lightImpact();
+                          setState(() {
+                            _currentStep = _DriverSetupStep.vehicle;
+                            _errorMessage = null;
+                          });
+                        },
+                  icon: const Icon(
+                    Icons.arrow_back_rounded,
+                    color: AppColors.textPrimary,
+                    size: 22,
+                  ),
+                  tooltip: 'Voltar ao carro',
                 ),
               ),
-              child: _isValidatingCpf
-                  ? const SizedBox(
-                      width: 22,
-                      height: 22,
-                      child: CircularProgressIndicator(
-                        strokeWidth: 2,
-                        color: AppColors.dockItemActive,
+              const SizedBox(width: 12),
+              Expanded(
+                child: SizedBox(
+                  height: 52,
+                  child: FilledButton(
+                    onPressed: _isValidatingCpf ? null : _onNextToCnh,
+                    style: FilledButton.styleFrom(
+                      backgroundColor: AppColors.primary,
+                      foregroundColor: AppColors.dockItemActive,
+                      disabledBackgroundColor: AppColors.primary,
+                      disabledForegroundColor: AppColors.dockItemActive,
+                      elevation: 0,
+                      shape: RoundedRectangleBorder(
+                        borderRadius: BorderRadius.circular(14),
                       ),
-                    )
-                  : const Row(
-                      mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                      children: [
-                        Text(
-                          'Avançar para CNH',
-                          style: TextStyle(
-                            fontSize: 16,
-                            fontWeight: FontWeight.w600,
-                          ),
-                        ),
-                        Icon(Icons.arrow_forward_rounded, size: 20),
-                      ],
                     ),
-            ),
+                    child: _isValidatingCpf
+                        ? const SizedBox(
+                            width: 22,
+                            height: 22,
+                            child: CircularProgressIndicator(
+                              strokeWidth: 2,
+                              color: AppColors.dockItemActive,
+                            ),
+                          )
+                        : const Row(
+                            mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                            children: [
+                              Text(
+                                'Validar e Ativar Modo',
+                                style: TextStyle(
+                                  fontSize: 16,
+                                  fontWeight: FontWeight.w600,
+                                ),
+                              ),
+                              Icon(Icons.arrow_forward_rounded, size: 20),
+                            ],
+                          ),
+                  ),
+                ),
+              ),
+            ],
           ),
         ],
       ),
@@ -806,14 +886,14 @@ class _BecomeDriverSheetState extends ConsumerState<BecomeDriverSheet> {
                 child: IconButton(
                   onPressed: () {
                     HapticFeedback.lightImpact();
-                    setState(() => _currentStep = _DriverSetupStep.pix);
+                    Navigator.of(context).pop();
                   },
                   icon: const Icon(
-                    Icons.arrow_back_rounded,
+                    Icons.close_rounded,
                     color: AppColors.textPrimary,
                     size: 22,
                   ),
-                  tooltip: 'Voltar ao PIX',
+                  tooltip: 'Cancelar cadastro',
                 ),
               ),
               const SizedBox(width: 12),
@@ -821,7 +901,7 @@ class _BecomeDriverSheetState extends ConsumerState<BecomeDriverSheet> {
                 child: SizedBox(
                   height: 52,
                   child: FilledButton(
-                    onPressed: _startAtomicActivation,
+                    onPressed: _onNextToVehicle,
                     style: FilledButton.styleFrom(
                       backgroundColor: AppColors.primary,
                       foregroundColor: AppColors.dockItemActive,
@@ -834,7 +914,7 @@ class _BecomeDriverSheetState extends ConsumerState<BecomeDriverSheet> {
                       mainAxisAlignment: MainAxisAlignment.spaceBetween,
                       children: [
                         Text(
-                          'Validar e Ativar Modo',
+                          'Avançar para o carro',
                           style: TextStyle(
                             fontSize: 16,
                             fontWeight: FontWeight.w600,
@@ -850,6 +930,20 @@ class _BecomeDriverSheetState extends ConsumerState<BecomeDriverSheet> {
           ),
         ],
       ),
+    );
+  }
+
+  // --- PASSO 2: CARRO ---
+  Widget _buildVehicleStep() {
+    return VehicleForm(
+      initial: _vehicleDraft,
+      submitLabel: 'Avançar para o PIX',
+      onChanged: (draft) => _vehicleDraft = draft,
+      onBack: () => setState(() {
+        _currentStep = _DriverSetupStep.license;
+        _errorMessage = null;
+      }),
+      onSubmit: _onVehicleConfirmed,
     );
   }
 
@@ -965,7 +1059,7 @@ class _BecomeDriverSheetState extends ConsumerState<BecomeDriverSheet> {
           const SizedBox(height: 6),
 
           const Text(
-            'Sua chave PIX foi configurada e sua CNH foi aprovada com sucesso. Você já pode iniciar expedientes e oferecer caronas no campus.',
+            'Sua CNH foi aprovada, o seu carro foi cadastrado e a chave PIX está configurada. Você já pode iniciar expedientes e oferecer caronas no campus.',
             textAlign: TextAlign.center,
             style: TextStyle(
               fontSize: 13,
@@ -991,6 +1085,13 @@ class _BecomeDriverSheetState extends ConsumerState<BecomeDriverSheet> {
                 ),
                 const Divider(height: 14, color: AppColors.borderSubtle),
                 _buildSummaryRow('Categoria CNH', _selectedCategory.label),
+                if (_vehicleDraft != null) ...[
+                  const Divider(height: 14, color: AppColors.borderSubtle),
+                  _buildSummaryRow(
+                    'Carro',
+                    '${_vehicleDraft!.model.trim()} • ${_vehicleDraft!.licensePlate.toUpperCase()}',
+                  ),
+                ],
                 const Divider(height: 14, color: AppColors.borderSubtle),
                 _buildSummaryRow(
                   'Status da Carteira',

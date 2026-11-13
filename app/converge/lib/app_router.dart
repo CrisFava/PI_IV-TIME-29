@@ -15,7 +15,6 @@ import 'features/auth/presentation/pages/splash_page.dart';
 import 'features/auth/presentation/pages/welcome_page.dart';
 import 'features/auth/state/auth_controller.dart';
 import 'features/auth/state/session/auth_session.dart';
-import 'features/matching/presentation/pages/ride_requests_page.dart';
 
 /// Decide para onde o usuário deve ir conforme a sessão. Retorna `null` para manter a rota atual
 String? authRedirect(AsyncValue<AuthSession> session, String location) {
@@ -82,10 +81,6 @@ final appRouterProvider = Provider<GoRouter>((ref) {
       GoRoute(
         path: AppRoutes.home,
         builder: (_, _) => const HomePage(),
-      ),
-      GoRoute(
-        path: AppRoutes.rideRequests,
-        builder: (_, _) => const RideRequestsPage(),
       ),
       GoRoute(
         path: AppRoutes.chat,

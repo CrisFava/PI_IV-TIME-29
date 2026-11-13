@@ -63,6 +63,11 @@ public class Vehicle {
     @NotBlank
     private String licensePlate;
 
+    // Registro Nacional de Veículos Automotores: 11 dígitos, o último é o verificador.
+    // Pode faltar em veículos cadastrados antes do campo existir.
+    @Nullable
+    private String renavam;
+
     @NotBlank
     private String color;
 
@@ -91,24 +96,28 @@ public class Vehicle {
             @Nullable String nickname,
             String model,
             String licensePlate,
+            String renavam,
             String color,
             VehicleType type,
             int totalCapacity,
             List<FuelSource> fuelSources
     ) {
         this.userId = userId;
-        this.applyVehicleData(nickname, model, licensePlate, color, type, totalCapacity, fuelSources);
+        this.applyVehicleData(nickname, model, licensePlate, renavam, color, type, totalCapacity, fuelSources);
     }
 
     private void applyVehicleData(
             @Nullable String nickname,
             String model,
             String licensePlate,
+            String renavam,
             String color,
             VehicleType type,
             int totalCapacity,
             List<FuelSource> fuelSources
     ) {
+        String normalizedRenavam = this.normalizeRenavam(renavam);
+        this.validateRenavam(normalizedRenavam);
         this.validateCapacity(type, totalCapacity);
         this.validateFuelSources(fuelSources);
         this.validateFuelRanges(type, fuelSources);
@@ -116,11 +125,42 @@ public class Vehicle {
         this.nickname = nickname;
         this.model = model;
         this.licensePlate = this.normalizeLicensePlate(licensePlate);
+        this.renavam = normalizedRenavam;
         this.color = color;
         this.type = type;
         this.totalCapacity = totalCapacity;
         this.fuelSources.clear();
         this.fuelSources.addAll(fuelSources);
+    }
+
+    private String normalizeRenavam(String renavam) {
+        return renavam == null ? "" : renavam.replaceAll("\\D", "");
+    }
+
+    /**
+     * RENAVAM válido: 11 dígitos, não todos iguais, e o último confere com o dígito verificador
+     * (soma dos 10 primeiros com os pesos 3, 2, 9, 8, 7, 6, 5, 4, 3, 2; dígito = soma × 10 mod 11,
+     * com 10 virando 0).
+     */
+    private void validateRenavam(String renavam) {
+        if (renavam.length() != 11 || renavam.chars().distinct().count() == 1) {
+            throw invalidRenavam("O RENAVAM deve ter 11 dígitos.");
+        }
+
+        int[] weights = {3, 2, 9, 8, 7, 6, 5, 4, 3, 2};
+        int sum = 0;
+        for (int i = 0; i < weights.length; i++) {
+            sum += Character.getNumericValue(renavam.charAt(i)) * weights[i];
+        }
+        int checkDigit = (sum * 10) % 11 % 10;
+
+        if (checkDigit != Character.getNumericValue(renavam.charAt(10))) {
+            throw invalidRenavam("RENAVAM inválido.");
+        }
+    }
+
+    private static ApplicationException invalidRenavam(String message) {
+        return new ApplicationException(ErrorCode.BAD_REQUEST, message, Set.of("renavam"));
     }
 
     private String normalizeLicensePlate(String licensePlate) {
@@ -216,12 +256,13 @@ public class Vehicle {
             @Nullable String nickname,
             String model,
             String licensePlate,
+            String renavam,
             String color,
             VehicleType type,
             int totalCapacity,
             List<FuelSource> fuelSources
     ) {
-        this.applyVehicleData(nickname, model, licensePlate, color, type, totalCapacity, fuelSources);
+        this.applyVehicleData(nickname, model, licensePlate, renavam, color, type, totalCapacity, fuelSources);
     }
 
     public void deactivate() {

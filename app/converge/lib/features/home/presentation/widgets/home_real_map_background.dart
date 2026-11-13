@@ -163,6 +163,9 @@ class HomeRealMapBackground extends StatefulWidget {
   final VoidCallback? onMapTap;
   final String universityName;
 
+  /// Altura coberta por um painel na parte de baixo: o enquadramento usa só a área visível.
+  final double bottomPadding;
+
   const HomeRealMapBackground({
     super.key,
     required this.isDriverMode,
@@ -184,6 +187,7 @@ class HomeRealMapBackground extends StatefulWidget {
     this.onDriverSelected,
     this.onMapTap,
     this.universityName = 'PUC-Campinas',
+    this.bottomPadding = 0,
   });
 
   @override
@@ -235,7 +239,8 @@ class _HomeRealMapBackgroundState extends State<HomeRealMapBackground> {
         widget.acceptedDriver != oldWidget.acceptedDriver ||
         widget.tripRoutePoints != oldWidget.tripRoutePoints ||
         widget.driverApproachRoutePoints != oldWidget.driverApproachRoutePoints ||
-        widget.showTrajectory != oldWidget.showTrajectory) {
+        widget.showTrajectory != oldWidget.showTrajectory ||
+        widget.bottomPadding != oldWidget.bottomPadding) {
       _adjustCameraForCurrentState();
     }
   }
@@ -505,6 +510,7 @@ class _HomeRealMapBackgroundState extends State<HomeRealMapBackground> {
               zoom: 15.0,
             ),
             onMapCreated: _onMapCreated,
+            padding: EdgeInsets.only(bottom: widget.bottomPadding),
             onTap: (_) => widget.onMapTap?.call(),
             onCameraMove: (pos) {
               _currentCameraTarget = pos.target;

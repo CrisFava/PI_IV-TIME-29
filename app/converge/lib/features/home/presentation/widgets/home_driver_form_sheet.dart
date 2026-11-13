@@ -146,7 +146,7 @@ class _HomeDriverFormSheetState extends ConsumerState<HomeDriverFormSheet> {
 
     return DraggableScrollableSheet(
       initialChildSize: 0.46,
-      minChildSize: 0.22,
+      minChildSize: 0.10,
       maxChildSize: 0.88,
       snap: true,
       snapSizes: const [0.22, 0.46, 0.88],

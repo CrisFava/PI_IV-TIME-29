@@ -9,6 +9,10 @@ abstract final class AppColors {
   static const Color dockBackground = Color(0xFF111111);
   static const Color carButtonResting = Color(0xFF14171A);
   static const Color carButtonDepressed = Color(0xFF1E232A);
+  static const Color carButtonBorder = Color(0x3DFFFFFF); // Borda do botão do carro fechado
+  static const Color carButtonBorderOpen = Colors.white; // Borda do botão do carro aberto
+  static const Color carButtonIcon = Colors.white;
+  static const Color carButtonShadow = Colors.black; // A opacidade é aplicada na sombra
 
   // Fundos e Superfícies Claras
   static const Color scaffoldBackground = Color(0xFFF8FAFC);
@@ -49,6 +53,11 @@ abstract final class AppColors {
   static const Color success = Color(0xFF15803D);
   static const Color successBackground = Color(0xFFF0FDF4);
   static const Color successBorder = Color(0xFFBBF7D0);
+
+  // Informação / em andamento (ex.: procurando motorista)
+  static const Color info = Color(0xFF2563EB);
+  static const Color infoBackground = Color(0xFFEFF6FF);
+  static const Color infoBorder = Color(0xFFBFDBFE);
 
   // Elementos do Mapa Estilo Uber (Cartografia Monocromática com Alto Contraste)
   static const Color mapBackground = Color(0xFFD6DADF); // Fundo cinza arquitetural contrastante

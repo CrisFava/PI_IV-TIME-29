@@ -238,6 +238,7 @@ Quando `active = false` (conta suspensa ou excluída):
   "nickname": "String | null",
   "model": "String",
   "licensePlate": "String",
+  "renavam": "String (11 dígitos)",
   "color": "String",
   "type": "HATCH | SEDAN | SUV | PICKUP | VAN | MOTORCYCLE | OTHER",
   "totalCapacity": "Integer",

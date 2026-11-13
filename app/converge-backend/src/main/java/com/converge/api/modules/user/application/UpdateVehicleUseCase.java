@@ -34,6 +34,7 @@ public class UpdateVehicleUseCase implements UseCase<UpdateVehicleCommand, Vehic
                 request.nickname(),
                 request.model(),
                 request.licensePlate(),
+                request.renavam(),
                 request.color(),
                 request.type(),
                 request.totalCapacity(),

@@ -33,6 +33,7 @@ class VehicleTest {
                 "Gol Azul",
                 "Volkswagen Gol",
                 "abc-1234",
+                "14283256656",
                 "Azul",
                 VehicleType.HATCH,
                 5,
@@ -43,6 +44,30 @@ class VehicleTest {
     }
 
     @Test
+    @DisplayName("Deve guardar o RENAVAM só com os dígitos")
+    void shouldNormalizeRenavam() {
+        Vehicle vehicle = new Vehicle(
+                "user-123", "Gol Azul", "Volkswagen Gol", "ABC1234", "142.832.566-56", "Azul",
+                VehicleType.HATCH, 5, gasolineOnly()
+        );
+
+        assertThat(vehicle.getRenavam()).isEqualTo("14283256656");
+    }
+
+    @Test
+    @DisplayName("RENAVAM com dígito verificador errado, tamanho errado ou dígitos repetidos deve ser recusado")
+    void shouldFailWhenRenavamIsInvalid() {
+        for (String renavam : new String[]{"14283256657", "1428325665", "11111111111", ""}) {
+            assertThatThrownBy(() -> new Vehicle(
+                    "user-123", "Gol Azul", "Volkswagen Gol", "ABC1234", renavam, "Azul",
+                    VehicleType.HATCH, 5, gasolineOnly()
+            ))
+                    .isInstanceOf(ApplicationException.class)
+                    .satisfies(error -> assertThat(((ApplicationException) error).getError().fields()).contains("renavam"));
+        }
+    }
+
+    @Test
     @DisplayName("Moto não pode ter mais de 2 lugares")
     void shouldFailWhenMotorcycleHasTooManySeats() {
         assertThatThrownBy(() -> new Vehicle(
@@ -50,6 +75,7 @@ class VehicleTest {
                 null,
                 "Honda CG",
                 "XYZ1A23",
+                "14283256656",
                 "Preta",
                 VehicleType.MOTORCYCLE,
                 3,
@@ -66,7 +92,7 @@ class VehicleTest {
         );
 
         assertThatThrownBy(() -> new Vehicle(
-                "user-123", "Gol Azul", "Volkswagen Gol", "ABC1234", "Azul",
+                "user-123", "Gol Azul", "Volkswagen Gol", "ABC1234", "14283256656", "Azul",
                 VehicleType.HATCH, 5, duplicated
         )).isInstanceOf(ApplicationException.class);
     }
@@ -79,7 +105,7 @@ class VehicleTest {
         );
 
         assertThatThrownBy(() -> new Vehicle(
-                "user-123", "Gol Azul", "Volkswagen Gol", "ABC1234", "Azul",
+                "user-123", "Gol Azul", "Volkswagen Gol", "ABC1234", "14283256656", "Azul",
                 VehicleType.HATCH, 5, tooEfficient
         )).isInstanceOf(ApplicationException.class);
     }
@@ -92,7 +118,7 @@ class VehicleTest {
         );
 
         assertThatThrownBy(() -> new Vehicle(
-                "user-123", "Gol Azul", "Volkswagen Gol", "ABC1234", "Azul",
+                "user-123", "Gol Azul", "Volkswagen Gol", "ABC1234", "14283256656", "Azul",
                 VehicleType.HATCH, 5, tooCheap
         )).isInstanceOf(ApplicationException.class);
     }
@@ -106,7 +132,7 @@ class VehicleTest {
         );
 
         Vehicle vehicle = new Vehicle(
-                "user-123", "Gol Azul", "Volkswagen Gol", "ABC1234", "Azul",
+                "user-123", "Gol Azul", "Volkswagen Gol", "ABC1234", "14283256656", "Azul",
                 VehicleType.HATCH, 5, flex
         );
 
@@ -121,6 +147,7 @@ class VehicleTest {
                 "Gol Azul",
                 "Volkswagen Gol",
                 "abc-1234",
+                "14283256656",
                 "Azul",
                 VehicleType.HATCH,
                 5,
