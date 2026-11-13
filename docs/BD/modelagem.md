@@ -722,7 +722,9 @@ Assim o resultado não depende da ordem em que os candidatos chegaram.
 
 **`estimatedCostPerPassenger`**: é `((routeDistanceKm + desvio) × preço da energia ÷ consumo + pedágio + estacionamento) ÷ (passageiros já confirmados + motorista + este passageiro)`, com 2 casas e arredondamento `HALF_EVEN`. A energia é a primeira `fuelSource` do veículo. O campo fica `null` se o veículo não tiver consumo e preço. É só uma estimativa: o valor final segue as regras de `rides`.
 
-**`maxAmount`** (só na resposta da API, não é gravado em `matchings`): é o teto do passageiro (RF35), a metade do mesmo custo da rota com o desvio (`(routeDistanceKm + desvio) × preço da energia ÷ consumo + pedágio + estacionamento) ÷ 2`). É o pior caso, em que só o motorista e esse passageiro dividem a viagem. O app mostra o aviso de que a estimativa pode subir até esse valor se alguém desistir.
+**`maxAmount`** (só na resposta da API, não é gravado em `matchings`): é uma **prévia** do teto do passageiro (RF35), calculada como a metade do mesmo custo da rota com o desvio: `((routeDistanceKm + desvio) × preço da energia ÷ consumo + pedágio + estacionamento) ÷ 2`. Representa o pior caso, em que só o motorista e esse passageiro dividem a viagem, e serve para o app avisar, antes do pedido, até quanto a estimativa pode subir se alguém desistir.
+
+> **Não é o teto gravado.** O pedido de vaga (`POST /rides/request`) não envia esse valor. O `maxAmount` que vale para o passageiro é calculado de novo no **aceite**, pelo `RideCostHandler` do servidor de sockets (acionado pelo `RideCostCalculator`), e gravado no participante da viagem (seção de custos de `rides`). Como o aceite usa os dados do momento (distância da rota e desvio calculados ali), o teto gravado pode ser diferente da prévia mostrada no matching.
 
 **Persistência:** cada busca recalcula o resultado e substitui o que havia para o trajeto pesquisado. O documento expira em 24 h (`expiresAt`). Quando um trajeto é editado ou excluído, o módulo `route` publica `RouteChangedEvent`, e todos os resultados que usam esse trajeto passam a `valid = false`.
 
