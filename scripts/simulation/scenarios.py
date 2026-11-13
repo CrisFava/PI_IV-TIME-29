@@ -276,7 +276,46 @@ def matching_filters(world: SimulationWorld) -> None:
         database["blocks"].delete_many({"userId": ana.id})
 
 
+def itinerary_with_stops(world: SimulationWorld) -> None:
+    driver = world.create_driver("Motorista")
+    driver_route = world.offer_route(driver, seats=3)
+    ana = world.create_passenger("Ana")
+    bruno = world.create_passenger("Bruno")
+
+    world.step("Ana e Bruno pedem vaga e o motorista aceita os dois")
+    ride_id = world.expect_ok(world.request_seat(ana, driver_route, world.search_route(ana)), "Ana pedir vaga")["id"]
+    world.expect_ok(world.request_seat(bruno, driver_route, world.search_route(bruno)), "Bruno pedir vaga")
+    world.expect_ok(world.passenger_action(driver, ride_id, ana, "accept"), "aceitar Ana")
+    ride = world.expect_ok(world.passenger_action(driver, ride_id, bruno, "accept"), "aceitar Bruno")
+
+    world.step("O motorista vê o itinerário: busca os dois e depois deixa os dois")
+    stops = ride.get("itinerary") or []
+    types = [stop.get("type") for stop in stops]
+    world.check(types == ["PICKUP", "PICKUP", "DROPOFF", "DROPOFF"],
+                f"o itinerário deveria buscar os dois e depois deixar, veio {types}")
+    world.check({stop.get("passengerId") for stop in stops} == {ana.id, bruno.id},
+                "o itinerário não tem as paradas dos dois passageiros")
+    distance = ride.get("itineraryDistanceKm")
+    world.check(distance is not None and distance > 0, "o itinerário veio sem distância")
+    print(f"      {len(stops)} paradas, {distance:.1f} km, "
+          f"rota do Google: {'sim' if ride.get('itineraryPolyline') else 'não (calculada em linha reta)'}")
+
+    world.step("A Ana vê só as próprias paradas, sem a rota que passa pela casa do Bruno")
+    seen_by_ana = world.ride(ana, ride_id)
+    own = seen_by_ana.get("itinerary") or []
+    world.check(len(own) == 2 and all(stop.get("passengerId") == ana.id for stop in own),
+                "a Ana viu paradas de outro passageiro")
+    world.check(seen_by_ana.get("itineraryPolyline") is None, "a Ana recebeu a rota completa do motorista")
+
+    world.step("O Bruno sai da carona e a rota deixa de passar por ele")
+    world.expect_ok(world.ride_action(bruno, ride_id, "leave", {"reason": "Simulação"}), "Bruno sair")
+    ride = world.ride(driver, ride_id)
+    remaining = {stop.get("passengerId") for stop in ride.get("itinerary") or []}
+    world.check(remaining == {ana.id}, f"depois da saída do Bruno, o itinerário deveria ter só a Ana: {remaining}")
+
+
 SCENARIOS = {
+    "itinerario": ("Rota com paradas: buscar e deixar cada passageiro aceito, e privacidade", itinerary_with_stops),
     "matching-filtros": ("Matching: proximidade, bloqueio nos dois sentidos, PIX e ordem por compatibilidade",
                          matching_filters),
     "caminho-feliz": ("Pedido, aceite, início, conclusão, PIX, avaliação e indicadores", happy_path),

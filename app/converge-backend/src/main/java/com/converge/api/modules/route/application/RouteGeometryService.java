@@ -11,6 +11,8 @@ import com.converge.api.shared.presentation.exception.ApplicationException;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Component;
+import java.util.ArrayList;
+import java.util.List;
 import java.util.Optional;
 
 /**
@@ -26,11 +28,22 @@ public class RouteGeometryService {
     private final MapsGateway mapsGateway;
 
     public RouteGeometry compute(Place origin, Place destination) {
-        Coordinates from = origin.coordinates();
-        Coordinates to = destination.coordinates();
+        return compute(origin, List.of(), destination);
+    }
+
+    /**
+     * Caminho passando pelas paradas, na ordem informada (ex.: buscar e deixar passageiros).
+     * Sem o Google, a distância é a soma das linhas retas entre os pontos, sem polyline.
+     */
+    public RouteGeometry compute(Place origin, List<Place> stops, Place destination) {
+        List<Coordinates> points = new ArrayList<>();
+        points.add(origin.coordinates());
+        stops.forEach(stop -> points.add(stop.coordinates()));
+        points.add(destination.coordinates());
 
         try {
-            Optional<RouteGeometry> route = mapsGateway.computeRoute(from, to);
+            Optional<RouteGeometry> route = mapsGateway.computeRoute(
+                    points.getFirst(), points.subList(1, points.size() - 1), points.getLast());
             if (route.isPresent()) {
                 return route.get();
             }
@@ -38,6 +51,11 @@ public class RouteGeometryService {
         } catch (ApplicationException e) {
             log.warn("Routes API indisponível, usando Haversine: {}", e.getMessage());
         }
-        return new RouteGeometry(HaversineCalculator.distanceKm(from, to), null);
+
+        double distanceKm = 0;
+        for (int i = 1; i < points.size(); i++) {
+            distanceKm += HaversineCalculator.distanceKm(points.get(i - 1), points.get(i));
+        }
+        return new RouteGeometry(distanceKm, null);
     }
 }

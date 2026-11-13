@@ -75,6 +75,10 @@ class RideJourneyTest {
     private static final BigDecimal ANA_FINAL_AMOUNT = new BigDecimal("12.50");
     private static final BigDecimal BRUNO_FINAL_AMOUNT = new BigDecimal("9.80");
 
+    // A rota com paradas é testada à parte (RideItineraryServiceTest)
+    @Mock
+    private RideItineraryService rideItineraryService;
+
     @Mock
     private UserUtils userUtils;
 
@@ -154,12 +158,12 @@ class RideJourneyTest {
         RidePaymentViewService paymentView = new RidePaymentViewService(getUserPixInfo, charge -> FAKE_PIX);
 
         acceptPassenger = new AcceptPassengerUseCase(
-                rideAccess, rideEligibility, rideCostCalculator, rideRepository, eventPublisher);
+                rideAccess, rideEligibility, rideCostCalculator, rideItineraryService, rideRepository, eventPublisher);
         startRide = new StartRideUseCase(rideAccess, rideRepository);
         markNoShow = new MarkNoShowUseCase(
                 rideAccess, rideCostCalculator, rideRepository, recordReputationPenalty, auditLogService);
         leaveRide = new LeaveRideUseCase(
-                rideAccess, rideCostCalculator, rideRepository, recordReputationPenalty, auditLogService);
+                rideAccess, rideCostCalculator, rideItineraryService, rideRepository, recordReputationPenalty, auditLogService);
         cancelRide = new CancelRideUseCase(
                 rideAccess, rideRepository, recordReputationPenalty, auditLogService, eventPublisher);
         completeRide = new CompleteRideUseCase(rideAccess, rideCostCalculator, rideRepository, completionPublisher);

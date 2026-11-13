@@ -18,5 +18,10 @@ public interface MapsGateway {
     Optional<PlaceDetails> getPlaceDetails(String placeId, String sessionToken);
 
     // Vazio quando não existe rota de carro entre os pontos
-    Optional<RouteGeometry> computeRoute(Coordinates origin, Coordinates destination);
+    default Optional<RouteGeometry> computeRoute(Coordinates origin, Coordinates destination) {
+        return computeRoute(origin, List.of(), destination);
+    }
+
+    // Rota passando pelas paradas, na ordem informada. Vazio quando não existe rota de carro
+    Optional<RouteGeometry> computeRoute(Coordinates origin, List<Coordinates> stops, Coordinates destination);
 }

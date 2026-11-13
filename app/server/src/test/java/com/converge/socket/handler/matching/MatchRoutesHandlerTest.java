@@ -106,12 +106,68 @@ class MatchRoutesHandlerTest {
     }
 
     @Test
-    @DisplayName("Deve descartar quando o desvio passa do máximo aceito pelo motorista")
-    void shouldRejectDetourAboveMax() throws ServerException {
-        // Origem em Valinhos: o motorista teria que desviar bem mais de 3 km
+    @DisplayName("Deve descartar quando o embarque fica longe do caminho do motorista")
+    void shouldRejectPickupFarFromPath() throws ServerException {
+        // Origem em Valinhos: bem mais de 3 km de qualquer ponto do caminho
         MatchRoute farAway = search("search-1", "passenger-1", -22.9706, -46.9958, "07:00", WEEKDAYS);
 
         assertTrue(passengerSeeks(farAway, driverOffer()).isEmpty());
+    }
+
+    @Test
+    @DisplayName("Embarque perto da rota pelas ruas entra, mesmo longe da linha reta origem-destino")
+    void shouldMatchPickupNearRoadPath() throws ServerException {
+        // A rota do motorista faz uma curva para o leste antes de chegar à PUC
+        String bentRoad = encode(List.of(
+                new double[]{CENTER_LAT, CENTER_LNG},
+                new double[]{-22.8700, -47.0000},
+                new double[]{PUC_LAT, PUC_LNG}
+        ));
+        MatchRoute offer = new MatchRoute("offer-1", "driver-1", CENTER_LAT, CENTER_LNG, PUC_LAT, PUC_LNG, "07:00",
+                WEEKDAYS, 1.0, 3, 3, 12.0, new BigDecimal("0.50"), new BigDecimal("4.00"), bentRoad);
+        MatchRoute straight = new MatchRoute("offer-2", "driver-2", CENTER_LAT, CENTER_LNG, PUC_LAT, PUC_LNG, "07:00",
+                WEEKDAYS, 1.0, 3, 3, 12.0, new BigDecimal("0.50"), new BigDecimal("4.00"));
+        // No meio do primeiro trecho da curva: a mais de 1 km de cada ponto da rota e da linha reta,
+        // então só a distância até o trecho (e não até os pontos) faz o passageiro entrar
+        MatchRoute midSegment = search("search-1", "passenger-1", -22.8878, -47.0304, "07:00", WEEKDAYS);
+
+        assertEquals(1, passengerSeeks(midSegment, offer).size());
+        assertTrue(passengerSeeks(midSegment, straight).isEmpty(), "sem a rota, vale a linha reta");
+    }
+
+    @Test
+    @DisplayName("Deve descartar quando o destino do passageiro fica longe do destino do motorista")
+    void shouldRejectDistantDestination() throws ServerException {
+        // Embarca no caminho, mas vai para Valinhos em vez da PUC
+        MatchRoute otherDestination = MatchRoute.search("search-1", "passenger-1", -22.9000, -47.0600,
+                -22.9706, -46.9958, "07:00", WEEKDAYS);
+
+        assertTrue(passengerSeeks(otherDestination, driverOffer()).isEmpty());
+    }
+
+    // Codifica os pontos no formato Encoded Polyline do Google
+    private static String encode(List<double[]> points) {
+        StringBuilder out = new StringBuilder();
+        long lastLat = 0;
+        long lastLng = 0;
+        for (double[] point : points) {
+            long lat = Math.round(point[0] * 1e5);
+            long lng = Math.round(point[1] * 1e5);
+            appendValue(out, lat - lastLat);
+            appendValue(out, lng - lastLng);
+            lastLat = lat;
+            lastLng = lng;
+        }
+        return out.toString();
+    }
+
+    private static void appendValue(StringBuilder out, long value) {
+        long shifted = value < 0 ? ~(value << 1) : value << 1;
+        while (shifted >= 0x20) {
+            out.append((char) ((0x20 | (shifted & 0x1f)) + 63));
+            shifted >>= 5;
+        }
+        out.append((char) (shifted + 63));
     }
 
     @Test

@@ -34,6 +34,10 @@ public record RideResponseDTO(
         RideCosts costs,
         List<ParticipantResponseDTO> participants,
         LocalDateTime createdAt,
-        LocalDateTime updatedAt
+        LocalDateTime updatedAt,
+        // O motorista vê todas as paradas e a rota; o passageiro, só as próprias paradas
+        List<RideStopResponseDTO> itinerary,
+        Double itineraryDistanceKm,
+        String itineraryPolyline
 ) {
 }

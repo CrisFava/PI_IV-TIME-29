@@ -438,10 +438,27 @@ Quando `active = false` (conta suspensa ou excluída):
       "updatedAt": "ISODate"
     }
   ],
+  "itinerary": [
+    {
+      "type": "PICKUP | DROPOFF",
+      "passengerId": "String (ref: users._id)",
+      "place": { "address": "String", "neighborhood": "String | null", "city": "String", "location": { "type": "Point", "coordinates": ["Double (longitude)", "Double (latitude)"] } }
+    }
+  ],
+  "itineraryDistanceKm": "Double | null",
+  "itineraryPolyline": "String | null",
   "createdAt": "ISODate",
   "updatedAt": "ISODate"
 }
 ```
+
+### Itinerário (rota com as paradas)
+
+O motorista vai até cada passageiro: `itinerary` guarda as paradas na ordem em que ele busca e deixa os passageiros confirmados.
+- **Quando muda:** é recalculado quando um passageiro é aceito (`AcceptPassengerUseCase`), quando um passageiro confirmado sai (`LeaveRideUseCase`) e quando o motorista remove um passageiro confirmado (`RejectPassengerUseCase`). Pedidos de vaga só existem antes de a viagem começar, então o itinerário não muda depois do `IN_PROGRESS`.
+- **Ordem** (`RideItineraryPlanner`): o motorista sai da origem e busca todos os confirmados, sempre o embarque mais próximo de onde ele está. Depois deixa cada um, sempre o desembarque mais próximo, e segue para o destino. Buscar todos antes de deixar garante que ninguém é deixado antes de embarcar.
+- **Rota:** `itineraryDistanceKm` e `itineraryPolyline` vêm da Routes API do Google, com as paradas como `intermediates`. Sem o Google, a distância é a soma das linhas retas entre os pontos e a polyline fica `null`. Uma falha no cálculo nunca impede o aceite nem a saída.
+- **Privacidade:** os pontos de embarque e desembarque são endereços dos passageiros. Na API, o motorista recebe todas as paradas, a distância e a polyline; cada passageiro recebe só as próprias paradas, sem a polyline.
 
 ### Índices
 
@@ -715,9 +732,12 @@ Ficam de fora:
 | Dias | Nenhum dia da semana em comum |
 | Vagas | `availableSeats` do motorista menor que 1 |
 | Horário | Saídas com mais de **30 min** de diferença (considera a virada da meia-noite) |
-| Desvio | Desvio maior que o `maxDetourKm` do motorista |
+| Embarque | Embarque do passageiro a mais de `maxDetourKm` do caminho do motorista (a rota pelas ruas, `encodedPolyline`; sem ela, a linha reta origem → destino) |
+| Destino | Destino do passageiro a mais de `maxDetourKm` do destino do motorista |
 
-**Desvio** (RF31): é calculado em linha reta (Haversine), com `m` = motorista e `p` = passageiro:
+**Distância até o caminho:** é a menor distância entre o embarque do passageiro e cada trecho da rota do motorista. O app chama o `maxDetourKm` de "Buscar passageiros a até X km" (padrão 3 km).
+
+**Desvio** (RF31): não decide mais quem aparece; entra no custo estimado. É calculado em linha reta (Haversine), com `m` = motorista e `p` = passageiro:
 
 `d(origem m → origem p) + d(origem p → destino p) + d(destino p → destino m) − d(origem m → destino m)`
 
@@ -727,10 +747,10 @@ O resultado vai para `calculatedDetourKm` e é o candidato natural ao `participa
 
 | Componente | Peso | Fórmula |
 |---|---|---|
-| Desvio | 0,4 | `1 − desvio / maxDetourKm` |
+| Embarque | 0,4 | `1 − distância do embarque ao caminho / maxDetourKm` |
 | Horário | 0,3 | `1 − diferença de saída / 30 min` |
 | Dias | 0,2 | dias em comum ÷ dias do passageiro |
-| Destino | 0,1 | `1 − min(d(destino p, destino m) / maxDetourKm, 1)` |
+| Destino | 0,1 | `1 − d(destino p, destino m) / maxDetourKm` |
 
 **Ordenação** (RF17): do maior para o menor índice. No empate, o critério passa a ser:
 1. o menor desvio;

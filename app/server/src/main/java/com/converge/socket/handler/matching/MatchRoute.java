@@ -35,6 +35,8 @@ public class MatchRoute implements Serializable {
     private final BigDecimal energyCostPerKm;
     // Pedágio + estacionamento da viagem.
     private final BigDecimal fixedCosts;
+    // Caminho do motorista pelas ruas (polyline do Google). Null: usa a linha reta origem → destino.
+    private final String encodedPolyline;
 
     public MatchRoute(
             String routeId,
@@ -51,6 +53,27 @@ public class MatchRoute implements Serializable {
             Double routeDistanceKm,
             BigDecimal energyCostPerKm,
             BigDecimal fixedCosts
+    ) {
+        this(routeId, userId, originLat, originLng, destinationLat, destinationLng, departureTime, weekDays,
+                maxDetourKm, totalSeats, availableSeats, routeDistanceKm, energyCostPerKm, fixedCosts, null);
+    }
+
+    public MatchRoute(
+            String routeId,
+            String userId,
+            double originLat,
+            double originLng,
+            double destinationLat,
+            double destinationLng,
+            String departureTime,
+            Set<DayOfWeek> weekDays,
+            Double maxDetourKm,
+            Integer totalSeats,
+            Integer availableSeats,
+            Double routeDistanceKm,
+            BigDecimal energyCostPerKm,
+            BigDecimal fixedCosts,
+            String encodedPolyline
     ) {
         this.routeId = routeId;
         this.userId = userId;
@@ -69,6 +92,7 @@ public class MatchRoute implements Serializable {
         this.routeDistanceKm = routeDistanceKm;
         this.energyCostPerKm = energyCostPerKm;
         this.fixedCosts = fixedCosts;
+        this.encodedPolyline = encodedPolyline;
     }
 
     public static MatchRoute search(
@@ -139,6 +163,10 @@ public class MatchRoute implements Serializable {
 
     public BigDecimal getFixedCosts() {
         return fixedCosts;
+    }
+
+    public String getEncodedPolyline() {
+        return encodedPolyline;
     }
 
     @Override

@@ -26,6 +26,7 @@ public class LeaveRideUseCase implements UseCase<CancelRideCommand, Ride> {
 
     private final RideAccess rideAccess;
     private final RideCostCalculator rideCostCalculator;
+    private final RideItineraryService rideItineraryService;
     private final RideRepository rideRepository;
     private final RecordReputationPenaltyUseCase recordReputationPenalty;
     private final AuditLogService auditLogService;
@@ -41,6 +42,8 @@ public class LeaveRideUseCase implements UseCase<CancelRideCommand, Ride> {
 
         if (wasConfirmed) {
             rideCostCalculator.recalculateEstimatedShares(ride);
+            // A rota deixa de passar pelo embarque e pelo desembarque de quem saiu
+            rideItineraryService.refresh(ride);
         }
 
         Ride saved = rideRepository.save(ride);

@@ -2,6 +2,8 @@
 
 package com.converge.api.modules.route.infrastructure.google;
 
+import com.fasterxml.jackson.annotation.JsonInclude;
+
 import com.converge.api.modules.route.infrastructure.google.GooglePlacesJson.LatLng;
 
 import java.util.List;
@@ -16,7 +18,13 @@ final class GoogleRoutesJson {
 
     // --- POST directions/v2:computeRoutes (requisição) ---
 
-    record ComputeRoutesRequest(Waypoint origin, Waypoint destination, String travelMode) {
+    // intermediates: paradas no meio do caminho, na ordem informada (vazio fica fora do JSON)
+    record ComputeRoutesRequest(
+            Waypoint origin,
+            Waypoint destination,
+            @JsonInclude(JsonInclude.Include.NON_EMPTY) List<Waypoint> intermediates,
+            String travelMode
+    ) {
     }
 
     record Waypoint(Location location) {

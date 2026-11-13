@@ -20,7 +20,7 @@ import java.util.Optional;
 public class MatchingRouteFactory {
 
     public MatchingRoute fromSearch(Route route) {
-        return build(route, null, null, null, null, null, null);
+        return build(route, null, null, null, null, null, null, null);
     }
 
     public MatchingRoute fromOffer(Route route, Optional<Vehicle> vehicle) {
@@ -31,7 +31,8 @@ public class MatchingRouteFactory {
                 route.getAvailableSeats(),
                 route.getRouteDistanceKm(),
                 vehicle.flatMap(MatchingRouteFactory::energyCostPerKm).orElse(null),
-                fixedCosts(route)
+                fixedCosts(route),
+                route.getEncodedPolyline()
         );
     }
 
@@ -61,7 +62,8 @@ public class MatchingRouteFactory {
             Integer availableSeats,
             Double routeDistanceKm,
             BigDecimal energyCostPerKm,
-            BigDecimal fixedCosts
+            BigDecimal fixedCosts,
+            String encodedPolyline
     ) {
         Coordinates origin = route.getOrigin().coordinates();
         Coordinates destination = route.getDestination().coordinates();
@@ -80,7 +82,8 @@ public class MatchingRouteFactory {
                 availableSeats,
                 routeDistanceKm,
                 energyCostPerKm,
-                fixedCosts
+                fixedCosts,
+                encodedPolyline
         );
     }
 }

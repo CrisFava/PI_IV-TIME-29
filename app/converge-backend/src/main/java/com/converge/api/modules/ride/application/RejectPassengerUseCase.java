@@ -33,6 +33,7 @@ public class RejectPassengerUseCase implements UseCase<RejectPassengerCommand, R
 
     private final RideAccess rideAccess;
     private final RideCostCalculator rideCostCalculator;
+    private final RideItineraryService rideItineraryService;
     private final RideRepository rideRepository;
     private final RecordReputationPenaltyUseCase recordReputationPenalty;
     private final AuditLogService auditLogService;
@@ -47,6 +48,8 @@ public class RejectPassengerUseCase implements UseCase<RejectPassengerCommand, R
         boolean wasConfirmed = ride.rejectPassenger(command.passengerId(), reason);
         if (wasConfirmed) {
             rideCostCalculator.recalculateEstimatedShares(ride);
+            // A rota deixa de passar pelo embarque e pelo desembarque de quem foi removido
+            rideItineraryService.refresh(ride);
         }
 
         Ride saved = rideRepository.save(ride);

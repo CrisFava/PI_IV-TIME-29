@@ -128,8 +128,12 @@ public class GoogleMapsGateway implements MapsGateway {
     }
 
     @Override
-    public Optional<RouteGeometry> computeRoute(Coordinates origin, Coordinates destination) {
-        ComputeRoutesRequest request = new ComputeRoutesRequest(waypoint(origin), waypoint(destination), "DRIVE");
+    public Optional<RouteGeometry> computeRoute(Coordinates origin, List<Coordinates> stops, Coordinates destination) {
+        List<Waypoint> intermediates = stops == null
+                ? List.of()
+                : stops.stream().map(GoogleMapsGateway::waypoint).toList();
+        ComputeRoutesRequest request = new ComputeRoutesRequest(
+                waypoint(origin), waypoint(destination), intermediates, "DRIVE");
 
         // URL absoluta: a Routes API fica em outro host, então o baseUrl do Places é ignorado
         ComputeRoutesResponse response = call(() -> restClient.post()
