@@ -15,7 +15,7 @@ class RideDockNavigation extends StatefulWidget {
   /// Callback disparado quando o usuário seleciona "Pedir ride".
   final VoidCallback onRequestRide;
 
-  /// Callback disparado quando o usuário seleciona "Iniciar expediente de motorista".
+  /// Callback disparado quando o usuário seleciona "Minhas caronas" (ou, com a viagem em andamento, as paradas).
   final VoidCallback onStartDriverShift;
 
   /// Estado de abertura opcional controlado externamente.
@@ -30,11 +30,11 @@ class RideDockNavigation extends StatefulWidget {
   /// Callback acionado quando o usuário clica na ação de motorista bloqueada.
   final VoidCallback? onLockedDriverTap;
 
-  /// O motorista está em expediente: o botão do carro ganha o anel verde pulsante
-  /// e o menu mostra "Em expediente" com o botão "Encerrar".
+  /// O motorista está com uma viagem em andamento: o botão do carro ganha o anel
+  /// verde pulsante e o menu mostra "Viagem em andamento" com o botão "Encerrar".
   final bool isOnShift;
 
-  /// Callback do botão "Encerrar" expediente.
+  /// Callback do botão "Encerrar": conclui a viagem em andamento.
   final VoidCallback? onEndDriverShift;
 
   /// Motorista sem carro cadastrado: a função de motorista fica bloqueada e o
@@ -319,7 +319,7 @@ class _RideDockNavigationState extends State<RideDockNavigation>
                     child: _CenterRideButton(
                       progress: progress,
                       onPressed: _handleToggle,
-                      // Verde no expediente; azul enquanto procura motorista
+                      // Verde na viagem em andamento; azul enquanto procura motorista
                       pulseColor: widget.isOnShift
                           ? AppColors.success
                           : widget.isSearchingRide
@@ -420,7 +420,7 @@ class _CenterRideButtonState extends State<_CenterRideButton>
     with SingleTickerProviderStateMixin {
   bool _isPressed = false;
 
-  // Anel verde que pulsa em volta do botão enquanto o motorista está em expediente
+  // Anel verde que pulsa em volta do botão enquanto a viagem do motorista está em andamento
   late final AnimationController _pulseController = AnimationController(
     vsync: this,
     duration: const Duration(milliseconds: 1600),
@@ -550,7 +550,7 @@ class _CenterRideButtonState extends State<_CenterRideButton>
                 ),
               ),
             ),
-            // Ponto verde de "em expediente"
+            // Ponto verde de "viagem em andamento"
             if (widget.pulseColor != null && !isExpanded)
               Positioned(
                 top: 2,
@@ -682,12 +682,12 @@ class _RidesPopoverCard extends StatelessWidget {
             _buildVehicleBlockedRow()
           else
             _CompactActionRow(
-              title: 'Iniciar expediente de motorista',
+              title: 'Minhas caronas',
               subtitle: canDrive
-                  ? 'Abra vagas no trajeto e compartilhe custos.'
+                  ? 'Ofereça uma carona ou veja as suas.'
                   : 'Requer perfil de motorista cadastrado.',
               icon: canDrive ? Icons.drive_eta_rounded : Icons.lock_rounded,
-              badgeLabel: canDrive ? 'Disponível' : 'Bloqueado',
+              badgeLabel: canDrive ? null : 'Bloqueado',
               onTap: canDrive
                   ? onStartDriverShift
                   : (onLockedDriverTap ?? onStartDriverShift),
@@ -887,7 +887,7 @@ class _RidesPopoverCard extends StatelessWidget {
     );
   }
 
-  /// Linha do expediente ativo: tocar abre os pedidos de vaga; "Encerrar" termina o expediente.
+  /// Viagem em andamento: tocar mostra as paradas; "Encerrar" conclui a viagem.
   Widget _buildOnShiftRow() {
     return Container(
       padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
@@ -935,7 +935,7 @@ class _RidesPopoverCard extends StatelessWidget {
                             ),
                             SizedBox(width: 5),
                             Text(
-                              'Em expediente',
+                              'Viagem em andamento',
                               style: TextStyle(
                                 fontSize: 13.5,
                                 fontWeight: FontWeight.w700,
@@ -947,7 +947,7 @@ class _RidesPopoverCard extends StatelessWidget {
                         ),
                         SizedBox(height: 2),
                         Text(
-                          'Toque para ver os pedidos de vaga.',
+                          'Toque para ver as paradas.',
                           style: TextStyle(
                             fontSize: 11,
                             color: AppColors.textSecondary,

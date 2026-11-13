@@ -82,6 +82,20 @@ void main() {
     });
   });
 
+  group('aviso do motorista disponível', () {
+    test('recusar sugere o próximo e, sem mais nenhum, o aviso some', () async {
+      await controller().findDrivers(fakeSearchRouteId);
+
+      controller().declineSuggestion(state().suggestion!);
+      expect(state().suggestion?.otherUserName, 'Mariana Costa');
+
+      controller().declineSuggestion(state().suggestion!);
+      expect(state().suggestion, isNull);
+      expect(state().matches, hasLength(2));
+    });
+
+  });
+
   group('requestSeat', () {
     setUp(() => controller().findDrivers(fakeSearchRouteId));
 
@@ -226,6 +240,29 @@ void main() {
       final id = await controller().prepareSearchRoute(request);
 
       expect(id, 'saved-elsewhere');
+    });
+
+    test('fechar o pedido desativa o trajeto criado só para ele', () async {
+      await controller().prepareSearchRoute(request);
+
+      controller().reset();
+      await pumpEventQueue();
+
+      expect(routes.calls, contains('deleteRoute:created-1'));
+    });
+
+    test('com a carona aceita, o trajeto de procura continua', () async {
+      final searchId = await controller().prepareSearchRoute(request);
+      await controller().findDrivers(searchId!);
+      await controller().requestSeat(fakeMatch());
+      rides.passengerStatus = 'CONFIRMED';
+      await controller().refreshRequest();
+      expect(state().phase, PassengerMatchPhase.accepted);
+
+      controller().reset();
+      await pumpEventQueue();
+
+      expect(routes.calls, isNot(contains('deleteRoute:created-1')));
     });
   });
 }

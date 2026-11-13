@@ -15,6 +15,9 @@ class FakeMatchingRouteRepository implements RouteRepository {
   /// Simula outro pedido salvando o mesmo trajeto no meio do caminho (409).
   bool conflictOnCreate = false;
 
+  /// Faz a próxima desativação falhar, como numa queda de rede.
+  bool failDelete = false;
+
   final List<String> calls = [];
 
   static RouteResponseModel routeFrom(String id, CreateRouteRequest request) =>
@@ -68,5 +71,15 @@ class FakeMatchingRouteRepository implements RouteRepository {
       throw UnimplementedError();
 
   @override
-  Future<void> deleteRoute(String routeId) => throw UnimplementedError();
+  Future<void> deleteRoute(String routeId) async {
+    calls.add('deleteRoute:$routeId');
+    if (failDelete) {
+      throw const ApiException(
+        code: ApiErrorCode.network,
+        message: 'Sem conexão.',
+        status: 0,
+      );
+    }
+    routes.removeWhere((route) => route.id == routeId);
+  }
 }

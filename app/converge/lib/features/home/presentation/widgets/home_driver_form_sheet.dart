@@ -8,38 +8,52 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:google_maps_flutter/google_maps_flutter.dart';
 
 import '../../../../core/config/styles.dart';
-import '../../../ride/data/models/driver_shift_payload.dart';
 import '../../../route/data/models/place_suggestion_model.dart';
 import '../../../route/state/places_autocomplete_controller.dart';
+import 'ride_departure_tile.dart';
 
 /// ============================================================================
 /// COMPONENTE: HomeDriverFormSheet (Modo Motorista - Painel e Formulário)
 /// ============================================================================
-/// Painel retrátil com formulário para iniciar expediente de motorista:
-/// 1. Destino do motorista (com busca Google Maps após 1s e lupa animada)
-/// 2. Raio de destino (área de tolerância do passageiro)
-/// 3. Raio em km a partir do local atual (refletido no mapa para apitar buscas)
-/// 4. Horário de fim de busca com aviso de timeout automático
-/// 5. Ação de salvar trajeto, botão de fechar e início de expediente
+/// Painel retrátil com o formulário para o motorista publicar uma carona agendada:
+/// 1. De onde sai e para onde vai (com busca Google Maps após 1s e lupa animada)
+/// 2. Até quantos km do caminho e do destino os passageiros podem estar
+/// 3. Quando a carona sai e o botão de publicar
 /// ============================================================================
 class HomeDriverFormSheet extends ConsumerStatefulWidget {
   final double initialSearchRadiusKm;
   final ValueChanged<double> onSearchRadiusChanged;
-  final ValueChanged<DriverShiftPayload> onStartShift;
+
+  /// Publica a carona com o desvio máximo escolhido, em km.
+  final ValueChanged<double> onPublish;
   final VoidCallback onSaveRoute;
   final VoidCallback? onClose;
   final void Function(String address, LatLng position)? onDestinationSelected;
+
+  /// De onde a carona sai (a localização atual não é usada).
+  final void Function(String address, LatLng position)? onOriginSelected;
   final double bottomSafeArea;
+
+  /// Publicando a carona: o botão fica desabilitado, com progresso.
+  final bool isPublishing;
+
+  /// Quando a carona sai ("Agora" por padrão) e a troca de dia e horário.
+  final String departureLabel;
+  final VoidCallback? onChangeDeparture;
 
   const HomeDriverFormSheet({
     super.key,
-    this.initialSearchRadiusKm = 5.0,
+    this.initialSearchRadiusKm = 3.0,
     required this.onSearchRadiusChanged,
-    required this.onStartShift,
+    required this.onPublish,
     required this.onSaveRoute,
     this.onClose,
     this.onDestinationSelected,
+    this.onOriginSelected,
     this.bottomSafeArea = 0,
+    this.isPublishing = false,
+    this.departureLabel = 'Agora',
+    this.onChangeDeparture,
   });
 
   @override
@@ -50,12 +64,12 @@ class HomeDriverFormSheet extends ConsumerStatefulWidget {
 class _HomeDriverFormSheetState extends ConsumerState<HomeDriverFormSheet> {
   final _formKey = GlobalKey<FormState>();
   final _destinationController = TextEditingController();
+  final _originController = TextEditingController();
+
+  // Qual campo de endereço está sendo digitado (as sugestões aparecem embaixo dele)
+  bool _editingOrigin = false;
 
   late double _searchRadiusKm;
-  double _destinationRadiusKm = 3.0;
-  TimeOfDay _endSearchTime = TimeOfDay.fromDateTime(
-    DateTime.now().add(const Duration(hours: 2)),
-  );
 
   @override
   void initState() {
@@ -66,6 +80,7 @@ class _HomeDriverFormSheetState extends ConsumerState<HomeDriverFormSheet> {
   @override
   void dispose() {
     _destinationController.dispose();
+    _originController.dispose();
     super.dispose();
   }
 
@@ -75,12 +90,15 @@ class _HomeDriverFormSheetState extends ConsumerState<HomeDriverFormSheet> {
     HapticFeedback.lightImpact();
     FocusScope.of(context).unfocus();
 
+    // A sugestão vai para o campo que estava sendo digitado
+    final isOrigin = _editingOrigin;
+    final controller = isOrigin ? _originController : _destinationController;
     final fullLabel = suggestion.secondaryText.isNotEmpty
         ? '${suggestion.mainText}, ${suggestion.secondaryText}'
         : suggestion.mainText;
 
     setState(() {
-      _destinationController.text = fullLabel;
+      controller.text = fullLabel;
     });
     ref.read(placesAutocompleteProvider.notifier).clear();
 
@@ -93,34 +111,14 @@ class _HomeDriverFormSheetState extends ConsumerState<HomeDriverFormSheet> {
           ? details.address
           : fullLabel;
       setState(() {
-        _destinationController.text = resolvedAddress;
+        controller.text = resolvedAddress;
       });
-      widget.onDestinationSelected?.call(
-        resolvedAddress,
-        LatLng(details.latitude, details.longitude),
-      );
-    }
-  }
-
-  Future<void> _selectTime(BuildContext context) async {
-    final picked = await showTimePicker(
-      context: context,
-      initialTime: _endSearchTime,
-      builder: (context, child) {
-        return Theme(
-          data: Theme.of(context).copyWith(
-            colorScheme: const ColorScheme.light(
-              primary: AppColors.primary,
-              onPrimary: AppColors.textLight,
-              onSurface: AppColors.textPrimary,
-            ),
-          ),
-          child: child!,
-        );
-      },
-    );
-    if (picked != null) {
-      setState(() => _endSearchTime = picked);
+      final position = LatLng(details.latitude, details.longitude);
+      if (isOrigin) {
+        widget.onOriginSelected?.call(resolvedAddress, position);
+      } else {
+        widget.onDestinationSelected?.call(resolvedAddress, position);
+      }
     }
   }
 
@@ -128,16 +126,181 @@ class _HomeDriverFormSheetState extends ConsumerState<HomeDriverFormSheet> {
     if (!_formKey.currentState!.validate()) return;
 
     HapticFeedback.mediumImpact();
-    final payload = DriverShiftPayload(
-      driverId: 'current_user',
-      destination: _destinationController.text.trim(),
-      destinationRadiusKm: _destinationRadiusKm,
-      searchRadiusKm: _searchRadiusKm,
-      endSearchTime: _endSearchTime,
-      startedAt: DateTime.now(),
-    );
+    widget.onPublish(_searchRadiusKm);
+  }
 
-    widget.onStartShift(payload);
+  /// Campo de endereço com a busca do Google Maps. As sugestões aparecem embaixo
+  /// do campo que está sendo digitado.
+  List<Widget> _buildPlaceInput({
+    required bool isOrigin,
+    required TextEditingController controller,
+    required String label,
+    required String hint,
+    required IconData icon,
+    required String emptyMessage,
+    required PlacesAutocompleteState autocompleteState,
+  }) {
+    final active = _editingOrigin == isOrigin;
+    return [
+      Text(
+        label,
+        style: TextStyle(
+          fontSize: 13.5,
+          fontWeight: FontWeight.w600,
+          color: AppColors.textPrimary,
+        ),
+      ),
+      const SizedBox(height: 6),
+      TextFormField(
+        key: ValueKey(
+          isOrigin ? 'driver_origin_input' : 'driver_destination_input',
+        ),
+        controller: controller,
+        onTap: () => setState(() => _editingOrigin = isOrigin),
+        style: const TextStyle(fontSize: 14, color: AppColors.textPrimary),
+        decoration: InputDecoration(
+          hintText: hint,
+          hintStyle: const TextStyle(
+            color: AppColors.textMuted,
+            fontSize: 13.5,
+          ),
+          prefixIcon: Icon(icon, size: 18, color: AppColors.textPrimary),
+          suffixIcon: autocompleteState.isLoading && active
+              ? const FloatingSearchLensIcon(
+                  key: ValueKey('floating_search_lens'),
+                )
+              : controller.text.isNotEmpty
+              ? IconButton(
+                  tooltip: 'Limpar',
+                  icon: const Icon(
+                    Icons.clear_rounded,
+                    size: 18,
+                    color: AppColors.textSecondary,
+                  ),
+                  onPressed: () {
+                    HapticFeedback.lightImpact();
+                    controller.clear();
+                    ref.read(placesAutocompleteProvider.notifier).clear();
+                    setState(() {});
+                  },
+                )
+              : const Icon(
+                  Icons.search_rounded,
+                  size: 18,
+                  color: AppColors.textMuted,
+                ),
+          filled: true,
+          fillColor: AppColors.neutralLight,
+          contentPadding: const EdgeInsets.symmetric(
+            horizontal: 14,
+            vertical: 12,
+          ),
+          enabledBorder: OutlineInputBorder(
+            borderRadius: BorderRadius.circular(14),
+            borderSide: const BorderSide(color: AppColors.borderSubtle),
+          ),
+          focusedBorder: OutlineInputBorder(
+            borderRadius: BorderRadius.circular(14),
+            borderSide: const BorderSide(color: AppColors.primary, width: 1.5),
+          ),
+          errorBorder: OutlineInputBorder(
+            borderRadius: BorderRadius.circular(14),
+            borderSide: const BorderSide(color: AppColors.error),
+          ),
+          focusedErrorBorder: OutlineInputBorder(
+            borderRadius: BorderRadius.circular(14),
+            borderSide: const BorderSide(color: AppColors.error, width: 1.5),
+          ),
+        ),
+        onChanged: (text) {
+          setState(() => _editingOrigin = isOrigin);
+          ref.read(placesAutocompleteProvider.notifier).onQueryChanged(text);
+        },
+        validator: (v) => (v == null || v.trim().isEmpty) ? emptyMessage : null,
+      ),
+
+      // Lista de sugestões retornadas pelo Google Maps (após 1s de digitação)
+      if (active && autocompleteState.suggestions.isNotEmpty) ...[
+        const SizedBox(height: 8),
+        Container(
+          decoration: BoxDecoration(
+            color: AppColors.cardBackground,
+            borderRadius: BorderRadius.circular(14),
+            border: Border.all(color: AppColors.borderSubtle),
+          ),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.stretch,
+            children: [
+              for (
+                int i = 0;
+                i < autocompleteState.suggestions.length;
+                i++
+              ) ...[
+                if (i > 0)
+                  const Divider(height: 1, color: AppColors.borderSubtle),
+                InkWell(
+                  borderRadius: BorderRadius.circular(14),
+                  onTap: () => _handleSuggestionSelected(
+                    autocompleteState.suggestions[i],
+                  ),
+                  child: Padding(
+                    padding: const EdgeInsets.symmetric(
+                      horizontal: 12,
+                      vertical: 10,
+                    ),
+                    child: Row(
+                      children: [
+                        const Icon(
+                          Icons.location_on_rounded,
+                          size: 18,
+                          color: AppColors.primary,
+                        ),
+                        const SizedBox(width: 10),
+                        Expanded(
+                          child: Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              Text(
+                                autocompleteState.suggestions[i].mainText,
+                                style: const TextStyle(
+                                  fontSize: 13.5,
+                                  fontWeight: FontWeight.w700,
+                                  color: AppColors.textPrimary,
+                                ),
+                              ),
+                              if (autocompleteState
+                                  .suggestions[i]
+                                  .secondaryText
+                                  .isNotEmpty)
+                                Text(
+                                  autocompleteState
+                                      .suggestions[i]
+                                      .secondaryText,
+                                  maxLines: 1,
+                                  overflow: TextOverflow.ellipsis,
+                                  style: const TextStyle(
+                                    fontSize: 11.5,
+                                    color: AppColors.textSecondary,
+                                  ),
+                                ),
+                            ],
+                          ),
+                        ),
+                        const Icon(
+                          Icons.north_west_rounded,
+                          size: 15,
+                          color: AppColors.iconMuted,
+                        ),
+                      ],
+                    ),
+                  ),
+                ),
+              ],
+            ],
+          ),
+        ),
+      ],
+    ];
   }
 
   @override
@@ -206,7 +369,7 @@ class _HomeDriverFormSheetState extends ConsumerState<HomeDriverFormSheet> {
                               SizedBox(width: 8),
                               Flexible(
                                 child: Text(
-                                  'Iniciar Expediente de Motorista',
+                                  'Oferecer carona',
                                   overflow: TextOverflow.ellipsis,
                                   style: TextStyle(
                                     fontSize: 16,
@@ -233,10 +396,10 @@ class _HomeDriverFormSheetState extends ConsumerState<HomeDriverFormSheet> {
                                 color: AppColors.textPrimary,
                               ),
                             ),
-                            // Botão para fechar o popup de expediente de motorista
+                            // Botão para fechar a oferta de carona
                             IconButton(
                               key: const ValueKey('close_driver_shift_sheet'),
-                              tooltip: 'Fechar expediente de motorista',
+                              tooltip: 'Fechar oferta de carona',
                               visualDensity: VisualDensity.compact,
                               onPressed: () {
                                 HapticFeedback.lightImpact();
@@ -263,250 +426,35 @@ class _HomeDriverFormSheetState extends ConsumerState<HomeDriverFormSheet> {
                       child: Column(
                         crossAxisAlignment: CrossAxisAlignment.stretch,
                         children: [
-                          // 1. Campo de Destino com Autocomplete Google Maps (1s debounce)
-                          const Text(
-                            'Para onde você está indo?',
-                            style: TextStyle(
-                              fontSize: 13.5,
-                              fontWeight: FontWeight.w600,
-                              color: AppColors.textPrimary,
-                            ),
+                          // 1. De onde a carona sai e para onde vai (busca do Google Maps)
+                          ..._buildPlaceInput(
+                            isOrigin: true,
+                            controller: _originController,
+                            label: 'Saindo de',
+                            hint: 'Ex.: Rua, bairro ou ponto de referência',
+                            icon: Icons.trip_origin_rounded,
+                            emptyMessage: 'Informe de onde você sai',
+                            autocompleteState: autocompleteState,
                           ),
-                          const SizedBox(height: 6),
-                          TextFormField(
-                            key: const ValueKey('driver_destination_input'),
+                          const SizedBox(height: 12),
+                          ..._buildPlaceInput(
+                            isOrigin: false,
                             controller: _destinationController,
-                            style: const TextStyle(
-                              fontSize: 14,
-                              color: AppColors.textPrimary,
-                            ),
-                            decoration: InputDecoration(
-                              hintText: 'Ex.: Campus Universitário / Reitoria',
-                              hintStyle: const TextStyle(
-                                color: AppColors.textMuted,
-                                fontSize: 13.5,
-                              ),
-                              prefixIcon: const Icon(
-                                Icons.pin_drop_rounded,
-                                size: 18,
-                                color: AppColors.textPrimary,
-                              ),
-                              suffixIcon: autocompleteState.isLoading
-                                  ? const FloatingSearchLensIcon(
-                                      key: ValueKey('floating_search_lens'),
-                                    )
-                                  : _destinationController.text.isNotEmpty
-                                      ? IconButton(
-                                          tooltip: 'Limpar destino',
-                                          icon: const Icon(
-                                            Icons.clear_rounded,
-                                            size: 18,
-                                            color: AppColors.textSecondary,
-                                          ),
-                                          onPressed: () {
-                                            HapticFeedback.lightImpact();
-                                            _destinationController.clear();
-                                            ref
-                                                .read(
-                                                  placesAutocompleteProvider
-                                                      .notifier,
-                                                )
-                                                .clear();
-                                            setState(() {});
-                                          },
-                                        )
-                                      : const Icon(
-                                          Icons.search_rounded,
-                                          size: 18,
-                                          color: AppColors.textMuted,
-                                        ),
-                              filled: true,
-                              fillColor: AppColors.neutralLight,
-                              contentPadding: const EdgeInsets.symmetric(
-                                horizontal: 14,
-                                vertical: 12,
-                              ),
-                              enabledBorder: OutlineInputBorder(
-                                borderRadius: BorderRadius.circular(14),
-                                borderSide: const BorderSide(
-                                  color: AppColors.borderSubtle,
-                                ),
-                              ),
-                              focusedBorder: OutlineInputBorder(
-                                borderRadius: BorderRadius.circular(14),
-                                borderSide: const BorderSide(
-                                  color: AppColors.primary,
-                                  width: 1.5,
-                                ),
-                              ),
-                              errorBorder: OutlineInputBorder(
-                                borderRadius: BorderRadius.circular(14),
-                                borderSide: const BorderSide(
-                                  color: AppColors.error,
-                                ),
-                              ),
-                              focusedErrorBorder: OutlineInputBorder(
-                                borderRadius: BorderRadius.circular(14),
-                                borderSide: const BorderSide(
-                                  color: AppColors.error,
-                                  width: 1.5,
-                                ),
-                              ),
-                            ),
-                            onChanged: (text) {
-                              setState(() {});
-                              ref
-                                  .read(placesAutocompleteProvider.notifier)
-                                  .onQueryChanged(text);
-                            },
-                            validator: (v) => (v == null || v.trim().isEmpty)
-                                ? 'Informe seu destino'
-                                : null,
-                          ),
-
-                          // Lista de sugestões retornadas pelo Google Maps (após 1s de digitação)
-                          if (autocompleteState.suggestions.isNotEmpty) ...[
-                            const SizedBox(height: 8),
-                            Container(
-                              decoration: BoxDecoration(
-                                color: AppColors.cardBackground,
-                                borderRadius: BorderRadius.circular(14),
-                                border: Border.all(
-                                  color: AppColors.borderSubtle,
-                                ),
-                              ),
-                              child: Column(
-                                crossAxisAlignment: CrossAxisAlignment.stretch,
-                                children: [
-                                  for (int i = 0;
-                                      i < autocompleteState.suggestions.length;
-                                      i++) ...[
-                                    if (i > 0)
-                                      const Divider(
-                                        height: 1,
-                                        color: AppColors.borderSubtle,
-                                      ),
-                                    InkWell(
-                                      borderRadius: BorderRadius.circular(14),
-                                      onTap: () => _handleSuggestionSelected(
-                                        autocompleteState.suggestions[i],
-                                      ),
-                                      child: Padding(
-                                        padding: const EdgeInsets.symmetric(
-                                          horizontal: 12,
-                                          vertical: 10,
-                                        ),
-                                        child: Row(
-                                          children: [
-                                            const Icon(
-                                              Icons.location_on_rounded,
-                                              size: 18,
-                                              color: AppColors.primary,
-                                            ),
-                                            const SizedBox(width: 10),
-                                            Expanded(
-                                              child: Column(
-                                                crossAxisAlignment:
-                                                    CrossAxisAlignment.start,
-                                                children: [
-                                                  Text(
-                                                    autocompleteState
-                                                        .suggestions[i]
-                                                        .mainText,
-                                                    style: const TextStyle(
-                                                      fontSize: 13.5,
-                                                      fontWeight:
-                                                          FontWeight.w700,
-                                                      color:
-                                                          AppColors.textPrimary,
-                                                    ),
-                                                  ),
-                                                  if (autocompleteState
-                                                      .suggestions[i]
-                                                      .secondaryText
-                                                      .isNotEmpty)
-                                                    Text(
-                                                      autocompleteState
-                                                          .suggestions[i]
-                                                          .secondaryText,
-                                                      maxLines: 1,
-                                                      overflow:
-                                                          TextOverflow.ellipsis,
-                                                      style: const TextStyle(
-                                                        fontSize: 11.5,
-                                                        color: AppColors
-                                                            .textSecondary,
-                                                      ),
-                                                    ),
-                                                ],
-                                              ),
-                                            ),
-                                            const Icon(
-                                              Icons.north_west_rounded,
-                                              size: 15,
-                                              color: AppColors.iconMuted,
-                                            ),
-                                          ],
-                                        ),
-                                      ),
-                                    ),
-                                  ],
-                                ],
-                              ),
-                            ),
-                          ],
-
-                          const SizedBox(height: 18),
-
-                          // 2. Raio de Destino do Passageiro
-                          Row(
-                            mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                            children: [
-                              const Text(
-                                'Tolerância no destino do passageiro',
-                                style: TextStyle(
-                                  fontSize: 13,
-                                  fontWeight: FontWeight.w600,
-                                  color: AppColors.textPrimary,
-                                ),
-                              ),
-                              Text(
-                                '${_destinationRadiusKm.toStringAsFixed(1)} km',
-                                style: const TextStyle(
-                                  fontSize: 13,
-                                  fontWeight: FontWeight.w700,
-                                  color: AppColors.primary,
-                                ),
-                              ),
-                            ],
-                          ),
-                          Slider(
-                            value: _destinationRadiusKm,
-                            min: 1.0,
-                            max: 10.0,
-                            divisions: 18,
-                            activeColor: AppColors.primary,
-                            inactiveColor: AppColors.borderSubtle,
-                            onChanged: (val) {
-                              setState(() => _destinationRadiusKm = val);
-                            },
-                          ),
-                          const Text(
-                            'O passageiro deve desembarcar em até esta distância do seu destino final.',
-                            style: TextStyle(
-                              fontSize: 11.5,
-                              color: AppColors.textSecondary,
-                            ),
+                            label: 'Indo para',
+                            hint: 'Ex.: Campus Universitário / Reitoria',
+                            icon: Icons.pin_drop_rounded,
+                            emptyMessage: 'Informe seu destino',
+                            autocompleteState: autocompleteState,
                           ),
 
                           const SizedBox(height: 18),
 
-                          // 3. Raio em KM Visual no Mapa (Para apitar buscas)
+                          // 2. Distância máxima: do caminho até o embarque e do destino até o do passageiro
                           Row(
                             mainAxisAlignment: MainAxisAlignment.spaceBetween,
                             children: [
                               const Text(
-                                'Raio de busca ao seu redor (no mapa)',
+                                'Buscar passageiros a até',
                                 style: TextStyle(
                                   fontSize: 13,
                                   fontWeight: FontWeight.w600,
@@ -526,8 +474,8 @@ class _HomeDriverFormSheetState extends ConsumerState<HomeDriverFormSheet> {
                           Slider(
                             value: _searchRadiusKm,
                             min: 1.0,
-                            max: 15.0,
-                            divisions: 28,
+                            max: 10.0,
+                            divisions: 18,
                             activeColor: AppColors.primary,
                             inactiveColor: AppColors.borderSubtle,
                             onChanged: (val) {
@@ -536,7 +484,7 @@ class _HomeDriverFormSheetState extends ConsumerState<HomeDriverFormSheet> {
                             },
                           ),
                           const Text(
-                            'O aplicativo apitará solicitações de passageiros dentro do círculo desenhado no mapa.',
+                            'Do seu caminho até onde o passageiro embarca, e do seu destino até o dele.',
                             style: TextStyle(
                               fontSize: 11.5,
                               color: AppColors.textSecondary,
@@ -545,96 +493,14 @@ class _HomeDriverFormSheetState extends ConsumerState<HomeDriverFormSheet> {
 
                           const SizedBox(height: 18),
 
-                          // 4. Horário de Fim de Busca
-                          const Text(
-                            'Horário de fim de busca',
-                            style: TextStyle(
-                              fontSize: 13,
-                              fontWeight: FontWeight.w600,
-                              color: AppColors.textPrimary,
+                          // 3. Quando a carona sai e o botão de publicar
+                          if (widget.onChangeDeparture != null) ...[
+                            RideDepartureTile(
+                              label: widget.departureLabel,
+                              onTap: widget.onChangeDeparture!,
                             ),
-                          ),
-                          const SizedBox(height: 6),
-                          InkWell(
-                            borderRadius: BorderRadius.circular(14),
-                            onTap: () => _selectTime(context),
-                            child: Container(
-                              padding: const EdgeInsets.symmetric(
-                                horizontal: 14,
-                                vertical: 12,
-                              ),
-                              decoration: BoxDecoration(
-                                color: AppColors.neutralLight,
-                                borderRadius: BorderRadius.circular(14),
-                                border: Border.all(
-                                  color: AppColors.borderSubtle,
-                                ),
-                              ),
-                              child: Row(
-                                mainAxisAlignment:
-                                    MainAxisAlignment.spaceBetween,
-                                children: [
-                                  Row(
-                                    children: [
-                                      const Icon(
-                                        Icons.alarm_rounded,
-                                        size: 18,
-                                        color: AppColors.textPrimary,
-                                      ),
-                                      const SizedBox(width: 8),
-                                      Text(
-                                        _endSearchTime.format(context),
-                                        style: const TextStyle(
-                                          fontSize: 14,
-                                          fontWeight: FontWeight.w700,
-                                          color: AppColors.textPrimary,
-                                        ),
-                                      ),
-                                    ],
-                                  ),
-                                  const Text(
-                                    'Alterar',
-                                    style: TextStyle(
-                                      fontSize: 12.5,
-                                      fontWeight: FontWeight.w600,
-                                      color: AppColors.textSecondary,
-                                    ),
-                                  ),
-                                ],
-                              ),
-                            ),
-                          ),
-                          const SizedBox(height: 4),
-                          Container(
-                            padding: const EdgeInsets.all(10),
-                            decoration: BoxDecoration(
-                              color: AppColors.neutralLight,
-                              borderRadius: BorderRadius.circular(10),
-                            ),
-                            child: const Row(
-                              children: [
-                                Icon(
-                                  Icons.info_outline_rounded,
-                                  size: 15,
-                                  color: AppColors.textSecondary,
-                                ),
-                                SizedBox(width: 8),
-                                Expanded(
-                                  child: Text(
-                                    'Atingido este horário sem corridas agendadas, seu expediente se encerra automaticamente.',
-                                    style: TextStyle(
-                                      fontSize: 11,
-                                      color: AppColors.textSecondary,
-                                    ),
-                                  ),
-                                ),
-                              ],
-                            ),
-                          ),
-
-                          const SizedBox(height: 22),
-
-                          // 5. Botão de Iniciar Expediente
+                            const SizedBox(height: 12),
+                          ],
                           SizedBox(
                             height: 50,
                             child: FilledButton.icon(
@@ -645,13 +511,22 @@ class _HomeDriverFormSheetState extends ConsumerState<HomeDriverFormSheet> {
                                   borderRadius: BorderRadius.circular(14),
                                 ),
                               ),
-                              onPressed: _submit,
-                              icon: const Icon(
-                                Icons.flash_on_rounded,
-                                size: 18,
-                              ),
+                              onPressed: widget.isPublishing ? null : _submit,
+                              icon: widget.isPublishing
+                                  ? const SizedBox(
+                                      width: 18,
+                                      height: 18,
+                                      child: CircularProgressIndicator(
+                                        strokeWidth: 2,
+                                        color: AppColors.textLight,
+                                      ),
+                                    )
+                                  : const Icon(
+                                      Icons.event_available_rounded,
+                                      size: 18,
+                                    ),
                               label: const Text(
-                                'Iniciar Expediente',
+                                'Publicar carona',
                                 style: TextStyle(
                                   fontSize: 15,
                                   fontWeight: FontWeight.w700,
@@ -679,8 +554,7 @@ class FloatingSearchLensIcon extends StatefulWidget {
   const FloatingSearchLensIcon({super.key});
 
   @override
-  State<FloatingSearchLensIcon> createState() =>
-      _FloatingSearchLensIconState();
+  State<FloatingSearchLensIcon> createState() => _FloatingSearchLensIconState();
 }
 
 class _FloatingSearchLensIconState extends State<FloatingSearchLensIcon>
@@ -719,10 +593,7 @@ class _FloatingSearchLensIconState extends State<FloatingSearchLensIcon>
           offset: Offset(dx, dy),
           child: Transform.rotate(
             angle: tilt,
-            child: Transform.scale(
-              scale: scale,
-              child: child,
-            ),
+            child: Transform.scale(scale: scale, child: child),
           ),
         );
       },

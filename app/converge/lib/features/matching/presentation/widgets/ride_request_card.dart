@@ -6,6 +6,7 @@ import 'package:flutter/services.dart';
 import '../../../../core/config/styles.dart';
 import '../../../ride/data/models/participant_status.dart';
 import '../../data/models/driver_ride_request.dart';
+import '../../../ride/presentation/widgets/ride_place_line.dart';
 import 'match_date_label.dart';
 import 'match_info_chip.dart';
 
@@ -33,6 +34,7 @@ class RideRequestCard extends StatelessWidget {
     final departure = ride.departureDateTime;
     final pending = request.passenger.status == ParticipantStatus.requested;
     final isFull = ride.availableSeats <= 0;
+    final boarding = request.passenger.boardingLocation?.address ?? '';
 
     return Container(
       padding: const EdgeInsets.all(14),
@@ -92,11 +94,6 @@ class RideRequestCard extends StatelessWidget {
                   label: matchDateTimeLabel(departure),
                 ),
               MatchInfoChip(
-                icon: Icons.tag_rounded,
-                label:
-                    'Viagem #${ride.sequentialNumber.toString().padLeft(3, '0')}',
-              ),
-              MatchInfoChip(
                 icon: Icons.event_seat_rounded,
                 label: isFull
                     ? 'Carona lotada (${ride.totalSeats}/${ride.totalSeats})'
@@ -105,6 +102,13 @@ class RideRequestCard extends StatelessWidget {
               ),
             ],
           ),
+          if (boarding.isNotEmpty) ...[
+            const SizedBox(height: 8),
+            RidePlaceLine(
+              icon: Icons.trip_origin_rounded,
+              text: 'Embarca em $boarding',
+            ),
+          ],
           const SizedBox(height: 12),
           if (pending)
             Row(

@@ -58,7 +58,9 @@ class MatchDriverCard extends StatelessWidget {
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
                     Text(
-                      match.otherUserName,
+                      rating == null
+                          ? '${match.otherUserName} • novo'
+                          : '${match.otherUserName} • ★ ${rating.toStringAsFixed(1)}',
                       style: const TextStyle(
                         fontSize: 15,
                         fontWeight: FontWeight.w700,
@@ -76,23 +78,6 @@ class MatchDriverCard extends StatelessWidget {
                   ],
                 ),
               ),
-              Column(
-                crossAxisAlignment: CrossAxisAlignment.end,
-                children: [
-                  Text(
-                    match.compatibilityLabel,
-                    style: const TextStyle(
-                      fontSize: 16,
-                      fontWeight: FontWeight.w800,
-                      color: AppColors.success,
-                    ),
-                  ),
-                  const Text(
-                    'compatível',
-                    style: TextStyle(fontSize: 11, color: AppColors.textMuted),
-                  ),
-                ],
-              ),
             ],
           ),
           const SizedBox(height: 10),
@@ -102,28 +87,17 @@ class MatchDriverCard extends StatelessWidget {
             children: [
               MatchInfoChip(
                 icon: Icons.schedule_rounded,
-                label: 'Sai às ${match.departureTime}',
-              ),
-              if (match.nextRideDate != null)
-                MatchInfoChip(
-                  icon: Icons.event_rounded,
-                  label: matchDateLabel(match.nextRideDate!),
-                ),
-              MatchInfoChip(
-                icon: Icons.alt_route_rounded,
-                label: '+${match.calculatedDetourKm.toStringAsFixed(1)} km',
+                label: match.nextRideDate == null
+                    ? 'Sai às ${match.departureTime}'
+                    : '${matchDateLabel(match.nextRideDate!)} às ${match.departureTime}',
               ),
               if (match.availableSeats != null)
                 MatchInfoChip(
                   icon: Icons.event_seat_rounded,
-                  label: '${match.availableSeats} vagas',
+                  label: match.availableSeats == 1
+                      ? '1 vaga'
+                      : '${match.availableSeats} vagas',
                 ),
-              MatchInfoChip(
-                icon: Icons.star_rounded,
-                label: rating == null
-                    ? 'Sem avaliações'
-                    : '${rating.toStringAsFixed(1)} (${match.otherUserTotalReviews})',
-              ),
             ],
           ),
           const SizedBox(height: 12),
@@ -146,7 +120,7 @@ class MatchDriverCard extends StatelessWidget {
                     Text(
                       maxAmount == null
                           ? 'estimativa por passageiro'
-                          : 'Pode subir até ${CurrencyFormatter.format(maxAmount)} se alguém desistir',
+                          : 'até ${CurrencyFormatter.format(maxAmount)} se alguém desistir',
                       style: const TextStyle(
                         fontSize: 11,
                         color: AppColors.textMuted,

@@ -1059,7 +1059,7 @@ class _BecomeDriverSheetState extends ConsumerState<BecomeDriverSheet> {
           const SizedBox(height: 6),
 
           const Text(
-            'Sua CNH foi aprovada, o seu carro foi cadastrado e a chave PIX está configurada. Você já pode iniciar expedientes e oferecer caronas no campus.',
+            'Sua CNH foi aprovada, o seu carro foi cadastrado e a chave PIX está configurada. Você já pode oferecer caronas no campus.',
             textAlign: TextAlign.center,
             style: TextStyle(
               fontSize: 13,
