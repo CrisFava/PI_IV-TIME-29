@@ -4,6 +4,7 @@ Ferramentas para testar o Converge sem precisar sair de casa nem fazer cadastros
 
 | Script | Para que serve |
 | :-- | :-- |
+| `run_servers.py` | Abre dois terminais: o servidor de sockets e, em seguida, o backend com o `.env` carregado |
 | `verificar_usuario.py` | Marca a CNH e o vínculo acadêmico de um usuário como `VERIFIED`, buscando pelo e-mail |
 | `simular_corrida.py` | Percorre corridas inteiras contra o backend rodando e confere cada resposta |
 
@@ -40,6 +41,18 @@ Nada mais precisa ser configurado.
 
 Variável definida no terminal tem prioridade sobre o `.env`. Os dois scripts **se recusam a mexer
 em banco com `prod` no nome**.
+
+---
+
+## `run_servers.py`
+
+Sobe o ambiente do backend em dois terminais novos, na ordem certa: primeiro o servidor de
+sockets (`app/server`), depois o Spring (`app/converge-backend`) com as variáveis do `.env`.
+Não precisa do venv.
+
+```bash
+python scripts/run_servers.py
+```
 
 ---
 

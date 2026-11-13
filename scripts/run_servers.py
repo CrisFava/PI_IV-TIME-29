@@ -63,7 +63,8 @@ def open_terminal(cmd: str, cwd: Path, title: str = "", env: dict = None):
 
 
 def main():
-    base_dir = Path(__file__).resolve().parent
+    # O script fica em scripts/; os módulos ficam em app/.
+    base_dir = Path(__file__).resolve().parent.parent / "app"
     server_dir = base_dir / "server"
     backend_dir = base_dir / "converge-backend"
 
