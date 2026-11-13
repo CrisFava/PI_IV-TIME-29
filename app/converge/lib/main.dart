@@ -17,7 +17,17 @@ Future<void> main() async {
     debugPrint('Erro ao carregar .env: $e');
   }
 
-  await Firebase.initializeApp(options: DefaultFirebaseOptions.currentPlatform);
+  if (Firebase.apps.isEmpty) {
+    try {
+      await Firebase.initializeApp(
+        options: DefaultFirebaseOptions.currentPlatform,
+      );
+    } on FirebaseException catch (e) {
+      if (e.code != 'duplicate-app') {
+        rethrow;
+      }
+    }
+  }
 
   runApp(
       const ProviderScope(

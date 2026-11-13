@@ -2,12 +2,14 @@
 
 package com.converge.api.shared.infrastructure.config.auth;
 
+import com.converge.api.shared.infrastructure.config.idempotency.IdempotencyFilter;
 import com.converge.api.shared.presentation.exception.ErrorCode;
 import com.converge.api.shared.infrastructure.exception.ErrorResponse;
 import com.converge.api.shared.presentation.dto.ApplicationResponse;
 import tools.jackson.databind.ObjectMapper;
 import jakarta.servlet.http.HttpServletResponse;
 import lombok.RequiredArgsConstructor;
+import org.springframework.boot.web.servlet.FilterRegistrationBean;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
 import org.springframework.http.MediaType;
@@ -30,6 +32,7 @@ import java.util.List;
 public class AuthorizationConfig {
 
     private final FirebaseTokenAuthenticationFilter firebaseTokenAuthenticationFilter;
+    private final IdempotencyFilter idempotencyFilter;
     private final ObjectMapper objectMapper = new ObjectMapper();
 
     @Bean
@@ -61,7 +64,15 @@ public class AuthorizationConfig {
                         .anyRequest().authenticated()
                 )
                 .addFilterBefore(firebaseTokenAuthenticationFilter, UsernamePasswordAuthenticationFilter.class)
+                .addFilterAfter(idempotencyFilter, FirebaseTokenAuthenticationFilter.class)
                 .build();
+    }
+
+    @Bean
+    public FilterRegistrationBean<IdempotencyFilter> idempotencyFilterRegistration(IdempotencyFilter filter) {
+        FilterRegistrationBean<IdempotencyFilter> registration = new FilterRegistrationBean<>(filter);
+        registration.setEnabled(false);
+        return registration;
     }
 
     @Bean

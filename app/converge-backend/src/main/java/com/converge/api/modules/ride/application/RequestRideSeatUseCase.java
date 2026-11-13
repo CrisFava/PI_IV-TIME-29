@@ -6,6 +6,7 @@ import com.converge.api.modules.ride.application.dto.RequestRideSeatCommand;
 import com.converge.api.modules.ride.application.mapper.RideMapper;
 import com.converge.api.modules.ride.domain.enums.RideStatus;
 import com.converge.api.modules.ride.domain.model.Ride;
+import com.converge.api.modules.ride.domain.model.subtypes.Participant;
 import com.converge.api.modules.ride.domain.repository.RideRepository;
 import com.converge.api.modules.route.application.RouteAccess;
 import com.converge.api.modules.route.domain.enums.RouteStatus;
@@ -51,13 +52,16 @@ public class RequestRideSeatUseCase implements UseCase<RequestRideSeatCommand, R
 
         LocalDateTime departure = date.atTime(LocalTime.parse(driverRoute.getDepartureTime()));
 
-        Ride ride = rideRepository
-                .findByDriverRouteIdAndDepartureDateTimeAndStatusNot(
-                        driverRoute.getId().toHexString(), departure, RideStatus.CANCELLED)
-                .orElseGet(() -> createRide(driverRoute, date, departure));
+        var existingRide = rideRepository.findByDriverRouteIdAndDepartureDateTimeAndStatusNot(
+                driverRoute.getId().toHexString(), departure, RideStatus.CANCELLED);
 
+        if (existingRide.isPresent() && existingRide.get().getId() != null) {
+            String passengerRouteId = passengerRoute.getId().toHexString();
+            return requestSeatOnExistingRide(existingRide.get(), passengerId, passengerRouteId, passengerRoute);
+        }
+
+        Ride ride = existingRide.orElseGet(() -> createRide(driverRoute, date, departure));
         String passengerRouteId = passengerRoute.getId().toHexString();
-
         ride.requestSeat(passengerId, passengerRouteId, passengerRoute.getOrigin(), passengerRoute.getDestination());
 
         try {
@@ -72,11 +76,45 @@ public class RequestRideSeatUseCase implements UseCase<RequestRideSeatCommand, R
                             driverRoute.getId().toHexString(), departure, RideStatus.CANCELLED)
                     .orElseThrow(this::rideConflict);
 
+            if (existing.getId() != null) {
+                return requestSeatOnExistingRide(existing, passengerId, passengerRouteId, passengerRoute);
+            }
+
             existing.requestSeat(
                     passengerId, passengerRouteId, passengerRoute.getOrigin(), passengerRoute.getDestination());
 
             return rideRepository.save(existing);
         }
+    }
+
+    private Ride requestSeatOnExistingRide(
+            Ride ride,
+            String passengerId,
+            String passengerRouteId,
+            Route passengerRoute
+    ) {
+        LocalDateTime now = LocalDateTime.now();
+        Participant passengerRequest = Participant.passengerRequest(
+                passengerId,
+                passengerRouteId,
+                passengerRoute.getOrigin(),
+                passengerRoute.getDestination(),
+                now
+        );
+
+        return rideRepository.requestSeatAtomic(ride.getId(), passengerRequest, now)
+                .orElseThrow(() -> resolveRequestSeatConflict(ride, passengerId, passengerRouteId, passengerRoute));
+    }
+
+    private ApplicationException resolveRequestSeatConflict(
+            Ride fallbackRide,
+            String passengerId,
+            String passengerRouteId,
+            Route passengerRoute
+    ) {
+        Ride latest = rideRepository.findById(fallbackRide.getId()).orElse(fallbackRide);
+        latest.requestSeat(passengerId, passengerRouteId, passengerRoute.getOrigin(), passengerRoute.getDestination());
+        return rideConflict();
     }
 
     private boolean isDuplicatedOpenRide(DuplicateKeyException exception) {
