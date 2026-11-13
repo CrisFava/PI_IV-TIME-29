@@ -455,7 +455,7 @@ Quando `active = false` (conta suspensa ou excluída):
 ### Itinerário (rota com as paradas)
 
 O motorista vai até cada passageiro: `itinerary` guarda as paradas na ordem em que ele busca e deixa os passageiros confirmados.
-- **Quando muda:** é recalculado quando um passageiro é aceito (`AcceptPassengerUseCase`) e quando um passageiro confirmado sai (`LeaveRideUseCase`). Pedidos de vaga só existem antes de a viagem começar, então o itinerário não muda depois do `IN_PROGRESS`.
+- **Quando muda:** é recalculado quando um passageiro é aceito (`AcceptPassengerUseCase`), quando um passageiro confirmado sai (`LeaveRideUseCase`) e quando o motorista remove um passageiro confirmado (`RejectPassengerUseCase`). Pedidos de vaga só existem antes de a viagem começar, então o itinerário não muda depois do `IN_PROGRESS`.
 - **Ordem** (`RideItineraryPlanner`): o motorista sai da origem e busca todos os confirmados, sempre o embarque mais próximo de onde ele está. Depois deixa cada um, sempre o desembarque mais próximo, e segue para o destino. Buscar todos antes de deixar garante que ninguém é deixado antes de embarcar.
 - **Rota:** `itineraryDistanceKm` e `itineraryPolyline` vêm da Routes API do Google, com as paradas como `intermediates`. Sem o Google, a distância é a soma das linhas retas entre os pontos e a polyline fica `null`. Uma falha no cálculo nunca impede o aceite nem a saída.
 - **Privacidade:** os pontos de embarque e desembarque são endereços dos passageiros. Na API, o motorista recebe todas as paradas, a distância e a polyline; cada passageiro recebe só as próprias paradas, sem a polyline.

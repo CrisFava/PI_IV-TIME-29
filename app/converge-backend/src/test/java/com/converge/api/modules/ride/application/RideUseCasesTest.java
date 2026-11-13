@@ -34,6 +34,7 @@ import org.junit.jupiter.api.extension.ExtendWith;
 import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.ValueSource;
 import org.mockito.ArgumentCaptor;
+import org.mockito.InOrder;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 import org.springframework.context.ApplicationEventPublisher;
@@ -54,6 +55,7 @@ import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.doThrow;
+import static org.mockito.Mockito.inOrder;
 import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.verify;
@@ -254,7 +256,10 @@ class RideUseCasesTest {
         assertThat(accepted.getParticipants().get(1).getMaxAmount()).isEqualByComparingTo("7.50");
         assertThat(accepted.getAvailableSeats()).isEqualTo(2);
         verify(rideCostCalculator).recalculateEstimatedShares(updatedRide);
-        verify(rideRepository).save(updatedRide);
+        // A rota é recalculada com o passageiro aceito, antes de salvar
+        InOrder order = inOrder(rideItineraryService, rideRepository);
+        order.verify(rideItineraryService).refresh(updatedRide);
+        order.verify(rideRepository).save(updatedRide);
         verify(eventPublisher).publishEvent(any(RideNotificationEvent.class));
     }
 
@@ -379,7 +384,7 @@ class RideUseCasesTest {
     @DisplayName("O motorista deve recusar o pedido de vaga pendente com o motivo sem penalidade")
     void shouldRejectPassengerWhenUserIsTheDriver() {
         RejectPassengerUseCase rejectPassenger = new RejectPassengerUseCase(
-                rideAccess, rideCostCalculator, rideRepository, recordReputationPenalty, auditLogService, eventPublisher);
+                rideAccess, rideCostCalculator, rideItineraryService, rideRepository, recordReputationPenalty, auditLogService, eventPublisher);
         Ride ride = rideOf(userObjectId.toHexString(), LocalDateTime.now().plusDays(1));
         ride.requestSeat("passenger-456", "route-456", place("Rua A"), place("Campus PUC"));
         currentUserIs(userObjectId);
@@ -399,7 +404,7 @@ class RideUseCasesTest {
     @DisplayName("Remover passageiro já confirmado pelo motorista deve recalcular rateio, penalizar motorista e auditar")
     void shouldPenalizeDriverAndRecalculateWhenRemovingConfirmedPassenger() {
         RejectPassengerUseCase rejectPassenger = new RejectPassengerUseCase(
-                rideAccess, rideCostCalculator, rideRepository, recordReputationPenalty, auditLogService, eventPublisher);
+                rideAccess, rideCostCalculator, rideItineraryService, rideRepository, recordReputationPenalty, auditLogService, eventPublisher);
         String driverId = userObjectId.toHexString();
         Ride ride = rideOf(driverId, LocalDateTime.now().plusDays(1));
         ride.requestSeat("passenger-456", "route-456", place("Rua A"), place("Campus PUC"));
@@ -412,6 +417,9 @@ class RideUseCasesTest {
                 rideObjectId.toHexString(), "passenger-456", UID, new RejectPassengerRequestDTO("Mudança de horário")));
 
         verify(rideCostCalculator).recalculateEstimatedShares(ride);
+        InOrder order = inOrder(rideItineraryService, rideRepository);
+        order.verify(rideItineraryService).refresh(ride);
+        order.verify(rideRepository).save(ride);
         verify(recordReputationPenalty).recordDriverCancellation(driverId);
         verify(auditLogService).record(
                 eq(AuditAction.RIDE_CANCELLED),
@@ -429,7 +437,7 @@ class RideUseCasesTest {
     @DisplayName("Falha na penalidade ou auditoria deve reverter a remoção do passageiro")
     void shouldRollBackConfirmedRemovalWhenRequiredEffectFails(boolean penaltyFails) {
         RejectPassengerUseCase target = new RejectPassengerUseCase(
-                rideAccess, rideCostCalculator, rideRepository, recordReputationPenalty, auditLogService, eventPublisher);
+                rideAccess, rideCostCalculator, rideItineraryService, rideRepository, recordReputationPenalty, auditLogService, eventPublisher);
         PlatformTransactionManager transactionManager = mock(PlatformTransactionManager.class);
         TransactionStatus transactionStatus = mock(TransactionStatus.class);
         when(transactionManager.getTransaction(any())).thenReturn(transactionStatus);
@@ -501,6 +509,9 @@ class RideUseCasesTest {
                 rideObjectId.toHexString(), UID, new CancelRideRequestDTO("Atrasado")));
 
         verify(rideCostCalculator).recalculateEstimatedShares(ride);
+        InOrder order = inOrder(rideItineraryService, rideRepository);
+        order.verify(rideItineraryService).refresh(ride);
+        order.verify(rideRepository).save(ride);
         verify(recordReputationPenalty).recordPassengerLateCancellation(passengerId);
         verify(auditLogService).record(
                 eq(AuditAction.RIDE_CANCELLED),
