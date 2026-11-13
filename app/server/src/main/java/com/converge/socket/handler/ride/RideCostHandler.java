@@ -1,4 +1,4 @@
-// Autor:
+// Autor: Allan Giovanni Matias Paes - RA 25008211
 
 package com.converge.socket.handler.ride;
 
@@ -7,10 +7,6 @@ import com.converge.socket.core.exception.ServerException;
 import com.converge.socket.core.handler.RequestHandler;
 
 import java.math.BigDecimal;
-import java.math.RoundingMode;
-import java.util.HashMap;
-import java.util.List;
-import java.util.Map;
 
 /**
  * Handler responsável pelos cálculos matemáticos de desvio, valor teto e rateio da viagem.
