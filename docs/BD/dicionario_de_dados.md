@@ -23,6 +23,7 @@
 | 21/10/2026 | Gustavo Alves de Siqueira Costa | 1.3.0 | `encodedPolyline` no Trajeto; `routeDistanceKm` calculada pela Routes API, com Haversine como alternativa |
 | 05/11/2026 | Daniela Mikie Kikuchi Gonçalves | 1.4.0 | Indicador por usuário (`indicators`) ajustado para a versão enxuta do MVP (campos planos, `carsAvoided`); `financial` e `series` marcados como evolução futura |
 | 12/11/2026 | Cristian Eduardo Fava | 1.5.0 | Cobrança combinada no chat na Participação (`requestedAmount`, `paymentRequestedAt`, `paidAt`); estrutura do chat no Firebase Realtime Database; indicadores atualizados ao concluir a viagem |
+| 13/11/2026 | Daniela Mikie Kikuchi Gonçalves | 1.5.1 | Avaliação: quem pode avaliar (participante que concluiu a viagem), avaliação imutável e sem prazo no MVP, média calculada a partir das avaliações; índice de duplicidade corrigido para `rideId + reviewerId + reviewedId` |
 
 ---
 
@@ -160,6 +161,13 @@ Ride é o evento central do sistema. Representa uma viagem concreta com data, ho
 
 Review é o registro de nota e comentário na relação **motorista ↔ passageiro** após a conclusão de uma viagem. Passageiros **não avaliam outros passageiros** — apenas o motorista avalia cada passageiro e cada passageiro avalia o motorista. Cada par (avaliador, avaliado) registra no máximo uma avaliação por viagem (unicidade por `rideId + reviewerId + reviewedId`). As notas alimentam a reputação por papel do usuário.
 
+**Regras do MVP:**
+- **Quem pode avaliar e ser avaliado:** apenas quem **concluiu** a viagem, ou seja, o participante com `status = COMPLETED` em uma viagem `COMPLETED`. Passageiro ausente (`NO_SHOW`), recusado (`REJECTED`), expirado (`EXPIRED`), que cancelou ou saiu (`CANCELLED`) e quem só pediu a vaga (`REQUESTED`) não avaliam nem são avaliados. Viagem cancelada ou sem passageiro efetivo não gera avaliação.
+- **Sem edição e sem exclusão:** a avaliação é imutável depois de criada.
+- **Sem prazo:** não há limite de tempo para avaliar depois que a viagem termina. Um prazo pode ser definido numa versão futura.
+- **Papel do avaliado:** o servidor calcula o `reviewedRole` a partir da viagem. O cliente não envia esse campo.
+- **Média de avaliação:** salvar a avaliação **não** grava nada no Usuário. A média e a quantidade de avaliações exibidas (ex.: nos resultados do matching) são calculadas na hora, a partir das avaliações recebidas no papel (`reviewedId + reviewedRole`). Gravar `averageRating` e `totalReviews` na reputação do Usuário, para o recálculo dos selos, ainda não foi implementado.
+
 #### Atributos de Review
 
 | Atributo / Dado | Tipo conceitual | Obrigatório | Característica | Ex. aceitos | Ex. não aceitos | Comentários |
@@ -167,9 +175,9 @@ Review é o registro de nota e comentário na relação **motorista ↔ passagei
 | `_id` | Texto alfanumérico | Sim | Simples | `64e5d4c3...` | vazio, nulo | Gerado pelo banco. |
 | `rideId` | Texto alfanumérico | Sim | Simples | `64d4c3b2...` | nulo | Referência ao Ride. Somente viagens com `status = COMPLETED` podem ser avaliadas. |
 | `reviewerId` | Texto alfanumérico | Sim | Simples | `64a1f3c2...` | nulo | Referência ao User que avalia. |
-| `reviewedId` | Texto alfanumérico | Sim | Simples | `64a9f8e7...` | igual ao reviewerId, nulo | Referência ao User avaliado. Deve ser participante da mesma viagem. |
+| `reviewedId` | Texto alfanumérico | Sim | Simples | `64a9f8e7...` | igual ao reviewerId, nulo | Referência ao User avaliado. Deve ter concluído a mesma viagem (`COMPLETED`). |
 | `reviewedRole` | Elemento de lista enumerada | Sim | Simples | `DRIVER`, `PASSENGER` | valor fora do enum | Papel do avaliado naquela viagem. Alimenta a reputação correta. |
-| `rating` | Número inteiro | Sim | Simples | `1`, `3`, `5` | `0`, `6`, negativo, decimal | Escala de 1 a 5 estrelas. Ao salvar, recalcula a reputação do avaliado no papel correspondente. |
+| `rating` | Número inteiro | Sim | Simples | `1`, `3`, `5` | `0`, `6`, negativo | Escala de 1 a 5 estrelas. O app deve enviar apenas inteiros: o servidor não valida decimais e descarta a parte fracionária (`4.5` vira `4`). Entra na média do avaliado no papel correspondente. |
 | `comment` | Texto | Não | Simples | `Ótima viagem!`, `Pontual e educado.` | — | Texto livre. Exibido no histórico de avaliações. |
 | `createdAt` | Data e hora | Sim | Simples | `2025-05-12T09:00:00Z` | data anterior à conclusão da viagem | Gerado automaticamente. |
 
@@ -1031,7 +1039,8 @@ Estrutura composta que representa a CNH do motorista. Opcional — só preenchid
 | Buscar viagem por número sequencial do motorista | `driverId`, `sequentialNumber` | `{ driverId: 1, sequentialNumber: 1 }` único | Referência amigável `Ride #042` por motorista. |
 | Buscar combinações válidas por passageiro | `passengerRouteId`, `valid`, `compatibilityScore` | `{ passengerRouteId: 1, valid: 1, compatibilityScore: -1 }` | Lista ordenada por score. |
 | Verificar bloqueio entre dois usuários | `userId`, `blockedUserId` | `{ userId: 1, blockedUserId: 1 }` único | Executada no matching, aceite de carona e chat. |
-| Verificar avaliação duplicada | `rideId`, `reviewerId` | `{ rideId: 1, reviewerId: 1 }` único | Impede dupla avaliação na mesma viagem. |
+| Verificar avaliação duplicada | `rideId`, `reviewerId`, `reviewedId` | `{ rideId: 1, reviewerId: 1, reviewedId: 1 }` único | Impede dupla avaliação do mesmo par na mesma viagem. O `reviewedId` é necessário porque o motorista avalia cada passageiro da mesma viagem. Também atende "avaliações que o usuário já fez na viagem" (`rideId + reviewerId`). |
+| Listar avaliações dadas por um usuário | `reviewerId` | `{ reviewerId: 1 }` | Verificar se o usuário já avaliou determinada viagem. |
 | Buscar avaliações recebidas por papel | `reviewedId`, `reviewedRole` | `{ reviewedId: 1, reviewedRole: 1 }` | Base do cálculo de reputação por papel. |
 | Buscar fila de denúncias pendentes | `status` | `{ status: 1 }` | Moderação — filtro por `PENDING` e `UNDER_REVIEW`. |
 | Buscar vínculo recorrente entre par | `passengerId`, `driverRouteId` | `{ passengerId: 1, driverRouteId: 1 }` único | Verificar se já existe vínculo e seu status. |

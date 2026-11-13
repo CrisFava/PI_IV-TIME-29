@@ -540,7 +540,11 @@ O backend monta o payload sob demanda (padrão BR Code do Banco Central, CRC16 i
 
 ### Regra de validação
 
-- Só é permitido avaliar se avaliador e avaliado participaram da mesma viagem **e** um deles é `DRIVER` e o outro é `PASSENGER`. Avaliação `PASSENGER → PASSENGER` é rejeitada no service.
+- Só é permitido avaliar se a viagem está `COMPLETED`, se avaliador e avaliado **concluíram** a mesma viagem (participante com `status = COMPLETED`) **e** um deles é `DRIVER` e o outro é `PASSENGER`. Avaliação `PASSENGER → PASSENGER` é rejeitada no service. Passageiro ausente (`NO_SHOW`), recusado, expirado, cancelado ou que saiu da viagem não avalia nem é avaliado.
+- O `reviewedRole` é calculado pelo servidor a partir da viagem; o cliente não envia.
+- A avaliação é imutável (sem edição nem exclusão) e não tem prazo no MVP.
+- Salvar a avaliação não grava nada no Usuário. A média exibida é calculada na hora a partir desta coleção, pelo índice `reviewedId + reviewedRole`. Gravar `averageRating`/`totalReviews` na reputação do Usuário ainda não foi implementado.
+- Duas avaliações iguais enviadas ao mesmo tempo: o índice único barra a segunda, e a API responde `REVIEW_ALREADY_EXISTS`.
 
 ---
 
