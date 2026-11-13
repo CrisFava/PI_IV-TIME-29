@@ -66,7 +66,8 @@ class FindMatchesForPassengerUseCaseTest {
 
     private static CompatibleMatch matchWith(Route offer, Route search) {
         return new CompatibleMatch(MatchingTestRoutes.id(offer), MatchingTestRoutes.id(search), offer.getUserId(),
-                search.getUserId(), 0.9, 0.4, 10, Set.of(DayOfWeek.MONDAY), new BigDecimal("6.40"));
+                search.getUserId(), 0.9, 0.4, 10, Set.of(DayOfWeek.MONDAY), new BigDecimal("6.40"),
+                new BigDecimal("9.60"));
     }
 
     @Test

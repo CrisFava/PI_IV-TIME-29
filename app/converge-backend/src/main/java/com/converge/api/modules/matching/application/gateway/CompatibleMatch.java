@@ -20,6 +20,7 @@ public record CompatibleMatch(
         double calculatedDetourKm,
         int scheduleDifferenceMin,
         Set<DayOfWeek> compatibleDays,
-        @Nullable BigDecimal estimatedCostPerPassenger
+        @Nullable BigDecimal estimatedCostPerPassenger,
+        @Nullable BigDecimal maxAmount
 ) {
 }

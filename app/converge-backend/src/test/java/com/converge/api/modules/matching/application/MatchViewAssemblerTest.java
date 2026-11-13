@@ -54,7 +54,8 @@ class MatchViewAssemblerTest {
         Route search = MatchingTestRoutes.search("passenger-1");
         String offerId = MatchingTestRoutes.id(offer);
         CompatibleMatch match = new CompatibleMatch(offerId, MatchingTestRoutes.id(search), "driver-1",
-                "passenger-1", 0.92, 0.35, 10, Set.of(DayOfWeek.MONDAY), new BigDecimal("6.40"));
+                "passenger-1", 0.92, 0.35, 10, Set.of(DayOfWeek.MONDAY), new BigDecimal("6.40"),
+                new BigDecimal("9.60"));
         when(getUserNames.execute(anyCollection())).thenReturn(Map.of("driver-1", "Ana Souza"));
         List<Review> reviews = List.of(reviewWith(5), reviewWith(4), reviewWith(4));
         when(listReviewsReceived.execute(new ListReviewsReceivedUseCase.Query("driver-1", ReviewedRole.DRIVER)))
@@ -73,6 +74,7 @@ class MatchViewAssemblerTest {
         assertThat(view.vehicle().model()).isEqualTo("Volkswagen Gol");
         assertThat(view.vehicle().licensePlate()).isEqualTo("ABC1234");
         assertThat(view.estimatedCostPerPassenger()).isEqualByComparingTo("6.40");
+        assertThat(view.maxAmount()).isEqualByComparingTo("9.60");
         assertThat(view.nextRideDate().getDayOfWeek()).isEqualTo(DayOfWeek.MONDAY);
     }
 
@@ -83,7 +85,7 @@ class MatchViewAssemblerTest {
         Route search = MatchingTestRoutes.search("passenger-1");
         String searchId = MatchingTestRoutes.id(search);
         CompatibleMatch match = new CompatibleMatch(MatchingTestRoutes.id(offer), searchId, "driver-1",
-                "passenger-1", 0.8, 0.5, 10, Set.of(DayOfWeek.WEDNESDAY), null);
+                "passenger-1", 0.8, 0.5, 10, Set.of(DayOfWeek.WEDNESDAY), null, null);
         when(getUserNames.execute(anyCollection())).thenReturn(Map.of());
         when(listReviewsReceived.execute(new ListReviewsReceivedUseCase.Query("passenger-1", ReviewedRole.PASSENGER)))
                 .thenReturn(List.of());

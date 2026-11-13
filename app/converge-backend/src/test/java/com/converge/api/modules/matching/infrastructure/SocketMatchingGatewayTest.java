@@ -52,6 +52,7 @@ class SocketMatchingGatewayTest {
         assertThat(match.compatibleDays()).isEqualTo(DAYS);
         assertThat(match.scheduleDifferenceMin()).isEqualTo(10);
         assertThat(match.estimatedCostPerPassenger()).isNotNull();
+        assertThat(match.maxAmount()).isGreaterThanOrEqualTo(match.estimatedCostPerPassenger());
     }
 
     @Test

@@ -27,6 +27,8 @@ public class MatchResult implements Serializable {
     private final Set<DayOfWeek> compatibleDays;
     // Null quando o veículo do motorista não tem consumo e preço da energia
     private final BigDecimal estimatedCostPerPassenger;
+    // Teto do passageiro: metade do custo da rota com o desvio. Null nas mesmas condições da estimativa
+    private final BigDecimal maxAmount;
 
     public MatchResult(
             String driverRouteId,
@@ -37,7 +39,8 @@ public class MatchResult implements Serializable {
             double calculatedDetourKm,
             int scheduleDifferenceMin,
             Set<DayOfWeek> compatibleDays,
-            BigDecimal estimatedCostPerPassenger
+            BigDecimal estimatedCostPerPassenger,
+            BigDecimal maxAmount
     ) {
         this.driverRouteId = driverRouteId;
         this.passengerRouteId = passengerRouteId;
@@ -50,6 +53,7 @@ public class MatchResult implements Serializable {
                 ? EnumSet.noneOf(DayOfWeek.class)
                 : EnumSet.copyOf(compatibleDays);
         this.estimatedCostPerPassenger = estimatedCostPerPassenger;
+        this.maxAmount = maxAmount;
     }
 
     public String getDriverRouteId() {
@@ -86,6 +90,10 @@ public class MatchResult implements Serializable {
 
     public BigDecimal getEstimatedCostPerPassenger() {
         return estimatedCostPerPassenger;
+    }
+
+    public BigDecimal getMaxAmount() {
+        return maxAmount;
     }
 
     @Override

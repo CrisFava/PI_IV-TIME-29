@@ -22,6 +22,7 @@ Map<String, dynamic> fakeMatchJson({
   'scheduleDifferenceMin': 10,
   'compatibleDays': ['MONDAY', 'WEDNESDAY'],
   'estimatedCostPerPassenger': 6.4,
+  'maxAmount': 9.6,
   'nextRideDate': nextRideDate,
   'departureTime': '07:30',
   'estimatedArrivalTime': '08:10',

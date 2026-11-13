@@ -32,6 +32,7 @@ class MatchDriverCard extends StatelessWidget {
   Widget build(BuildContext context) {
     final rating = match.otherUserAverageRating;
     final cost = match.estimatedCostPerPassenger;
+    final maxAmount = match.maxAmount;
     final canTap = !isDisabled && !isRequesting && match.canRequestSeat;
 
     return Container(
@@ -142,9 +143,11 @@ class MatchDriverCard extends StatelessWidget {
                         color: AppColors.textPrimary,
                       ),
                     ),
-                    const Text(
-                      'estimativa por passageiro',
-                      style: TextStyle(
+                    Text(
+                      maxAmount == null
+                          ? 'estimativa por passageiro'
+                          : 'Pode subir até ${CurrencyFormatter.format(maxAmount)} se alguém desistir',
+                      style: const TextStyle(
                         fontSize: 11,
                         color: AppColors.textMuted,
                       ),

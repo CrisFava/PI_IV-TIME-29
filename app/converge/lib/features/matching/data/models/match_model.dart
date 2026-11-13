@@ -25,6 +25,9 @@ class MatchModel {
   final Set<String> compatibleDays;
   final double? estimatedCostPerPassenger;
 
+  /// Teto do passageiro (RF35): a estimativa pode subir até aqui se alguém desistir.
+  final double? maxAmount;
+
   /// Próxima data em comum: é a que vai no pedido de vaga.
   final DateTime? nextRideDate;
   final String departureTime;
@@ -48,6 +51,7 @@ class MatchModel {
     required this.scheduleDifferenceMin,
     this.compatibleDays = const {},
     this.estimatedCostPerPassenger,
+    this.maxAmount,
     this.nextRideDate,
     required this.departureTime,
     required this.estimatedArrivalTime,
@@ -86,6 +90,7 @@ class MatchModel {
           : const {},
       estimatedCostPerPassenger: (json['estimatedCostPerPassenger'] as num?)
           ?.toDouble(),
+      maxAmount: (json['maxAmount'] as num?)?.toDouble(),
       nextRideDate: nextDate is String ? DateTime.tryParse(nextDate) : null,
       departureTime: json['departureTime'] as String? ?? '',
       estimatedArrivalTime: json['estimatedArrivalTime'] as String? ?? '',

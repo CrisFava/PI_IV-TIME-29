@@ -95,6 +95,7 @@ public class MatchViewAssembler {
                 match.scheduleDifferenceMin(),
                 match.compatibleDays(),
                 match.estimatedCostPerPassenger(),
+                match.maxAmount(),
                 // A viagem sai no horário do motorista
                 NextRideDate.of(match.compatibleDays(), driverRoute.getDepartureTime()).orElse(null),
                 otherRoute.getDepartureTime(),

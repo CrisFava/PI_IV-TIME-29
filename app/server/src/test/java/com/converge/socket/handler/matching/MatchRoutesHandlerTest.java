@@ -194,12 +194,26 @@ class MatchRoutesHandlerTest {
     }
 
     @Test
+    @DisplayName("Teto do passageiro: metade do custo da rota com o desvio, mesmo com outros passageiros no carro")
+    void shouldComputeMaxAmountAsHalfOfTripCost() {
+        // (10 km + 2 km de desvio) x R$ 0,50 + R$ 4,00 = R$ 10,00 -> teto de R$ 5,00
+        assertEquals(new BigDecimal("5.00"), MatchRoutesHandler.maxAmount(driverOffer(), 2.0));
+
+        // Outros passageiros baixam a estimativa, mas não o teto
+        MatchRoute withOnePassenger = offer("offer-1", "driver-1", "07:00", WEEKDAYS, 3.0, 2);
+        assertEquals(new BigDecimal("5.00"), MatchRoutesHandler.maxAmount(withOnePassenger, 2.0));
+        assertTrue(MatchRoutesHandler.estimatedCostPerPassenger(withOnePassenger, 2.0)
+                .compareTo(MatchRoutesHandler.maxAmount(withOnePassenger, 2.0)) < 0);
+    }
+
+    @Test
     @DisplayName("Sem consumo e preço da energia, o custo estimado fica nulo")
     void shouldLeaveCostNullWithoutEnergyData() {
         MatchRoute withoutCost = new MatchRoute("offer-1", "driver-1", CENTER_LAT, CENTER_LNG, PUC_LAT, PUC_LNG,
                 "07:00", WEEKDAYS, 3.0, 3, 3, 10.0, null, null);
 
         assertNull(MatchRoutesHandler.estimatedCostPerPassenger(withoutCost, 1.0));
+        assertNull(MatchRoutesHandler.maxAmount(withoutCost, 1.0));
     }
 
     @Test

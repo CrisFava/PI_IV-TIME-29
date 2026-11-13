@@ -112,7 +112,8 @@ public class SocketMatchingGateway implements MatchingGateway {
                 result.getCalculatedDetourKm(),
                 result.getScheduleDifferenceMin(),
                 result.getCompatibleDays(),
-                result.getEstimatedCostPerPassenger()
+                result.getEstimatedCostPerPassenger(),
+                result.getMaxAmount()
         );
     }
 }

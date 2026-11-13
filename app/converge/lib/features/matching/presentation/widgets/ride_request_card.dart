@@ -32,6 +32,7 @@ class RideRequestCard extends StatelessWidget {
     final ride = request.ride;
     final departure = ride.departureDateTime;
     final pending = request.passenger.status == ParticipantStatus.requested;
+    final isFull = ride.availableSeats <= 0;
 
     return Container(
       padding: const EdgeInsets.all(14),
@@ -97,7 +98,10 @@ class RideRequestCard extends StatelessWidget {
               ),
               MatchInfoChip(
                 icon: Icons.event_seat_rounded,
-                label: '${ride.availableSeats} vagas livres',
+                label: isFull
+                    ? 'Carona lotada (${ride.totalSeats}/${ride.totalSeats})'
+                    : '${ride.availableSeats}/${ride.totalSeats} vagas livres',
+                alert: isFull,
               ),
             ],
           ),
@@ -130,7 +134,8 @@ class RideRequestCard extends StatelessWidget {
                 const SizedBox(width: 10),
                 Expanded(
                   child: ElevatedButton(
-                    onPressed: isBusy
+                    // Sem vaga livre, só dá para recusar
+                    onPressed: isBusy || isFull
                         ? null
                         : () {
                             HapticFeedback.mediumImpact();
@@ -140,6 +145,7 @@ class RideRequestCard extends StatelessWidget {
                       backgroundColor: AppColors.primary,
                       foregroundColor: AppColors.textLight,
                       disabledBackgroundColor: AppColors.borderMedium,
+                      disabledForegroundColor: AppColors.textLight,
                       elevation: 0,
                       padding: const EdgeInsets.symmetric(vertical: 11),
                       shape: RoundedRectangleBorder(
@@ -155,9 +161,9 @@ class RideRequestCard extends StatelessWidget {
                               color: AppColors.textLight,
                             ),
                           )
-                        : const Text(
-                            'Aceitar',
-                            style: TextStyle(fontWeight: FontWeight.w700),
+                        : Text(
+                            isFull ? 'Lotada' : 'Aceitar',
+                            style: const TextStyle(fontWeight: FontWeight.w700),
                           ),
                   ),
                 ),

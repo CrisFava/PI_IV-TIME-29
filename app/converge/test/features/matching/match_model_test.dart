@@ -16,6 +16,7 @@ void main() {
     expect(match.compatibilityLabel, '92%');
     expect(match.compatibleDays, {'MONDAY', 'WEDNESDAY'});
     expect(match.estimatedCostPerPassenger, 6.4);
+    expect(match.maxAmount, 9.6);
     expect(match.nextRideDate, DateTime(2026, 11, 16));
     expect(match.vehicle?.description, 'Onix • Preto • ABC1D23');
     expect(match.origin.latitude, -22.9064);

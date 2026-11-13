@@ -114,7 +114,8 @@ public class MatchRoutesHandler implements RequestHandler<MatchRoutesRequest, Ma
                 round(detourKm, 2),
                 scheduleDifference,
                 commonDays,
-                estimatedCostPerPassenger(offer, detourKm)
+                estimatedCostPerPassenger(offer, detourKm),
+                maxAmount(offer, detourKm)
         ));
     }
 
@@ -182,6 +183,31 @@ public class MatchRoutesHandler implements RequestHandler<MatchRoutesRequest, Ma
      * É uma estimativa: o valor final depende de quem realmente for (RF35 a RF38).
      */
     static BigDecimal estimatedCostPerPassenger(MatchRoute offer, double detourKm) {
+        BigDecimal tripCost = tripCost(offer, detourKm);
+        if (tripCost == null) {
+            return null;
+        }
+
+        int occupied = offer.getTotalSeats() == null
+                ? 0
+                : Math.max(0, offer.getTotalSeats() - offer.getAvailableSeats());
+        // Passageiros já confirmados + o motorista + este passageiro
+        int people = occupied + 2;
+
+        return tripCost.divide(BigDecimal.valueOf(people), 2, RoundingMode.HALF_EVEN);
+    }
+
+    /**
+     * Teto do passageiro (RF35, RF37): metade do custo da rota com o desvio dele.
+     * É o pior caso, em que só ele e o motorista dividem a viagem.
+     */
+    static BigDecimal maxAmount(MatchRoute offer, double detourKm) {
+        BigDecimal tripCost = tripCost(offer, detourKm);
+        return tripCost == null ? null : tripCost.divide(BigDecimal.TWO, 2, RoundingMode.HALF_EVEN);
+    }
+
+    /** Energia da rota com o desvio mais pedágio e estacionamento. Null sem o custo por km do veículo. */
+    private static BigDecimal tripCost(MatchRoute offer, double detourKm) {
         BigDecimal costPerKm = offer.getEnergyCostPerKm();
         if (costPerKm == null || costPerKm.signum() <= 0) {
             return null;
@@ -193,17 +219,9 @@ public class MatchRoutesHandler implements RequestHandler<MatchRoutesRequest, Ma
                         offer.getDestinationLat(), offer.getDestinationLng());
 
         BigDecimal fixedCosts = offer.getFixedCosts() == null ? BigDecimal.ZERO : offer.getFixedCosts();
-        BigDecimal totalCost = costPerKm
+        return costPerKm
                 .multiply(BigDecimal.valueOf(routeKm + detourKm))
                 .add(fixedCosts);
-
-        int occupied = offer.getTotalSeats() == null
-                ? 0
-                : Math.max(0, offer.getTotalSeats() - offer.getAvailableSeats());
-        // Passageiros já confirmados + o motorista + este passageiro
-        int people = occupied + 2;
-
-        return totalCost.divide(BigDecimal.valueOf(people), 2, RoundingMode.HALF_EVEN);
     }
 
     private static Set<DayOfWeek> commonDays(MatchRoute offer, MatchRoute search) {

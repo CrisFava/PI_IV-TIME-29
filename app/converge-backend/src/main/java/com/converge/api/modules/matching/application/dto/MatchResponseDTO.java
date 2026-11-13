@@ -16,6 +16,7 @@ import java.util.Set;
  *
  * nextRideDate: próxima data em comum, a que o app manda ao pedir a vaga (POST /rides/request).
  * availableSeats e vehicle: só na visão do passageiro.
+ * maxAmount: teto do passageiro (RF35), metade do custo da rota com o desvio. A estimativa pode subir até ele.
  */
 public record MatchResponseDTO(
         String driverRouteId,
@@ -29,6 +30,7 @@ public record MatchResponseDTO(
         int scheduleDifferenceMin,
         Set<DayOfWeek> compatibleDays,
         @Nullable BigDecimal estimatedCostPerPassenger,
+        @Nullable BigDecimal maxAmount,
         @Nullable LocalDate nextRideDate,
         String departureTime,
         String estimatedArrivalTime,
