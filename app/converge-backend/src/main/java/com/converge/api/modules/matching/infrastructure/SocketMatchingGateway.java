@@ -94,7 +94,8 @@ public class SocketMatchingGateway implements MatchingGateway {
                 route.availableSeats(),
                 route.routeDistanceKm(),
                 route.energyCostPerKm(),
-                route.fixedCosts()
+                route.fixedCosts(),
+                route.encodedPolyline()
         );
     }
 

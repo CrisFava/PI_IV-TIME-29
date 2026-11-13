@@ -23,12 +23,14 @@ import java.util.Set;
  *
  * Para cada par oferta (motorista) x procura (passageiro):
  * 1. Filtros eliminatórios: um dia da semana em comum, vaga livre, saídas a no máximo
- *    {@value #MAX_SCHEDULE_DIFFERENCE_MIN} min uma da outra e desvio dentro do maxDetourKm do motorista.
+ *    {@value #MAX_SCHEDULE_DIFFERENCE_MIN} min uma da outra e, com X = maxDetourKm do motorista:
+ *    - o embarque do passageiro a até X km do caminho do motorista (a rota pelas ruas);
+ *    - o destino do passageiro a até X km do destino do motorista.
  * 2. Desvio: quanto o caminho do motorista aumenta para buscar e deixar o passageiro,
- *    d(Om, Op) + d(Op, Dp) + d(Dp, Dm) - d(Om, Dm), com distâncias em linha reta (Haversine).
+ *    d(Om, Op) + d(Op, Dp) + d(Dp, Dm) - d(Om, Dm), em linha reta. Entra no custo estimado.
  * 3. Índice de compatibilidade de 0 a 1, combinação ponderada de:
- *    desvio ({@value #DETOUR_WEIGHT}), horário ({@value #SCHEDULE_WEIGHT}),
- *    dias em comum ({@value #DAYS_WEIGHT}) e proximidade dos destinos ({@value #DESTINATION_WEIGHT}).
+ *    embarque perto do caminho ({@value #PICKUP_WEIGHT}), horário ({@value #SCHEDULE_WEIGHT}),
+ *    dias em comum ({@value #DAYS_WEIGHT}) e destino perto ({@value #DESTINATION_WEIGHT}).
  * 4. Custo estimado por passageiro e ordenação do mais para o menos compatível.
  */
 public class MatchRoutesHandler implements RequestHandler<MatchRoutesRequest, MatchRoutesResponse> {
@@ -37,7 +39,7 @@ public class MatchRoutesHandler implements RequestHandler<MatchRoutesRequest, Ma
     static final int MAX_SCHEDULE_DIFFERENCE_MIN = 30;
 
     // Pesos do índice. Somam 1, então o índice fica entre 0 e 1.
-    static final double DETOUR_WEIGHT = 0.4;
+    static final double PICKUP_WEIGHT = 0.4;
     static final double SCHEDULE_WEIGHT = 0.3;
     static final double DAYS_WEIGHT = 0.2;
     static final double DESTINATION_WEIGHT = 0.1;
@@ -98,12 +100,16 @@ public class MatchRoutesHandler implements RequestHandler<MatchRoutesRequest, Ma
             return Optional.empty();
         }
 
-        double detourKm = detourKm(offer, search);
-        if (detourKm > maxDetourKm) {
+        // O embarque precisa ficar perto do caminho do motorista e o destino, perto do destino dele
+        double pickupKm = RoutePath.distanceKm(search.getOriginLat(), search.getOriginLng(), offer);
+        double destinationKm = distance(search.getDestinationLat(), search.getDestinationLng(),
+                offer.getDestinationLat(), offer.getDestinationLng());
+        if (pickupKm > maxDetourKm || destinationKm > maxDetourKm) {
             return Optional.empty();
         }
 
-        double score = score(offer, search, detourKm, scheduleDifference, commonDays);
+        double detourKm = detourKm(offer, search);
+        double score = score(offer, search, pickupKm, destinationKm, scheduleDifference, commonDays);
 
         return Optional.of(new MatchResult(
                 offer.getRouteId(),
@@ -156,21 +162,20 @@ public class MatchRoutesHandler implements RequestHandler<MatchRoutesRequest, Ma
     private double score(
             MatchRoute offer,
             MatchRoute search,
-            double detourKm,
+            double pickupKm,
+            double destinationKm,
             int scheduleDifference,
             Set<DayOfWeek> commonDays
     ) {
         double maxDetourKm = offer.getMaxDetourKm();
 
-        double detourScore = 1 - detourKm / maxDetourKm;
+        double pickupScore = 1 - pickupKm / maxDetourKm;
         double scheduleScore = 1 - (double) scheduleDifference / MAX_SCHEDULE_DIFFERENCE_MIN;
         // Proporção dos dias do passageiro que o motorista atende
         double daysScore = (double) commonDays.size() / search.getWeekDays().size();
-        double destinationKm = distance(search.getDestinationLat(), search.getDestinationLng(),
-                offer.getDestinationLat(), offer.getDestinationLng());
-        double destinationScore = 1 - Math.min(destinationKm / maxDetourKm, 1);
+        double destinationScore = 1 - destinationKm / maxDetourKm;
 
-        double score = DETOUR_WEIGHT * detourScore
+        double score = PICKUP_WEIGHT * pickupScore
                 + SCHEDULE_WEIGHT * scheduleScore
                 + DAYS_WEIGHT * daysScore
                 + DESTINATION_WEIGHT * destinationScore;

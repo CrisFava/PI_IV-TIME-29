@@ -14,6 +14,7 @@ import java.util.Set;
  *
  * energyCostPerKm: preço da energia dividido pelo consumo do veículo (R$/km); null se não for possível saber.
  * fixedCosts: pedágio + estacionamento.
+ * encodedPolyline: caminho do motorista pelas ruas, para medir se o embarque fica perto dele.
  */
 public record MatchingRoute(
         String routeId,
@@ -29,6 +30,7 @@ public record MatchingRoute(
         @Nullable Integer availableSeats,
         @Nullable Double routeDistanceKm,
         @Nullable BigDecimal energyCostPerKm,
-        @Nullable BigDecimal fixedCosts
+        @Nullable BigDecimal fixedCosts,
+        @Nullable String encodedPolyline
 ) {
 }

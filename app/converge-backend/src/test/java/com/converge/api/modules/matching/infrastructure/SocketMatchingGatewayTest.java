@@ -26,12 +26,12 @@ class SocketMatchingGatewayTest {
 
     private static MatchingRoute offer() {
         return new MatchingRoute("offer-1", "driver-1", -22.9056, -47.0608, -22.8337, -47.0524, "07:00", DAYS,
-                3.0, 3, 3, 10.0, new BigDecimal("0.50"), BigDecimal.ZERO);
+                3.0, 3, 3, 10.0, new BigDecimal("0.50"), BigDecimal.ZERO, null);
     }
 
     private static MatchingRoute search() {
         return new MatchingRoute("search-1", "passenger-1", -22.9000, -47.0600, -22.8337, -47.0524, "07:10", DAYS,
-                null, null, null, null, null, null);
+                null, null, null, null, null, null, null);
     }
 
     @Test
