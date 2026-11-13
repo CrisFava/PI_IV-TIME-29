@@ -6,6 +6,7 @@ import com.converge.api.modules.ride.domain.enums.ParticipantPaymentStatus;
 import com.converge.api.modules.ride.domain.enums.ParticipantStatus;
 import com.converge.api.modules.ride.domain.enums.RideStatus;
 import com.converge.api.modules.ride.domain.model.subtypes.Participant;
+import com.converge.api.modules.ride.domain.model.subtypes.RideCosts;
 import com.converge.api.modules.ride.domain.model.subtypes.VehicleSnapshot;
 import com.converge.api.modules.route.domain.model.subtypes.Coordinates;
 import com.converge.api.modules.route.domain.model.subtypes.Place;
@@ -22,6 +23,7 @@ import org.springframework.test.util.ReflectionTestUtils;
 import java.math.BigDecimal;
 import java.time.DayOfWeek;
 import java.time.LocalDateTime;
+import java.util.Map;
 import java.util.Set;
 
 import static org.assertj.core.api.Assertions.assertThat;
@@ -592,5 +594,79 @@ class RideTest {
 
         assertThat(ride.isOwnedBy("driver-123")).isTrue();
         assertThat(ride.isOwnedBy("outra-pessoa")).isFalse();
+    }
+
+    @Test
+    @DisplayName("Aceitar passageiro informando desvio e valor máximo deve registrá-los e marcar lotação quando zerar vagas")
+    void shouldRecordDetourAndMaxAmountWhenAcceptingPassenger() {
+        Ride ride = rideWith(tomorrow, tomorrow.plusMinutes(40), Set.of(DayOfWeek.MONDAY), 1);
+        ride.requestSeat("passenger-1", "route-1", place("Rua A"), place("Campus PUC"));
+
+        assertThat(ride.isFull()).isFalse();
+
+        ride.acceptPassenger("passenger-1", 2.4, new BigDecimal("8.50"));
+
+        Participant passenger = ride.getParticipants().get(1);
+        assertThat(passenger.getStatus()).isEqualTo(ParticipantStatus.CONFIRMED);
+        assertThat(passenger.getDetourGeneratedKm()).isEqualTo(2.4);
+        assertThat(passenger.getMaxAmount()).isEqualByComparingTo("8.50");
+        assertThat(ride.isFull()).isTrue();
+    }
+
+    @Test
+    @DisplayName("Expirar pedido pendente deve mudar status para EXPIRED e permitir novo pedido depois")
+    void shouldExpirePendingRequestAndAllowNewRequestLater() {
+        Ride ride = validRide();
+        ride.requestSeat("passenger-1", "route-1", place("Rua A"), place("Campus PUC"));
+
+        ride.expireRequest("passenger-1");
+
+        Participant expired = ride.getParticipants().get(1);
+        assertThat(expired.getStatus()).isEqualTo(ParticipantStatus.EXPIRED);
+        assertThat(expired.getRespondedAt()).isNotNull();
+        assertThat(ride.getAvailableSeats()).isEqualTo(3);
+
+        ride.requestSeat("passenger-1", "route-1", place("Rua A"), place("Campus PUC"));
+        assertThat(ride.getParticipants()).hasSize(3);
+        assertThat(ride.getParticipants().get(2).getStatus()).isEqualTo(ParticipantStatus.REQUESTED);
+    }
+
+    @Test
+    @DisplayName("Motorista deve poder remover passageiro confirmado antes da partida, liberando vaga e voltando status")
+    void shouldAllowDriverToRemoveConfirmedPassengerBeforeStart() {
+        Ride ride = validRide();
+        ride.requestSeat("passenger-1", "route-1", place("Rua A"), place("Campus PUC"));
+        ride.acceptPassenger("passenger-1", 1.5, new BigDecimal("7.00"));
+
+        boolean wasConfirmed = ride.rejectPassenger("passenger-1", "Mudança de rota");
+
+        assertThat(wasConfirmed).isTrue();
+        Participant passenger = ride.getParticipants().get(1);
+        assertThat(passenger.getStatus()).isEqualTo(ParticipantStatus.CANCELLED);
+        assertThat(passenger.getCancellationReason()).isEqualTo("Mudança de rota");
+        assertThat(passenger.isLateCancellation()).isFalse();
+        assertThat(passenger.getPaymentStatus()).isEqualTo(ParticipantPaymentStatus.NOT_APPLICABLE);
+        assertThat(ride.getAvailableSeats()).isEqualTo(3);
+        assertThat(ride.getStatus()).isEqualTo(RideStatus.AWAITING_CONFIRMATION);
+    }
+
+    @Test
+    @DisplayName("Atualizar estimativas e valores finais deve respeitar o valor máximo (maxAmount) do passageiro")
+    void shouldCapEstimatedAndFinalAmountsAtMaxAmount() {
+        Ride ride = validRide();
+        ride.requestSeat("passenger-1", "route-1", place("Rua A"), place("Campus PUC"));
+        ride.acceptPassenger("passenger-1", 1.8, new BigDecimal("6.00"));
+
+        RideCosts updatedCosts = RideCosts.withExtras(BigDecimal.ZERO, BigDecimal.ZERO);
+        ride.applyCostEstimates(updatedCosts, Map.of("passenger-1", new BigDecimal("9.50")));
+
+        Participant passenger = ride.getParticipants().get(1);
+        assertThat(passenger.getEstimatedAmount()).isEqualByComparingTo("6.00");
+
+        ride.start();
+        ride.complete();
+        ride.applyFinalAmounts(updatedCosts, Map.of("passenger-1", new BigDecimal("8.00")));
+
+        assertThat(passenger.getFinalAmount()).isEqualByComparingTo("6.00");
     }
 }

@@ -9,6 +9,8 @@ import com.converge.socket.handler.matching.MatchRoutesHandler;
 import com.converge.socket.handler.matching.MatchRoutesRequest;
 import com.converge.socket.handler.math.MathOperationHandler;
 import com.converge.socket.handler.math.MathOperationRequest;
+import com.converge.socket.handler.ride.RideCostHandler;
+import com.converge.socket.handler.ride.RideCostRequest;
 import com.converge.socket.handler.pix.PixPayloadHandler;
 import com.converge.socket.handler.pix.PixPayloadRequest;
 
@@ -21,6 +23,7 @@ public class Main {
         server.registerHandler(ValidateCpfRequest.class, new ValidateCpfHandler());
         server.registerHandler(PixPayloadRequest.class, new PixPayloadHandler());
         server.registerHandler(MatchRoutesRequest.class, new MatchRoutesHandler());
+        server.registerHandler(RideCostRequest.class, new RideCostHandler());
     }
     
     public static void main(String[] args) {
