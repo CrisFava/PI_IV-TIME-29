@@ -29,6 +29,10 @@ public class RideEligibility {
         if (!eligibility.driverLicenseValid()) {
             throw notAllowed(subject + " não tem a CNH verificada e dentro da validade.", "driverLicense");
         }
+
+        if (!eligibility.hasPixKey()) {
+            throw notAllowed(subject + " não tem uma chave PIX cadastrada para receber o rateio.", "pixKey");
+        }
     }
 
     private void validateJoin(UserEligibilityDTO eligibility, String subject) {

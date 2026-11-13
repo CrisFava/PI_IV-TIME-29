@@ -32,7 +32,8 @@ public class GetUserEligibilityUseCase implements UseCase<String, UserEligibilit
                 user.isActive(),
                 user.isAcademicVerified(),
                 user.isBlockedByDebt(),
-                user.hasValidDriverLicense(LocalDateTime.now())
+                user.hasValidDriverLicense(LocalDateTime.now()),
+                user.hasPixKey()
         );
     }
 

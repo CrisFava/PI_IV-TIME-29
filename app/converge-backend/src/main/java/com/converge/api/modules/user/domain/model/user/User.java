@@ -202,8 +202,14 @@ public class User {
         return this.academicRecord != null && this.academicRecord.status() == VerificationStatus.VERIFIED;
     }
 
+    // RF67: bloqueado pela situação de pagamento ou marcado como inadimplente
     public boolean isBlockedByDebt() {
-        return this.paymentStanding == PaymentStanding.BLOCKED;
+        return this.paymentStanding == PaymentStanding.BLOCKED || this.isDefaulter;
+    }
+
+    // RF72: o motorista só oferece carona com a chave PIX cadastrada
+    public boolean hasPixKey() {
+        return this.pixKey != null && !this.pixKey.isBlank();
     }
 
     public boolean hasValidDriverLicense(LocalDateTime now) {
