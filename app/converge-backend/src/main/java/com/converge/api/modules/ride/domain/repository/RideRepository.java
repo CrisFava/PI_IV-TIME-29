@@ -14,7 +14,7 @@ import java.util.List;
 import java.util.Optional;
 
 @Repository
-public interface RideRepository extends MongoRepository<Ride, ObjectId> {
+public interface RideRepository extends MongoRepository<Ride, ObjectId>, RideRepositoryCustom {
 
     Optional<Ride> findTopByDriverIdOrderBySequentialNumberDesc(String driverId);
 

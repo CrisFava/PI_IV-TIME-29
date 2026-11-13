@@ -10,12 +10,15 @@ import com.converge.api.modules.ride.infrastructure.RideCostCalculator;
 import com.converge.api.shared.application.SafeActionHandler;
 import com.converge.api.shared.application.UseCase;
 import com.converge.api.shared.domain.enums.NotificationType;
+import com.converge.api.shared.presentation.exception.ApplicationException;
+import com.converge.api.shared.presentation.exception.ErrorCode;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.context.ApplicationEventPublisher;
 import org.springframework.stereotype.Service;
 
 import java.math.BigDecimal;
+import java.time.LocalDateTime;
 import java.util.List;
 
 /**
@@ -37,10 +40,23 @@ public class AcceptPassengerUseCase implements UseCase<PassengerRequestCommand, 
         Ride ride = rideAccess.getOwnedRide(command.rideId(), command.firebaseUid());
 
         validateParticipantsEligibility(ride, command.passengerId());
-        confirmPassengerWithQuote(ride, command.passengerId());
-        rideCostCalculator.recalculateEstimatedShares(ride);
 
-        Ride saved = rideRepository.save(ride);
+        RideCostCalculator.ConfirmationQuote quote = rideCostCalculator.computeConfirmationQuote(ride, command.passengerId());
+        Double detourKm = quote != null ? quote.detourGeneratedKm() : null;
+        BigDecimal maxAmount = quote != null ? quote.maxAmount() : null;
+
+        Ride updated = rideRepository.acceptPassengerAtomic(
+                        ride.getId(),
+                        command.passengerId(),
+                        detourKm,
+                        maxAmount,
+                        LocalDateTime.now()
+                )
+                .orElseThrow(() -> resolveAcceptConflict(ride, command.passengerId(), detourKm, maxAmount));
+
+        rideCostCalculator.recalculateEstimatedShares(updated);
+
+        Ride saved = rideRepository.save(updated);
         notifyConfirmedPassenger(command.passengerId(), command.rideId());
 
         return saved;
@@ -51,12 +67,20 @@ public class AcceptPassengerUseCase implements UseCase<PassengerRequestCommand, 
         rideEligibility.assertCanJoin(passengerId, "O passageiro");
     }
 
-    private void confirmPassengerWithQuote(Ride ride, String passengerId) {
-        RideCostCalculator.ConfirmationQuote quote = rideCostCalculator.computeConfirmationQuote(ride, passengerId);
-        Double detourKm = quote != null ? quote.detourGeneratedKm() : null;
-        BigDecimal maxAmount = quote != null ? quote.maxAmount() : null;
-
-        ride.acceptPassenger(passengerId, detourKm, maxAmount);
+    private ApplicationException resolveAcceptConflict(
+            Ride fallbackRide,
+            String passengerId,
+            Double detourKm,
+            BigDecimal maxAmount
+    ) {
+        Ride latest = fallbackRide.getId() != null
+                ? rideRepository.findById(fallbackRide.getId()).orElse(fallbackRide)
+                : fallbackRide;
+        latest.acceptPassenger(passengerId, detourKm, maxAmount);
+        return new ApplicationException(
+                ErrorCode.RIDE_CONFLICT,
+                "Não foi possível aceitar o passageiro agora. Tente novamente."
+        );
     }
 
     private void notifyConfirmedPassenger(String passengerId, String rideId) {
