@@ -8,6 +8,7 @@ import '../../../route/state/places_autocomplete_controller.dart';
 import 'package:google_maps_flutter/google_maps_flutter.dart';
 
 import '../../../../core/config/styles.dart';
+import '../../../../core/widgets/show_app_notice.dart';
 import '../../../../core/utils/currency_formatter.dart';
 import '../../../matching/data/models/match_model.dart';
 import '../../../matching/presentation/widgets/match_driver_card.dart';
@@ -107,10 +108,10 @@ class _HomePassengerSheetState extends ConsumerState<HomePassengerSheet> {
         LatLng(details.latitude, details.longitude),
       );
     } else if (mounted) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(
-          content: Text('Não foi possível obter detalhes deste endereço.'),
-        ),
+      showAppNotice(
+        context,
+        'Não foi possível obter detalhes deste endereço.',
+        type: AppNoticeType.error,
       );
     }
   }
@@ -131,10 +132,10 @@ class _HomePassengerSheetState extends ConsumerState<HomePassengerSheet> {
         LatLng(details.latitude, details.longitude),
       );
     } else if (mounted) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(
-          content: Text('Não foi possível obter detalhes deste endereço.'),
-        ),
+      showAppNotice(
+        context,
+        'Não foi possível obter detalhes deste endereço.',
+        type: AppNoticeType.error,
       );
     }
   }
@@ -186,7 +187,7 @@ class _HomePassengerSheetState extends ConsumerState<HomePassengerSheet> {
 
     return DraggableScrollableSheet(
       initialChildSize: 0.62,
-      minChildSize: 0.38,
+      minChildSize: 0.26,
       maxChildSize: 0.92,
       snap: true,
       snapSizes: const [0.38, 0.62, 0.92],
@@ -955,7 +956,7 @@ class _HomePassengerSheetState extends ConsumerState<HomePassengerSheet> {
 
     return DraggableScrollableSheet(
       initialChildSize: 0.54,
-      minChildSize: 0.34,
+      minChildSize: 0.22,
       maxChildSize: 0.88,
       snap: true,
       snapSizes: const [0.34, 0.54, 0.88],
@@ -1504,7 +1505,7 @@ class _HomePassengerSheetState extends ConsumerState<HomePassengerSheet> {
 
     return DraggableScrollableSheet(
       initialChildSize: 0.54,
-      minChildSize: 0.34,
+      minChildSize: 0.22,
       maxChildSize: 0.90,
       snap: true,
       snapSizes: const [0.34, 0.54, 0.90],
@@ -2145,7 +2146,7 @@ class _HomePassengerSheetState extends ConsumerState<HomePassengerSheet> {
 
     return DraggableScrollableSheet(
       initialChildSize: 0.5,
-      minChildSize: 0.28,
+      minChildSize: 0.16,
       maxChildSize: 0.85,
       snap: true,
       snapSizes: const [0.28, 0.5, 0.85],

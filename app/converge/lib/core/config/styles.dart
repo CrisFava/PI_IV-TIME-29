@@ -50,6 +50,11 @@ abstract final class AppColors {
   static const Color successBackground = Color(0xFFF0FDF4);
   static const Color successBorder = Color(0xFFBBF7D0);
 
+  // Informação / em andamento (ex.: procurando motorista)
+  static const Color info = Color(0xFF2563EB);
+  static const Color infoBackground = Color(0xFFEFF6FF);
+  static const Color infoBorder = Color(0xFFBFDBFE);
+
   // Elementos do Mapa Estilo Uber (Cartografia Monocromática com Alto Contraste)
   static const Color mapBackground = Color(0xFFD6DADF); // Fundo cinza arquitetural contrastante
   static const Color mapRoadPrimary = Color(0xFFFFFFFF); // Ruas em branco puro

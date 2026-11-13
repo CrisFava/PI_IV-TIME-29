@@ -4,6 +4,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../../../core/config/styles.dart';
+import '../../../../core/widgets/show_app_notice.dart';
 import '../../../ride/state/ride_providers.dart';
 import '../../data/models/chat_conversation.dart';
 import '../../state/chat_actions_controller.dart';
@@ -144,21 +145,9 @@ class _ChatPageState extends ConsumerState<ChatPage> {
     );
   }
 
-  void _showError(Object error) {
-    ScaffoldMessenger.of(context)
-      ..hideCurrentSnackBar()
-      ..showSnackBar(
-        SnackBar(
-          content: Text(
-            chatErrorMessage(error),
-            style: const TextStyle(
-              fontWeight: FontWeight.w600,
-              color: AppColors.textLight,
-            ),
-          ),
-          backgroundColor: AppColors.error,
-          behavior: SnackBarBehavior.floating,
-        ),
-      );
-  }
+  void _showError(Object error) => showAppNotice(
+    context,
+    chatErrorMessage(error),
+    type: AppNoticeType.error,
+  );
 }

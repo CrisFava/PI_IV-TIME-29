@@ -3,7 +3,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 
-import '../../../../core/config/styles.dart';
+import '../../../../core/widgets/show_app_notice.dart';
 import 'chat_panel_button.dart';
 
 /// Botão "Copiar código PIX". Fica desabilitado e mostra progresso enquanto copia.
@@ -35,23 +35,14 @@ class _CopyPixButtonState extends State<CopyPixButton> {
     }
     if (!mounted) return;
 
-    ScaffoldMessenger.of(context)
-      ..hideCurrentSnackBar()
-      ..showSnackBar(
-        SnackBar(
-          content: Text(
-            copied
-                ? 'Código PIX copiado. Cole no app do seu banco.'
-                : 'Não foi possível copiar o código PIX. Tente novamente.',
-            style: const TextStyle(
-              fontWeight: FontWeight.w600,
-              color: AppColors.textLight,
-            ),
-          ),
-          backgroundColor: copied ? AppColors.primary : AppColors.error,
-          behavior: SnackBarBehavior.floating,
-        ),
+    // Só a falha avisa; a cópia bem-sucedida não precisa de aviso
+    if (!copied) {
+      showAppNotice(
+        context,
+        'Não foi possível copiar o código PIX. Tente novamente.',
+        type: AppNoticeType.error,
       );
+    }
   }
 
   @override

@@ -30,6 +30,36 @@ class RideDockNavigation extends StatefulWidget {
   /// Callback acionado quando o usuário clica na ação de motorista bloqueada.
   final VoidCallback? onLockedDriverTap;
 
+  /// O motorista está em expediente: o botão do carro ganha o anel verde pulsante
+  /// e o menu mostra "Em expediente" com o botão "Encerrar".
+  final bool isOnShift;
+
+  /// Callback do botão "Encerrar" expediente.
+  final VoidCallback? onEndDriverShift;
+
+  /// Motorista sem carro cadastrado: a função de motorista fica bloqueada e o
+  /// menu oferece "Adicionar carro".
+  final bool needsVehicle;
+
+  /// Callback do botão "Adicionar carro".
+  final VoidCallback? onAddVehicle;
+
+  /// O passageiro tem um pedido de carona em andamento: o botão do carro ganha o
+  /// anel azul pulsante e o menu mostra a busca com o destino e o botão "Cancelar".
+  final bool isSearchingRide;
+
+  /// Título da busca no menu (ex.: "Procurando motorista").
+  final String rideSearchTitle;
+
+  /// Destino do pedido de carona, mostrado no menu.
+  final String? rideSearchDestination;
+
+  /// Toque na busca: abre os detalhes do pedido.
+  final VoidCallback? onOpenRideSearch;
+
+  /// Callback do botão "Cancelar" da busca.
+  final VoidCallback? onCancelRideSearch;
+
   const RideDockNavigation({
     super.key,
     required this.currentIndex,
@@ -40,8 +70,19 @@ class RideDockNavigation extends StatefulWidget {
     this.onToggleOpen,
     this.canDrive = true,
     this.onLockedDriverTap,
-  }) : assert(currentIndex >= 0 && currentIndex <= 3,
-            'currentIndex deve estar entre 0 e 3.');
+    this.isOnShift = false,
+    this.onEndDriverShift,
+    this.needsVehicle = false,
+    this.onAddVehicle,
+    this.isSearchingRide = false,
+    this.rideSearchTitle = 'Procurando motorista',
+    this.rideSearchDestination,
+    this.onOpenRideSearch,
+    this.onCancelRideSearch,
+  }) : assert(
+         currentIndex >= 0 && currentIndex <= 3,
+         'currentIndex deve estar entre 0 e 3.',
+       );
 
   @override
   State<RideDockNavigation> createState() => _RideDockNavigationState();
@@ -165,6 +206,27 @@ class _RideDockNavigationState extends State<RideDockNavigation>
                           }
                         },
                         onClose: _handleToggle,
+                        isOnShift: widget.isOnShift,
+                        onEndDriverShift: () {
+                          _handleToggle();
+                          widget.onEndDriverShift?.call();
+                        },
+                        needsVehicle: widget.needsVehicle,
+                        onAddVehicle: () {
+                          _handleToggle();
+                          widget.onAddVehicle?.call();
+                        },
+                        isSearchingRide: widget.isSearchingRide,
+                        rideSearchTitle: widget.rideSearchTitle,
+                        rideSearchDestination: widget.rideSearchDestination,
+                        onOpenRideSearch: () {
+                          _handleToggle();
+                          widget.onOpenRideSearch?.call();
+                        },
+                        onCancelRideSearch: () {
+                          _handleToggle();
+                          widget.onCancelRideSearch?.call();
+                        },
                       ),
                     ),
                   ),
@@ -198,7 +260,7 @@ class _RideDockNavigationState extends State<RideDockNavigation>
                     ),
                     child: Row(
                       children: [
-                        // Asa Esquerda (flex 1): [0] Início, [1] Buscar
+                        // Asa Esquerda (flex 1): [0] Início, [2] Chat
                         Expanded(
                           child: Row(
                             children: [
@@ -212,10 +274,10 @@ class _RideDockNavigationState extends State<RideDockNavigation>
                               ),
                               Expanded(
                                 child: _SymmetricTabItem(
-                                  icon: Icons.search_rounded,
-                                  label: 'Buscar e Rotas',
-                                  isSelected: widget.currentIndex == 1,
-                                  onTap: () => _handleTabTap(1),
+                                  icon: Icons.chat_bubble_rounded,
+                                  label: 'Chat',
+                                  isSelected: widget.currentIndex == 2,
+                                  onTap: () => _handleTabTap(2),
                                 ),
                               ),
                             ],
@@ -225,16 +287,16 @@ class _RideDockNavigationState extends State<RideDockNavigation>
                         // Espaço central reservado para o botão proeminente
                         const SizedBox(width: 64),
 
-                        // Asa Direita (flex 1): [2] Chat, [3] Perfil
+                        // Asa Direita (flex 1): [1] Histórico, [3] Perfil
                         Expanded(
                           child: Row(
                             children: [
                               Expanded(
                                 child: _SymmetricTabItem(
-                                  icon: Icons.chat_bubble_outline_rounded,
-                                  label: 'Chat',
-                                  isSelected: widget.currentIndex == 2,
-                                  onTap: () => _handleTabTap(2),
+                                  icon: Icons.history_rounded,
+                                  label: 'Histórico',
+                                  isSelected: widget.currentIndex == 1,
+                                  onTap: () => _handleTabTap(1),
                                 ),
                               ),
                               Expanded(
@@ -257,6 +319,12 @@ class _RideDockNavigationState extends State<RideDockNavigation>
                     child: _CenterRideButton(
                       progress: progress,
                       onPressed: _handleToggle,
+                      // Verde no expediente; azul enquanto procura motorista
+                      pulseColor: widget.isOnShift
+                          ? AppColors.success
+                          : widget.isSearchingRide
+                          ? AppColors.info
+                          : null,
                     ),
                   ),
                 ],
@@ -299,7 +367,8 @@ class _SymmetricTabItem extends StatelessWidget {
             mainAxisAlignment: MainAxisAlignment.center,
             children: [
               AnimatedScale(
-                scale: isSelected ? 1.16 : 1.0,
+                // Todos os ícones do mesmo tamanho; a seleção é marcada pela cor e pelo ponto
+                scale: 1.0,
                 duration: const Duration(milliseconds: 280),
                 curve: Curves.easeOutBack,
                 child: Icon(
@@ -334,18 +403,77 @@ class _SymmetricTabItem extends StatelessWidget {
 class _CenterRideButton extends StatefulWidget {
   final double progress;
   final VoidCallback onPressed;
+  /// Cor do anel pulsante e do ponto de status; null deixa o botão sem destaque.
+  final Color? pulseColor;
 
   const _CenterRideButton({
     required this.progress,
     required this.onPressed,
+    this.pulseColor,
   });
 
   @override
   State<_CenterRideButton> createState() => _CenterRideButtonState();
 }
 
-class _CenterRideButtonState extends State<_CenterRideButton> {
+class _CenterRideButtonState extends State<_CenterRideButton>
+    with SingleTickerProviderStateMixin {
   bool _isPressed = false;
+
+  // Anel verde que pulsa em volta do botão enquanto o motorista está em expediente
+  late final AnimationController _pulseController = AnimationController(
+    vsync: this,
+    duration: const Duration(milliseconds: 1600),
+  );
+
+  @override
+  void initState() {
+    super.initState();
+    if (widget.pulseColor != null) _pulseController.repeat();
+  }
+
+  @override
+  void didUpdateWidget(covariant _CenterRideButton oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    final isActive = widget.pulseColor != null;
+    if (isActive == (oldWidget.pulseColor != null)) return;
+    if (isActive) {
+      _pulseController.repeat();
+    } else {
+      _pulseController
+        ..stop()
+        ..value = 0;
+    }
+  }
+
+  @override
+  void dispose() {
+    _pulseController.dispose();
+    super.dispose();
+  }
+
+  Widget _buildPulseRing() {
+    return AnimatedBuilder(
+      animation: _pulseController,
+      builder: (context, _) {
+        final t = _pulseController.value;
+        return Transform.scale(
+          scale: 1.0 + (0.45 * t),
+          child: Container(
+            width: 60,
+            height: 60,
+            decoration: BoxDecoration(
+              shape: BoxShape.circle,
+              border: Border.all(
+                color: widget.pulseColor!.withValues(alpha: 0.7 * (1.0 - t)),
+                width: 3,
+              ),
+            ),
+          ),
+        );
+      },
+    );
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -354,7 +482,9 @@ class _CenterRideButtonState extends State<_CenterRideButton> {
     final isExpanded = progress > 0.5;
 
     return Semantics(
-      label: isExpanded ? 'Fechar opções de Caronas' : 'Abrir opções de Caronas',
+      label: isExpanded
+          ? 'Fechar opções de Caronas'
+          : 'Abrir opções de Caronas',
       button: true,
       child: GestureDetector(
         onTapDown: (_) => setState(() => _isPressed = true),
@@ -364,62 +494,86 @@ class _CenterRideButtonState extends State<_CenterRideButton> {
         },
         onTapCancel: () => setState(() => _isPressed = false),
         behavior: HitTestBehavior.opaque,
-        child: Transform.scale(
-          scale: currentScale,
-          child: Container(
-            width: 60,
-            height: 60,
-            decoration: BoxDecoration(
-              shape: BoxShape.circle,
-              color: Color.lerp(
-                AppColors.carButtonResting,
-                AppColors.carButtonDepressed,
-                progress,
-              ),
-              border: Border.all(
-                color: Color.lerp(
-                  Colors.white.withValues(alpha: 0.24),
-                  Colors.white,
-                  progress,
-                )!,
-                width: 2.0 + (0.4 * progress),
-              ),
-              boxShadow: [
-                BoxShadow(
-                  color: Colors.black.withValues(alpha: 0.42 - (0.17 * progress)),
-                  blurRadius: 18 - (12 * progress),
-                  offset: Offset(0, 8 - (6 * progress)),
-                  spreadRadius: 1.0 - (1.0 * progress),
-                ),
-              ],
-            ),
-            child: Center(
-              child: Transform.rotate(
-                angle: progress * 3.141592653589793,
-                child: AnimatedSwitcher(
-                  duration: const Duration(milliseconds: 200),
-                  transitionBuilder: (child, animation) => ScaleTransition(
-                    scale: animation,
-                    child: child,
+        child: Stack(
+          clipBehavior: Clip.none,
+          alignment: Alignment.center,
+          children: [
+            if (widget.pulseColor != null && !isExpanded) _buildPulseRing(),
+            Transform.scale(
+              scale: currentScale,
+              child: Container(
+                width: 60,
+                height: 60,
+                decoration: BoxDecoration(
+                  shape: BoxShape.circle,
+                  color: Color.lerp(
+                    AppColors.carButtonResting,
+                    AppColors.carButtonDepressed,
+                    progress,
                   ),
-                  child: Icon(
-                    isExpanded
-                        ? Icons.close
-                        : Icons.directions_car_rounded,
-                    key: ValueKey(isExpanded),
-                    size: 27,
-                    color: Colors.white,
+                  border: Border.all(
+                    color: widget.pulseColor != null && !isExpanded
+                        ? widget.pulseColor!
+                        : Color.lerp(
+                            Colors.white.withValues(alpha: 0.24),
+                            Colors.white,
+                            progress,
+                          )!,
+                    width: 2.0 + (0.4 * progress),
+                  ),
+                  boxShadow: [
+                    BoxShadow(
+                      color: Colors.black.withValues(
+                        alpha: 0.42 - (0.17 * progress),
+                      ),
+                      blurRadius: 18 - (12 * progress),
+                      offset: Offset(0, 8 - (6 * progress)),
+                      spreadRadius: 1.0 - (1.0 * progress),
+                    ),
+                  ],
+                ),
+                child: Center(
+                  child: Transform.rotate(
+                    angle: progress * 3.141592653589793,
+                    child: AnimatedSwitcher(
+                      duration: const Duration(milliseconds: 200),
+                      transitionBuilder: (child, animation) =>
+                          ScaleTransition(scale: animation, child: child),
+                      child: Icon(
+                        isExpanded ? Icons.close : Icons.directions_car_rounded,
+                        key: ValueKey(isExpanded),
+                        size: 27,
+                        color: Colors.white,
+                      ),
+                    ),
                   ),
                 ),
               ),
             ),
-          ),
+            // Ponto verde de "em expediente"
+            if (widget.pulseColor != null && !isExpanded)
+              Positioned(
+                top: 2,
+                right: 2,
+                child: Container(
+                  width: 14,
+                  height: 14,
+                  decoration: BoxDecoration(
+                    color: widget.pulseColor,
+                    shape: BoxShape.circle,
+                    border: Border.all(
+                      color: AppColors.dockBackground,
+                      width: 2,
+                    ),
+                  ),
+                ),
+              ),
+          ],
         ),
       ),
     );
   }
 }
-
 
 class _RidesPopoverCard extends StatelessWidget {
   final VoidCallback onRequestRide;
@@ -427,13 +581,31 @@ class _RidesPopoverCard extends StatelessWidget {
   final VoidCallback onClose;
   final bool canDrive;
   final VoidCallback? onLockedDriverTap;
+  final bool isOnShift;
+  final VoidCallback onEndDriverShift;
+  final bool needsVehicle;
+  final VoidCallback onAddVehicle;
+  final bool isSearchingRide;
+  final String rideSearchTitle;
+  final String? rideSearchDestination;
+  final VoidCallback onOpenRideSearch;
+  final VoidCallback onCancelRideSearch;
 
   const _RidesPopoverCard({
     required this.onRequestRide,
     required this.onStartDriverShift,
     required this.onClose,
+    required this.onEndDriverShift,
+    required this.onAddVehicle,
+    required this.onOpenRideSearch,
+    required this.onCancelRideSearch,
+    this.isSearchingRide = false,
+    this.rideSearchTitle = 'Procurando motorista',
+    this.rideSearchDestination,
+    this.needsVehicle = false,
     this.canDrive = true,
     this.onLockedDriverTap,
+    this.isOnShift = false,
   });
 
   @override
@@ -493,24 +665,323 @@ class _RidesPopoverCard extends StatelessWidget {
           ),
           const SizedBox(height: 10),
 
-          _CompactActionRow(
-            title: 'Pedir carona',
-            subtitle: 'Encontre motoristas na sua rota com rateio.',
-            icon: Icons.hail_rounded,
-            onTap: onRequestRide,
-          ),
+          if (isSearchingRide)
+            _buildRideSearchRow()
+          else
+            _CompactActionRow(
+              title: 'Pedir carona',
+              subtitle: 'Encontre motoristas na sua rota com rateio.',
+              icon: Icons.hail_rounded,
+              onTap: onRequestRide,
+            ),
           const SizedBox(height: 8),
 
-          _CompactActionRow(
-            title: 'Iniciar expediente de motorista',
-            subtitle: canDrive
-                ? 'Abra vagas no trajeto e compartilhe custos.'
-                : 'Requer perfil de motorista cadastrado.',
-            icon: canDrive ? Icons.drive_eta_rounded : Icons.lock_rounded,
-            badgeLabel: canDrive ? 'Disponível' : 'Bloqueado',
-            onTap: canDrive
-                ? onStartDriverShift
-                : (onLockedDriverTap ?? onStartDriverShift),
+          if (isOnShift)
+            _buildOnShiftRow()
+          else if (needsVehicle)
+            _buildVehicleBlockedRow()
+          else
+            _CompactActionRow(
+              title: 'Iniciar expediente de motorista',
+              subtitle: canDrive
+                  ? 'Abra vagas no trajeto e compartilhe custos.'
+                  : 'Requer perfil de motorista cadastrado.',
+              icon: canDrive ? Icons.drive_eta_rounded : Icons.lock_rounded,
+              badgeLabel: canDrive ? 'Disponível' : 'Bloqueado',
+              onTap: canDrive
+                  ? onStartDriverShift
+                  : (onLockedDriverTap ?? onStartDriverShift),
+            ),
+        ],
+      ),
+    );
+  }
+
+  /// Pedido de carona em andamento: tocar abre os detalhes; "Cancelar" encerra a busca.
+  Widget _buildRideSearchRow() {
+    final destination = rideSearchDestination?.trim() ?? '';
+
+    return Container(
+      key: const ValueKey('ride_search_row'),
+      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+      decoration: BoxDecoration(
+        color: AppColors.infoBackground,
+        borderRadius: BorderRadius.circular(14),
+        border: Border.all(color: AppColors.infoBorder, width: 1.1),
+      ),
+      child: Row(
+        children: [
+          Expanded(
+            child: GestureDetector(
+              behavior: HitTestBehavior.opaque,
+              onTap: () {
+                HapticFeedback.lightImpact();
+                onOpenRideSearch();
+              },
+              child: Row(
+                children: [
+                  Container(
+                    width: 36,
+                    height: 36,
+                    decoration: BoxDecoration(
+                      color: AppColors.cardBackground,
+                      borderRadius: BorderRadius.circular(10),
+                      border: Border.all(color: AppColors.infoBorder),
+                    ),
+                    child: const Icon(
+                      Icons.person_search_rounded,
+                      size: 19,
+                      color: AppColors.info,
+                    ),
+                  ),
+                  const SizedBox(width: 12),
+                  Expanded(
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Row(
+                          children: [
+                            const Icon(
+                              Icons.fiber_manual_record_rounded,
+                              size: 9,
+                              color: AppColors.info,
+                            ),
+                            const SizedBox(width: 5),
+                            Flexible(
+                              child: Text(
+                                rideSearchTitle,
+                                overflow: TextOverflow.ellipsis,
+                                style: const TextStyle(
+                                  fontSize: 13.5,
+                                  fontWeight: FontWeight.w700,
+                                  color: AppColors.info,
+                                  letterSpacing: -0.2,
+                                ),
+                              ),
+                            ),
+                          ],
+                        ),
+                        const SizedBox(height: 2),
+                        Text(
+                          destination.isEmpty
+                              ? 'Toque para ver os detalhes.'
+                              : 'Para: $destination',
+                          maxLines: 2,
+                          overflow: TextOverflow.ellipsis,
+                          style: const TextStyle(
+                            fontSize: 11,
+                            color: AppColors.textSecondary,
+                            height: 1.25,
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                ],
+              ),
+            ),
+          ),
+          const SizedBox(width: 8),
+          ElevatedButton(
+            key: const ValueKey('cancel_ride_search_button'),
+            onPressed: () {
+              HapticFeedback.mediumImpact();
+              onCancelRideSearch();
+            },
+            style: ElevatedButton.styleFrom(
+              backgroundColor: AppColors.error,
+              foregroundColor: AppColors.textLight,
+              elevation: 0,
+              padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 8),
+              minimumSize: const Size(0, 36),
+              shape: RoundedRectangleBorder(
+                borderRadius: BorderRadius.circular(10),
+              ),
+            ),
+            child: const Text(
+              'Cancelar',
+              style: TextStyle(fontSize: 12.5, fontWeight: FontWeight.w700),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  /// Motorista sem carro: a função fica bloqueada até ele cadastrar um carro.
+  Widget _buildVehicleBlockedRow() {
+    return Container(
+      key: const ValueKey('driver_blocked_no_vehicle'),
+      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+      decoration: BoxDecoration(
+        color: AppColors.errorBackground,
+        borderRadius: BorderRadius.circular(14),
+        border: Border.all(color: AppColors.errorBorder, width: 1.1),
+      ),
+      child: Row(
+        children: [
+          Container(
+            width: 36,
+            height: 36,
+            decoration: BoxDecoration(
+              color: AppColors.cardBackground,
+              borderRadius: BorderRadius.circular(10),
+              border: Border.all(color: AppColors.errorBorder),
+            ),
+            child: const Icon(
+              Icons.lock_rounded,
+              size: 19,
+              color: AppColors.errorText,
+            ),
+          ),
+          const SizedBox(width: 12),
+          const Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  'Bloqueado',
+                  style: TextStyle(
+                    fontSize: 13.5,
+                    fontWeight: FontWeight.w700,
+                    color: AppColors.errorText,
+                    letterSpacing: -0.2,
+                  ),
+                ),
+                SizedBox(height: 2),
+                Text(
+                  'Adicione um carro para ter acesso a essa função.',
+                  style: TextStyle(
+                    fontSize: 11,
+                    color: AppColors.textSecondary,
+                    height: 1.25,
+                  ),
+                ),
+              ],
+            ),
+          ),
+          const SizedBox(width: 8),
+          ElevatedButton(
+            key: const ValueKey('add_vehicle_from_dock_button'),
+            onPressed: () {
+              HapticFeedback.mediumImpact();
+              onAddVehicle();
+            },
+            style: ElevatedButton.styleFrom(
+              backgroundColor: AppColors.primary,
+              foregroundColor: AppColors.textLight,
+              elevation: 0,
+              padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+              minimumSize: const Size(0, 36),
+              shape: RoundedRectangleBorder(
+                borderRadius: BorderRadius.circular(10),
+              ),
+            ),
+            child: const Text(
+              'Adicionar carro',
+              style: TextStyle(fontSize: 12, fontWeight: FontWeight.w700),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  /// Linha do expediente ativo: tocar abre os pedidos de vaga; "Encerrar" termina o expediente.
+  Widget _buildOnShiftRow() {
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+      decoration: BoxDecoration(
+        color: AppColors.successBackground,
+        borderRadius: BorderRadius.circular(14),
+        border: Border.all(color: AppColors.successBorder, width: 1.1),
+      ),
+      child: Row(
+        children: [
+          Expanded(
+            child: GestureDetector(
+              behavior: HitTestBehavior.opaque,
+              onTap: () {
+                HapticFeedback.lightImpact();
+                onStartDriverShift();
+              },
+              child: Row(
+                children: [
+                  Container(
+                    width: 36,
+                    height: 36,
+                    decoration: BoxDecoration(
+                      color: AppColors.cardBackground,
+                      borderRadius: BorderRadius.circular(10),
+                      border: Border.all(color: AppColors.successBorder),
+                    ),
+                    child: const Icon(
+                      Icons.drive_eta_rounded,
+                      size: 19,
+                      color: AppColors.success,
+                    ),
+                  ),
+                  const SizedBox(width: 12),
+                  const Expanded(
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Row(
+                          children: [
+                            Icon(
+                              Icons.fiber_manual_record_rounded,
+                              size: 9,
+                              color: AppColors.success,
+                            ),
+                            SizedBox(width: 5),
+                            Text(
+                              'Em expediente',
+                              style: TextStyle(
+                                fontSize: 13.5,
+                                fontWeight: FontWeight.w700,
+                                color: AppColors.success,
+                                letterSpacing: -0.2,
+                              ),
+                            ),
+                          ],
+                        ),
+                        SizedBox(height: 2),
+                        Text(
+                          'Toque para ver os pedidos de vaga.',
+                          style: TextStyle(
+                            fontSize: 11,
+                            color: AppColors.textSecondary,
+                            height: 1.25,
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                ],
+              ),
+            ),
+          ),
+          const SizedBox(width: 8),
+          ElevatedButton(
+            key: const ValueKey('end_driver_shift_button'),
+            onPressed: () {
+              HapticFeedback.mediumImpact();
+              onEndDriverShift();
+            },
+            style: ElevatedButton.styleFrom(
+              backgroundColor: AppColors.error,
+              foregroundColor: AppColors.textLight,
+              elevation: 0,
+              padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 8),
+              minimumSize: const Size(0, 36),
+              shape: RoundedRectangleBorder(
+                borderRadius: BorderRadius.circular(10),
+              ),
+            ),
+            child: const Text(
+              'Encerrar',
+              style: TextStyle(fontSize: 12.5, fontWeight: FontWeight.w700),
+            ),
           ),
         ],
       ),
