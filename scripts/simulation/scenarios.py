@@ -5,9 +5,13 @@ uns dos outros e podem rodar sozinhos (--cenario).
 
 from __future__ import annotations
 
+from datetime import datetime, timezone
 from decimal import Decimal
 
 from simulation.simulation_world import SimulationWorld
+
+# Origem a uns 90 km do campus (São Paulo): fora do raio de candidatos do matching
+FAR_ORIGIN = ("Av. Paulista, 1000", "Bela Vista", -23.5614, -46.6559)
 
 
 def _ride_with_passengers(world: SimulationWorld, seats: int, *nicknames: str):
@@ -39,7 +43,7 @@ def happy_path(world: SimulationWorld) -> None:
     bruno_route = world.search_route(bruno)
 
     world.step("Ana procura carona e o matching encontra o motorista")
-    matches = world.expect_ok(world.api.get("/matching/passenger", ana.token, {"routeId": ana_route}),
+    matches = world.expect_ok(world.api.get("/matchings", ana.token, {"routeId": ana_route}),
                               "matching da Ana")
     world.check(any(match.get("driverRouteId") == driver_route for match in matches or []),
                 "o matching não trouxe o trajeto do motorista para a Ana")
@@ -210,7 +214,61 @@ def full_and_rejected(world: SimulationWorld) -> None:
     world.expect_error(world.request_seat(carla, driver_route, world.search_route(carla)), "Carla pedir vaga lotada")
 
 
+def matching_filters(world: SimulationWorld) -> None:
+    near = world.create_driver("Motorista perto")
+    near_route = world.offer_route(near, seats=3)
+    far = world.create_driver("Motorista longe")
+    far_route = world.offer_route(far, seats=3, origin=FAR_ORIGIN)
+    blocked = world.create_driver("Motorista bloqueado")
+    blocked_route = world.offer_route(blocked, seats=3)
+    no_pix = world.create_driver("Motorista sem PIX")
+    no_pix_route = world.offer_route(no_pix, seats=3)
+    ana = world.create_passenger("Ana")
+    ana_route = world.search_route(ana)
+
+    database = world.users_collection.database
+    world.step("Ana bloqueia um motorista e outro motorista fica sem chave PIX (direto no Mongo)")
+    database["blocks"].insert_one({"userId": ana.id, "blockedUserId": blocked.id,
+                                   "createdAt": datetime.now(timezone.utc)})
+    database["users"].update_one({"email": no_pix.email}, {"$unset": {"pixKey": "", "pixKeyType": ""}})
+
+    try:
+        world.step("Ana procura carona: só o motorista perto, sem bloqueio e com PIX aparece")
+        matches = world.expect_ok(world.api.get("/matchings", ana.token, {"routeId": ana_route}),
+                                  "matching da Ana") or []
+        found = {match.get("driverRouteId") for match in matches}
+        world.check(near_route in found, "o motorista perto não apareceu para a Ana")
+        world.check(far_route not in found, "o motorista a 90 km apareceu para a Ana")
+        world.check(blocked_route not in found, "o motorista bloqueado apareceu para a Ana")
+        world.check(no_pix_route not in found, "o motorista sem chave PIX apareceu para a Ana")
+        scores = [match.get("compatibilityScore") or 0 for match in matches]
+        world.check(scores == sorted(scores, reverse=True), "o matching não veio do mais para o menos compatível")
+        print(f"      {len(matches)} motorista(s) compatível(is) para a Ana")
+
+        world.step("O motorista perto vê a Ana entre os passageiros compatíveis (N passageiros x 1 motorista)")
+        passengers = world.expect_ok(world.api.get("/matchings", near.token, {"routeId": near_route}),
+                                     "matching do motorista perto") or []
+        world.check(any(match.get("passengerRouteId") == ana_route for match in passengers),
+                    "a Ana não apareceu para o motorista perto")
+
+        world.step("O bloqueio vale nos dois sentidos: o motorista bloqueado também não vê a Ana")
+        passengers = world.expect_ok(world.api.get("/matchings", blocked.token, {"routeId": blocked_route}),
+                                     "matching do motorista bloqueado") or []
+        world.check(all(match.get("passengerRouteId") != ana_route for match in passengers),
+                    "a Ana apareceu para o motorista que ela bloqueou")
+
+        world.step("O motorista longe não vê a Ana")
+        passengers = world.expect_ok(world.api.get("/matchings", far.token, {"routeId": far_route}),
+                                     "matching do motorista longe") or []
+        world.check(all(match.get("passengerRouteId") != ana_route for match in passengers),
+                    "a Ana apareceu para o motorista a 90 km")
+    finally:
+        database["blocks"].delete_many({"userId": ana.id})
+
+
 SCENARIOS = {
+    "matching-filtros": ("Matching: proximidade, bloqueio nos dois sentidos, PIX e ordem por compatibilidade",
+                         matching_filters),
     "caminho-feliz": ("Pedido, aceite, início, conclusão, PIX, avaliação e indicadores", happy_path),
     "ausencia-parcial": ("Um passageiro falta: os presentes concluem e o ausente não paga", partial_no_show),
     "todos-ausentes": ("Ninguém aparece: concluir vira CANCELLED", everyone_absent),
