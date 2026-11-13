@@ -8,8 +8,10 @@ import com.converge.api.modules.route.application.gateway.RouteGeometry;
 import com.converge.api.modules.route.application.mapper.RouteMapper;
 import com.converge.api.modules.route.domain.model.Route;
 import com.converge.api.modules.route.domain.repository.RouteRepository;
+import com.converge.api.modules.route.application.event.RouteChangedEvent;
 import com.converge.api.shared.application.UseCase;
 import lombok.RequiredArgsConstructor;
+import org.springframework.context.ApplicationEventPublisher;
 import org.springframework.stereotype.Service;
 
 @Service
@@ -20,6 +22,7 @@ public class UpdateRouteUseCase implements UseCase<UpdateRouteCommand, Route> {
     private final RouteRepository routeRepository;
     private final RouteMapper routeMapper;
     private final RouteGeometryService routeGeometryService;
+    private final ApplicationEventPublisher eventPublisher;
 
     @Override
     public Route execute(UpdateRouteCommand command) {
@@ -41,6 +44,8 @@ public class UpdateRouteUseCase implements UseCase<UpdateRouteCommand, Route> {
         RouteGeometry geometry = routeGeometryService.compute(route.getOrigin(), route.getDestination());
         route.defineGeometry(geometry.distanceKm(), geometry.encodedPolyline());
 
-        return routeRepository.save(route);
+        Route saved = routeRepository.save(route);
+        eventPublisher.publishEvent(new RouteChangedEvent(command.routeId()));
+        return saved;
     }
 }

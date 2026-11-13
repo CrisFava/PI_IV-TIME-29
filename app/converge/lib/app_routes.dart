@@ -15,6 +15,9 @@ abstract class AppRoutes {
   static String chatOf({required String rideId, required String passengerId}) =>
       '/chat/$rideId/$passengerId';
 
+  /// Painel do motorista com os pedidos de vaga.
+  static const String rideRequests = '/ride-requests';
+
   /// Rotas acessíveis sem sessão.
   static const Set<String> public = {welcome, login, register, forgotPassword};
 }

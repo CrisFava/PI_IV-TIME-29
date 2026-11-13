@@ -20,11 +20,13 @@ import org.mockito.junit.jupiter.MockitoExtension;
 import org.springframework.test.util.ReflectionTestUtils;
 
 import java.time.DayOfWeek;
+import java.util.List;
 import java.util.Optional;
 import java.util.Set;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.junit.jupiter.api.Assertions.assertThrows;
+import static org.mockito.Mockito.verifyNoInteractions;
 import static org.mockito.Mockito.when;
 
 @ExtendWith(MockitoExtension.class)
@@ -152,5 +154,23 @@ class RouteAccessTest {
         when(routeRepository.findById(new ObjectId(ROUTE_ID))).thenReturn(Optional.of(route));
 
         assertActiveRouteNotFound(ROUTE_ID);
+    }
+
+    @Test
+    @DisplayName("listActiveByType: deve buscar os trajetos ativos do tipo nos dias informados")
+    void shouldListActiveRoutesByTypeAndDays() {
+        List<Route> offers = List.of(routeOwnedBy("motorista-456"));
+        Set<DayOfWeek> days = Set.of(DayOfWeek.MONDAY, DayOfWeek.FRIDAY);
+        when(routeRepository.findByTypeAndStatusAndWeekDaysIn(RouteType.OFFER, RouteStatus.ACTIVE, days))
+                .thenReturn(offers);
+
+        assertThat(routeAccess.listActiveByType(RouteType.OFFER, days)).isEqualTo(offers);
+    }
+
+    @Test
+    @DisplayName("listActiveByType: sem dias não há candidatos e o banco nem é consultado")
+    void shouldReturnEmptyWithoutDays() {
+        assertThat(routeAccess.listActiveByType(RouteType.OFFER, Set.of())).isEmpty();
+        verifyNoInteractions(routeRepository);
     }
 }

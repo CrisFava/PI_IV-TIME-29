@@ -10,7 +10,10 @@ import '../widgets/become_driver_sheet.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:go_router/go_router.dart';
 import 'package:google_maps_flutter/google_maps_flutter.dart';
+
+import '../../../../app_routes.dart';
 
 import '../../../../core/network/api_error_code.dart';
 import '../../../../core/network/api_exception.dart';
@@ -24,7 +27,15 @@ import '../../../../core/config/styles.dart';
 import '../../../../core/services/maps/google_maps_service.dart';
 import '../../../../core/widgets/ride_dock_navigation.dart';
 import '../../../ride/data/models/driver_shift_payload.dart';
-import '../../../ride/data/models/mock_driver_model.dart';
+import '../../../../core/utils/currency_formatter.dart';
+import '../../../matching/data/models/match_model.dart';
+import '../../../matching/state/matching_viewer_provider.dart';
+import '../../../matching/state/passenger_match_controller.dart';
+import '../../../matching/state/passenger_match_phase.dart';
+import '../../../matching/state/passenger_match_state.dart';
+import '../../../vehicle/data/repository/vehicle_repository_impl.dart';
+import '../widgets/campus_spots.dart';
+import '../widgets/passenger_ride_step.dart';
 import '../../../auth/state/auth_action_controller.dart';
 import '../../../auth/state/auth_controller.dart';
 import '../../../auth/state/session/auth_session.dart';
@@ -46,14 +57,10 @@ class _HomePageState extends ConsumerState<HomePage> {
 
   // Estado do fluxo Uber-like do passageiro (etapas graduais)
   PassengerRideStep _passengerStep = PassengerRideStep.idle;
-  LatLng _pickupLocation = mockCampusCoordinates;
+  LatLng _pickupLocation = campusCoordinates;
   String _pickupAddress = 'PUC-Campinas - Portaria Principal';
   LatLng? _destinationLocation;
   String _destinationAddress = '';
-
-  // Lista dinâmica de motoristas e seleção
-  List<MockNearbyDriver> _availableDrivers = List.from(mockNearbyDriversList);
-  MockNearbyDriver? _selectedDriver;
 
   // Rotas de carro pelas ruas reais
   List<LatLng>? _tripRoutePoints;
@@ -158,67 +165,126 @@ class _HomePageState extends ConsumerState<HomePage> {
     }
   }
 
-  void _handleConfirmRideOrder() {
-    setState(() {
-      _passengerStep = PassengerRideStep.driverList;
-    });
-    _showFeedback('Selecione um motorista para solicitar a carona.');
+  /// Salva (ou reaproveita) o trajeto de procura e busca os motoristas compatíveis.
+  Future<void> _handleConfirmRideOrder() async {
+    if (_destinationLocation == null) {
+      _showFeedback('Escolha o ponto de desembarque antes de buscar motoristas.');
+      return;
+    }
+
+    HapticFeedback.mediumImpact();
+    setState(() => _passengerStep = PassengerRideStep.driverList);
+
+    final controller = ref.read(passengerMatchProvider.notifier);
+    // Limpa a busca anterior: a lista mostra o carregamento até os novos motoristas chegarem
+    controller.reset();
+    final routeId = await controller.prepareSearchRoute(
+      _buildRouteRequest(isDriver: false),
+    );
+    if (!mounted) return;
+
+    if (routeId == null) {
+      setState(() => _passengerStep = PassengerRideStep.routeConfirmation);
+      return;
+    }
+
+    ref.read(savedRoutesProvider.notifier).loadMyRoutes();
+    await controller.findDrivers(routeId);
   }
 
-  void _handleSelectDriver(MockNearbyDriver driver) {
-    setState(() {
-      _selectedDriver = driver;
-      _passengerStep = PassengerRideStep.waitingDriver;
-    });
-  }
+  /// Pede a vaga ao motorista escolhido e espera a resposta dele.
+  Future<void> _handleSelectDriver(MatchModel driver) async {
+    if (ref.read(passengerMatchProvider).isBusy) return;
 
-  Future<void> _handleSimulateDriverResponse(bool accepted) async {
-    final driver = _selectedDriver;
-    if (driver == null) return;
+    setState(() => _passengerStep = PassengerRideStep.waitingDriver);
+    final requested = await ref
+        .read(passengerMatchProvider.notifier)
+        .requestSeat(driver);
 
-    if (accepted) {
-      // Motorista aceitou!
-      _showFeedback(
-        'O motorista ${driver.name} aceitou a corrida! Ele está a caminho.',
-      );
-      List<LatLng>? approachRoute;
-      try {
-        approachRoute = await GoogleMapsService.computeRoutes(
-          origin: driver.position,
-          destination: _pickupLocation,
-        );
-      } catch (e) {
-        debugPrint('Erro ao obter trajeto de aproximação do motorista: $e');
-      }
-
-      if (mounted) {
-        setState(() {
-          _driverApproachRoutePoints = approachRoute;
-          _passengerStep = PassengerRideStep.driverAccepted;
-        });
-      }
-    } else {
-      // Motorista recusou! Volta pra lista SEM esse motorista
-      HapticFeedback.mediumImpact();
-      setState(() {
-        _availableDrivers.removeWhere((d) => d.id == driver.id);
-        _selectedDriver = null;
-        _passengerStep = PassengerRideStep.driverList;
-      });
-      _showFeedback(
-        'O motorista ${driver.name} não pôde aceitar. Selecione outro motorista.',
-      );
+    if (!requested && mounted) {
+      setState(() => _passengerStep = PassengerRideStep.driverList);
     }
   }
 
-  void _handleSendMessageToDriver() {
+  void _handleRetryMatches() {
+    final routeId = ref.read(passengerMatchProvider).searchRouteId;
+    if (routeId == null) return;
+
     HapticFeedback.lightImpact();
-    final driver = _selectedDriver;
-    _showFeedback('Iniciando conversa com ${driver?.name ?? "o motorista"}...');
-    _onTabSelected(2); // Redireciona para a aba de Chat
+    ref.read(passengerMatchProvider.notifier).findDrivers(routeId);
   }
 
-  void _handleCancelFlow() {
+  Future<void> _handleCancelRequest() async {
+    await ref.read(passengerMatchProvider.notifier).cancelRequest();
+    if (mounted) {
+      setState(() => _passengerStep = PassengerRideStep.driverList);
+      _showFeedback('Pedido de vaga cancelado.');
+    }
+  }
+
+  /// Reage às mudanças do pedido de vaga: aceite, recusa e avisos.
+  void _onPassengerMatchChanged(
+    PassengerMatchState? previous,
+    PassengerMatchState next,
+  ) {
+    final notice = next.notice;
+    if (notice != null && notice != previous?.notice) {
+      _showFeedback(notice);
+      Future.microtask(
+        () => ref.read(passengerMatchProvider.notifier).clearNotice(),
+      );
+    }
+
+    if (previous?.phase == next.phase) return;
+
+    if (next.phase == PassengerMatchPhase.accepted) {
+      _handleDriverAccepted(next.selected);
+    } else if (next.phase == PassengerMatchPhase.ready &&
+        _passengerStep == PassengerRideStep.waitingDriver) {
+      setState(() => _passengerStep = PassengerRideStep.driverList);
+    }
+  }
+
+  Future<void> _handleDriverAccepted(MatchModel? driver) async {
+    HapticFeedback.mediumImpact();
+    setState(() => _passengerStep = PassengerRideStep.driverAccepted);
+    _showFeedback(
+      '${driver?.otherUserName ?? 'O motorista'} aceitou! O chat está liberado.',
+    );
+
+    if (driver == null) return;
+    try {
+      final approachRoute = await GoogleMapsService.computeRoutes(
+        origin: LatLng(driver.origin.latitude, driver.origin.longitude),
+        destination: _pickupLocation,
+      );
+      if (mounted) setState(() => _driverApproachRoutePoints = approachRoute);
+    } catch (e) {
+      debugPrint('Erro ao obter o trajeto de aproximação do motorista: $e');
+    }
+  }
+
+  /// Abre o chat da carona aceita (Parte B).
+  void _handleSendMessageToDriver() {
+    HapticFeedback.lightImpact();
+    final rideId = ref.read(passengerMatchProvider).rideId;
+    final viewerId = ref.read(matchingViewerIdProvider);
+
+    if (rideId == null || viewerId == null) {
+      _showFeedback('Não foi possível abrir a conversa agora.');
+      return;
+    }
+
+    context.push(AppRoutes.chatOf(rideId: rideId, passengerId: viewerId));
+  }
+
+  Future<void> _handleCancelFlow() async {
+    final matchController = ref.read(passengerMatchProvider.notifier);
+    if (_passengerStep == PassengerRideStep.waitingDriver) {
+      await matchController.cancelRequest();
+      if (!mounted) return;
+    }
+
     setState(() {
       if (_passengerStep == PassengerRideStep.selectPickup) {
         _passengerStep = PassengerRideStep.chooseRouteOption;
@@ -226,12 +292,12 @@ class _HomePageState extends ConsumerState<HomePage> {
         _passengerStep = PassengerRideStep.idle;
         _destinationLocation = null;
         _destinationAddress = '';
-        _selectedDriver = null;
         _tripRoutePoints = null;
         _driverApproachRoutePoints = null;
-        _availableDrivers = List.from(mockNearbyDriversList);
       }
     });
+
+    if (_passengerStep == PassengerRideStep.idle) matchController.reset();
   }
 
   Future<void> _handleSelectSavedRoute(RouteResponseModel route) async {
@@ -254,7 +320,16 @@ class _HomePageState extends ConsumerState<HomePage> {
       _passengerStep = PassengerRideStep.driverList;
     });
 
-    _showFeedback('Trajeto selecionado! Buscando motoristas disponíveis...');
+    if (route.type == AppRouteType.search) {
+      _showFeedback('Trajeto selecionado! Buscando motoristas compatíveis...');
+      ref.read(passengerMatchProvider.notifier).findDrivers(route.id);
+    } else {
+      // Trajeto de oferta: quem pede carona é o passageiro. O motorista vê os pedidos no painel.
+      setState(() => _passengerStep = PassengerRideStep.idle);
+      _showFeedback('Esse é um trajeto de oferta. Abrindo os seus pedidos de vaga.');
+      context.push(AppRoutes.rideRequests);
+      return;
+    }
 
     if ((_tripRoutePoints == null || _tripRoutePoints!.isEmpty) &&
         _destinationLocation != null) {
@@ -361,35 +436,22 @@ class _HomePageState extends ConsumerState<HomePage> {
     } catch (_) {}
   }
 
+  /// O motorista não precisa de "expediente": com um trajeto de oferta ativo ele já aparece
+  /// no matching. Aqui ele vai para o painel com os pedidos de vaga.
   Future<void> _handleStartDriverShift(DriverShiftPayload payload) async {
-    _showFeedback(
-      'Expediente de motorista iniciado com sucesso! Buscando passageiros no raio de ${payload.searchRadiusKm.toStringAsFixed(1)} km até às ${payload.endSearchTime.format(context)}.',
-    );
-
-    // ========================================================================
-    // TODO: Enviar informações coletadas do motorista para o backend (API Converge):
-    // Endpoint previsto: POST /api/v1/rides/work
-    // Payload preparado: payload.toJson()
-    // Exemplo:
-    // await ref.read(caronaRepositoryProvider).iniciarExpediente(payload.toJson());
-    // ========================================================================
-    debugPrint(
-      'Dados do expediente de motorista prontos para o backend: ${payload.toJson()}',
-    );
+    HapticFeedback.mediumImpact();
+    context.push(AppRoutes.rideRequests);
   }
 
-  Future<void> _handleSaveRoute() async {
-    HapticFeedback.lightImpact();
-    if (_destinationLocation == null) {
-      _showFeedback(
-        'Selecione uma origem e destino antes de salvar o trajeto.',
-      );
-      return;
-    }
-
-    final isDriver = _currentMode == AppRideMode.driver;
-    final request = CreateRouteRequest(
+  /// Dados do trajeto marcado no mapa. Os horários e os dias ainda são fixos neste fluxo.
+  CreateRouteRequest _buildRouteRequest({
+    required bool isDriver,
+    String? vehicleId,
+    int? totalSeats,
+  }) {
+    return CreateRouteRequest(
       type: isDriver ? AppRouteType.offer : AppRouteType.search,
+      vehicleId: vehicleId,
       origin: RoutePlaceModel(
         address: _pickupAddress,
         neighborhood: 'Campus / Origem',
@@ -410,7 +472,46 @@ class _HomePageState extends ConsumerState<HomePage> {
       estimatedArrivalTime: '08:45',
       weekDays: const {'MONDAY', 'TUESDAY', 'WEDNESDAY', 'THURSDAY', 'FRIDAY'},
       maxDetourKm: 3.0,
-      totalSeats: isDriver ? 3 : 1,
+      totalSeats: isDriver ? (totalSeats ?? 3) : 1,
+    );
+  }
+
+  /// Veículo ativo do motorista, exigido em todo trajeto de oferta.
+  Future<({String id, int seats})?> _findDriverVehicle() async {
+    try {
+      final vehicles = await ref.read(vehicleRepositoryProvider).listMyVehicles();
+      for (final vehicle in vehicles) {
+        if (vehicle.active) return (id: vehicle.id, seats: vehicle.passengerSeats);
+      }
+    } catch (e) {
+      debugPrint('Erro ao buscar os veículos do motorista: $e');
+    }
+    return null;
+  }
+
+  Future<void> _handleSaveRoute() async {
+    HapticFeedback.lightImpact();
+    if (_destinationLocation == null) {
+      _showFeedback(
+        'Selecione uma origem e destino antes de salvar o trajeto.',
+      );
+      return;
+    }
+
+    final isDriver = _currentMode == AppRideMode.driver;
+    final vehicle = isDriver ? await _findDriverVehicle() : null;
+    if (!mounted) return;
+    if (isDriver && vehicle == null) {
+      _showFeedback(
+        'Cadastre um veículo antes de salvar um trajeto de oferta.',
+      );
+      return;
+    }
+
+    final request = _buildRouteRequest(
+      isDriver: isDriver,
+      vehicleId: vehicle?.id,
+      totalSeats: vehicle?.seats,
     );
 
     final authService = ref.read(authServiceProvider);
@@ -560,6 +661,8 @@ class _HomePageState extends ConsumerState<HomePage> {
     // Verificação estrita de permissão de motorista através de participationRoles
     final canDrive = user?.isDriver ?? false;
 
+    ref.listen(passengerMatchProvider, _onPassengerMatchChanged);
+
     return Scaffold(
       backgroundColor: AppColors.scaffoldBackground,
       body: user == null
@@ -639,9 +742,9 @@ class _HomePageState extends ConsumerState<HomePage> {
             showDrivers:
                 _currentMode.isPassenger &&
                 _passengerStep == PassengerRideStep.driverList,
-            availableDrivers: _availableDrivers,
+            availableDrivers: ref.watch(passengerMatchProvider).matches,
             acceptedDriver: _passengerStep == PassengerRideStep.driverAccepted
-                ? _selectedDriver
+                ? ref.watch(passengerMatchProvider).selected
                 : null,
             pickupLocation: _pickupLocation,
             destinationLocation: _destinationLocation,
@@ -701,8 +804,6 @@ class _HomePageState extends ConsumerState<HomePage> {
               destinationAddress: _destinationAddress,
               pickupLocation: _pickupLocation,
               destinationLocation: _destinationLocation,
-              availableDrivers: _availableDrivers,
-              selectedDriver: _selectedDriver,
               bottomSafeArea: bottomPadding,
               onStartRideFlow: () {
                 setState(
@@ -722,7 +823,8 @@ class _HomePageState extends ConsumerState<HomePage> {
               onConfirmDestination: _handleConfirmDestination,
               onConfirmRideOrder: _handleConfirmRideOrder,
               onSelectDriver: _handleSelectDriver,
-              onSimulateDriverResponse: _handleSimulateDriverResponse,
+              onRetryMatches: _handleRetryMatches,
+              onCancelRequest: _handleCancelRequest,
               onSendMessageToDriver: _handleSendMessageToDriver,
               onCancelFlow: _handleCancelFlow,
               onSaveRoute: _handleSaveRoute,
@@ -821,8 +923,14 @@ class _HomePageState extends ConsumerState<HomePage> {
           ),
         ),
         const SizedBox(height: 24),
+        if (ref.watch(authControllerProvider).value case Authenticated(
+          :final user,
+        ) when user.isDriver) ...[
+          _buildRideRequestsShortcut(),
+          const SizedBox(height: 24),
+        ],
         const Text(
-          'Motoristas Ativos no Campus',
+          'Motoristas compatíveis com o seu trajeto',
           style: TextStyle(
             fontSize: 15,
             fontWeight: FontWeight.w800,
@@ -831,61 +939,118 @@ class _HomePageState extends ConsumerState<HomePage> {
           ),
         ),
         const SizedBox(height: 12),
-        ...mockNearbyDriversList.map((driver) {
-          return Container(
-            margin: const EdgeInsets.only(bottom: 10),
-            padding: const EdgeInsets.all(16),
-            decoration: BoxDecoration(
-              color: AppColors.cardBackground,
-              borderRadius: BorderRadius.circular(18),
-              border: Border.all(color: AppColors.borderSubtle),
-            ),
-            child: Row(
-              children: [
-                const CircleAvatar(
-                  backgroundColor: AppColors.neutralLight,
-                  child: Icon(
-                    Icons.person_rounded,
-                    color: AppColors.textPrimary,
+        ..._buildCompatibleDriversSummary(),
+      ],
+    );
+  }
+
+  Widget _buildRideRequestsShortcut() {
+    return Material(
+      color: AppColors.primary,
+      borderRadius: BorderRadius.circular(18),
+      child: InkWell(
+        borderRadius: BorderRadius.circular(18),
+        onTap: () {
+          HapticFeedback.lightImpact();
+          context.push(AppRoutes.rideRequests);
+        },
+        child: const Padding(
+          padding: EdgeInsets.all(16),
+          child: Row(
+            children: [
+              Icon(Icons.inbox_rounded, color: AppColors.textLight),
+              SizedBox(width: 12),
+              Expanded(
+                child: Text(
+                  'Pedidos de vaga nas suas caronas',
+                  style: TextStyle(
+                    fontSize: 14,
+                    fontWeight: FontWeight.w700,
+                    color: AppColors.textLight,
                   ),
                 ),
-                const SizedBox(width: 12),
-                Expanded(
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      Text(
-                        driver.name,
-                        style: const TextStyle(
-                          fontWeight: FontWeight.w700,
-                          fontSize: 14,
-                          color: AppColors.textPrimary,
-                        ),
+              ),
+              Icon(Icons.chevron_right_rounded, color: AppColors.textLight),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+
+  /// Resumo do último matching do passageiro (a lista completa fica no mapa).
+  List<Widget> _buildCompatibleDriversSummary() {
+    final matches = ref.watch(passengerMatchProvider).matches;
+
+    if (matches.isEmpty) {
+      return [
+        Container(
+          padding: const EdgeInsets.all(16),
+          decoration: BoxDecoration(
+            color: AppColors.cardBackground,
+            borderRadius: BorderRadius.circular(18),
+            border: Border.all(color: AppColors.borderSubtle),
+          ),
+          child: const Text(
+            'Toque em "Pedir carona" e escolha um trajeto para ver os motoristas compatíveis.',
+            style: TextStyle(fontSize: 13, color: AppColors.textSecondary),
+          ),
+        ),
+      ];
+    }
+
+    return [
+      for (final driver in matches)
+        Container(
+          margin: const EdgeInsets.only(bottom: 10),
+          padding: const EdgeInsets.all(16),
+          decoration: BoxDecoration(
+            color: AppColors.cardBackground,
+            borderRadius: BorderRadius.circular(18),
+            border: Border.all(color: AppColors.borderSubtle),
+          ),
+          child: Row(
+            children: [
+              const CircleAvatar(
+                backgroundColor: AppColors.neutralLight,
+                child: Icon(Icons.person_rounded, color: AppColors.textPrimary),
+              ),
+              const SizedBox(width: 12),
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      '${driver.otherUserName} • ${driver.compatibilityLabel}',
+                      style: const TextStyle(
+                        fontWeight: FontWeight.w700,
+                        fontSize: 14,
+                        color: AppColors.textPrimary,
                       ),
-                      Text(
-                        '${driver.vehicleModel} • ${driver.currentRoute}',
-                        style: const TextStyle(
-                          fontSize: 12,
-                          color: AppColors.textSecondary,
-                        ),
+                    ),
+                    Text(
+                      '${driver.vehicle?.model ?? 'Veículo'} • sai às ${driver.departureTime}',
+                      style: const TextStyle(
+                        fontSize: 12,
+                        color: AppColors.textSecondary,
                       ),
-                    ],
-                  ),
+                    ),
+                  ],
                 ),
+              ),
+              if (driver.estimatedCostPerPassenger != null)
                 Text(
-                  'R\$ ${driver.contributionAmount.toStringAsFixed(2)}',
+                  CurrencyFormatter.format(driver.estimatedCostPerPassenger!),
                   style: const TextStyle(
                     fontWeight: FontWeight.w700,
                     fontSize: 14,
                     color: AppColors.textPrimary,
                   ),
                 ),
-              ],
-            ),
-          );
-        }),
-      ],
-    );
+            ],
+          ),
+        ),
+    ];
   }
 
   // --- ABA 2: CHAT ---

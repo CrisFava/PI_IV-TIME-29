@@ -676,6 +676,60 @@ O backend monta o payload sob demanda (padrão BR Code do Banco Central, CRC16 i
 | `valid` + `compatibilityScore` | Composto | Listar combinações válidas ordenadas por score |
 | `expiresAt` | Simples (TTL) | Limpeza automática de resultados obsoletos |
 
+### Como o cálculo funciona
+
+O cálculo fica no `MatchRoutesHandler` (`app/server`, pacote `handler/matching`). O backend chama esse handler pelo `SocketMatchingGateway`, e quando o servidor de sockets está fora do ar ele roda o mesmo handler localmente. O cálculo compara um trajeto com N candidatos do tipo oposto, nos dois sentidos:
+
+- `GET /api/v1/matching/passenger?routeId=` compara uma procura do passageiro com as ofertas.
+- `GET /api/v1/matching/driver?routeId=` compara uma oferta do motorista com as procuras, o "N passageiros × 1 motorista".
+
+**Candidatos:** são trajetos `ACTIVE` do tipo oposto que tenham pelo menos um dia da semana em comum. Ficam de fora:
+- o próprio usuário;
+- motoristas que não podem oferecer carona (conta inativa, vínculo não verificado, bloqueado por dívida ou CNH inválida);
+- passageiros que não podem pedir vaga;
+- pares já recusados numa viagem em aberto.
+
+**Filtros eliminatórios** (RF14, RF15). O par é descartado quando:
+
+| Filtro | Regra |
+|---|---|
+| Dias | Nenhum dia da semana em comum |
+| Vagas | `availableSeats` do motorista menor que 1 |
+| Horário | Saídas com mais de **30 min** de diferença (considera a virada da meia-noite) |
+| Desvio | Desvio maior que o `maxDetourKm` do motorista |
+
+**Desvio** (RF31): é calculado em linha reta (Haversine), com `m` = motorista e `p` = passageiro:
+
+`d(origem m → origem p) + d(origem p → destino p) + d(destino p → destino m) − d(origem m → destino m)`
+
+O resultado vai para `calculatedDetourKm` e é o candidato natural ao `participants[].detourGeneratedKm` no aceite.
+
+**Índice de compatibilidade** (RF16): fica entre 0 e 1 e é a combinação ponderada abaixo. Os pesos somam 1.
+
+| Componente | Peso | Fórmula |
+|---|---|---|
+| Desvio | 0,4 | `1 − desvio / maxDetourKm` |
+| Horário | 0,3 | `1 − diferença de saída / 30 min` |
+| Dias | 0,2 | dias em comum ÷ dias do passageiro |
+| Destino | 0,1 | `1 − min(d(destino p, destino m) / maxDetourKm, 1)` |
+
+**Ordenação** (RF17): do maior para o menor índice. No empate, o critério passa a ser:
+1. o menor desvio;
+2. a menor diferença de horário;
+3. o id do trajeto.
+
+Assim o resultado não depende da ordem em que os candidatos chegaram.
+
+**`estimatedCostPerPassenger`**: é `((routeDistanceKm + desvio) × preço da energia ÷ consumo + pedágio + estacionamento) ÷ (passageiros já confirmados + motorista + este passageiro)`, com 2 casas e arredondamento `HALF_EVEN`. A energia é a primeira `fuelSource` do veículo. O campo fica `null` se o veículo não tiver consumo e preço. É só uma estimativa: o valor final segue as regras de `rides`.
+
+**`maxAmount`** (só na resposta da API, não é gravado em `matchings`): é uma **prévia** do teto do passageiro (RF35), calculada como a metade do mesmo custo da rota com o desvio: `((routeDistanceKm + desvio) × preço da energia ÷ consumo + pedágio + estacionamento) ÷ 2`. Representa o pior caso, em que só o motorista e esse passageiro dividem a viagem, e serve para o app avisar, antes do pedido, até quanto a estimativa pode subir se alguém desistir.
+
+> **Não é o teto gravado.** O pedido de vaga (`POST /rides/request`) não envia esse valor. O `maxAmount` que vale para o passageiro é calculado de novo no **aceite**, pelo `RideCostHandler` do servidor de sockets (acionado pelo `RideCostCalculator`), e gravado no participante da viagem (seção de custos de `rides`). Como o aceite usa os dados do momento (distância da rota e desvio calculados ali), o teto gravado pode ser diferente da prévia mostrada no matching.
+
+**Persistência:** cada busca recalcula o resultado e substitui o que havia para o trajeto pesquisado. O documento expira em 24 h (`expiresAt`). Quando um trajeto é editado ou excluído, o módulo `route` publica `RouteChangedEvent`, e todos os resultados que usam esse trajeto passam a `valid = false`.
+
+**Próxima data:** a resposta da API traz `nextRideDate`, que é o primeiro dia em comum a partir de hoje, em America/Sao_Paulo. Se o motorista já saiu hoje, o dia de hoje é pulado. É essa data que o app manda em `POST /rides/request`.
+
 ---
 
 ## 10. Coleção `indicators`

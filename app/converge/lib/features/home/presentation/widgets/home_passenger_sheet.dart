@@ -8,10 +8,18 @@ import '../../../route/state/places_autocomplete_controller.dart';
 import 'package:google_maps_flutter/google_maps_flutter.dart';
 
 import '../../../../core/config/styles.dart';
-import '../../../ride/data/models/mock_driver_model.dart';
+import '../../../../core/utils/currency_formatter.dart';
+import '../../../matching/data/models/match_model.dart';
+import '../../../matching/presentation/widgets/match_driver_card.dart';
+import '../../../matching/presentation/widgets/match_waiting_card.dart';
+import '../../../matching/state/passenger_match_controller.dart';
+import '../../../matching/state/passenger_match_phase.dart';
+import '../../../matching/state/passenger_match_state.dart';
 import '../../../route/data/models/route_response_model.dart';
 import '../../../route/state/saved_routes_controller.dart';
+import 'campus_spots.dart';
 import 'home_driver_form_sheet.dart';
+import 'passenger_ride_step.dart';
 
 /// ============================================================================
 /// COMPONENTE: HomePassengerSheet (Fluxo de Solicitação do Passageiro)
@@ -20,9 +28,9 @@ import 'home_driver_form_sheet.dart';
 /// 1. Primeiro: Seleção do Ponto de Embarque (Origem)
 /// 2. Segundo: Seleção do Ponto de Desembarque (Destino)
 /// 3. Terceiro: Confirmação de Rota (com resumo Origem e Destino)
-/// 4. Quarto: Lista de Motoristas Disponíveis
-/// 5. Quinto: Aguardando Aceite (Simulação)
-/// 6. Sexto: Corrida Aceita (Trajeto de aproximação e Chat)
+/// 4. Quarto: Lista de Motoristas Compatíveis (matching real)
+/// 5. Quinto: Aguardando o motorista aceitar ou recusar o pedido de vaga
+/// 6. Sexto: Carona Aceita (atalho para o Chat)
 /// ============================================================================
 class HomePassengerSheet extends ConsumerStatefulWidget {
   final PassengerRideStep step;
@@ -30,8 +38,6 @@ class HomePassengerSheet extends ConsumerStatefulWidget {
   final String destinationAddress;
   final LatLng pickupLocation;
   final LatLng? destinationLocation;
-  final List<MockNearbyDriver> availableDrivers;
-  final MockNearbyDriver? selectedDriver;
 
   final VoidCallback onStartRideFlow;
   final VoidCallback onStartDragMapPickup;
@@ -41,8 +47,9 @@ class HomePassengerSheet extends ConsumerStatefulWidget {
   final VoidCallback onConfirmPickup;
   final VoidCallback onConfirmDestination;
   final VoidCallback onConfirmRideOrder;
-  final ValueChanged<MockNearbyDriver> onSelectDriver;
-  final ValueChanged<bool> onSimulateDriverResponse;
+  final ValueChanged<MatchModel> onSelectDriver;
+  final VoidCallback onRetryMatches;
+  final VoidCallback onCancelRequest;
   final VoidCallback onSendMessageToDriver;
   final VoidCallback onCancelFlow;
   final VoidCallback onSaveRoute;
@@ -57,8 +64,6 @@ class HomePassengerSheet extends ConsumerStatefulWidget {
     required this.destinationAddress,
     required this.pickupLocation,
     this.destinationLocation,
-    this.availableDrivers = const [],
-    this.selectedDriver,
     required this.onStartRideFlow,
     required this.onStartDragMapPickup,
     required this.onStartDragMapDestination,
@@ -68,7 +73,8 @@ class HomePassengerSheet extends ConsumerStatefulWidget {
     required this.onConfirmDestination,
     required this.onConfirmRideOrder,
     required this.onSelectDriver,
-    required this.onSimulateDriverResponse,
+    required this.onRetryMatches,
+    required this.onCancelRequest,
     required this.onSendMessageToDriver,
     required this.onCancelFlow,
     required this.onSaveRoute,
@@ -163,7 +169,7 @@ class _HomePassengerSheetState extends ConsumerState<HomePassengerSheet> {
         return _buildWaitingDriverSheet();
       case PassengerRideStep.driverAccepted:
         return _DriverAcceptedPipSheet(
-          driver: widget.selectedDriver,
+          driver: ref.watch(passengerMatchProvider).selected,
           onSendMessage: widget.onSendMessageToDriver,
           onCancel: widget.onCancelFlow,
           bottomSafeArea: widget.bottomSafeArea,
@@ -1290,7 +1296,7 @@ class _HomePassengerSheetState extends ConsumerState<HomePassengerSheet> {
                     const SizedBox(height: 8),
 
                     // Lista de Pontos de Embarque no Campus
-                    ...mockPickupSuggestionsList.map((spot) {
+                    ...campusPickupSuggestions.map((spot) {
                       final isSelected = widget.pickupAddress == spot.title;
                       return Padding(
                         padding: const EdgeInsets.only(bottom: 8),
@@ -1490,7 +1496,7 @@ class _HomePassengerSheetState extends ConsumerState<HomePassengerSheet> {
   Widget _buildSearchDestinationSheet() {
     final query = _searchController.text.trim().toLowerCase();
     final autocompleteState = ref.watch(placesAutocompleteProvider);
-    final filteredDestinations = mockDestinationsList.where((dest) {
+    final filteredDestinations = campusDestinationSuggestions.where((dest) {
       if (query.isEmpty) return true;
       return dest.title.toLowerCase().contains(query) ||
           dest.subtitle.toLowerCase().contains(query);
@@ -2135,27 +2141,20 @@ class _HomePassengerSheetState extends ConsumerState<HomePassengerSheet> {
   // PASSO 6: LISTA DE MOTORISTAS DISPONÍVEIS
   // ==========================================================================
   Widget _buildDriverListSheet() {
-    final drivers = widget.availableDrivers;
+    final matchState = ref.watch(passengerMatchProvider);
 
     return DraggableScrollableSheet(
-      initialChildSize: 0.44,
+      initialChildSize: 0.5,
       minChildSize: 0.28,
-      maxChildSize: 0.78,
+      maxChildSize: 0.85,
       snap: true,
-      snapSizes: const [0.28, 0.44, 0.78],
+      snapSizes: const [0.28, 0.5, 0.85],
       builder: (context, scrollController) {
         return Container(
           decoration: BoxDecoration(
             color: AppColors.cardBackground,
             borderRadius: const BorderRadius.vertical(top: Radius.circular(26)),
             border: Border.all(color: AppColors.borderSubtle, width: 1),
-            boxShadow: [
-              BoxShadow(
-                color: Colors.black.withValues(alpha: 0.14),
-                blurRadius: 24,
-                offset: const Offset(0, -6),
-              ),
-            ],
           ),
           child: CustomScrollView(
             controller: scrollController,
@@ -2173,7 +2172,6 @@ class _HomePassengerSheetState extends ConsumerState<HomePassengerSheet> {
                   ),
                 ),
               ),
-
               SliverPadding(
                 padding: EdgeInsets.fromLTRB(16, 4, 16, 120 + widget.bottomSafeArea),
                 sliver: SliverList(
@@ -2181,169 +2179,46 @@ class _HomePassengerSheetState extends ConsumerState<HomePassengerSheet> {
                     Row(
                       mainAxisAlignment: MainAxisAlignment.spaceBetween,
                       children: [
-                        const Column(
-                          crossAxisAlignment: CrossAxisAlignment.start,
-                          children: [
-                            Text(
-                              'Motoristas Disponíveis',
-                              style: TextStyle(
-                                fontSize: 17,
-                                fontWeight: FontWeight.w800,
-                                color: AppColors.textPrimary,
+                        const Expanded(
+                          child: Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              Text(
+                                'Motoristas Compatíveis',
+                                style: TextStyle(
+                                  fontSize: 17,
+                                  fontWeight: FontWeight.w800,
+                                  color: AppColors.textPrimary,
+                                ),
                               ),
-                            ),
-                            SizedBox(height: 2),
-                            Text(
-                              'Toque no motorista para solicitar a carona',
-                              style: TextStyle(
-                                fontSize: 12,
-                                color: AppColors.textSecondary,
+                              SizedBox(height: 2),
+                              Text(
+                                'Ordenados pela compatibilidade com o seu trajeto',
+                                style: TextStyle(
+                                  fontSize: 12,
+                                  color: AppColors.textSecondary,
+                                ),
                               ),
-                            ),
-                          ],
+                            ],
+                          ),
+                        ),
+                        IconButton(
+                          icon: const Icon(Icons.refresh_rounded),
+                          onPressed: matchState.phase == PassengerMatchPhase.loading ||
+                                  matchState.isBusy
+                              ? null
+                              : widget.onRetryMatches,
+                          tooltip: 'Buscar de novo',
                         ),
                         IconButton(
                           icon: const Icon(Icons.close_rounded),
                           onPressed: widget.onCancelFlow,
-                          tooltip: 'Cancelar pedido',
+                          tooltip: 'Fechar',
                         ),
                       ],
                     ),
                     const SizedBox(height: 14),
-
-                    if (drivers.isEmpty)
-                      Container(
-                        padding: const EdgeInsets.all(24),
-                        alignment: Alignment.center,
-                        child: const Text(
-                          'Nenhum outro motorista disponível no momento.',
-                          style: TextStyle(
-                            fontSize: 14,
-                            color: AppColors.textSecondary,
-                            fontWeight: FontWeight.w600,
-                          ),
-                        ),
-                      )
-                    else
-                      ...drivers.map((driver) {
-                        return Padding(
-                          padding: const EdgeInsets.only(bottom: 10),
-                          child: Material(
-                            color: AppColors.cardBackground,
-                            borderRadius: BorderRadius.circular(18),
-                            child: InkWell(
-                              borderRadius: BorderRadius.circular(18),
-                              onTap: () {
-                                HapticFeedback.mediumImpact();
-                                widget.onSelectDriver(driver);
-                              },
-                              child: Container(
-                                padding: const EdgeInsets.all(14),
-                                decoration: BoxDecoration(
-                                  borderRadius: BorderRadius.circular(18),
-                                  border: Border.all(color: AppColors.borderSubtle),
-                                ),
-                                child: Row(
-                                  children: [
-                                    const CircleAvatar(
-                                      radius: 24,
-                                      backgroundColor: AppColors.neutralLight,
-                                      child: Icon(
-                                        Icons.person_rounded,
-                                        color: AppColors.primary,
-                                        size: 26,
-                                      ),
-                                    ),
-                                    const SizedBox(width: 12),
-                                    Expanded(
-                                      child: Column(
-                                        crossAxisAlignment: CrossAxisAlignment.start,
-                                        children: [
-                                          Text(
-                                            driver.name,
-                                            style: const TextStyle(
-                                              fontSize: 15,
-                                              fontWeight: FontWeight.w700,
-                                              color: AppColors.textPrimary,
-                                            ),
-                                          ),
-                                          const SizedBox(height: 2),
-                                          Text(
-                                            '${driver.vehicleModel} • ${driver.licensePlate}',
-                                            style: const TextStyle(
-                                              fontSize: 12.5,
-                                              color: AppColors.textSecondary,
-                                            ),
-                                          ),
-                                          const SizedBox(height: 4),
-                                          Row(
-                                            children: [
-                                              const Icon(
-                                                Icons.star_rounded,
-                                                size: 15,
-                                                color: Colors.amber,
-                                              ),
-                                              const SizedBox(width: 4),
-                                              Text(
-                                                driver.rating.toStringAsFixed(1),
-                                                style: const TextStyle(
-                                                  fontSize: 12,
-                                                  fontWeight: FontWeight.w700,
-                                                  color: AppColors.textPrimary,
-                                                ),
-                                              ),
-                                              const SizedBox(width: 10),
-                                              Text(
-                                                '${driver.availableSeats} vagas',
-                                                style: const TextStyle(
-                                                  fontSize: 12,
-                                                  color: AppColors.textSecondary,
-                                                ),
-                                              ),
-                                            ],
-                                          ),
-                                        ],
-                                      ),
-                                    ),
-                                    Column(
-                                      crossAxisAlignment: CrossAxisAlignment.end,
-                                      children: [
-                                        Text(
-                                          'R\$ ${driver.contributionAmount.toStringAsFixed(2)}',
-                                          style: const TextStyle(
-                                            fontSize: 16,
-                                            fontWeight: FontWeight.w800,
-                                            color: AppColors.primary,
-                                          ),
-                                        ),
-                                        const SizedBox(height: 4),
-                                        Container(
-                                          padding: const EdgeInsets.symmetric(
-                                            horizontal: 10,
-                                            vertical: 5,
-                                          ),
-                                          decoration: BoxDecoration(
-                                            color: AppColors.primary,
-                                            borderRadius: BorderRadius.circular(10),
-                                          ),
-                                          child: const Text(
-                                            'Pedir',
-                                            style: TextStyle(
-                                              fontSize: 12,
-                                              fontWeight: FontWeight.w700,
-                                              color: AppColors.textLight,
-                                            ),
-                                          ),
-                                        ),
-                                      ],
-                                    ),
-                                  ],
-                                ),
-                              ),
-                            ),
-                          ),
-                        );
-                      }),
+                    ..._buildDriverListContent(matchState),
                   ]),
                 ),
               ),
@@ -2354,152 +2229,84 @@ class _HomePassengerSheetState extends ConsumerState<HomePassengerSheet> {
     );
   }
 
+  List<Widget> _buildDriverListContent(PassengerMatchState matchState) {
+    final phase = matchState.phase;
+    final drivers = matchState.matches;
+
+    if (phase == PassengerMatchPhase.loading || phase == PassengerMatchPhase.idle) {
+      return const [
+        Padding(
+          padding: EdgeInsets.all(28),
+          child: Center(
+            child: CircularProgressIndicator(color: AppColors.primary),
+          ),
+        ),
+      ];
+    }
+
+    if (phase == PassengerMatchPhase.failed) {
+      return [
+        _buildDriverListMessage(
+          matchState.errorMessage ?? 'Não foi possível buscar os motoristas.',
+        ),
+      ];
+    }
+
+    if (drivers.isEmpty) {
+      return [
+        _buildDriverListMessage(
+          'Nenhum motorista compatível com o seu trajeto agora. '
+          'Tente outro horário ou toque em atualizar mais tarde.',
+        ),
+      ];
+    }
+
+    final selected = matchState.selected;
+    return [
+      for (final driver in drivers)
+        Padding(
+          padding: const EdgeInsets.only(bottom: 10),
+          child: MatchDriverCard(
+            match: driver,
+            isRequesting: phase == PassengerMatchPhase.requesting &&
+                selected?.driverRouteId == driver.driverRouteId,
+            isDisabled: matchState.isBusy,
+            onRequest: () => widget.onSelectDriver(driver),
+          ),
+        ),
+    ];
+  }
+
+  Widget _buildDriverListMessage(String text) {
+    return Container(
+      padding: const EdgeInsets.all(20),
+      alignment: Alignment.center,
+      child: Text(
+        text,
+        textAlign: TextAlign.center,
+        style: const TextStyle(
+          fontSize: 14,
+          color: AppColors.textSecondary,
+          fontWeight: FontWeight.w600,
+        ),
+      ),
+    );
+  }
+
   // ==========================================================================
-  // PASSO 7: AGUARDANDO ACEITE DO MOTORISTA (COM BOTÕES DE SIMULAÇÃO)
+  // PASSO 7: AGUARDANDO O MOTORISTA ACEITAR OU RECUSAR O PEDIDO DE VAGA
   // ==========================================================================
   Widget _buildWaitingDriverSheet() {
-    final driver = widget.selectedDriver;
+    final matchState = ref.watch(passengerMatchProvider);
 
     return Align(
       alignment: Alignment.bottomCenter,
       child: Padding(
         padding: EdgeInsets.fromLTRB(16, 0, 16, 96 + widget.bottomSafeArea),
-        child: Container(
-          padding: const EdgeInsets.all(20),
-          decoration: BoxDecoration(
-            color: AppColors.cardBackground,
-            borderRadius: BorderRadius.circular(26),
-            border: Border.all(color: AppColors.borderSubtle, width: 1),
-            boxShadow: [
-              BoxShadow(
-                color: Colors.black.withValues(alpha: 0.16),
-                blurRadius: 26,
-                offset: const Offset(0, 6),
-              ),
-            ],
-          ),
-          child: Column(
-            mainAxisSize: MainAxisSize.min,
-            crossAxisAlignment: CrossAxisAlignment.stretch,
-            children: [
-              Row(
-                children: [
-                  const SizedBox(
-                    width: 22,
-                    height: 22,
-                    child: CircularProgressIndicator(
-                      strokeWidth: 2.5,
-                      color: AppColors.primary,
-                    ),
-                  ),
-                  const SizedBox(width: 14),
-                  Expanded(
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        const Text(
-                          'Aguardando o motorista...',
-                          style: TextStyle(
-                            fontSize: 15.5,
-                            fontWeight: FontWeight.w800,
-                            color: AppColors.textPrimary,
-                          ),
-                        ),
-                        Text(
-                          driver != null
-                              ? 'Solicitação enviada para ${driver.name}'
-                              : 'Conectando ao veículo...',
-                          style: const TextStyle(
-                            fontSize: 12.5,
-                            color: AppColors.textSecondary,
-                          ),
-                        ),
-                      ],
-                    ),
-                  ),
-                  IconButton(
-                    onPressed: widget.onCancelFlow,
-                    icon: const Icon(Icons.close_rounded),
-                    tooltip: 'Cancelar solicitação',
-                  ),
-                ],
-              ),
-              const SizedBox(height: 18),
-
-              // Botões explícitos de teste/simulação de aceite ou recusa
-              Container(
-                padding: const EdgeInsets.all(12),
-                decoration: BoxDecoration(
-                  color: AppColors.neutralLight,
-                  borderRadius: BorderRadius.circular(16),
-                  border: Border.all(color: AppColors.borderSubtle),
-                ),
-                child: Column(
-                  children: [
-                    const Text(
-                      'SIMULAÇÃO DE RESPOSTA DO MOTORISTA:',
-                      style: TextStyle(
-                        fontSize: 11,
-                        fontWeight: FontWeight.w800,
-                        color: AppColors.textSecondary,
-                        letterSpacing: 0.4,
-                      ),
-                    ),
-                    const SizedBox(height: 10),
-                    Row(
-                      children: [
-                        Expanded(
-                          child: ElevatedButton.icon(
-                            style: ElevatedButton.styleFrom(
-                              backgroundColor: AppColors.success,
-                              foregroundColor: AppColors.textLight,
-                              shape: RoundedRectangleBorder(
-                                borderRadius: BorderRadius.circular(12),
-                              ),
-                              padding: const EdgeInsets.symmetric(vertical: 10),
-                              elevation: 0,
-                            ),
-                            onPressed: () => widget.onSimulateDriverResponse(true),
-                            icon: const Icon(Icons.check_rounded, size: 18),
-                            label: const Text(
-                              'Aceitar',
-                              style: TextStyle(
-                                fontSize: 13,
-                                fontWeight: FontWeight.w700,
-                              ),
-                            ),
-                          ),
-                        ),
-                        const SizedBox(width: 10),
-                        Expanded(
-                          child: ElevatedButton.icon(
-                            style: ElevatedButton.styleFrom(
-                              backgroundColor: AppColors.error,
-                              foregroundColor: AppColors.textLight,
-                              shape: RoundedRectangleBorder(
-                                borderRadius: BorderRadius.circular(12),
-                              ),
-                              padding: const EdgeInsets.symmetric(vertical: 10),
-                              elevation: 0,
-                            ),
-                            onPressed: () => widget.onSimulateDriverResponse(false),
-                            icon: const Icon(Icons.close_rounded, size: 18),
-                            label: const Text(
-                              'Recusar',
-                              style: TextStyle(
-                                fontSize: 13,
-                                fontWeight: FontWeight.w700,
-                              ),
-                            ),
-                          ),
-                        ),
-                      ],
-                    ),
-                  ],
-                ),
-              ),
-            ],
-          ),
+        child: MatchWaitingCard(
+          match: matchState.selected,
+          isCancelling: matchState.isCancelling,
+          onCancel: widget.onCancelRequest,
         ),
       ),
     );
@@ -2511,7 +2318,7 @@ class _HomePassengerSheetState extends ConsumerState<HomePassengerSheet> {
 }
 
 class _DriverAcceptedPipSheet extends StatefulWidget {
-  final MockNearbyDriver? driver;
+  final MatchModel? driver;
   final VoidCallback onSendMessage;
   final VoidCallback onCancel;
   final double bottomSafeArea;
@@ -2752,8 +2559,8 @@ class _DriverAcceptedPipSheetState extends State<_DriverAcceptedPipSheet>
                                   ),
                                   Text(
                                     widget.driver != null
-                                        ? '${widget.driver!.name} está a caminho'
-                                        : 'Motorista a caminho',
+                                        ? '${widget.driver!.otherUserName} aceitou o seu pedido'
+                                        : 'O motorista aceitou o seu pedido',
                                     style: const TextStyle(
                                       fontSize: 12.5,
                                       color: AppColors.textSecondary,
@@ -2797,7 +2604,8 @@ class _DriverAcceptedPipSheetState extends State<_DriverAcceptedPipSheet>
                                 const SizedBox(width: 10),
                                 Expanded(
                                   child: Text(
-                                    '${widget.driver!.vehicleModel} • Placa ${widget.driver!.licensePlate}',
+                                    widget.driver!.vehicle?.description ??
+                                        'Sai às ${widget.driver!.departureTime}',
                                     style: const TextStyle(
                                       fontSize: 13,
                                       fontWeight: FontWeight.w700,
@@ -2805,14 +2613,17 @@ class _DriverAcceptedPipSheetState extends State<_DriverAcceptedPipSheet>
                                     ),
                                   ),
                                 ),
-                                Text(
-                                  'R\$ ${widget.driver!.contributionAmount.toStringAsFixed(2)}',
-                                  style: const TextStyle(
-                                    fontSize: 15,
-                                    fontWeight: FontWeight.w800,
-                                    color: AppColors.primary,
+                                if (widget.driver!.estimatedCostPerPassenger != null)
+                                  Text(
+                                    CurrencyFormatter.format(
+                                      widget.driver!.estimatedCostPerPassenger!,
+                                    ),
+                                    style: const TextStyle(
+                                      fontSize: 15,
+                                      fontWeight: FontWeight.w800,
+                                      color: AppColors.primary,
+                                    ),
                                   ),
-                                ),
                               ],
                             ),
                           ),
@@ -2845,7 +2656,7 @@ class _DriverAcceptedPipSheetState extends State<_DriverAcceptedPipSheet>
                             padding: const EdgeInsets.symmetric(vertical: 8),
                           ),
                           child: const Text(
-                            'Cancelar carona',
+                            'Fechar',
                             style: TextStyle(fontSize: 13, fontWeight: FontWeight.w600),
                           ),
                         ),
