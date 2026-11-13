@@ -75,8 +75,9 @@ public class User {
     @Setter
     private String photoUrl;
 
+    // Sem final: o Spring Data não preenche campo final ao ler do Mongo, e os papéis voltavam vazios.
     @NotEmpty
-    private final Set<ParticipationRole> participationRoles = new HashSet<>();
+    private Set<ParticipationRole> participationRoles = new HashSet<>();
 
     @NotNull
     @Valid
@@ -115,7 +116,8 @@ public class User {
     @Setter
     private Reputation reputation = Reputation.defaultInitial();
 
-    private final Set<@Valid UserBadge> badges = new HashSet<>();
+    // Sem final pelo mesmo motivo de participationRoles.
+    private Set<@Valid UserBadge> badges = new HashSet<>();
 
     @Setter
     private boolean active = true;
