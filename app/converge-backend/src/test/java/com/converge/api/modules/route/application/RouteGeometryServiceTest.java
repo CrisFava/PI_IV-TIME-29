@@ -10,6 +10,7 @@ import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 
+import java.util.List;
 import java.util.Optional;
 
 import static com.converge.api.modules.route.application.FakeMapsGateway.GOOGLE_ROUTE;
@@ -58,6 +59,20 @@ class RouteGeometryServiceTest {
         RouteGeometry geometry = routeGeometryService.compute(HOME, PUC);
 
         assertThat(geometry.distanceKm()).isEqualTo(STRAIGHT_LINE_KM);
+        assertThat(geometry.encodedPolyline()).isNull();
+    }
+    @Test
+    @DisplayName("Sem o Google, a distância com paradas é a soma das linhas retas entre os pontos")
+    void shouldSumStraightLinesThroughStopsWhenGoogleIsDown() {
+        mapsGateway.routesDown = true;
+        Coordinates stopCoordinates = new Coordinates(-22.8955, -47.0525);
+        Place stop = Place.of("Rua Coronel Quirino, 900", "Cambuí", "Campinas", stopCoordinates);
+
+        RouteGeometry geometry = routeGeometryService.compute(HOME, List.of(stop), PUC);
+
+        double expected = HaversineCalculator.distanceKm(HOME_COORDINATES, stopCoordinates)
+                + HaversineCalculator.distanceKm(stopCoordinates, PUC_COORDINATES);
+        assertThat(geometry.distanceKm()).isEqualTo(expected);
         assertThat(geometry.encodedPolyline()).isNull();
     }
 }

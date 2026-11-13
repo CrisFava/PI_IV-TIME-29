@@ -185,4 +185,24 @@ class GoogleMapsGatewayTest {
 
         assertThat(gateway.computeRoute(new Coordinates(0, 0), new Coordinates(1, 1))).isEmpty();
     }
+
+    @Test
+    @DisplayName("Deve mandar as paradas como intermediates, na ordem")
+    void shouldSendStopsAsIntermediates() {
+        google.expect(requestTo(GoogleMapsGateway.ROUTES_URL))
+                .andExpect(jsonPath("$.intermediates[0].location.latLng.latitude").value(-22.8955))
+                .andExpect(jsonPath("$.intermediates[1].location.latLng.latitude").value(-22.8400))
+                .andRespond(withSuccess("""
+                        { "routes": [ { "distanceMeters": 15000, "polyline": { "encodedPolyline": "com-paradas" } } ] }
+                        """, MediaType.APPLICATION_JSON));
+
+        Optional<RouteGeometry> route = gateway.computeRoute(
+                new Coordinates(-22.9056, -47.0608),
+                List.of(new Coordinates(-22.8955, -47.0525), new Coordinates(-22.8400, -47.0530)),
+                new Coordinates(-22.8337, -47.0524)
+        );
+
+        assertThat(route).contains(new RouteGeometry(15.0, "com-paradas"));
+        google.verify();
+    }
 }

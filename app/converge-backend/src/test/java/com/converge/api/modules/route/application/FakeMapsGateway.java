@@ -47,7 +47,7 @@ class FakeMapsGateway implements MapsGateway {
     }
 
     @Override
-    public Optional<RouteGeometry> computeRoute(Coordinates origin, Coordinates destination) {
+    public Optional<RouteGeometry> computeRoute(Coordinates origin, List<Coordinates> stops, Coordinates destination) {
         if (routesDown) {
             throw new ApplicationException(ErrorCode.EXTERNAL_SERVICE_ERROR, "Google fora do ar (simulado).");
         }
