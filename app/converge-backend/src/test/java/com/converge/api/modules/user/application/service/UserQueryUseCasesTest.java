@@ -165,8 +165,11 @@ class UserQueryUseCasesTest {
         valid.setPixKey("12345678909");
         User expired = user("Gabi Reis", VerificationStatus.VERIFIED);
         expired.setDriverLicense(license(VerificationStatus.VERIFIED, LocalDateTime.now().minusDays(1)));
+        expired.setPixKey("12345678909");
         User pending = user("Hugo Paz", VerificationStatus.VERIFIED);
         pending.setDriverLicense(license(VerificationStatus.PENDING, LocalDateTime.now().plusYears(2)));
+        // Com PIX: a recusa vem só da CNH vencida ou pendente
+        pending.setPixKey("12345678909");
 
         assertThat(eligibilityOf(valid).canOfferRides()).isTrue();
         assertThat(eligibilityOf(expired).canOfferRides()).isFalse();

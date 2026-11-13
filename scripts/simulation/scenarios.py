@@ -12,6 +12,8 @@ from simulation.simulation_world import SimulationWorld
 
 # Origem a uns 90 km do campus (São Paulo): fora do raio de candidatos do matching
 FAR_ORIGIN = ("Av. Paulista, 1000", "Bela Vista", -23.5614, -46.6559)
+# Segundo motorista perto, saindo de outro ponto: o desvio muda e a compatibilidade fica diferente
+SECOND_ORIGIN = ("Rua Sacramento, 300", "Centro", -22.9120, -47.0560)
 
 
 def _ride_with_passengers(world: SimulationWorld, seats: int, *nicknames: str):
@@ -217,6 +219,8 @@ def full_and_rejected(world: SimulationWorld) -> None:
 def matching_filters(world: SimulationWorld) -> None:
     near = world.create_driver("Motorista perto")
     near_route = world.offer_route(near, seats=3)
+    second = world.create_driver("Segundo motorista perto")
+    second_route = world.offer_route(second, seats=3, origin=SECOND_ORIGIN)
     far = world.create_driver("Motorista longe")
     far_route = world.offer_route(far, seats=3, origin=FAR_ORIGIN)
     blocked = world.create_driver("Motorista bloqueado")
@@ -236,11 +240,17 @@ def matching_filters(world: SimulationWorld) -> None:
         world.step("Ana procura carona: só o motorista perto, sem bloqueio e com PIX aparece")
         matches = world.expect_ok(world.api.get("/matchings", ana.token, {"routeId": ana_route}),
                                   "matching da Ana") or []
-        found = {match.get("driverRouteId") for match in matches}
+        found = {match.get("driverRouteId"): match for match in matches}
         world.check(near_route in found, "o motorista perto não apareceu para a Ana")
+        world.check(second_route in found, "o segundo motorista perto não apareceu para a Ana")
         world.check(far_route not in found, "o motorista a 90 km apareceu para a Ana")
         world.check(blocked_route not in found, "o motorista bloqueado apareceu para a Ana")
         world.check(no_pix_route not in found, "o motorista sem chave PIX apareceu para a Ana")
+        near_score = found[near_route].get("compatibilityScore") or 0
+        second_score = found[second_route].get("compatibilityScore") or 0
+        world.check(near_score != second_score,
+                    f"os dois motoristas tiveram a mesma compatibilidade ({near_score}); a ordem não seria testada")
+        print(f"      compatibilidade: motorista perto {near_score}, segundo motorista {second_score}")
         scores = [match.get("compatibilityScore") or 0 for match in matches]
         world.check(scores == sorted(scores, reverse=True), "o matching não veio do mais para o menos compatível")
         print(f"      {len(matches)} motorista(s) compatível(is) para a Ana")
