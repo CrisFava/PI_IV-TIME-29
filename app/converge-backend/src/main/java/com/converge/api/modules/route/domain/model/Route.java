@@ -72,9 +72,10 @@ public class Route {
     @Pattern(regexp = TIME_PATTERN)
     private String estimatedArrivalTime;
 
+    // Sem final: o Spring Data não preenche campo final ao ler do Mongo, e os dias voltavam vazios.
     @NotEmpty
     @Indexed
-    private final Set<DayOfWeek> weekDays = new HashSet<>();
+    private Set<DayOfWeek> weekDays = new HashSet<>();
 
     @Nullable
     private Double maxDetourKm;

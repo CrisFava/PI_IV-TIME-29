@@ -47,7 +47,8 @@ public class Matching {
     private double compatibilityScore;
     private double calculatedDetourKm;
     private int scheduleDifferenceMin;
-    private final Set<DayOfWeek> compatibleDays = new HashSet<>();
+    // Sem final: o Spring Data não preenche campo final ao ler do Mongo.
+    private Set<DayOfWeek> compatibleDays = new HashSet<>();
     private BigDecimal estimatedCostPerPassenger;
     private boolean valid;
 

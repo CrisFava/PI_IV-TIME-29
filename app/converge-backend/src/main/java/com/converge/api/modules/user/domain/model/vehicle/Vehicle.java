@@ -73,7 +73,8 @@ public class Vehicle {
     @Max(15)
     private int totalCapacity;
 
-    private final List<FuelSource> fuelSources = new ArrayList<>();
+    // Sem final: o Spring Data não preenche campo final ao ler do Mongo.
+    private List<FuelSource> fuelSources = new ArrayList<>();
 
     private boolean active = true;
 

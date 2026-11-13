@@ -109,7 +109,8 @@ public class Ride {
     @Nullable
     private LocalDateTime completedAt;
 
-    private final Set<DayOfWeek> weekDays = new HashSet<>();
+    // Sem final (aqui e em participants): o Spring Data não preenche campo final ao ler do Mongo.
+    private Set<DayOfWeek> weekDays = new HashSet<>();
 
     @Positive
     private int totalSeats;
@@ -132,7 +133,7 @@ public class Ride {
 
     @NotEmpty
     @Valid
-    private final List<Participant> participants = new ArrayList<>();
+    private List<Participant> participants = new ArrayList<>();
 
     @Nullable
     @Valid
