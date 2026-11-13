@@ -194,7 +194,8 @@ public class User {
     }
 
     public boolean hasRole(ParticipationRole role) {
-        return this.participationRoles.contains(role);
+        // Todo usuário é passageiro, mesmo que o papel tenha se perdido no banco
+        return role == PASSENGER || this.participationRoles.contains(role);
     }
 
     public boolean isAcademicVerified() {
@@ -216,6 +217,7 @@ public class User {
             this.validateDriverRequirements();
         }
 
+        this.participationRoles.add(PASSENGER);
         this.participationRoles.add(role);
     }
 
@@ -225,7 +227,9 @@ public class User {
     }
 
     public Set<ParticipationRole> getParticipationRoles() {
-        return Collections.unmodifiableSet(this.participationRoles);
+        Set<ParticipationRole> roles = new HashSet<>(this.participationRoles);
+        roles.add(PASSENGER);
+        return Collections.unmodifiableSet(roles);
     }
 
     public Set<UserBadge> getBadges() {
