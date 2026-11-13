@@ -124,12 +124,15 @@ class MatchRoutesHandlerTest {
                 new double[]{PUC_LAT, PUC_LNG}
         ));
         MatchRoute offer = new MatchRoute("offer-1", "driver-1", CENTER_LAT, CENTER_LNG, PUC_LAT, PUC_LNG, "07:00",
-                WEEKDAYS, 3.0, 3, 3, 12.0, new BigDecimal("0.50"), new BigDecimal("4.00"), bentRoad);
-        // Passageiro na curva: uns 5 km a leste da linha reta, mas colado na rota
-        MatchRoute onTheCurve = search("search-1", "passenger-1", -22.8700, -47.0050, "07:00", WEEKDAYS);
+                WEEKDAYS, 1.0, 3, 3, 12.0, new BigDecimal("0.50"), new BigDecimal("4.00"), bentRoad);
+        MatchRoute straight = new MatchRoute("offer-2", "driver-2", CENTER_LAT, CENTER_LNG, PUC_LAT, PUC_LNG, "07:00",
+                WEEKDAYS, 1.0, 3, 3, 12.0, new BigDecimal("0.50"), new BigDecimal("4.00"));
+        // No meio do primeiro trecho da curva: a mais de 1 km de cada ponto da rota e da linha reta,
+        // então só a distância até o trecho (e não até os pontos) faz o passageiro entrar
+        MatchRoute midSegment = search("search-1", "passenger-1", -22.8878, -47.0304, "07:00", WEEKDAYS);
 
-        assertEquals(1, passengerSeeks(onTheCurve, offer).size());
-        assertTrue(passengerSeeks(onTheCurve, driverOffer()).isEmpty(), "sem a rota, vale a linha reta");
+        assertEquals(1, passengerSeeks(midSegment, offer).size());
+        assertTrue(passengerSeeks(midSegment, straight).isEmpty(), "sem a rota, vale a linha reta");
     }
 
     @Test
