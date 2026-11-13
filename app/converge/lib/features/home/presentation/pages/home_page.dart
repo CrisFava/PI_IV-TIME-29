@@ -21,6 +21,8 @@ import '../../../../core/services/auth/auth_providers.dart';
 import '../../../route/data/models/create_route_request.dart';
 import '../../../route/data/models/route_place_model.dart';
 import '../../../route/data/models/route_response_model.dart';
+import '../../../route/data/models/route_schedule.dart';
+import '../../../route/state/offer_route_controller.dart';
 import '../../../route/state/saved_routes_controller.dart';
 
 import '../../../../core/config/styles.dart';
@@ -28,9 +30,15 @@ import '../../../../core/services/maps/google_maps_service.dart';
 import '../../../../core/widgets/ride_dock_navigation.dart';
 import '../../../../core/widgets/sheet_drag_to_dismiss.dart';
 import '../../../../core/widgets/show_app_notice.dart';
-import '../../../ride/data/models/driver_shift_payload.dart';
 import '../../../matching/data/models/match_model.dart';
 import '../../../matching/presentation/widgets/ride_requests_sheet.dart';
+import '../../../matching/state/driver_offers_provider.dart';
+import '../../../matching/state/driver_ride_actions_controller.dart';
+import '../../../matching/state/driver_rides_provider.dart';
+import '../../../ride/data/models/ride_model.dart';
+import '../../../ride/data/models/ride_stop_type.dart';
+import '../../../matching/presentation/widgets/driver_suggestion_alert.dart';
+import '../../../matching/presentation/widgets/incoming_ride_request_alert.dart';
 import '../../../matching/state/matching_viewer_provider.dart';
 import '../../../matching/state/passenger_match_controller.dart';
 import '../../../matching/state/passenger_match_phase.dart';
@@ -45,6 +53,7 @@ import '../../../vehicle/state/my_vehicles_controller.dart';
 import '../../../auth/presentation/widgets/edit_profile_sheet.dart';
 import '../widgets/campus_spots.dart';
 import '../widgets/passenger_ride_step.dart';
+import '../widgets/ride_departure_label.dart';
 import '../../../auth/state/auth_action_controller.dart';
 import '../../../auth/state/auth_controller.dart';
 import '../../../auth/state/session/auth_session.dart';
@@ -64,24 +73,26 @@ class _HomePageState extends ConsumerState<HomePage> {
   // Modo ativo na tela principal (Passageiro vs Motorista)
   AppRideMode _currentMode = AppRideMode.passenger;
 
-  // No modo motorista: painel de pedidos de vaga no lugar do painel de expediente
+  // No modo motorista: painel de caronas e pedidos no lugar do formulário de oferta
   bool _showRideRequests = false;
 
-  // Expediente ativo: o botão do carro fica verde e o menu mostra "Em expediente"
-  bool _isOnShift = false;
+  // Rota da viagem em andamento já decodificada (evita decodificar a cada build)
+  String? _itineraryPolylineCache;
+  List<LatLng>? _itineraryPointsCache;
+
+  // Saída escolhida para a carona que o motorista vai publicar; null é "agora"
+  DateTime? _offerDeparture;
+
+  // De onde sai a carona que o motorista vai publicar (escolhido no campo "Saindo de")
+  String _offerOriginAddress = '';
+  LatLng? _offerOriginLocation;
 
   // Pedido de carona em andamento com o painel escondido: a busca continua e o
   // botão do carro fica azul; o menu do carro reabre os detalhes
   bool _passengerSheetHidden = false;
 
-  // Destino do expediente, guardado à parte para o fluxo de pedir carona não apagá-lo
-  String _shiftDestinationAddress = '';
-  LatLng? _shiftDestination;
-  List<LatLng>? _shiftRoutePoints;
-
-  // Muda a cada expediente iniciado ou encerrado: a rota calculada para um
-  // expediente anterior é descartada
-  int _shiftGeneration = 0;
+  // Saída escolhida para o pedido de carona; null é "agora"
+  DateTime? _rideDeparture;
 
   // Muda sempre que o rascunho do pedido de carona é fechado: um cálculo de rota
   // que termine depois disso não reabre o painel
@@ -99,7 +110,7 @@ class _HomePageState extends ConsumerState<HomePage> {
   List<LatLng>? _driverApproachRoutePoints;
 
   // Estado do raio de busca do motorista em KM (refletido no mapa)
-  double _driverSearchRadiusKm = 5.0;
+  double _driverSearchRadiusKm = 3.0;
 
   void _onCameraCenterChanged(LatLng target) async {
     if (_passengerStep == PassengerRideStep.dragMapPickup ||
@@ -216,7 +227,11 @@ class _HomePageState extends ConsumerState<HomePage> {
     // Limpa a busca anterior: a lista mostra o carregamento até os novos motoristas chegarem
     controller.reset();
     final routeId = await controller.prepareSearchRoute(
-      _buildRouteRequest(isDriver: false),
+      // Sai agora, ou no dia e horário que o passageiro escolheu
+      _buildRouteRequest(
+        isDriver: false,
+        schedule: RouteSchedule.startingAt(_rideDeparture ?? DateTime.now()),
+      ),
     );
     if (!mounted) return;
 
@@ -328,6 +343,7 @@ class _HomePageState extends ConsumerState<HomePage> {
         _passengerStep = PassengerRideStep.chooseRouteOption;
       } else {
         _passengerStep = PassengerRideStep.idle;
+        _rideDeparture = null;
         _destinationLocation = null;
         _destinationAddress = '';
         _tripRoutePoints = null;
@@ -441,19 +457,21 @@ class _HomePageState extends ConsumerState<HomePage> {
         (latestSession is Authenticated && latestSession.user.isDriver);
 
     if (isDriverNow) {
-      setState(() {
-        _currentMode = AppRideMode.driver;
-        _currentTabIndex = 0;
-        _showRideRequests = false;
-      });
+      // "Minhas caronas": o painel com as caronas oferecidas e os pedidos
+      _openRideRequests();
     } else {
       _showLockedDriverWarning();
     }
   }
 
+  /// Fechar a folha de nova carona volta para "Minhas caronas".
   void _handleCloseDriverFormSheet() {
     setState(() {
-      _currentMode = AppRideMode.passenger;
+      _currentMode = AppRideMode.driver;
+      _showRideRequests = true;
+      _offerDeparture = null;
+      _offerOriginAddress = '';
+      _offerOriginLocation = null;
       _destinationLocation = null;
       _destinationAddress = '';
       _tripRoutePoints = null;
@@ -468,15 +486,32 @@ class _HomePageState extends ConsumerState<HomePage> {
       _destinationAddress = address;
       _destinationLocation = position;
     });
+    await _previewOfferRoute();
+  }
+
+  Future<void> _handleDriverOriginSelected(
+    String address,
+    LatLng position,
+  ) async {
+    setState(() {
+      _offerOriginAddress = address;
+      _offerOriginLocation = position;
+    });
+    await _previewOfferRoute();
+  }
+
+  /// Desenha no mapa o caminho da carona assim que a origem e o destino estão escolhidos.
+  Future<void> _previewOfferRoute() async {
+    final origin = _offerOriginLocation;
+    final destination = _destinationLocation;
+    if (origin == null || destination == null) return;
     try {
       final points = await GoogleMapsService.computeRoutes(
-        origin: _pickupLocation,
-        destination: position,
+        origin: origin,
+        destination: destination,
       );
       if (mounted && points.isNotEmpty) {
-        setState(() {
-          _tripRoutePoints = points;
-        });
+        setState(() => _tripRoutePoints = points);
       }
     } catch (_) {}
   }
@@ -488,7 +523,7 @@ class _HomePageState extends ConsumerState<HomePage> {
       _passengerStep == PassengerRideStep.driverAccepted;
 
   /// Fecha os painéis do mapa. Um pedido de carona em andamento só é escondido
-  /// (a busca continua e volta pelo botão do carro). O expediente também continua.
+  /// (a busca continua e volta pelo botão do carro). A viagem em andamento também continua.
   void _closeOpenSheets() {
     final keepRequest = _hasActiveRideRequest;
     final draftOpen = _passengerStep != PassengerRideStep.idle && !keepRequest;
@@ -506,12 +541,73 @@ class _HomePageState extends ConsumerState<HomePage> {
       if (draftOpen) {
         _draftGeneration++;
         _passengerStep = PassengerRideStep.idle;
+        _rideDeparture = null;
       }
       _destinationLocation = null;
       _destinationAddress = '';
       _tripRoutePoints = null;
     });
     if (draftOpen) ref.read(passengerMatchProvider.notifier).reset();
+  }
+
+  /// Escolhe outro dia e horário de saída (até 7 dias à frente), para o pedido de
+  /// carona ou para a carona do motorista. O matching junta saídas com até 30 min
+  /// de diferença. [onPicked] recebe null quando a saída volta a ser "agora".
+  Future<void> _pickDeparture({
+    required DateTime? current,
+    required void Function(DateTime? departure) onPicked,
+  }) async {
+    final now = DateTime.now();
+    final initial = current ?? now;
+    final today = DateTime(now.year, now.month, now.day);
+
+    final date = await showDatePicker(
+      context: context,
+      initialDate: initial.isBefore(today) ? today : initial,
+      firstDate: today,
+      lastDate: today.add(const Duration(days: 6)),
+      helpText: 'Dia da carona',
+      builder: _pickerTheme,
+    );
+    if (date == null || !mounted) return;
+
+    final time = await showTimePicker(
+      context: context,
+      initialTime: TimeOfDay.fromDateTime(initial),
+      helpText: 'Horário de saída',
+      builder: _pickerTheme,
+    );
+    if (time == null || !mounted) return;
+
+    final chosen = DateTime(
+      date.year,
+      date.month,
+      date.day,
+      time.hour,
+      time.minute,
+    );
+    // Um horário que já passou vira "agora"
+    if (!chosen.isAfter(DateTime.now())) {
+      setState(() => onPicked(null));
+      _showError('Esse horário já passou. A carona fica para agora.');
+      return;
+    }
+    HapticFeedback.selectionClick();
+    setState(() => onPicked(chosen));
+  }
+
+  Widget _pickerTheme(BuildContext context, Widget? child) {
+    return Theme(
+      data: ThemeData.light().copyWith(
+        colorScheme: const ColorScheme.light(
+          primary: AppColors.primary,
+          onPrimary: AppColors.dockItemActive,
+          surface: AppColors.cardBackground,
+          onSurface: AppColors.textPrimary,
+        ),
+      ),
+      child: child!,
+    );
   }
 
   /// Reabre os detalhes do pedido de carona escondido.
@@ -541,68 +637,101 @@ class _HomePageState extends ConsumerState<HomePage> {
     _handleCancelFlow();
   }
 
-  /// O motorista não precisa de "expediente": com um trajeto de oferta ativo ele já aparece
-  /// no matching. Aqui ele vai para o painel com os pedidos de vaga.
-
-  Future<void> _handleStartDriverShift(DriverShiftPayload payload) async {
-    HapticFeedback.mediumImpact();
-    final generation = ++_shiftGeneration;
-    setState(() {
-      _isOnShift = true;
-      _shiftDestinationAddress = _destinationAddress.isNotEmpty
-          ? _destinationAddress
-          : payload.destination;
-      _shiftDestination = _destinationLocation;
-      _shiftRoutePoints = _tripRoutePoints;
-    });
-    _openRideRequests();
-
-    // Sem a rota ainda calculada, busca agora para desenhar o caminho até o destino
-    final destination = _shiftDestination;
-    if (destination != null &&
-        (_shiftRoutePoints == null || _shiftRoutePoints!.isEmpty)) {
-      try {
-        final points = await GoogleMapsService.computeRoutes(
-          origin: _pickupLocation,
-          destination: destination,
-        );
-        if (mounted &&
-            _isOnShift &&
-            generation == _shiftGeneration &&
-            points.isNotEmpty) {
-          setState(() => _shiftRoutePoints = points);
-        }
-      } catch (e) {
-        debugPrint('Erro ao calcular a rota do expediente: $e');
-      }
+  /// Publica a carona agendada: um trajeto de oferta no dia e horário escolhidos
+  /// ("agora" por padrão), com o raio de busca como desvio máximo. Os passageiros já
+  /// podem pedir vaga; a viagem só começa no "Iniciar trajeto" da carona.
+  Future<void> _handlePublishOffer(double maxDetourKm) async {
+    if (ref.read(offerRouteProvider)) return;
+    if (_offerOriginLocation == null) {
+      _showError('Escolha de onde a carona sai.');
+      return;
     }
+    if (_destinationLocation == null) {
+      _showError('Escolha o destino antes de publicar a carona.');
+      return;
+    }
+
+    HapticFeedback.mediumImpact();
+    final vehicle = await _findDriverVehicle();
+    if (!mounted) return;
+    if (vehicle == null) {
+      _showError('Cadastre um veículo antes de publicar a carona.');
+      return;
+    }
+
+    final request = _buildRouteRequest(
+      isDriver: true,
+      vehicleId: vehicle.id,
+      totalSeats: vehicle.seats,
+      schedule: RouteSchedule.startingAt(_offerDeparture ?? DateTime.now()),
+      maxDetourKm: maxDetourKm,
+      originAddress: _offerOriginAddress,
+      originLocation: _offerOriginLocation,
+    );
+    try {
+      await ref.read(offerRouteProvider.notifier).publish(request);
+    } catch (e) {
+      if (mounted) _showError(authErrorMessage(e));
+      return;
+    }
+    if (!mounted) return;
+
+    ref.invalidate(myOfferRoutesProvider);
+    setState(() {
+      _offerDeparture = null;
+      _offerOriginAddress = '';
+      _offerOriginLocation = null;
+      _destinationLocation = null;
+      _destinationAddress = '';
+      _tripRoutePoints = null;
+    });
+    // Abre o painel: a carona aparece com os passageiros compatíveis
+    _openRideRequests();
   }
 
-  /// Encerra o expediente: fecha os painéis de motorista e volta ao mapa do passageiro.
-  void _handleEndDriverShift() {
+  /// "Encerrar": conclui a viagem em andamento.
+  Future<void> _handleEndDriverShift() async {
+    final ride = ref.read(driverRideInProgressProvider);
+    if (ride == null) return;
+
+    final error = await ref
+        .read(driverRideActionsProvider.notifier)
+        .complete(ride.id);
+    if (!mounted) return;
+    if (error != null) {
+      _showError(error);
+      return;
+    }
     setState(() {
-      _shiftGeneration++;
-      _isOnShift = false;
       _showRideRequests = false;
       _currentMode = AppRideMode.passenger;
-      // Um pedido de carona em andamento usa o mesmo destino e a mesma rota
-      if (!_hasActiveRideRequest) {
-        _destinationLocation = null;
-        _destinationAddress = '';
-        _tripRoutePoints = null;
-      }
-      _shiftDestinationAddress = '';
-      _shiftDestination = null;
-      _shiftRoutePoints = null;
     });
   }
 
-  /// Fechar os pedidos: em expediente, só esconde o painel (o expediente continua);
-  /// fora dele, volta para o painel de expediente.
+  /// "Oferecer carona" no painel: abre a folha para publicar uma carona nova.
+  void _openOfferForm() {
+    setState(() {
+      _currentMode = AppRideMode.driver;
+      _showRideRequests = false;
+    });
+  }
+
+  /// A viagem começou ("Iniciar trajeto"): fecha o painel e mostra a rota com as paradas.
+  void _handleRideStarted() {
+    HapticFeedback.mediumImpact();
+    setState(() {
+      _isCarMenuOpen = false;
+      _showRideRequests = false;
+      _currentMode = AppRideMode.passenger;
+      _currentTabIndex = 0;
+    });
+  }
+
+  /// Fechar o painel de caronas e pedidos volta ao mapa.
   void _handleCloseRideRequests() {
     setState(() {
       _showRideRequests = false;
-      if (_isOnShift) _currentMode = AppRideMode.passenger;
+      _currentMode = AppRideMode.passenger;
     });
   }
 
@@ -612,18 +741,35 @@ class _HomePageState extends ConsumerState<HomePage> {
     await showAddVehicleSheet(context);
   }
 
-  /// Sem carro, o motorista perde o acesso: encerra o expediente e fecha os painéis.
+  /// Sem carro, o motorista perde o acesso: fecha os painéis de motorista.
   void _onDriverAccessChanged(DriverAccess? previous, DriverAccess next) {
     if (!next.isBlockedByVehicle || previous == next) return;
     setState(() {
-      _shiftGeneration++;
-      _isOnShift = false;
       _showRideRequests = false;
-      _shiftDestinationAddress = '';
-      _shiftDestination = null;
-      _shiftRoutePoints = null;
       if (_currentMode.isDriver) _currentMode = AppRideMode.passenger;
     });
+  }
+
+  static LatLng _latLngOf(RoutePlaceModel place) =>
+      LatLng(place.latitude, place.longitude);
+
+  // Nome do passageiro de uma parada (o motorista vê todos os participantes)
+  static String _stopName(RideModel ride, String passengerId) {
+    for (final participant in ride.participants) {
+      if (participant.userId == passengerId) return participant.displayName;
+    }
+    return 'Passageiro';
+  }
+
+  /// Rota da viagem em andamento, decodificada uma vez por polyline.
+  List<LatLng>? _itineraryPoints(RideModel ride) {
+    final polyline = ride.itineraryPolyline;
+    if (polyline == null || polyline.isEmpty) return null;
+    if (_itineraryPolylineCache != polyline) {
+      _itineraryPolylineCache = polyline;
+      _itineraryPointsCache = GoogleMapsService.decodePolyline(polyline);
+    }
+    return _itineraryPointsCache;
   }
 
   /// Bloqueia as ações de motorista sem carro confirmado: sem carro, abre o
@@ -657,21 +803,30 @@ class _HomePageState extends ConsumerState<HomePage> {
     });
   }
 
-  /// Dados do trajeto marcado no mapa. Os horários e os dias ainda são fixos neste fluxo.
+  /// Dados do trajeto marcado no mapa, com o horário e os dias informados.
   CreateRouteRequest _buildRouteRequest({
     required bool isDriver,
+    required RouteSchedule schedule,
     String? vehicleId,
     int? totalSeats,
+    double maxDetourKm = 3.0,
+    String? originAddress,
+    LatLng? originLocation,
   }) {
+    // A carona do motorista sai do ponto escolhido; o pedido do passageiro, do embarque marcado
+    final from = originLocation ?? _pickupLocation;
+    final fromAddress = originLocation != null
+        ? (originAddress ?? '')
+        : _pickupAddress;
     return CreateRouteRequest(
       type: isDriver ? AppRouteType.offer : AppRouteType.search,
       vehicleId: vehicleId,
       origin: RoutePlaceModel(
-        address: _pickupAddress,
+        address: fromAddress,
         neighborhood: 'Campus / Origem',
         city: 'Campinas',
-        latitude: _pickupLocation.latitude,
-        longitude: _pickupLocation.longitude,
+        latitude: from.latitude,
+        longitude: from.longitude,
       ),
       destination: RoutePlaceModel(
         address: _destinationAddress.isNotEmpty
@@ -682,10 +837,10 @@ class _HomePageState extends ConsumerState<HomePage> {
         latitude: _destinationLocation!.latitude,
         longitude: _destinationLocation!.longitude,
       ),
-      departureTime: '08:00',
-      estimatedArrivalTime: '08:45',
-      weekDays: const {'MONDAY', 'TUESDAY', 'WEDNESDAY', 'THURSDAY', 'FRIDAY'},
-      maxDetourKm: 3.0,
+      departureTime: schedule.departureTime,
+      estimatedArrivalTime: schedule.estimatedArrivalTime,
+      weekDays: schedule.weekDays,
+      maxDetourKm: maxDetourKm,
       totalSeats: isDriver ? (totalSeats ?? 3) : 1,
     );
   }
@@ -715,6 +870,10 @@ class _HomePageState extends ConsumerState<HomePage> {
     }
 
     final isDriver = _currentMode == AppRideMode.driver;
+    if (isDriver && _offerOriginLocation == null) {
+      _showError('Escolha de onde a carona sai antes de salvar o trajeto.');
+      return;
+    }
     final vehicle = isDriver ? await _findDriverVehicle() : null;
     if (!mounted) return;
     if (isDriver && vehicle == null) {
@@ -722,10 +881,14 @@ class _HomePageState extends ConsumerState<HomePage> {
       return;
     }
 
+    // Trajeto frequente: o mesmo horário nos dias úteis
     final request = _buildRouteRequest(
       isDriver: isDriver,
+      schedule: RouteSchedule.weekdayCommute,
       vehicleId: vehicle?.id,
       totalSeats: vehicle?.seats,
+      originAddress: isDriver ? _offerOriginAddress : null,
+      originLocation: isDriver ? _offerOriginLocation : null,
     );
 
     final authService = ref.read(authServiceProvider);
@@ -850,6 +1013,8 @@ class _HomePageState extends ConsumerState<HomePage> {
     ref.listen(passengerMatchProvider, _onPassengerMatchChanged);
     ref.listen(driverAccessProvider, _onDriverAccessChanged);
     final driverAccess = ref.watch(driverAccessProvider);
+    // A viagem que o motorista está fazendo agora (botão verde e rota com paradas)
+    final shiftRide = ref.watch(driverRideInProgressProvider);
 
     return Scaffold(
       backgroundColor: AppColors.scaffoldBackground,
@@ -908,11 +1073,12 @@ class _HomePageState extends ConsumerState<HomePage> {
                     isOpen: _isCarMenuOpen,
                     onToggleOpen: _onToggleCarMenu,
                     onRequestRide: _onRequestRide,
-                    onStartDriverShift: () => _isOnShift
+                    // Com a viagem em andamento, o menu abre as paradas; fora dela, a oferta de carona
+                    onStartDriverShift: () => shiftRide != null
                         ? _openRideRequests()
                         : _onStartDriverShiftFromDock(canDrive),
-                    isOnShift: _isOnShift,
-                    onEndDriverShift: _handleEndDriverShift,
+                    isOnShift: shiftRide != null,
+                    onEndDriverShift: () => _handleEndDriverShift(),
                     needsVehicle: driverAccess.isBlockedByVehicle,
                     onAddVehicle: _handleAddVehicle,
                     // Pedido aceito também aparece: o menu reabre os detalhes da
@@ -929,17 +1095,56 @@ class _HomePageState extends ConsumerState<HomePage> {
                     onCancelRideSearch: _handleCancelRideSearch,
                   ),
                 ),
+
+                // ============================================================
+                // CAMADA 4: AVISOS DE CARONA NO TOPO
+                // ============================================================
+                Positioned(
+                  key: const ValueKey('home_ride_alerts_layer'),
+                  top: MediaQuery.paddingOf(context).top + 8,
+                  left: 12,
+                  right: 12,
+                  child: _buildRideAlert(driverAccess.canDrive),
+                ),
               ],
             ),
     );
   }
 
+  /// Avisos de carona no topo: o motorista vê os pedidos de vaga das suas caronas
+  /// (eles só chegam antes de a viagem começar); o passageiro procurando carona vê
+  /// o motorista mais compatível.
+  Widget _buildRideAlert(bool canDrive) {
+    final matchState = ref.watch(passengerMatchProvider);
+    final suggestion = _passengerStep == PassengerRideStep.driverList
+        ? matchState.suggestion
+        : null;
+
+    return Column(
+      mainAxisSize: MainAxisSize.min,
+      crossAxisAlignment: CrossAxisAlignment.stretch,
+      children: [
+        if (canDrive) const IncomingRideRequestAlert(),
+        if (suggestion != null)
+          DriverSuggestionAlert(
+            match: suggestion,
+            isBusy: matchState.isBusy,
+            onConfirm: () => _handleSelectDriver(suggestion),
+            onDecline: () => ref
+                .read(passengerMatchProvider.notifier)
+                .declineSuggestion(suggestion),
+          ),
+      ],
+    );
+  }
+
   // --- VIEW 0: TELA PRINCIPAL COM GOOGLE MAPS REAL ---
   Widget _buildUberHomeView(dynamic user, bool canDrive, double bottomPadding) {
-    // Em expediente (sem um pedido de carona em andamento), o mapa mostra o caminho
-    // até o destino do expediente, mesmo com o painel fechado
+    // Com a viagem em andamento (e sem um pedido de carona aberto), o mapa
+    // mostra a rota da viagem com as paradas: buscar e deixar cada passageiro
+    final shiftRide = ref.watch(driverRideInProgressProvider);
     final showShiftRoute =
-        _isOnShift &&
+        shiftRide != null &&
         _passengerStep == PassengerRideStep.idle &&
         (_currentMode.isPassenger || _showRideRequests);
     // Os painéis do motorista abrem em 46% da tela: o mapa enquadra só a parte de cima
@@ -954,7 +1159,6 @@ class _HomePageState extends ConsumerState<HomePage> {
         Positioned.fill(
           child: HomeRealMapBackground(
             isDriverMode: _currentMode.isDriver,
-            searchRadiusKm: _driverSearchRadiusKm,
             showDrivers:
                 _currentMode.isPassenger &&
                 _passengerStep == PassengerRideStep.driverList,
@@ -962,17 +1166,33 @@ class _HomePageState extends ConsumerState<HomePage> {
             acceptedDriver: _passengerStep == PassengerRideStep.driverAccepted
                 ? ref.watch(passengerMatchProvider).selected
                 : null,
-            pickupLocation: _pickupLocation,
+            pickupLocation: showShiftRoute
+                ? _latLngOf(shiftRide.origin)
+                : (_currentMode.isDriver && _offerOriginLocation != null)
+                ? _offerOriginLocation
+                : _pickupLocation,
             destinationLocation: showShiftRoute
-                ? _shiftDestination
+                ? _latLngOf(shiftRide.destination)
                 : _destinationLocation,
-            pickupAddress: _pickupAddress,
+            pickupAddress: showShiftRoute
+                ? shiftRide.origin.address
+                : _pickupAddress,
             destinationAddress: showShiftRoute
-                ? _shiftDestinationAddress
+                ? shiftRide.destination.address
                 : _destinationAddress,
+            itineraryStops: showShiftRoute
+                ? [
+                    for (final stop in shiftRide.itinerary)
+                      (
+                        _latLngOf(stop.place),
+                        stop.type == RideStopType.pickup,
+                        _stopName(shiftRide, stop.passengerId),
+                      ),
+                  ]
+                : const [],
             bottomPadding: mapBottomPadding,
             showTrajectory:
-                (showShiftRoute && _shiftDestination != null) ||
+                showShiftRoute ||
                 (_currentMode.isDriver && _destinationLocation != null) ||
                 (_currentMode.isPassenger &&
                     (_passengerStep == PassengerRideStep.routeConfirmation ||
@@ -980,7 +1200,7 @@ class _HomePageState extends ConsumerState<HomePage> {
                         _passengerStep == PassengerRideStep.waitingDriver ||
                         _passengerStep == PassengerRideStep.driverAccepted)),
             tripRoutePoints: showShiftRoute
-                ? _shiftRoutePoints
+                ? _itineraryPoints(shiftRide)
                 : _tripRoutePoints,
             driverApproachRoutePoints: _driverApproachRoutePoints,
             isDraggingPin:
@@ -1012,10 +1232,9 @@ class _HomePageState extends ConsumerState<HomePage> {
               onDismiss: _handleCloseRideRequests,
               child: RideRequestsSheet(
                 bottomSafeArea: bottomPadding,
-                destinationAddress: _isOnShift
-                    ? _shiftDestinationAddress
-                    : null,
                 onClose: _handleCloseRideRequests,
+                onRideStarted: _handleRideStarted,
+                onNewOffer: _openOfferForm,
               ),
             ),
           )
@@ -1029,10 +1248,20 @@ class _HomePageState extends ConsumerState<HomePage> {
                 onSearchRadiusChanged: (newRadius) {
                   setState(() => _driverSearchRadiusKm = newRadius);
                 },
-                onStartShift: _handleStartDriverShift,
+                onPublish: _handlePublishOffer,
+                isPublishing: ref.watch(offerRouteProvider),
+                departureLabel: rideDepartureLabel(
+                  _offerDeparture,
+                  DateTime.now(),
+                ),
+                onChangeDeparture: () => _pickDeparture(
+                  current: _offerDeparture,
+                  onPicked: (departure) => _offerDeparture = departure,
+                ),
                 onSaveRoute: _handleSaveRoute,
                 onClose: _handleCloseDriverFormSheet,
                 onDestinationSelected: _handleDriverDestinationSelected,
+                onOriginSelected: _handleDriverOriginSelected,
               ),
             ),
           )
@@ -1067,6 +1296,14 @@ class _HomePageState extends ConsumerState<HomePage> {
                 onConfirmPickup: _handleConfirmPickup,
                 onConfirmDestination: _handleConfirmDestination,
                 onConfirmRideOrder: _handleConfirmRideOrder,
+                departureLabel: rideDepartureLabel(
+                  _rideDeparture,
+                  DateTime.now(),
+                ),
+                onChangeDeparture: () => _pickDeparture(
+                  current: _rideDeparture,
+                  onPicked: (departure) => _rideDeparture = departure,
+                ),
                 onSelectDriver: _handleSelectDriver,
                 onRetryMatches: _handleRetryMatches,
                 onCancelRequest: _handleCancelRequest,

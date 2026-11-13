@@ -3,6 +3,7 @@
 import 'package:flutter/foundation.dart';
 
 import '../../../auth/data/models/participation_role.dart';
+import '../../../route/data/models/route_place_model.dart';
 import 'participant_status.dart';
 import 'payment_status.dart';
 
@@ -19,6 +20,10 @@ class RideParticipantModel {
   final PaymentStatus? paymentStatus;
   final bool paymentConfirmedByDriver;
 
+  /// Onde o passageiro embarca e desembarca (o motorista não tem).
+  final RoutePlaceModel? boardingLocation;
+  final RoutePlaceModel? dropOffLocation;
+
   const RideParticipantModel({
     required this.userId,
     required this.name,
@@ -26,6 +31,8 @@ class RideParticipantModel {
     required this.status,
     this.paymentStatus,
     this.paymentConfirmedByDriver = false,
+    this.boardingLocation,
+    this.dropOffLocation,
   });
 
   bool get isDriver => role == ParticipationRole.driver;
@@ -48,6 +55,11 @@ class RideParticipantModel {
           : PaymentStatus.fromJson(paymentStatus),
       paymentConfirmedByDriver:
           json['paymentConfirmedByDriver'] as bool? ?? false,
+      boardingLocation: _placeOrNull(json['boardingLocation']),
+      dropOffLocation: _placeOrNull(json['dropOffLocation']),
     );
   }
+
+  static RoutePlaceModel? _placeOrNull(Object? json) =>
+      json is Map<String, dynamic> ? RoutePlaceModel.fromJson(json) : null;
 }

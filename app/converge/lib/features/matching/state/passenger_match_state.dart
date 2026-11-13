@@ -27,6 +27,9 @@ class PassengerMatchState {
   /// Aviso pontual para a tela (ex.: o motorista recusou).
   final String? notice;
 
+  /// Motoristas que o passageiro recusou no aviso: não são sugeridos de novo nesta busca.
+  final Set<String> declinedRouteIds;
+
   const PassengerMatchState({
     this.phase = PassengerMatchPhase.idle,
     this.searchRouteId,
@@ -36,7 +39,21 @@ class PassengerMatchState {
     this.isCancelling = false,
     this.errorMessage,
     this.notice,
+    this.declinedRouteIds = const {},
   });
+
+  /// Motorista sugerido no aviso: o mais compatível que ainda dá para pedir e que
+  /// o passageiro não recusou. A lista já vem do mais para o menos compatível.
+  MatchModel? get suggestion {
+    if (phase != PassengerMatchPhase.ready) return null;
+    for (final match in matches) {
+      if (match.canRequestSeat &&
+          !declinedRouteIds.contains(match.driverRouteId)) {
+        return match;
+      }
+    }
+    return null;
+  }
 
   bool get isBusy =>
       phase == PassengerMatchPhase.requesting ||
@@ -52,6 +69,7 @@ class PassengerMatchState {
     bool? isCancelling,
     Object? errorMessage = _unset,
     Object? notice = _unset,
+    Set<String>? declinedRouteIds,
   }) {
     return PassengerMatchState(
       phase: phase ?? this.phase,
@@ -68,6 +86,7 @@ class PassengerMatchState {
           ? this.errorMessage
           : errorMessage as String?,
       notice: identical(notice, _unset) ? this.notice : notice as String?,
+      declinedRouteIds: declinedRouteIds ?? this.declinedRouteIds,
     );
   }
 }

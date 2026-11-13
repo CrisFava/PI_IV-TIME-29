@@ -91,10 +91,18 @@ class FakeSeatRideRepository implements RideRepository {
   }
 
   @override
-  Future<RideModel> startRide(String rideId) => throw UnimplementedError();
+  Future<RideModel> startRide(String rideId) async {
+    calls.add('start:$rideId');
+    _maybeFail();
+    return fakeRide(status: 'IN_PROGRESS');
+  }
 
   @override
-  Future<RideModel> completeRide(String rideId) => throw UnimplementedError();
+  Future<RideModel> completeRide(String rideId) async {
+    calls.add('complete:$rideId');
+    _maybeFail();
+    return fakeRide(status: 'COMPLETED', passengerStatus: 'COMPLETED');
+  }
 
   @override
   Future<RideModel> cancelRide(String rideId, {String? reason}) =>

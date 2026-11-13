@@ -140,7 +140,6 @@ const String _monochromeMapStyle = '''[
 /// ============================================================================
 class HomeRealMapBackground extends StatefulWidget {
   final bool isDriverMode;
-  final double searchRadiusKm;
   final bool showDrivers;
   /// Motoristas compatíveis (matching), marcados no ponto de partida de cada um.
   final List<MatchModel> availableDrivers;
@@ -166,10 +165,12 @@ class HomeRealMapBackground extends StatefulWidget {
   /// Altura coberta por um painel na parte de baixo: o enquadramento usa só a área visível.
   final double bottomPadding;
 
+  /// Paradas da viagem em andamento: (posição, é embarque?, título do marcador).
+  final List<(LatLng, bool, String)> itineraryStops;
+
   const HomeRealMapBackground({
     super.key,
     required this.isDriverMode,
-    this.searchRadiusKm = 5.0,
     this.showDrivers = false,
     this.availableDrivers = const [],
     this.acceptedDriver,
@@ -188,6 +189,7 @@ class HomeRealMapBackground extends StatefulWidget {
     this.onMapTap,
     this.universityName = 'PUC-Campinas',
     this.bottomPadding = 0,
+    this.itineraryStops = const [],
   });
 
   @override
@@ -324,21 +326,6 @@ class _HomeRealMapBackgroundState extends State<HomeRealMapBackground> {
     );
   }
 
-  Set<Circle> _buildCircles() {
-    if (!widget.isDriverMode) return const {};
-
-    return {
-      Circle(
-        circleId: const CircleId('driver_acceptance_radius'),
-        center: widget.pickupLocation ?? campusCoordinates,
-        radius: widget.searchRadiusKm * 1000,
-        strokeWidth: 1,
-        strokeColor: AppColors.primary.withValues(alpha: 0.35),
-        fillColor: AppColors.primary.withValues(alpha: 0.04),
-      ),
-    };
-  }
-
   Set<Marker> _buildMarkers() {
     final markers = <Marker>{};
 
@@ -384,6 +371,24 @@ class _HomeRealMapBackgroundState extends State<HomeRealMapBackground> {
           infoWindow: InfoWindow(
             title: destTitle,
             snippet: 'Ponto de chegada da viagem',
+          ),
+        ),
+      );
+    }
+
+    // Paradas da viagem em andamento: embarques em verde, desembarques em laranja
+    for (var i = 0; i < widget.itineraryStops.length; i++) {
+      final (position, isPickup, title) = widget.itineraryStops[i];
+      markers.add(
+        Marker(
+          markerId: MarkerId('itinerary_stop_$i'),
+          position: position,
+          icon: BitmapDescriptor.defaultMarkerWithHue(
+            isPickup ? BitmapDescriptor.hueGreen : BitmapDescriptor.hueOrange,
+          ),
+          infoWindow: InfoWindow(
+            title: '${i + 1}. $title',
+            snippet: isPickup ? 'Buscar o passageiro' : 'Deixar o passageiro',
           ),
         ),
       );
@@ -526,7 +531,6 @@ class _HomeRealMapBackgroundState extends State<HomeRealMapBackground> {
             compassEnabled: false,
             mapToolbarEnabled: false,
             trafficEnabled: false,
-            circles: _buildCircles(),
             markers: _buildMarkers(),
             polylines: _buildPolylines(),
           ),
@@ -553,9 +557,13 @@ class _HomeRealMapBackgroundState extends State<HomeRealMapBackground> {
   }
 
   Widget _buildRecenterFab() {
+    // Logo acima da navbar: ela fica 16 px acima da base (ou da área segura) e tem 66 px
+    final safeBottom = MediaQuery.paddingOf(context).bottom;
+    final dockTop = (safeBottom > 0 ? safeBottom : 16.0) + 66;
+
     return Positioned(
       right: 16,
-      bottom: 270,
+      bottom: dockTop + 12,
       child: Material(
         color: AppColors.cardBackground,
         elevation: 4,

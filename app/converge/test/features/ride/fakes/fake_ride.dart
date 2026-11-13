@@ -62,6 +62,18 @@ Map<String, dynamic> fakeRideJson({
       'status': passengerStatus,
       'paymentStatus': 'PENDING',
       'paymentConfirmedByDriver': false,
+      'boardingLocation': {
+        'address': 'Rua Coronel Quirino, 900',
+        'city': 'Campinas',
+        'latitude': -22.8955,
+        'longitude': -47.0525,
+      },
+      'dropOffLocation': {
+        'address': 'PUC-Campinas',
+        'city': 'Campinas',
+        'latitude': -22.8338,
+        'longitude': -47.0519,
+      },
     },
     ...extraParticipants,
   ],

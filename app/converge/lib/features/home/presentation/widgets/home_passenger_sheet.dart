@@ -21,6 +21,7 @@ import '../../../route/state/saved_routes_controller.dart';
 import 'campus_spots.dart';
 import 'home_driver_form_sheet.dart';
 import 'passenger_ride_step.dart';
+import 'ride_departure_tile.dart';
 
 /// ============================================================================
 /// COMPONENTE: HomePassengerSheet (Fluxo de Solicitação do Passageiro)
@@ -48,6 +49,10 @@ class HomePassengerSheet extends ConsumerStatefulWidget {
   final VoidCallback onConfirmPickup;
   final VoidCallback onConfirmDestination;
   final VoidCallback onConfirmRideOrder;
+
+  /// Saída do pedido de carona ("Agora" por padrão) e a troca de dia e horário.
+  final String departureLabel;
+  final VoidCallback onChangeDeparture;
   final ValueChanged<MatchModel> onSelectDriver;
   final VoidCallback onRetryMatches;
   final VoidCallback onCancelRequest;
@@ -73,6 +78,8 @@ class HomePassengerSheet extends ConsumerStatefulWidget {
     required this.onConfirmPickup,
     required this.onConfirmDestination,
     required this.onConfirmRideOrder,
+    required this.onChangeDeparture,
+    this.departureLabel = 'Agora',
     required this.onSelectDriver,
     required this.onRetryMatches,
     required this.onCancelRequest,
@@ -2096,6 +2103,12 @@ class _HomePassengerSheetState extends ConsumerState<HomePassengerSheet> {
                     ),
                   ],
                 ),
+              ),
+              const SizedBox(height: 10),
+              // Saída: agora por padrão, ou outro dia e horário
+              RideDepartureTile(
+                label: widget.departureLabel,
+                onTap: widget.onChangeDeparture,
               ),
               const SizedBox(height: 16),
 

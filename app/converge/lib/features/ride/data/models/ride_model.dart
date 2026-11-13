@@ -4,6 +4,7 @@ import 'package:flutter/foundation.dart';
 
 import '../../../route/data/models/route_place_model.dart';
 import 'ride_participant_model.dart';
+import 'ride_stop_model.dart';
 import 'ride_status.dart';
 
 /// Uma viagem concreta, conforme `RideResponseDTO`.
@@ -30,6 +31,14 @@ class RideModel {
   /// Lista imutável: quem chamou o construtor não consegue alterá-la depois.
   final List<RideParticipantModel> participants;
 
+  /// Paradas na ordem: buscar e deixar cada passageiro confirmado. O motorista
+  /// vê todas; o passageiro, só as próprias.
+  final List<RideStopModel> itinerary;
+
+  /// Rota passando pelas paradas (só o motorista recebe).
+  final String? itineraryPolyline;
+  final double? itineraryDistanceKm;
+
   RideModel({
     required this.id,
     required this.sequentialNumber,
@@ -46,7 +55,11 @@ class RideModel {
     required this.vehicleModel,
     required this.vehicleLicensePlate,
     required List<RideParticipantModel> participants,
-  }) : participants = List.unmodifiable(participants);
+    List<RideStopModel> itinerary = const [],
+    this.itineraryPolyline,
+    this.itineraryDistanceKm,
+  }) : participants = List.unmodifiable(participants),
+       itinerary = List.unmodifiable(itinerary);
 
   bool isDrivenBy(String userId) => driverId == userId;
 
@@ -78,6 +91,7 @@ class RideModel {
   factory RideModel.fromJson(Map<String, dynamic> json) {
     final vehicle = json['vehicleSnapshot'];
     final participants = json['participants'];
+    final itinerary = json['itinerary'];
     return RideModel(
       id: json['id'] as String? ?? '',
       sequentialNumber: (json['sequentialNumber'] as num?)?.toInt() ?? 0,
@@ -109,6 +123,13 @@ class RideModel {
             if (participant is Map<String, dynamic>)
               RideParticipantModel.fromJson(participant),
       ],
+      itinerary: [
+        if (itinerary is List)
+          for (final stop in itinerary)
+            if (stop is Map<String, dynamic>) RideStopModel.fromJson(stop),
+      ],
+      itineraryPolyline: json['itineraryPolyline'] as String?,
+      itineraryDistanceKm: (json['itineraryDistanceKm'] as num?)?.toDouble(),
     );
   }
 }

@@ -3,6 +3,7 @@
 import 'package:converge/features/ride/data/models/participant_status.dart';
 import 'package:converge/features/ride/data/models/payment_status.dart';
 import 'package:converge/features/ride/data/models/ride_model.dart';
+import 'package:converge/features/ride/data/models/ride_stop_type.dart';
 import 'package:converge/features/ride/data/models/ride_payment_model.dart';
 import 'package:converge/features/ride/data/models/ride_status.dart';
 import 'package:flutter_test/flutter_test.dart';
@@ -27,6 +28,42 @@ void main() {
       expect(ride.vehicleLicensePlate, 'ABC1D23');
       expect(ride.participants, hasLength(2));
       expect(ride.driverName, 'Lucas Silveira');
+    });
+
+    test('lê o itinerário: paradas na ordem, distância e rota', () {
+      final ride = RideModel.fromJson({
+        ...fakeRideJson(),
+        'itinerary': [
+          {
+            'type': 'PICKUP',
+            'passengerId': fakePassengerId,
+            'place': {
+              'address': 'Rua Coronel Quirino, 900',
+              'latitude': -22.8955,
+              'longitude': -47.0525,
+            },
+          },
+          {
+            'type': 'DROPOFF',
+            'passengerId': fakePassengerId,
+            'place': {
+              'address': 'PUC-Campinas',
+              'latitude': -22.8338,
+              'longitude': -47.0519,
+            },
+          },
+        ],
+        'itineraryDistanceKm': 14.2,
+        'itineraryPolyline': 'polyline-com-paradas',
+      });
+
+      expect(ride.itinerary.map((s) => s.type), [
+        RideStopType.pickup,
+        RideStopType.dropOff,
+      ]);
+      expect(ride.itinerary.first.place.address, 'Rua Coronel Quirino, 900');
+      expect(ride.itineraryDistanceKm, 14.2);
+      expect(ride.itineraryPolyline, 'polyline-com-paradas');
     });
 
     test('status desconhecido não quebra a leitura', () {

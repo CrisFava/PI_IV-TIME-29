@@ -2,6 +2,7 @@
 
 import 'dart:async';
 
+import 'package:flutter/foundation.dart' show debugPrint;
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../../core/network/api_exception.dart';
@@ -31,6 +32,10 @@ final passengerMatchProvider =
 class PassengerMatchController extends Notifier<PassengerMatchState> {
   Timer? _polling;
 
+  // Trajeto de procura criado só para este pedido: sai do matching quando o pedido
+  // é fechado sem carona aceita (cada pedido "agora" cria um trajeto novo)
+  String? _createdSearchRouteId;
+
   MatchingRepository get _matching => ref.read(matchingRepositoryProvider);
   RideRepository get _rides => ref.read(rideRepositoryProvider);
   RouteRepository get _routes => ref.read(routeRepositoryProvider);
@@ -48,7 +53,9 @@ class PassengerMatchController extends Notifier<PassengerMatchState> {
       final existing = _findSame(await _routes.listMyRoutes(), request);
       if (existing != null) return existing.id;
 
-      return (await _routes.createRoute(request)).id;
+      final created = await _routes.createRoute(request);
+      _createdSearchRouteId = created.id;
+      return created.id;
     } on ApiException catch (e) {
       // Outro pedido salvou o mesmo trajeto no meio do caminho: usa o que ficou no banco.
       if (e.isConflict) {
@@ -101,6 +108,13 @@ class PassengerMatchController extends Notifier<PassengerMatchState> {
         errorMessage: authErrorMessage(e),
       );
     }
+  }
+
+  /// O passageiro recusou o motorista sugerido no aviso: sugere o próximo.
+  void declineSuggestion(MatchModel match) {
+    state = state.copyWith(
+      declinedRouteIds: {...state.declinedRouteIds, match.driverRouteId},
+    );
   }
 
   /// Pede a vaga no trajeto do motorista, na próxima data em comum.
@@ -184,10 +198,24 @@ class PassengerMatchController extends Notifier<PassengerMatchState> {
   /// O aviso já foi mostrado.
   void clearNotice() => state = state.copyWith(notice: null);
 
-  /// Volta ao início (o passageiro fechou o fluxo).
+  /// Volta ao início (o passageiro fechou o fluxo). O trajeto de procura criado
+  /// para o pedido é desativado, a não ser que a carona tenha sido aceita.
   void reset() {
     _stopPolling();
+    final created = _createdSearchRouteId;
+    final accepted = state.phase == PassengerMatchPhase.accepted;
+    _createdSearchRouteId = null;
+    if (created != null && !accepted) unawaited(_discardRoute(created));
     state = const PassengerMatchState();
+  }
+
+  Future<void> _discardRoute(String routeId) async {
+    try {
+      await _routes.deleteRoute(routeId);
+    } catch (e) {
+      // Não atrapalha o passageiro: o trajeto só continua visível até ser apagado
+      debugPrint('Erro ao desativar o trajeto de procura $routeId: $e');
+    }
   }
 
   void _apply(RideModel ride) {
