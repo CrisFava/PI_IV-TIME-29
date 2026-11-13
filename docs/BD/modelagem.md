@@ -584,6 +584,8 @@ O backend monta o payload sob demanda (padrão BR Code do Banco Central, CRC16 i
 
 **Módulo:** `modules/security`
 **Descrição:** Registros de bloqueio entre usuários. Usada para filtrar resultados de matching, aceites de carona e chat. O bloqueio é bidirecional para fins de interação.
+- **Hoje:** o matching já lê esta coleção pela porta `BlockAccess`, nos dois sentidos.
+- **Ainda falta:** as rotas para criar e desfazer bloqueios (RF46) e o uso no aceite de carona e no chat.
 
 ```json
 {
@@ -683,15 +685,27 @@ O backend monta o payload sob demanda (padrão BR Code do Banco Central, CRC16 i
 
 ### Como o cálculo funciona
 
-O cálculo fica no `MatchRoutesHandler` (`app/server`, pacote `handler/matching`). O backend chama esse handler pelo `SocketMatchingGateway`, e quando o servidor de sockets está fora do ar ele roda o mesmo handler localmente. O cálculo compara um trajeto com N candidatos do tipo oposto, nos dois sentidos:
+O cálculo fica no `MatchRoutesHandler` (`app/server`, pacote `handler/matching`). O backend chama esse handler pelo `SocketMatchingGateway`, e quando o servidor de sockets está fora do ar ele roda o mesmo handler localmente. O cálculo compara um trajeto com N candidatos do tipo oposto.
 
-- `GET /api/v1/matching/passenger?routeId=` compara uma procura do passageiro com as ofertas.
-- `GET /api/v1/matching/driver?routeId=` compara uma oferta do motorista com as procuras, o "N passageiros × 1 motorista".
+`GET /api/v1/matchings?routeId=` lista as combinações de um trajeto do usuário, da maior para a menor `compatibilityScore`. O tipo do trajeto decide o lado da busca:
+- **procura (`SEARCH`):** compara a procura do passageiro com as ofertas e lista os motoristas;
+- **oferta (`OFFER`):** compara a oferta do motorista com as procuras e lista os passageiros, o "N passageiros × 1 motorista".
 
-**Candidatos:** são trajetos `ACTIVE` do tipo oposto que tenham pelo menos um dia da semana em comum. Ficam de fora:
+**Candidatos:** vêm de uma consulta geoespacial nos índices `2dsphere` (`$geoWithin` + `$centerSphere`). Entram os trajetos `ACTIVE` do tipo oposto com pelo menos um dia da semana em comum, desde que:
+- a origem esteja dentro do raio em volta da origem do trajeto pesquisado;
+- o destino esteja dentro do raio em volta do destino do trajeto pesquisado.
+
+**Raio** (`MatchingSearchRadius`): para o desvio caber no `maxDetourKm`, a origem e o destino do passageiro ficam a no máximo (distância em linha reta da rota do motorista + `maxDetourKm`) dos pontos do motorista.
+- **Oferta:** o raio é `routeDistanceKm + maxDetourKm`, que é um limite seguro, porque a distância pela rua nunca é menor que a em linha reta.
+- **Procura:** cada motorista tem o próprio desvio máximo, então vale o teto.
+- **Teto:** os dois lados respeitam o teto `converge.matching.max-candidate-radius-km` (padrão 50 km), para o par aparecer igual para os dois.
+- **Filtro exato:** o raio só pré-seleciona; o desvio exato continua no servidor de sockets.
+
+Ficam de fora:
 - o próprio usuário;
-- motoristas que não podem oferecer carona (conta inativa, vínculo não verificado, bloqueado por dívida ou CNH inválida);
-- passageiros que não podem pedir vaga;
+- quem tem bloqueio ativo com o usuário, nos dois sentidos (coleção `blocks`, RF47);
+- motoristas que não podem oferecer carona: conta inativa, vínculo não verificado, bloqueado por dívida (`paymentStanding = BLOCKED` ou `isDefaulter = true`, RF67), CNH não verificada ou vencida (RF63) ou sem chave PIX (RF72);
+- passageiros que não podem pedir vaga: conta inativa, vínculo não verificado ou bloqueado por dívida (RF67);
 - pares já recusados numa viagem em aberto.
 
 **Filtros eliminatórios** (RF14, RF15). O par é descartado quando:

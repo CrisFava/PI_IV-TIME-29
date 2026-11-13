@@ -123,6 +123,29 @@ class UserQueryUseCasesTest {
     }
 
     @Test
+    @DisplayName("Inadimplente (isDefaulter) não pode participar, mesmo com a situação de pagamento desatualizada (RF67)")
+    void shouldNotBeEligibleWhenMarkedAsDefaulter() {
+        User defaulter = user("Iara Luz", VerificationStatus.VERIFIED);
+        defaulter.setDefaulter(true);
+
+        assertThat(eligibilityOf(defaulter).blockedByDebt()).isTrue();
+        assertThat(eligibilityOf(defaulter).canJoinRides()).isFalse();
+    }
+
+    @Test
+    @DisplayName("Motorista com CNH válida mas sem chave PIX não pode oferecer carona (RF72)")
+    void shouldNotOfferRidesWithoutPixKey() {
+        User withoutPix = user("João Paz", VerificationStatus.VERIFIED);
+        withoutPix.setDriverLicense(license(VerificationStatus.VERIFIED, LocalDateTime.now().plusYears(2)));
+
+        UserEligibilityDTO eligibility = eligibilityOf(withoutPix);
+
+        assertThat(eligibility.driverLicenseValid()).isTrue();
+        assertThat(eligibility.hasPixKey()).isFalse();
+        assertThat(eligibility.canOfferRides()).isFalse();
+    }
+
+    @Test
     @DisplayName("Conta desativada impede participar")
     void shouldNotBeEligibleWhenAccountIsInactive() {
         User inactive = user("Eva Rocha", VerificationStatus.VERIFIED);
@@ -139,10 +162,14 @@ class UserQueryUseCasesTest {
     void shouldOnlyOfferRidesWithVerifiedAndValidLicense() {
         User valid = user("Fabio Dias", VerificationStatus.VERIFIED);
         valid.setDriverLicense(license(VerificationStatus.VERIFIED, LocalDateTime.now().plusYears(2)));
+        valid.setPixKey("12345678909");
         User expired = user("Gabi Reis", VerificationStatus.VERIFIED);
         expired.setDriverLicense(license(VerificationStatus.VERIFIED, LocalDateTime.now().minusDays(1)));
+        expired.setPixKey("12345678909");
         User pending = user("Hugo Paz", VerificationStatus.VERIFIED);
         pending.setDriverLicense(license(VerificationStatus.PENDING, LocalDateTime.now().plusYears(2)));
+        // Com PIX: a recusa vem só da CNH vencida ou pendente
+        pending.setPixKey("12345678909");
 
         assertThat(eligibilityOf(valid).canOfferRides()).isTrue();
         assertThat(eligibilityOf(expired).canOfferRides()).isFalse();

@@ -80,6 +80,8 @@ class SimulationWorld:
             "model": "Volkswagen Gol",
             "licensePlate": f"SIM{random.randint(0, 9)}{random.choice('ABCDEFGHJ')}{random.randint(10, 99)}",
             "color": "Prata",
+            # RENAVAM obrigatório desde o cadastro de carros; este tem o dígito verificador válido
+            "renavam": "14283256656",
             "type": "HATCH",
             "totalCapacity": 4,
             "fuelSources": [{"energySource": "GASOLINE", "averageConsumption": 12.0, "currentEnergyPrice": 6.29}],
@@ -176,11 +178,11 @@ class SimulationWorld:
 
     # ------------------------------------------------------------------ trajetos e pedidos
 
-    def offer_route(self, driver: SimulatedUser, seats: int) -> str:
+    def offer_route(self, driver: SimulatedUser, seats: int, origin: tuple = DRIVER_ORIGIN) -> str:
         return self._create_route(driver, {
             "type": "OFFER",
             "vehicleId": driver.vehicle_id,
-            "origin": _place(DRIVER_ORIGIN),
+            "origin": _place(origin),
             "maxDetourKm": 5.0,
             "totalSeats": seats,
             "toll": 0,

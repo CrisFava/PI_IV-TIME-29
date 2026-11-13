@@ -34,8 +34,30 @@ class RideEligibilityTest {
     }
 
     private void userIs(boolean active, boolean academicVerified, boolean blockedByDebt, boolean driverLicenseValid) {
-        when(getUserEligibility.execute(USER_ID))
-                .thenReturn(new UserEligibilityDTO(active, academicVerified, blockedByDebt, driverLicenseValid));
+        userIs(active, academicVerified, blockedByDebt, driverLicenseValid, true);
+    }
+
+    private void userIs(
+            boolean active,
+            boolean academicVerified,
+            boolean blockedByDebt,
+            boolean driverLicenseValid,
+            boolean hasPixKey
+    ) {
+        when(getUserEligibility.execute(USER_ID)).thenReturn(
+                new UserEligibilityDTO(active, academicVerified, blockedByDebt, driverLicenseValid, hasPixKey));
+    }
+
+    @Test
+    @DisplayName("Motorista sem chave PIX não pode oferecer carona (RF72)")
+    void shouldRejectOfferWithoutPixKey() {
+        userIs(true, true, false, true, false);
+
+        ApplicationException thrown = assertThrows(ApplicationException.class,
+                () -> rideEligibility.assertCanOffer(USER_ID, "O motorista"));
+
+        assertThat(thrown.getError().code()).isEqualTo(ErrorCode.NOT_ALLOWED);
+        assertThat(thrown.getError().fields()).containsExactly("pixKey");
     }
 
     @Test

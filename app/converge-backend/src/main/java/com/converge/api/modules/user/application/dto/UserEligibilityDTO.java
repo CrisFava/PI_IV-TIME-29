@@ -6,7 +6,8 @@ public record UserEligibilityDTO(
         boolean active,
         boolean academicVerified,
         boolean blockedByDebt,
-        boolean driverLicenseValid
+        boolean driverLicenseValid,
+        boolean hasPixKey
 ) {
 
     public boolean canJoinRides() {
@@ -14,6 +15,6 @@ public record UserEligibilityDTO(
     }
 
     public boolean canOfferRides() {
-        return canJoinRides() && driverLicenseValid;
+        return canJoinRides() && driverLicenseValid && hasPixKey;
     }
 }
