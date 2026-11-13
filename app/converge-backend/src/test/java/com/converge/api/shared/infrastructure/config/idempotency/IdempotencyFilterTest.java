@@ -2,11 +2,14 @@
 
 package com.converge.api.shared.infrastructure.config.idempotency;
 
+import com.converge.api.shared.domain.enums.IdempotencyStatus;
 import com.converge.api.shared.domain.model.IdempotencyKey;
 import com.converge.api.shared.domain.repository.IdempotencyKeyRepository;
 import com.converge.api.shared.infrastructure.config.auth.AuthenticatedUser;
 import jakarta.servlet.FilterChain;
 import jakarta.servlet.ServletException;
+import jakarta.servlet.http.HttpServletRequest;
+import jakarta.servlet.http.HttpServletResponse;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
@@ -21,8 +24,10 @@ import org.springframework.security.authentication.UsernamePasswordAuthenticatio
 import org.springframework.security.core.context.SecurityContextHolder;
 
 import java.io.IOException;
+import java.nio.charset.StandardCharsets;
 import java.util.Collections;
 import java.util.Optional;
+import java.util.concurrent.atomic.AtomicReference;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.mockito.ArgumentMatchers.any;
@@ -58,16 +63,25 @@ class IdempotencyFilterTest {
     }
 
     @Test
-    @DisplayName("Deve armazenar resposta no primeiro POST com Idempotency-Key e retornar resposta em cache no replay")
+    @DisplayName("Deve armazenar resposta e fingerprint no primeiro POST com Idempotency-Key e retornar resposta em cache no replay")
     void shouldStoreAndReplayCompletedResponse() throws ServletException, IOException {
+        AtomicReference<IdempotencyKey> savedEntry = new AtomicReference<>();
+
         MockHttpServletRequest request1 = new MockHttpServletRequest("POST", "/api/v1/rides/ride-1/passengers/p1/accept");
         request1.addHeader("Idempotency-Key", "uuid-123");
+        request1.setQueryString("notify=true");
+        request1.setContent("{\"note\":\"ok\"}".getBytes(StandardCharsets.UTF_8));
         MockHttpServletResponse response1 = new MockHttpServletResponse();
 
-        when(repository.save(any(IdempotencyKey.class))).thenAnswer(inv -> inv.getArgument(0));
+        when(repository.save(any(IdempotencyKey.class))).thenAnswer(inv -> {
+            IdempotencyKey arg = inv.getArgument(0);
+            savedEntry.set(arg);
+            return arg;
+        });
         doAnswer(inv -> {
-            MockHttpServletResponse resp = new MockHttpServletResponse();
-            var wrapper = (jakarta.servlet.http.HttpServletResponse) inv.getArgument(1);
+            HttpServletRequest req = (HttpServletRequest) inv.getArgument(0);
+            assertThat(req.getInputStream().readAllBytes()).isEqualTo("{\"note\":\"ok\"}".getBytes(StandardCharsets.UTF_8));
+            HttpServletResponse wrapper = (HttpServletResponse) inv.getArgument(1);
             wrapper.setStatus(200);
             wrapper.setContentType("application/json");
             wrapper.getWriter().write("{\"success\":true,\"data\":{\"id\":\"ride-1\"}}");
@@ -78,65 +92,138 @@ class IdempotencyFilterTest {
 
         assertThat(response1.getStatus()).isEqualTo(200);
         assertThat(response1.getContentAsString()).isEqualTo("{\"success\":true,\"data\":{\"id\":\"ride-1\"}}");
+        assertThat(savedEntry.get().getRequestFingerprint()).isNotBlank();
         verify(repository, times(2)).save(any(IdempotencyKey.class));
         verify(filterChain, times(1)).doFilter(any(), any());
 
-        // Replay com a mesma chave
-        IdempotencyKey completedEntry = IdempotencyKey.inProgress(
-                "uuid-123", "user-1", "POST", "/api/v1/rides/ride-1/passengers/p1/accept");
-        completedEntry.markCompleted(200, "application/json", "{\"success\":true,\"data\":{\"id\":\"ride-1\"}}");
-
+        // Replay com a mesma chave, query e corpo
         when(repository.save(any(IdempotencyKey.class))).thenThrow(new DuplicateKeyException("duplicate key"));
-        when(repository.findByKey("uuid-123")).thenReturn(Optional.of(completedEntry));
+        when(repository.findByKey("uuid-123")).thenReturn(Optional.of(savedEntry.get()));
 
         MockHttpServletRequest request2 = new MockHttpServletRequest("POST", "/api/v1/rides/ride-1/passengers/p1/accept");
         request2.addHeader("Idempotency-Key", "uuid-123");
+        request2.setQueryString("notify=true");
+        request2.setContent("{\"note\":\"ok\"}".getBytes(StandardCharsets.UTF_8));
         MockHttpServletResponse response2 = new MockHttpServletResponse();
 
         filter.doFilter(request2, response2, filterChain);
 
         assertThat(response2.getStatus()).isEqualTo(200);
         assertThat(response2.getContentAsString()).isEqualTo("{\"success\":true,\"data\":{\"id\":\"ride-1\"}}");
-        // FilterChain não foi chamado novamente
+        verify(filterChain, times(1)).doFilter(any(), any());
+    }
+
+    @Test
+    @DisplayName("Deve retornar 400 Bad Request quando Idempotency-Key é reutilizada com corpo ou query diferente")
+    void shouldReturnBadRequestWhenFingerprintDiffers() throws ServletException, IOException {
+        AtomicReference<IdempotencyKey> savedEntry = new AtomicReference<>();
+        when(repository.save(any(IdempotencyKey.class))).thenAnswer(inv -> {
+            IdempotencyKey arg = inv.getArgument(0);
+            savedEntry.set(arg);
+            return arg;
+        });
+
+        MockHttpServletRequest request1 = new MockHttpServletRequest("POST", "/api/v1/rides/request");
+        request1.addHeader("Idempotency-Key", "uuid-fp");
+        request1.setContent("{\"driverRouteId\":\"r1\"}".getBytes(StandardCharsets.UTF_8));
+        filter.doFilter(request1, new MockHttpServletResponse(), filterChain);
+
+        when(repository.save(any(IdempotencyKey.class))).thenThrow(new DuplicateKeyException("duplicate"));
+        when(repository.findByKey("uuid-fp")).thenReturn(Optional.of(savedEntry.get()));
+
+        MockHttpServletRequest request2 = new MockHttpServletRequest("POST", "/api/v1/rides/request");
+        request2.addHeader("Idempotency-Key", "uuid-fp");
+        request2.setContent("{\"driverRouteId\":\"r2\"}".getBytes(StandardCharsets.UTF_8));
+        MockHttpServletResponse response2 = new MockHttpServletResponse();
+
+        filter.doFilter(request2, response2, filterChain);
+
+        assertThat(response2.getStatus()).isEqualTo(400);
+        assertThat(response2.getContentAsString()).contains("BAD_REQUEST");
+        verify(filterChain, times(1)).doFilter(any(), any());
+    }
+
+    @Test
+    @DisplayName("Deve preservar reserva como UNKNOWN_OUTCOME se falhar ao salvar resposta concluída após mutação")
+    void shouldPreserveUnknownOutcomeWhenSavingCompletedFails() throws ServletException, IOException {
+        AtomicReference<IdempotencyKey> savedEntry = new AtomicReference<>();
+        when(repository.save(any(IdempotencyKey.class)))
+                .thenAnswer(inv -> {
+                    IdempotencyKey arg = inv.getArgument(0);
+                    savedEntry.set(arg);
+                    return arg;
+                })
+                .thenThrow(new RuntimeException("Mongo timeout on save"))
+                .thenAnswer(inv -> {
+                    IdempotencyKey arg = inv.getArgument(0);
+                    savedEntry.set(arg);
+                    return arg;
+                });
+
+        doAnswer(inv -> {
+            HttpServletResponse wrapper = (HttpServletResponse) inv.getArgument(1);
+            wrapper.setStatus(200);
+            wrapper.getWriter().write("{\"success\":true}");
+            return null;
+        }).when(filterChain).doFilter(any(), any());
+
+        MockHttpServletRequest request1 = new MockHttpServletRequest("POST", "/api/v1/rides/ride-1/cancel");
+        request1.addHeader("Idempotency-Key", "uuid-unk");
+        MockHttpServletResponse response1 = new MockHttpServletResponse();
+
+        filter.doFilter(request1, response1, filterChain);
+
+        assertThat(response1.getStatus()).isEqualTo(200);
+        assertThat(savedEntry.get().getStatus()).isEqualTo(IdempotencyStatus.UNKNOWN_OUTCOME);
+        verify(repository, never()).deleteByKey("uuid-unk");
+
+        // Retry com a mesma chave não deve reexecutar mutação
+        when(repository.save(any(IdempotencyKey.class))).thenThrow(new DuplicateKeyException("duplicate"));
+        when(repository.findByKey("uuid-unk")).thenReturn(Optional.of(savedEntry.get()));
+
+        MockHttpServletRequest request2 = new MockHttpServletRequest("POST", "/api/v1/rides/ride-1/cancel");
+        request2.addHeader("Idempotency-Key", "uuid-unk");
+        MockHttpServletResponse response2 = new MockHttpServletResponse();
+
+        filter.doFilter(request2, response2, filterChain);
+
+        assertThat(response2.getStatus()).isEqualTo(409);
+        assertThat(response2.getContentAsString()).contains("RIDE_CONFLICT");
         verify(filterChain, times(1)).doFilter(any(), any());
     }
 
     @Test
     @DisplayName("Deve retornar 409 Conflict quando requisição com mesma Idempotency-Key ainda está IN_PROGRESS")
     void shouldReturnConflictWhenInProgress() throws ServletException, IOException {
-        IdempotencyKey inProgressEntry = IdempotencyKey.inProgress(
-                "uuid-456", "user-1", "POST", "/api/v1/rides/request");
+        AtomicReference<IdempotencyKey> savedEntry = new AtomicReference<>();
+        when(repository.save(any(IdempotencyKey.class))).thenAnswer(inv -> {
+            IdempotencyKey arg = inv.getArgument(0);
+            savedEntry.set(arg);
+            return arg;
+        });
+
+        // Simula primeira requisição registrando IN_PROGRESS
+        MockHttpServletRequest req = new MockHttpServletRequest("POST", "/api/v1/rides/request");
+        req.addHeader("Idempotency-Key", "uuid-456");
+        req.setContent("{\"a\":1}".getBytes(StandardCharsets.UTF_8));
+        filter.doFilter(req, new MockHttpServletResponse(), filterChain);
+
+        savedEntry.set(IdempotencyKey.inProgress(
+                "uuid-456", "user-1", "POST", "/api/v1/rides/request", savedEntry.get().getRequestFingerprint()));
+
         when(repository.save(any(IdempotencyKey.class))).thenThrow(new DuplicateKeyException("duplicate"));
-        when(repository.findByKey("uuid-456")).thenReturn(Optional.of(inProgressEntry));
+        when(repository.findByKey("uuid-456")).thenReturn(Optional.of(savedEntry.get()));
 
-        MockHttpServletRequest request = new MockHttpServletRequest("POST", "/api/v1/rides/request");
-        request.addHeader("Idempotency-Key", "uuid-456");
-        MockHttpServletResponse response = new MockHttpServletResponse();
+        MockHttpServletRequest request2 = new MockHttpServletRequest("POST", "/api/v1/rides/request");
+        request2.addHeader("Idempotency-Key", "uuid-456");
+        request2.setContent("{\"a\":1}".getBytes(StandardCharsets.UTF_8));
+        MockHttpServletResponse response2 = new MockHttpServletResponse();
 
-        filter.doFilter(request, response, filterChain);
+        filter.doFilter(request2, response2, filterChain);
 
-        assertThat(response.getStatus()).isEqualTo(409);
-        assertThat(response.getContentAsString()).contains("RIDE_CONFLICT");
-        verify(filterChain, never()).doFilter(any(), any());
-    }
-
-    @Test
-    @DisplayName("Deve retornar 400 Bad Request quando Idempotency-Key é reutilizada por outro usuário ou endpoint")
-    void shouldReturnBadRequestWhenKeyUsedForDifferentPath() throws ServletException, IOException {
-        IdempotencyKey existing = IdempotencyKey.inProgress(
-                "uuid-789", "user-1", "POST", "/api/v1/rides/request");
-        when(repository.save(any(IdempotencyKey.class))).thenThrow(new DuplicateKeyException("duplicate"));
-        when(repository.findByKey("uuid-789")).thenReturn(Optional.of(existing));
-
-        MockHttpServletRequest request = new MockHttpServletRequest("POST", "/api/v1/rides/ride-1/cancel");
-        request.addHeader("Idempotency-Key", "uuid-789");
-        MockHttpServletResponse response = new MockHttpServletResponse();
-
-        filter.doFilter(request, response, filterChain);
-
-        assertThat(response.getStatus()).isEqualTo(400);
-        assertThat(response.getContentAsString()).contains("BAD_REQUEST");
-        verify(filterChain, never()).doFilter(any(), any());
+        assertThat(response2.getStatus()).isEqualTo(409);
+        assertThat(response2.getContentAsString()).contains("RIDE_CONFLICT");
+        verify(filterChain, times(1)).doFilter(any(), any());
     }
 
     @Test
@@ -148,7 +235,7 @@ class IdempotencyFilterTest {
 
         when(repository.save(any(IdempotencyKey.class))).thenAnswer(inv -> inv.getArgument(0));
         doAnswer(inv -> {
-            var wrapper = (jakarta.servlet.http.HttpServletResponse) inv.getArgument(1);
+            HttpServletResponse wrapper = (HttpServletResponse) inv.getArgument(1);
             wrapper.setStatus(500);
             return null;
         }).when(filterChain).doFilter(any(), any());

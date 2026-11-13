@@ -341,6 +341,37 @@ class RideUseCasesTest {
     }
 
     @Test
+    @DisplayName("AcceptPassengerUseCase.execute deve ser @Transactional e propagar falha de recalculateEstimatedShares antes de salvar e notificar")
+    void shouldPropagateRecalculateFailureAndBeTransactionalOnAcceptPassenger() throws NoSuchMethodException {
+        var method = AcceptPassengerUseCase.class.getMethod("execute", PassengerRequestCommand.class);
+        assertThat(method.isAnnotationPresent(org.springframework.transaction.annotation.Transactional.class)).isTrue();
+
+        AcceptPassengerUseCase acceptPassenger = new AcceptPassengerUseCase(
+                rideAccess, rideEligibility, rideCostCalculator, rideRepository, eventPublisher);
+        Ride ride = rideOf(userObjectId.toHexString(), LocalDateTime.now().plusDays(1));
+        ride.requestSeat("passenger-456", "route-456", place("Rua A"), place("Campus PUC"));
+        Ride updatedRide = rideOf(userObjectId.toHexString(), LocalDateTime.now().plusDays(1));
+        updatedRide.requestSeat("passenger-456", "route-456", place("Rua A"), place("Campus PUC"));
+        updatedRide.acceptPassenger("passenger-456", 1.8, new BigDecimal("7.50"));
+
+        currentUserIs(userObjectId);
+        when(rideRepository.findById(rideObjectId)).thenReturn(Optional.of(ride));
+        when(rideCostCalculator.computeConfirmationQuote(ride, "passenger-456"))
+                .thenReturn(new RideCostCalculator.ConfirmationQuote(1.8, new BigDecimal("7.50")));
+        when(rideRepository.acceptPassengerAtomic(
+                any(), eq("passenger-456"), eq(1.8), eq(new BigDecimal("7.50")), any()))
+                .thenReturn(Optional.of(updatedRide));
+        doThrow(new RuntimeException("Socket timeout"))
+                .when(rideCostCalculator).recalculateEstimatedShares(updatedRide);
+
+        assertThrows(RuntimeException.class, () -> acceptPassenger.execute(
+                new PassengerRequestCommand(rideObjectId.toHexString(), "passenger-456", UID)));
+
+        verify(rideRepository, never()).save(any());
+        verify(eventPublisher, never()).publishEvent(any());
+    }
+
+    @Test
     @DisplayName("O motorista deve recusar o pedido de vaga pendente com o motivo sem penalidade")
     void shouldRejectPassengerWhenUserIsTheDriver() {
         RejectPassengerUseCase rejectPassenger = new RejectPassengerUseCase(

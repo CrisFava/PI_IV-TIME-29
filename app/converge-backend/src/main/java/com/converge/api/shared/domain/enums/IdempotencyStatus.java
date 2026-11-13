@@ -4,5 +4,6 @@ package com.converge.api.shared.domain.enums;
 
 public enum IdempotencyStatus {
     IN_PROGRESS,
-    COMPLETED
+    COMPLETED,
+    UNKNOWN_OUTCOME
 }

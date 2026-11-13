@@ -33,6 +33,8 @@ public class IdempotencyKey {
 
     private String path;
 
+    private String requestFingerprint;
+
     private IdempotencyStatus status;
 
     private int responseStatus;
@@ -44,12 +46,19 @@ public class IdempotencyKey {
     @Indexed(expireAfter = "24h")
     private Instant createdAt;
 
-    public static IdempotencyKey inProgress(String key, String userId, String method, String path) {
+    public static IdempotencyKey inProgress(
+            String key,
+            String userId,
+            String method,
+            String path,
+            String requestFingerprint
+    ) {
         IdempotencyKey entry = new IdempotencyKey();
         entry.key = key;
         entry.userId = userId;
         entry.method = method;
         entry.path = path;
+        entry.requestFingerprint = requestFingerprint;
         entry.status = IdempotencyStatus.IN_PROGRESS;
         entry.createdAt = Instant.now();
         return entry;
@@ -60,5 +69,9 @@ public class IdempotencyKey {
         this.responseStatus = responseStatus;
         this.contentType = contentType;
         this.responseBody = responseBody;
+    }
+
+    public void markUnknownOutcome() {
+        this.status = IdempotencyStatus.UNKNOWN_OUTCOME;
     }
 }
