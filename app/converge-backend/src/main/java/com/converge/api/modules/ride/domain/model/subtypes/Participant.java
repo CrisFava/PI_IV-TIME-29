@@ -19,6 +19,9 @@ import org.springframework.data.mongodb.core.index.Indexed;
 import java.math.BigDecimal;
 import java.time.LocalDateTime;
 
+/**
+ * Subdocumento que representa a participação de um motorista ou passageiro em uma viagem.
+ */
 @NoArgsConstructor(access = AccessLevel.PROTECTED)
 @Getter
 public class Participant {
@@ -122,10 +125,24 @@ public class Participant {
         this.updatedAt = now;
     }
 
+    public void confirm(@Nullable Double detourGeneratedKm, @Nullable BigDecimal maxAmount, LocalDateTime now) {
+        this.detourGeneratedKm = detourGeneratedKm;
+        if (maxAmount != null && maxAmount.signum() >= 0) {
+            this.maxAmount = maxAmount;
+        }
+        confirm(now);
+    }
+
     public void reject(@Nullable String reason, LocalDateTime now) {
         this.status = ParticipantStatus.REJECTED;
         this.respondedAt = now;
         this.rejectionReason = reason;
+        this.updatedAt = now;
+    }
+
+    public void expire(LocalDateTime now) {
+        this.status = ParticipantStatus.EXPIRED;
+        this.respondedAt = now;
         this.updatedAt = now;
     }
 
@@ -166,6 +183,29 @@ public class Participant {
         if (!late) {
             this.paymentStatus = ParticipantPaymentStatus.NOT_APPLICABLE;
         }
+    }
+
+    public void updateEstimatedAmount(BigDecimal candidateAmount, LocalDateTime now) {
+        if (candidateAmount == null) {
+            return;
+        }
+        this.estimatedAmount = capAtMaxAmount(candidateAmount);
+        this.updatedAt = now;
+    }
+
+    public void defineFinalAmount(BigDecimal candidateAmount, LocalDateTime now) {
+        if (candidateAmount == null) {
+            return;
+        }
+        this.finalAmount = capAtMaxAmount(candidateAmount);
+        this.updatedAt = now;
+    }
+
+    private BigDecimal capAtMaxAmount(BigDecimal amount) {
+        if (this.maxAmount != null && this.maxAmount.signum() > 0 && amount.compareTo(this.maxAmount) > 0) {
+            return this.maxAmount;
+        }
+        return amount;
     }
 
     public static Participant passengerRequest(

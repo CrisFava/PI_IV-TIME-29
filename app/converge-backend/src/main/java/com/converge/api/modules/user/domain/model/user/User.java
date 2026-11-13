@@ -2,6 +2,7 @@
 
 package com.converge.api.modules.user.domain.model.user;
 
+import com.converge.api.modules.user.domain.enums.user.Badge;
 import com.converge.api.modules.user.domain.enums.user.ParticipationRole;
 import com.converge.api.modules.user.domain.enums.user.PaymentStanding;
 import com.converge.api.modules.user.domain.enums.user.PixKeyType;
@@ -308,5 +309,43 @@ public class User {
 
     public void deactivate() {
         this.active = false;
+    }
+
+    public void recordDriverCancellation(LocalDateTime now) {
+        this.reputation = currentReputation().withDriverCancellation(now);
+        revokeTrustBadgeIfThresholdExceeded();
+    }
+
+    public void recordPassengerLateCancellation(LocalDateTime now) {
+        this.reputation = currentReputation().withPassengerLateCancellation(now);
+        revokeTrustBadgeIfThresholdExceeded();
+    }
+
+    public void recordPassengerNoShow(LocalDateTime now) {
+        this.reputation = currentReputation().withPassengerNoShow(now);
+        revokeTrustBadgeIfThresholdExceeded();
+    }
+
+    private Reputation currentReputation() {
+        return this.reputation != null ? this.reputation : Reputation.defaultInitial();
+    }
+
+    private void revokeTrustBadgeIfThresholdExceeded() {
+        boolean driverEligible = this.reputation.driver() != null && this.reputation.driver().meetsTrustCriteria();
+        boolean passengerEligible = this.reputation.passenger() != null && this.reputation.passenger().meetsTrustCriteria();
+        boolean driverViolated = this.reputation.driver() != null
+                && this.reputation.driver().window() != null
+                && this.reputation.driver().window().driverInitiatedCancellations() != null
+                && this.reputation.driver().window().driverInitiatedCancellations() > 2;
+        boolean passengerViolated = this.reputation.passenger() != null
+                && this.reputation.passenger().window() != null
+                && ((this.reputation.passenger().window().lateCancellations() != null
+                && this.reputation.passenger().window().lateCancellations() > 2)
+                || (this.reputation.passenger().window().noShows() != null
+                && this.reputation.passenger().window().noShows() > 1));
+
+        if (driverViolated || passengerViolated || (!driverEligible && !passengerEligible)) {
+            this.badges.removeIf(b -> b.badge() == Badge.TRUST);
+        }
     }
 }

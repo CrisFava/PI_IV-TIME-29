@@ -2,10 +2,14 @@
 
 package com.converge.api.modules.ride.domain.enums;
 
+/**
+ * Estados possíveis de um participante em uma viagem.
+ */
 public enum ParticipantStatus {
 
     REQUESTED,
     REJECTED,
+    EXPIRED,
     CONFIRMED,
     CANCELLED,
     NO_SHOW,
