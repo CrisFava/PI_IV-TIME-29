@@ -33,6 +33,7 @@ public class AcceptPassengerUseCase implements UseCase<PassengerRequestCommand, 
     private final RideAccess rideAccess;
     private final RideEligibility rideEligibility;
     private final RideCostCalculator rideCostCalculator;
+    private final RideItineraryService rideItineraryService;
     private final RideRepository rideRepository;
     private final ApplicationEventPublisher eventPublisher;
 
@@ -57,6 +58,8 @@ public class AcceptPassengerUseCase implements UseCase<PassengerRequestCommand, 
                 .orElseThrow(() -> resolveAcceptConflict(ride, command.passengerId(), detourKm, maxAmount));
 
         rideCostCalculator.recalculateEstimatedShares(updated);
+        // A rota passa a buscar e deixar o passageiro aceito
+        rideItineraryService.refresh(updated);
 
         Ride saved = rideRepository.save(updated);
         notifyConfirmedPassenger(command.passengerId(), command.rideId());

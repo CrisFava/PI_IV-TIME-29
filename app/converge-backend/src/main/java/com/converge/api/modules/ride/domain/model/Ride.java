@@ -7,6 +7,7 @@ import com.converge.api.modules.ride.domain.enums.ParticipantStatus;
 import com.converge.api.modules.ride.domain.enums.RideStatus;
 import com.converge.api.modules.ride.domain.model.subtypes.Participant;
 import com.converge.api.modules.ride.domain.model.subtypes.RideCosts;
+import com.converge.api.modules.ride.domain.model.subtypes.RideStop;
 import com.converge.api.modules.ride.domain.model.subtypes.VehicleSnapshot;
 import com.converge.api.modules.route.domain.model.subtypes.Place;
 import com.converge.api.modules.user.domain.enums.user.ParticipationRole;
@@ -138,6 +139,17 @@ public class Ride {
     @Nullable
     @Valid
     private RideCosts costs;
+
+    // Itinerário: as paradas na ordem (buscar e deixar cada passageiro confirmado),
+    // com a distância e o desenho da rota passando por elas
+    @Valid
+    private List<RideStop> itinerary = new ArrayList<>();
+
+    @Nullable
+    private Double itineraryDistanceKm;
+
+    @Nullable
+    private String itineraryPolyline;
 
     @CreatedDate
     private LocalDateTime createdAt;
@@ -325,7 +337,22 @@ public class Ride {
         }
     }
 
-    public void start() {
+    /**
+     * Troca o itinerário da viagem (recalculado quando um passageiro entra ou sai).
+     * Sem paradas, a distância e o desenho também ficam vazios.
+     */
+    public void updateItinerary(List<RideStop> stops, @Nullable Double distanceKm, @Nullable String polyline) {
+        this.itinerary = stops == null ? new ArrayList<>() : new ArrayList<>(stops);
+        boolean hasStops = !this.itinerary.isEmpty();
+        this.itineraryDistanceKm = hasStops ? distanceKm : null;
+        this.itineraryPolyline = hasStops ? polyline : null;
+    }
+
+    public List<RideStop> getItinerary() {
+        return Collections.unmodifiableList(this.itinerary);
+    }
+
+        public void start() {
         if (this.status != RideStatus.CONFIRMED) {
             throw new ApplicationException(
                     ErrorCode.BAD_REQUEST,

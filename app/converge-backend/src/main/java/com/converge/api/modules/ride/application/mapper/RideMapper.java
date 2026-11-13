@@ -4,6 +4,7 @@ package com.converge.api.modules.ride.application.mapper;
 
 import com.converge.api.modules.ride.application.dto.ParticipantResponseDTO;
 import com.converge.api.modules.ride.application.dto.RideResponseDTO;
+import com.converge.api.modules.ride.application.dto.RideStopResponseDTO;
 import com.converge.api.modules.ride.domain.enums.ParticipantStatus;
 import com.converge.api.modules.ride.domain.model.Ride;
 import com.converge.api.modules.ride.domain.model.subtypes.Participant;
@@ -56,8 +57,22 @@ public class RideMapper {
                 ride.getCosts(),
                 participants,
                 ride.getCreatedAt(),
-                ride.getUpdatedAt()
+                ride.getUpdatedAt(),
+                toItinerary(ride, viewerId),
+                ride.isOwnedBy(viewerId) ? ride.getItineraryDistanceKm() : null,
+                ride.isOwnedBy(viewerId) ? ride.getItineraryPolyline() : null
         );
+    }
+
+    // Os pontos de embarque e desembarque são endereços dos passageiros:
+    // o motorista vê todos; cada passageiro, só os seus
+    private List<RideStopResponseDTO> toItinerary(Ride ride, String viewerId) {
+        boolean isDriver = ride.isOwnedBy(viewerId);
+
+        return ride.getItinerary().stream()
+                .filter(stop -> isDriver || stop.passengerId().equals(viewerId))
+                .map(stop -> new RideStopResponseDTO(stop.type(), stop.passengerId(), toPlaceResponse(stop.place())))
+                .toList();
     }
 
     public Set<String> visibleUserIds(Ride ride, String viewerId) {

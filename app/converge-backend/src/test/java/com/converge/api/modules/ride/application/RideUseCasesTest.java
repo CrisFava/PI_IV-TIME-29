@@ -64,6 +64,10 @@ class RideUseCasesTest {
 
     private static final String UID = "firebase-uid-123";
 
+    // A rota com paradas é testada à parte (RideItineraryServiceTest)
+    @Mock
+    private RideItineraryService rideItineraryService;
+
     @Mock
     private UserUtils userUtils;
 
@@ -227,7 +231,7 @@ class RideUseCasesTest {
     @DisplayName("O motorista deve aceitar o pedido de vaga registrando desvio, valor máximo e recalculando rateio")
     void shouldAcceptPassengerWhenUserIsTheDriver() {
         AcceptPassengerUseCase acceptPassenger = new AcceptPassengerUseCase(
-                rideAccess, rideEligibility, rideCostCalculator, rideRepository, eventPublisher);
+                rideAccess, rideEligibility, rideCostCalculator, rideItineraryService, rideRepository, eventPublisher);
         Ride ride = rideOf(userObjectId.toHexString(), LocalDateTime.now().plusDays(1));
         ride.requestSeat("passenger-456", "route-456", place("Rua A"), place("Campus PUC"));
         Ride updatedRide = rideOf(userObjectId.toHexString(), LocalDateTime.now().plusDays(1));
@@ -258,7 +262,7 @@ class RideUseCasesTest {
     @DisplayName("Aceitar passageiro deve isolar falhas de notificação e retornar carona salva com sucesso")
     void shouldSucceedWhenNotificationFailsOnAcceptPassenger() {
         AcceptPassengerUseCase acceptPassenger = new AcceptPassengerUseCase(
-                rideAccess, rideEligibility, rideCostCalculator, rideRepository, eventPublisher);
+                rideAccess, rideEligibility, rideCostCalculator, rideItineraryService, rideRepository, eventPublisher);
         Ride ride = rideOf(userObjectId.toHexString(), LocalDateTime.now().plusDays(1));
         ride.requestSeat("passenger-456", "route-456", place("Rua A"), place("Campus PUC"));
         Ride updatedRide = rideOf(userObjectId.toHexString(), LocalDateTime.now().plusDays(1));
@@ -289,7 +293,7 @@ class RideUseCasesTest {
     @DisplayName("Quem não é o motorista não pode aceitar passageiros")
     void shouldNotAcceptPassengerWhenUserIsNotTheDriver() {
         AcceptPassengerUseCase acceptPassenger = new AcceptPassengerUseCase(
-                rideAccess, rideEligibility, rideCostCalculator, rideRepository, eventPublisher);
+                rideAccess, rideEligibility, rideCostCalculator, rideItineraryService, rideRepository, eventPublisher);
         Ride ride = rideOf("outro-motorista", LocalDateTime.now().plusDays(1));
         ride.requestSeat("passenger-456", "route-456", place("Rua A"), place("Campus PUC"));
         currentUserIs(userObjectId);
@@ -306,7 +310,7 @@ class RideUseCasesTest {
     @DisplayName("Não deve aceitar passageiro bloqueado ou sem vínculo acadêmico verificado")
     void shouldNotAcceptIneligiblePassenger() {
         AcceptPassengerUseCase acceptPassenger = new AcceptPassengerUseCase(
-                rideAccess, rideEligibility, rideCostCalculator, rideRepository, eventPublisher);
+                rideAccess, rideEligibility, rideCostCalculator, rideItineraryService, rideRepository, eventPublisher);
         Ride ride = rideOf(userObjectId.toHexString(), LocalDateTime.now().plusDays(1));
         ride.requestSeat("passenger-456", "route-456", place("Rua A"), place("Campus PUC"));
         currentUserIs(userObjectId);
@@ -325,7 +329,7 @@ class RideUseCasesTest {
     @DisplayName("Motorista que perdeu a CNH ou o vínculo não pode aceitar passageiros")
     void shouldNotAcceptWhenDriverCannotOfferRidesAnymore() {
         AcceptPassengerUseCase acceptPassenger = new AcceptPassengerUseCase(
-                rideAccess, rideEligibility, rideCostCalculator, rideRepository, eventPublisher);
+                rideAccess, rideEligibility, rideCostCalculator, rideItineraryService, rideRepository, eventPublisher);
         Ride ride = rideOf(userObjectId.toHexString(), LocalDateTime.now().plusDays(1));
         ride.requestSeat("passenger-456", "route-456", place("Rua A"), place("Campus PUC"));
         currentUserIs(userObjectId);
@@ -347,7 +351,7 @@ class RideUseCasesTest {
         assertThat(method.isAnnotationPresent(org.springframework.transaction.annotation.Transactional.class)).isTrue();
 
         AcceptPassengerUseCase acceptPassenger = new AcceptPassengerUseCase(
-                rideAccess, rideEligibility, rideCostCalculator, rideRepository, eventPublisher);
+                rideAccess, rideEligibility, rideCostCalculator, rideItineraryService, rideRepository, eventPublisher);
         Ride ride = rideOf(userObjectId.toHexString(), LocalDateTime.now().plusDays(1));
         ride.requestSeat("passenger-456", "route-456", place("Rua A"), place("Campus PUC"));
         Ride updatedRide = rideOf(userObjectId.toHexString(), LocalDateTime.now().plusDays(1));
@@ -464,7 +468,7 @@ class RideUseCasesTest {
     @DisplayName("O passageiro deve conseguir sair antecipadamente sem penalidade")
     void shouldLetPassengerLeaveRide() {
         LeaveRideUseCase leaveRide = new LeaveRideUseCase(
-                rideAccess, rideCostCalculator, rideRepository, recordReputationPenalty, auditLogService);
+                rideAccess, rideCostCalculator, rideItineraryService, rideRepository, recordReputationPenalty, auditLogService);
         Ride ride = rideOf("outro-motorista", LocalDateTime.now().plusDays(1));
         ride.requestSeat(userObjectId.toHexString(), "route-456", place("Rua A"), place("Campus PUC"));
         currentUserIs(userObjectId);
@@ -484,7 +488,7 @@ class RideUseCasesTest {
     @DisplayName("Cancelamento tardio do passageiro deve aplicar penalidade de reputação, recalcular rateio e gravar auditoria")
     void shouldPenalizeAndAuditWhenConfirmedPassengerLeavesLate() {
         LeaveRideUseCase leaveRide = new LeaveRideUseCase(
-                rideAccess, rideCostCalculator, rideRepository, recordReputationPenalty, auditLogService);
+                rideAccess, rideCostCalculator, rideItineraryService, rideRepository, recordReputationPenalty, auditLogService);
         String passengerId = userObjectId.toHexString();
         Ride ride = rideOf("outro-motorista", LocalDateTime.now().plusMinutes(45));
         ride.requestSeat(passengerId, "route-456", place("Rua A"), place("Campus PUC"));
@@ -541,7 +545,7 @@ class RideUseCasesTest {
     @DisplayName("Quem não participa da viagem não pode sair dela")
     void shouldNotLetStrangerLeaveRide() {
         LeaveRideUseCase leaveRide = new LeaveRideUseCase(
-                rideAccess, rideCostCalculator, rideRepository, recordReputationPenalty, auditLogService);
+                rideAccess, rideCostCalculator, rideItineraryService, rideRepository, recordReputationPenalty, auditLogService);
         Ride ride = rideOf("outro-motorista", LocalDateTime.now().plusDays(1));
         currentUserIs(userObjectId);
         when(rideRepository.findById(rideObjectId)).thenReturn(Optional.of(ride));

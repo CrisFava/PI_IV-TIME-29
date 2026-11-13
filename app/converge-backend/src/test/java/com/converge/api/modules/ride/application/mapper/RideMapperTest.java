@@ -2,6 +2,10 @@
 
 package com.converge.api.modules.ride.application.mapper;
 
+import java.util.List;
+import com.converge.api.modules.ride.domain.model.subtypes.RideStop;
+import com.converge.api.modules.ride.domain.enums.RideStopType;
+import com.converge.api.modules.ride.application.dto.RideStopResponseDTO;
 import com.converge.api.modules.ride.application.dto.ParticipantResponseDTO;
 import com.converge.api.modules.ride.application.dto.RideResponseDTO;
 import com.converge.api.modules.ride.domain.enums.ParticipantPaymentStatus;
@@ -221,5 +225,28 @@ class RideMapperTest {
         assertThat(snapshot.licensePlate()).isEqualTo("XYZ9876");
         assertThat(snapshot.type()).isEqualTo(VehicleType.HATCH);
         assertThat(snapshot.color()).isEqualTo("Branco");
+    }
+
+    @Test
+    @DisplayName("Itinerário: o motorista vê todas as paradas e a rota; o passageiro, só as próprias paradas")
+    void shouldShowItineraryOnlyToWhoCanSeeIt() {
+        Ride ride = rideWithEveryKindOfPassenger();
+        ride.updateItinerary(List.of(
+                new RideStop(RideStopType.PICKUP, ANA, place("Rua da Ana, 1")),
+                new RideStop(RideStopType.PICKUP, BIA, place("Rua da Bia, 2")),
+                new RideStop(RideStopType.DROPOFF, ANA, place("Campus PUC")),
+                new RideStop(RideStopType.DROPOFF, BIA, place("Campus PUC"))
+        ), 15.0, "polyline");
+
+        RideResponseDTO driverView = mapper.toResponse(ride, DRIVER, names);
+        assertThat(driverView.itinerary()).hasSize(4);
+        assertThat(driverView.itineraryPolyline()).isEqualTo("polyline");
+        assertThat(driverView.itineraryDistanceKm()).isEqualTo(15.0);
+
+        RideResponseDTO anaView = mapper.toResponse(ride, ANA, names);
+        assertThat(anaView.itinerary()).extracting(RideStopResponseDTO::passengerId).containsOnly(ANA);
+        assertThat(anaView.itinerary()).hasSize(2);
+        assertThat(anaView.itineraryPolyline()).isNull();
+        assertThat(anaView.itineraryDistanceKm()).isNull();
     }
 }
