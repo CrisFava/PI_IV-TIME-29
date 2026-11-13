@@ -8,7 +8,7 @@ import java.util.List;
 import java.util.Optional;
 
 // "Porta" para o módulo de viagens. O Review não lê a coleção de viagens direto:
-// pergunta por aqui. A implementação real vem quando o módulo ride existir;
+// pergunta por aqui. A implementação real é a RideModuleParticipationGateway;
 // nos testes usamos uma versão falsa.
 public interface RideParticipationGateway {
 

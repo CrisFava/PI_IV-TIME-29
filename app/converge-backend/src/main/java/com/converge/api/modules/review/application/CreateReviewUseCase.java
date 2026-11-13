@@ -13,6 +13,7 @@ import com.converge.api.shared.application.UseCase;
 import com.converge.api.shared.presentation.exception.ApplicationException;
 import com.converge.api.shared.presentation.exception.ErrorCode;
 import lombok.RequiredArgsConstructor;
+import org.springframework.dao.DuplicateKeyException;
 import org.springframework.stereotype.Service;
 
 // Cria uma avaliação depois de validar as regras (RF43):
@@ -72,7 +73,15 @@ public class CreateReviewUseCase implements UseCase<CreateReviewUseCase.Command,
                 request.rating(),
                 request.comment()
         );
-        return reviewRepository.save(review);
+        try {
+            return reviewRepository.save(review);
+        } catch (DuplicateKeyException e) {
+            // Dois pedidos iguais ao mesmo tempo: o índice único barra o segundo.
+            throw new ApplicationException(
+                    ErrorCode.REVIEW_ALREADY_EXISTS,
+                    "Você já avaliou esse participante nesta viagem."
+            );
+        }
     }
 
     // Descobre o papel do usuário na viagem; se não participou, recusa.

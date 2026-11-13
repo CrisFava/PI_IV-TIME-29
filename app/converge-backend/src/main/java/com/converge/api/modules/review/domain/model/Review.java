@@ -13,6 +13,7 @@ import org.bson.types.ObjectId;
 import org.springframework.data.annotation.CreatedDate;
 import org.springframework.data.annotation.Id;
 import org.springframework.data.mongodb.core.index.CompoundIndex;
+import org.springframework.data.mongodb.core.index.CompoundIndexes;
 import org.springframework.data.mongodb.core.index.Indexed;
 import org.springframework.data.mongodb.core.mapping.Document;
 
@@ -22,11 +23,18 @@ import java.util.Set;
 // Avaliação de um usuário por outro depois de uma viagem (RF43, RF44).
 // Índice único impede duas avaliações do mesmo par na mesma viagem.
 @Document(collection = "reviews")
-@CompoundIndex(
-        name = "ride_reviewer_reviewed_unique",
-        def = "{'rideId': 1, 'reviewerId': 1, 'reviewedId': 1}",
-        unique = true
-)
+@CompoundIndexes({
+        @CompoundIndex(
+                name = "ride_reviewer_reviewed_unique",
+                def = "{'rideId': 1, 'reviewerId': 1, 'reviewedId': 1}",
+                unique = true
+        ),
+        // Avaliações recebidas por papel (base da reputação).
+        @CompoundIndex(
+                name = "reviewed_role",
+                def = "{'reviewedId': 1, 'reviewedRole': 1}"
+        )
+})
 @NoArgsConstructor(access = AccessLevel.PROTECTED)
 @Getter
 @EqualsAndHashCode(onlyExplicitlyIncluded = true)
@@ -41,10 +49,9 @@ public class Review {
 
     private String rideId;
 
+    @Indexed
     private String reviewerId;
 
-    // Índice para buscar as avaliações recebidas por papel (base da reputação).
-    @Indexed
     private String reviewedId;
 
     private ReviewedRole reviewedRole;
