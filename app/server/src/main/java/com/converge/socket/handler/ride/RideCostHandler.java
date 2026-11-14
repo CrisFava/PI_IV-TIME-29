@@ -8,8 +8,10 @@ import com.converge.socket.core.handler.RequestHandler;
 
 import java.math.BigDecimal;
 import java.math.RoundingMode;
+import java.util.HashSet;
 import java.util.LinkedHashMap;
 import java.util.Map;
+import java.util.Set;
 
 /**
  * Handler responsável pelos cálculos matemáticos de desvio, valor teto e rateio da viagem.
@@ -49,7 +51,7 @@ public class RideCostHandler implements RequestHandler<RideCostRequest, RideCost
         }
         double totalDistanceKm = request.getBaseDistanceKm() + totalDetourKm;
 
-        BigDecimal energyCost = energyCost(totalDistanceKm, request).setScale(2, RoundingMode.HALF_UP);
+        BigDecimal energyCost = energyCost(totalDistanceKm, request);
         BigDecimal totalCost = routeCost(totalDistanceKm, request).setScale(2, RoundingMode.HALF_UP);
 
         BigDecimal participants = BigDecimal.valueOf(request.getPassengers().size() + 1); // +1 motorista
@@ -100,7 +102,7 @@ public class RideCostHandler implements RequestHandler<RideCostRequest, RideCost
     private BigDecimal energyCost(double distanceKm, RideCostRequest request) {
         return BigDecimal.valueOf(distanceKm)
                 .multiply(request.getCurrentEnergyPrice())
-                .divide(BigDecimal.valueOf(request.getAverageConsumption()), 10, RoundingMode.HALF_UP);
+                .divide(BigDecimal.valueOf(request.getAverageConsumption()), 2, RoundingMode.HALF_UP);
     }
 
     private void validateRequest(RideCostRequest request) throws ServerException {
@@ -114,5 +116,40 @@ public class RideCostHandler implements RequestHandler<RideCostRequest, RideCost
                 || request.getCurrentEnergyPrice() == null) {
             throw new ServerException(ServerErrorCode.INVALID_MESSAGE, "Valid fuel consumption, base distance, and energy price are required");
         }
+
+        switch (request.getOperation()) {
+            case CONFIRMATION_QUOTE -> validateQuoteLegs(request);
+            case COST_SHARING -> validatePassengers(request);
+        }
+    }
+
+    // os trechos do passageiro são opcionais (nulos valem desvio zero), mas, se vierem, precisam ser distâncias válidas
+    private void validateQuoteLegs(RideCostRequest request) throws ServerException {
+        if (isNonFinite(request.getLegOriginToBoardingKm())
+                || isNonFinite(request.getLegBoardingToDropOffKm())
+                || isNonFinite(request.getLegDropOffToDestinationKm())) {
+            throw new ServerException(ServerErrorCode.INVALID_MESSAGE, "Quote legs must be finite distances");
+        }
+    }
+
+    // desvio finito, teto não negativo e nenhum passageiro repetido (senão o divisor contaria dois e o mapa guardaria um)
+    private void validatePassengers(RideCostRequest request) throws ServerException {
+        Set<String> ids = new HashSet<>();
+
+        for (RideCostRequest.PassengerCostInput passenger : request.getPassengers()) {
+            if (isNonFinite(passenger.detourGeneratedKm())) {
+                throw new ServerException(ServerErrorCode.INVALID_MESSAGE, "Passenger detour must be a finite distance");
+            }
+            if (passenger.maxAmount() != null && passenger.maxAmount().signum() < 0) {
+                throw new ServerException(ServerErrorCode.INVALID_MESSAGE, "Passenger max amount cannot be negative");
+            }
+            if (!ids.add(passenger.userId())) {
+                throw new ServerException(ServerErrorCode.INVALID_MESSAGE, "Duplicated passenger in the request");
+            }
+        }
+    }
+
+    private static boolean isNonFinite(Double km) {
+        return km != null && !Double.isFinite(km);
     }
 }

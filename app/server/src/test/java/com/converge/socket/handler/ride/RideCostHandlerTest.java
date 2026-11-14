@@ -237,6 +237,68 @@ class RideCostHandlerTest {
         assertTrue(response.getSharesByPassenger().isEmpty());
     }
 
+    private static RideCostRequest sharingWith(List<RideCostRequest.PassengerCostInput> passengers) {
+        return RideCostRequest.forCostSharing(
+                BASE_DISTANCE_KM,
+                AVERAGE_CONSUMPTION,
+                ENERGY_PRICE,
+                TOLL,
+                PARKING,
+                passengers
+        );
+    }
+
+    @Test
+    @DisplayName("O custo da rota é arredondado para 2 casas antes de calcular o valor máximo")
+    void shouldRoundRouteCostBeforeComputingTheMaximum() throws ServerException {
+        // 40,01 km ÷ 10 × 5,50 = 22,0055, que vira 22,01; + 7,00 + 3,00 = 32,01; metade = 16,005, que vira 16,01
+        RideCostRequest request = RideCostRequest.forConfirmationQuote(
+                40.01,
+                null,
+                null,
+                null,
+                AVERAGE_CONSUMPTION,
+                ENERGY_PRICE,
+                TOLL,
+                PARKING
+        );
+
+        RideCostResponse response = handler.execute(request);
+
+        assertEquals(new BigDecimal("16.01"), response.getMaxAmount());
+    }
+
+    @Test
+    @DisplayName("Deve recusar trecho com distância infinita ou inválida (NaN)")
+    void shouldRejectNonFiniteLegs() {
+        assertThrows(ServerException.class, () -> handler.execute(quoteWithLegs(Double.NaN, 32.0, 0.0)));
+        assertThrows(ServerException.class, () -> handler.execute(quoteWithLegs(8.0, Double.POSITIVE_INFINITY, 0.0)));
+    }
+
+    @Test
+    @DisplayName("Deve recusar desvio de passageiro infinito ou inválido (NaN)")
+    void shouldRejectNonFinitePassengerDetour() {
+        assertThrows(ServerException.class, () -> handler.execute(sharingWith(List.of(
+                new RideCostRequest.PassengerCostInput("passenger-1", Double.NaN, new BigDecimal("17.10"))))));
+        assertThrows(ServerException.class, () -> handler.execute(sharingWith(List.of(
+                new RideCostRequest.PassengerCostInput("passenger-1", Double.POSITIVE_INFINITY, new BigDecimal("17.10"))))));
+    }
+
+    @Test
+    @DisplayName("Deve recusar teto negativo de passageiro")
+    void shouldRejectNegativeMaxAmount() {
+        assertThrows(ServerException.class, () -> handler.execute(sharingWith(List.of(
+                new RideCostRequest.PassengerCostInput("passenger-1", 4.0, new BigDecimal("-1.00"))))));
+    }
+
+    @Test
+    @DisplayName("Deve recusar o mesmo passageiro repetido na lista")
+    void shouldRejectDuplicatedPassengerIds() {
+        assertThrows(ServerException.class, () -> handler.execute(sharingWith(List.of(
+                new RideCostRequest.PassengerCostInput("passenger-1", 4.0, new BigDecimal("17.10")),
+                new RideCostRequest.PassengerCostInput("passenger-1", 6.0, new BigDecimal("17.65"))))));
+    }
+
     @Test
     @DisplayName("Deve recusar consumo zero, negativo ou inválido")
     void shouldRejectInvalidConsumption() {
