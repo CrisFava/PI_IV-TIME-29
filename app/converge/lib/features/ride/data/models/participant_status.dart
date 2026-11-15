@@ -8,6 +8,7 @@ enum ParticipantStatus {
   cancelled('CANCELLED'),
   noShow('NO_SHOW'),
   completed('COMPLETED'),
+  expired('EXPIRED'),
 
   /// Valor que o app ainda não conhece (backend mais novo que o app).
   unknown('UNKNOWN');

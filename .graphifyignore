@@ -16,5 +16,8 @@ app/converge/.dart_tool/
 *.swift
 lombok.*
 org.springframework.*
+org.junit.*
 package:flutter/*
 java.*
+scripts/__pycache__/*
+scripts/.venv/*

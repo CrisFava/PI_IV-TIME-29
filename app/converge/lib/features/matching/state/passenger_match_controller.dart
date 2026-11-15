@@ -230,9 +230,14 @@ class PassengerMatchController extends Notifier<PassengerMatchState> {
       case ParticipantStatus.confirmed || ParticipantStatus.completed:
         _stopPolling();
         state = state.copyWith(phase: PassengerMatchPhase.accepted);
-      case ParticipantStatus.rejected || ParticipantStatus.cancelled:
+      case ParticipantStatus.rejected ||
+          ParticipantStatus.cancelled ||
+          ParticipantStatus.expired:
         _stopPolling();
         final declined = state.selected;
+        final message = status == ParticipantStatus.expired
+            ? 'O tempo limite de resposta do motorista expirou. Escolha outro motorista.'
+            : '${declined?.otherUserName ?? 'O motorista'} não pôde aceitar. Escolha outro motorista.';
         state = state.copyWith(
           phase: PassengerMatchPhase.ready,
           matches: [
@@ -241,8 +246,7 @@ class PassengerMatchController extends Notifier<PassengerMatchState> {
           ],
           selected: null,
           rideId: null,
-          notice:
-              '${declined?.otherUserName ?? 'O motorista'} não pôde aceitar. Escolha outro motorista.',
+          notice: message,
         );
       default:
         break;
