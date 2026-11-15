@@ -19,6 +19,7 @@ import org.springframework.stereotype.Repository;
 
 import java.math.BigDecimal;
 import java.time.LocalDateTime;
+import java.util.List;
 import java.util.Optional;
 
 import static org.springframework.data.mongodb.core.query.Criteria.where;
@@ -35,18 +36,23 @@ public class RideRepositoryImpl implements RideRepositoryCustom {
             String passengerId,
             @Nullable Double detourGeneratedKm,
             @Nullable BigDecimal maxAmount,
-            LocalDateTime now
+            LocalDateTime now,
+            @Nullable LocalDateTime requestCutoff
     ) {
+        Criteria participantCriteria = where("userId").is(passengerId)
+                .and("role").is(ParticipationRole.PASSENGER)
+                .and("status").is(ParticipantStatus.REQUESTED);
+
+        if (requestCutoff != null) {
+            participantCriteria = participantCriteria.and("requestedAt").gt(requestCutoff);
+        }
+
         Query query = new Query(new Criteria().andOperator(
                 where("_id").is(rideId),
                 where("status").in(RideStatus.AWAITING_CONFIRMATION, RideStatus.CONFIRMED),
                 where("departureDateTime").gte(now),
                 where("availableSeats").gt(0),
-                where("participants").elemMatch(
-                        where("userId").is(passengerId)
-                                .and("role").is(ParticipationRole.PASSENGER)
-                                .and("status").is(ParticipantStatus.REQUESTED)
-                )
+                where("participants").elemMatch(participantCriteria)
         ));
 
         Update update = new Update()
@@ -112,5 +118,31 @@ public class RideRepositoryImpl implements RideRepositoryCustom {
                 Ride.class
         );
         return Optional.ofNullable(updated);
+    }
+
+    @Override
+    public List<Ride> findRidesWithExpiredRequests(LocalDateTime cutoff) {
+        Query query = new Query(new Criteria().andOperator(
+                where("status").in(RideStatus.AWAITING_CONFIRMATION, RideStatus.CONFIRMED),
+                where("participants").elemMatch(
+                        where("role").is(ParticipationRole.PASSENGER)
+                                .and("status").is(ParticipantStatus.REQUESTED)
+                                .and("requestedAt").lte(cutoff)
+                )
+        ));
+        return mongoTemplate.find(query, Ride.class);
+    }
+
+    @Override
+    public List<Ride> findOpenRidesPastDepartureWithoutConfirmedPassengers(LocalDateTime now) {
+        Query query = new Query(new Criteria().andOperator(
+                where("status").in(RideStatus.AWAITING_CONFIRMATION, RideStatus.CONFIRMED),
+                where("departureDateTime").lte(now),
+                where("participants").not().elemMatch(
+                        where("role").is(ParticipationRole.PASSENGER)
+                                .and("status").is(ParticipantStatus.CONFIRMED)
+                )
+        ));
+        return mongoTemplate.find(query, Ride.class);
     }
 }

@@ -9,16 +9,28 @@ import org.bson.types.ObjectId;
 
 import java.math.BigDecimal;
 import java.time.LocalDateTime;
+import java.util.List;
 import java.util.Optional;
 
 public interface RideRepositoryCustom {
+
+    default Optional<Ride> acceptPassengerAtomic(
+            ObjectId rideId,
+            String passengerId,
+            @Nullable Double detourGeneratedKm,
+            @Nullable BigDecimal maxAmount,
+            LocalDateTime now
+    ) {
+        return acceptPassengerAtomic(rideId, passengerId, detourGeneratedKm, maxAmount, now, null);
+    }
 
     Optional<Ride> acceptPassengerAtomic(
             ObjectId rideId,
             String passengerId,
             @Nullable Double detourGeneratedKm,
             @Nullable BigDecimal maxAmount,
-            LocalDateTime now
+            LocalDateTime now,
+            @Nullable LocalDateTime requestCutoff
     );
 
     Optional<Ride> requestSeatAtomic(
@@ -26,4 +38,8 @@ public interface RideRepositoryCustom {
             Participant passengerRequest,
             LocalDateTime now
     );
+
+    List<Ride> findRidesWithExpiredRequests(LocalDateTime cutoff);
+
+    List<Ride> findOpenRidesPastDepartureWithoutConfirmedPassengers(LocalDateTime now);
 }

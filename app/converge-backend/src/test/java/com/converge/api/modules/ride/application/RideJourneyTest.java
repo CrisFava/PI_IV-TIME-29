@@ -129,7 +129,7 @@ class RideJourneyTest {
         loggedUser(BRUNO_UID, brunoId);
 
         when(rideRepository.save(any(Ride.class))).thenAnswer(invocation -> invocation.getArgument(0));
-        when(rideRepository.acceptPassengerAtomic(any(), any(), any(), any(), any())).thenAnswer(invocation -> {
+        when(rideRepository.acceptPassengerAtomic(any(), any(), any(), any(), any(), any())).thenAnswer(invocation -> {
             String passengerId = invocation.getArgument(1);
             Double detourKm = invocation.getArgument(2);
             BigDecimal maxAmount = invocation.getArgument(3);

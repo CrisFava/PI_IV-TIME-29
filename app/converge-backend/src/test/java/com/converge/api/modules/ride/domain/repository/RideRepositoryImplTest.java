@@ -148,4 +148,29 @@ class RideRepositoryImplTest {
         assertThat(pushDoc.get("participants")).isEqualTo(participant);
         assertThat(optionsCaptor.getValue().isReturnNew()).isTrue();
     }
+
+    @Test
+    @DisplayName("acceptPassengerAtomic com requestCutoff deve incluir filtro requestedAt >= cutoff no predicate do participante")
+    void shouldIncludeRequestCutoffInPredicateWhenProvided() {
+        ObjectId rideId = new ObjectId();
+        LocalDateTime now = LocalDateTime.now();
+        LocalDateTime cutoff = now.minusMinutes(3);
+        Ride expected = sampleRide();
+
+        when(mongoTemplate.findAndModify(any(Query.class), any(Update.class), any(FindAndModifyOptions.class), eq(Ride.class)))
+                .thenReturn(expected);
+
+        Optional<Ride> result = repository.acceptPassengerAtomic(
+                rideId, "passenger-1", 1.5, new BigDecimal("8.00"), now, cutoff);
+
+        assertThat(result).contains(expected);
+
+        ArgumentCaptor<Query> queryCaptor = ArgumentCaptor.forClass(Query.class);
+        verify(mongoTemplate, org.mockito.Mockito.atLeastOnce()).findAndModify(
+                queryCaptor.capture(), any(Update.class), any(FindAndModifyOptions.class), eq(Ride.class));
+
+        Document queryDoc = queryCaptor.getValue().getQueryObject();
+        String queryStr = queryDoc.toString();
+        assertThat(queryStr).contains("requestedAt");
+    }
 }

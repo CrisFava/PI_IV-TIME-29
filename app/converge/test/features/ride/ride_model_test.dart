@@ -67,12 +67,22 @@ void main() {
     });
 
     test('status desconhecido não quebra a leitura', () {
-      final ride = fakeRide(status: 'NOVO_STATUS', passengerStatus: 'EXPIRED');
+      final ride =
+          fakeRide(status: 'NOVO_STATUS', passengerStatus: 'STATUS_INEXISTENTE');
 
       expect(ride.status, RideStatus.unknown);
       expect(
         ride.passengerOf(fakePassengerId)!.status,
         ParticipantStatus.unknown,
+      );
+    });
+
+    test('lê status EXPIRED do participante corretamente', () {
+      final ride = fakeRide(passengerStatus: 'EXPIRED');
+
+      expect(
+        ride.passengerOf(fakePassengerId)!.status,
+        ParticipantStatus.expired,
       );
     });
 
