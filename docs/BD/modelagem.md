@@ -162,7 +162,7 @@ O selo `SUSTAINABILITY` reconhece o impacto ambiental acumulado do usuário. É 
 | Base para concessão | ≥ 50 kg de CO₂ evitado | ~2 árvores/ano |
 | (opcional — exibição de destaque) | ≥ 200 kg de CO₂ evitado | ~9 árvores/ano |
 
-- O cálculo de CO₂ evitado já é feito e armazenado em `indicators.sustainability.co2AvoidedKg`, com base na energia economizada × fator de emissão da fonte do veículo (metodologia verídica — ver dicionário).
+- O cálculo de CO₂ evitado já é feito e armazenado em `indicators.co2AvoidedKg`, com base na energia economizada × fator de emissão da fonte do veículo (metodologia verídica — ver dicionário).
 - O selo considera **apenas viagens concluídas com pelo menos um passageiro efetivo** — garante que o impacto seja real (compartilhamento de fato), não apenas o motorista rodando sozinho.
 - Recalculado semanalmente junto com o selo de confiança.
 
