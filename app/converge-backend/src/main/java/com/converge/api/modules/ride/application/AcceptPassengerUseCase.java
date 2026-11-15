@@ -15,6 +15,7 @@ import com.converge.api.shared.domain.enums.NotificationType;
 import com.converge.api.shared.presentation.exception.ApplicationException;
 import com.converge.api.shared.presentation.exception.ErrorCode;
 import lombok.extern.slf4j.Slf4j;
+import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.context.ApplicationEventPublisher;
 import org.springframework.stereotype.Service;
@@ -52,6 +53,7 @@ public class AcceptPassengerUseCase implements UseCase<PassengerRequestCommand, 
         this(rideAccess, rideEligibility, rideCostCalculator, rideItineraryService, rideRepository, eventPublisher, Duration.ofMinutes(3));
     }
 
+    @Autowired
     public AcceptPassengerUseCase(
             RideAccess rideAccess,
             RideEligibility rideEligibility,
@@ -74,9 +76,11 @@ public class AcceptPassengerUseCase implements UseCase<PassengerRequestCommand, 
     @Transactional
     public Ride execute(PassengerRequestCommand command) {
         Ride ride = rideAccess.getOwnedRide(command.rideId(), command.firebaseUid());
+        LocalDateTime now = LocalDateTime.now();
+        LocalDateTime requestCutoff = now.minus(this.requestTimeout);
 
         validateParticipantsEligibility(ride, command.passengerId());
-        validateRequestNotExpired(ride, command.passengerId());
+        validateRequestNotExpired(ride, command.passengerId(), now, requestCutoff);
 
         RideCostCalculator.ConfirmationQuote quote = rideCostCalculator.computeConfirmationQuote(ride, command.passengerId());
         Double detourKm = quote != null ? quote.detourGeneratedKm() : null;
@@ -87,7 +91,8 @@ public class AcceptPassengerUseCase implements UseCase<PassengerRequestCommand, 
                         command.passengerId(),
                         detourKm,
                         maxAmount,
-                        LocalDateTime.now()
+                        now,
+                        requestCutoff
                 )
                 .orElseThrow(() -> resolveAcceptConflict(ride, command.passengerId(), detourKm, maxAmount));
 
@@ -106,15 +111,15 @@ public class AcceptPassengerUseCase implements UseCase<PassengerRequestCommand, 
         rideEligibility.assertCanJoin(passengerId, "O passageiro");
     }
 
-    private void validateRequestNotExpired(Ride ride, String passengerId) {
+    private void validateRequestNotExpired(Ride ride, String passengerId, LocalDateTime now, LocalDateTime requestCutoff) {
         Participant requestedPassenger = ride.getParticipants().stream()
                 .filter(p -> p.getUserId().equals(passengerId) && p.getStatus() == ParticipantStatus.REQUESTED)
                 .findFirst()
                 .orElse(null);
 
         if (requestedPassenger != null
-                && requestedPassenger.getRequestedAt().plus(this.requestTimeout).isBefore(LocalDateTime.now())) {
-            ride.expireRequest(passengerId);
+                && requestedPassenger.getRequestedAt().isBefore(requestCutoff)) {
+            ride.expireRequest(passengerId, now);
             rideRepository.save(ride);
             throw new ApplicationException(
                     ErrorCode.BAD_REQUEST,

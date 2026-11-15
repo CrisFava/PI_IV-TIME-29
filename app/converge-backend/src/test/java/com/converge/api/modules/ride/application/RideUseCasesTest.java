@@ -244,7 +244,7 @@ class RideUseCasesTest {
         when(rideCostCalculator.computeConfirmationQuote(ride, "passenger-456"))
                 .thenReturn(new RideCostCalculator.ConfirmationQuote(1.8, new BigDecimal("7.50")));
         when(rideRepository.acceptPassengerAtomic(
-                any(), eq("passenger-456"), eq(1.8), eq(new BigDecimal("7.50")), any()))
+                any(), eq("passenger-456"), eq(1.8), eq(new BigDecimal("7.50")), any(), any()))
                 .thenReturn(Optional.of(updatedRide));
         when(rideRepository.save(any(Ride.class))).thenAnswer(invocation -> invocation.getArgument(0));
 
@@ -278,7 +278,7 @@ class RideUseCasesTest {
         when(rideCostCalculator.computeConfirmationQuote(ride, "passenger-456"))
                 .thenReturn(new RideCostCalculator.ConfirmationQuote(1.8, new BigDecimal("7.50")));
         when(rideRepository.acceptPassengerAtomic(
-                any(), eq("passenger-456"), eq(1.8), eq(new BigDecimal("7.50")), any()))
+                any(), eq("passenger-456"), eq(1.8), eq(new BigDecimal("7.50")), any(), any()))
                 .thenReturn(Optional.of(updatedRide));
         when(rideRepository.save(any(Ride.class))).thenAnswer(invocation -> invocation.getArgument(0));
         doThrow(new RuntimeException("Database error saving notification"))
@@ -368,7 +368,7 @@ class RideUseCasesTest {
         when(rideCostCalculator.computeConfirmationQuote(ride, "passenger-456"))
                 .thenReturn(new RideCostCalculator.ConfirmationQuote(1.8, new BigDecimal("7.50")));
         when(rideRepository.acceptPassengerAtomic(
-                any(), eq("passenger-456"), eq(1.8), eq(new BigDecimal("7.50")), any()))
+                any(), eq("passenger-456"), eq(1.8), eq(new BigDecimal("7.50")), any(), any()))
                 .thenReturn(Optional.of(updatedRide));
         doThrow(new RuntimeException("Socket timeout"))
                 .when(rideCostCalculator).recalculateEstimatedShares(updatedRide);

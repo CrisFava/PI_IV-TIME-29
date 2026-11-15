@@ -14,12 +14,23 @@ import java.util.Optional;
 
 public interface RideRepositoryCustom {
 
-    Optional<Ride> acceptPassengerAtomic(
+    default Optional<Ride> acceptPassengerAtomic(
             ObjectId rideId,
             String passengerId,
             @Nullable Double detourGeneratedKm,
             @Nullable BigDecimal maxAmount,
             LocalDateTime now
+    ) {
+        return acceptPassengerAtomic(rideId, passengerId, detourGeneratedKm, maxAmount, now, null);
+    }
+
+    Optional<Ride> acceptPassengerAtomic(
+            ObjectId rideId,
+            String passengerId,
+            @Nullable Double detourGeneratedKm,
+            @Nullable BigDecimal maxAmount,
+            LocalDateTime now,
+            @Nullable LocalDateTime requestCutoff
     );
 
     Optional<Ride> requestSeatAtomic(

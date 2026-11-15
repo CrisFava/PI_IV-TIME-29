@@ -36,18 +36,23 @@ public class RideRepositoryImpl implements RideRepositoryCustom {
             String passengerId,
             @Nullable Double detourGeneratedKm,
             @Nullable BigDecimal maxAmount,
-            LocalDateTime now
+            LocalDateTime now,
+            @Nullable LocalDateTime requestCutoff
     ) {
+        Criteria participantCriteria = where("userId").is(passengerId)
+                .and("role").is(ParticipationRole.PASSENGER)
+                .and("status").is(ParticipantStatus.REQUESTED);
+
+        if (requestCutoff != null) {
+            participantCriteria = participantCriteria.and("requestedAt").gte(requestCutoff);
+        }
+
         Query query = new Query(new Criteria().andOperator(
                 where("_id").is(rideId),
                 where("status").in(RideStatus.AWAITING_CONFIRMATION, RideStatus.CONFIRMED),
                 where("departureDateTime").gte(now),
                 where("availableSeats").gt(0),
-                where("participants").elemMatch(
-                        where("userId").is(passengerId)
-                                .and("role").is(ParticipationRole.PASSENGER)
-                                .and("status").is(ParticipantStatus.REQUESTED)
-                )
+                where("participants").elemMatch(participantCriteria)
         ));
 
         Update update = new Update()

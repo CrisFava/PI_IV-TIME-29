@@ -31,6 +31,7 @@ final passengerMatchProvider =
 /// pede a vaga e acompanha a viagem até o motorista aceitar ou recusar.
 class PassengerMatchController extends Notifier<PassengerMatchState> {
   Timer? _polling;
+  int _pollGeneration = 0;
 
   // Trajeto de procura criado só para este pedido: sai do matching quando o pedido
   // é fechado sem carona aceita (cada pedido "agora" cria um trajeto novo)
@@ -163,8 +164,11 @@ class PassengerMatchController extends Notifier<PassengerMatchState> {
     final rideId = state.rideId;
     if (rideId == null || state.phase != PassengerMatchPhase.waiting) return;
 
+    final generation = _pollGeneration;
     try {
-      _apply(await _rides.getRide(rideId));
+      final ride = await _rides.getRide(rideId);
+      if (_pollGeneration != generation) return;
+      _apply(ride);
     } catch (_) {
       // Falha passageira de rede: tenta de novo na próxima volta do timer.
     }
@@ -262,6 +266,7 @@ class PassengerMatchController extends Notifier<PassengerMatchState> {
   }
 
   void _stopPolling() {
+    _pollGeneration++;
     _polling?.cancel();
     _polling = null;
   }
