@@ -19,6 +19,7 @@ import org.springframework.stereotype.Repository;
 
 import java.math.BigDecimal;
 import java.time.LocalDateTime;
+import java.util.List;
 import java.util.Optional;
 
 import static org.springframework.data.mongodb.core.query.Criteria.where;
@@ -112,5 +113,31 @@ public class RideRepositoryImpl implements RideRepositoryCustom {
                 Ride.class
         );
         return Optional.ofNullable(updated);
+    }
+
+    @Override
+    public List<Ride> findRidesWithExpiredRequests(LocalDateTime cutoff) {
+        Query query = new Query(new Criteria().andOperator(
+                where("status").in(RideStatus.AWAITING_CONFIRMATION, RideStatus.CONFIRMED),
+                where("participants").elemMatch(
+                        where("role").is(ParticipationRole.PASSENGER)
+                                .and("status").is(ParticipantStatus.REQUESTED)
+                                .and("requestedAt").lte(cutoff)
+                )
+        ));
+        return mongoTemplate.find(query, Ride.class);
+    }
+
+    @Override
+    public List<Ride> findOpenRidesPastDepartureWithoutConfirmedPassengers(LocalDateTime now) {
+        Query query = new Query(new Criteria().andOperator(
+                where("status").in(RideStatus.AWAITING_CONFIRMATION, RideStatus.CONFIRMED),
+                where("departureDateTime").lte(now),
+                where("participants").not().elemMatch(
+                        where("role").is(ParticipationRole.PASSENGER)
+                                .and("status").is(ParticipantStatus.CONFIRMED)
+                )
+        ));
+        return mongoTemplate.find(query, Ride.class);
     }
 }

@@ -9,6 +9,7 @@ import org.bson.types.ObjectId;
 
 import java.math.BigDecimal;
 import java.time.LocalDateTime;
+import java.util.List;
 import java.util.Optional;
 
 public interface RideRepositoryCustom {
@@ -26,4 +27,8 @@ public interface RideRepositoryCustom {
             Participant passengerRequest,
             LocalDateTime now
     );
+
+    List<Ride> findRidesWithExpiredRequests(LocalDateTime cutoff);
+
+    List<Ride> findOpenRidesPastDepartureWithoutConfirmedPassengers(LocalDateTime now);
 }

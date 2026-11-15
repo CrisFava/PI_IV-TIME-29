@@ -490,7 +490,6 @@ public class Ride {
         passenger.requestPayment(amount.setScale(2, RoundingMode.HALF_EVEN), LocalDateTime.now());
     }
 
-    // "Passageiro já pagou": o banco não avisa o servidor, então quem confirma é o motorista.
     public void confirmPayment(String passengerId) {
         this.validateCanCharge();
 
@@ -584,6 +583,16 @@ public class Ride {
             Place boardingLocation,
             Place dropOffLocation
     ) {
+        requestSeat(passengerId, passengerRouteId, boardingLocation, dropOffLocation, LocalDateTime.now());
+    }
+
+    public void requestSeat(
+            String passengerId,
+            String passengerRouteId,
+            Place boardingLocation,
+            Place dropOffLocation,
+            LocalDateTime now
+    ) {
         validateCanRequestSeat(passengerId);
 
         this.participants.add(Participant.passengerRequest(
@@ -591,7 +600,7 @@ public class Ride {
                 passengerRouteId,
                 boardingLocation,
                 dropOffLocation,
-                LocalDateTime.now()
+                now
         ));
     }
 
@@ -715,8 +724,52 @@ public class Ride {
     }
 
     public void expireRequest(String passengerId) {
+        expireRequest(passengerId, LocalDateTime.now());
+    }
+
+    public void expireRequest(String passengerId, LocalDateTime now) {
         Participant passenger = findRequestedPassenger(passengerId);
-        passenger.expire(LocalDateTime.now());
+        passenger.expire(now);
+        this.updatedAt = now;
+    }
+
+    public List<String> expireRequestsOlderThan(LocalDateTime cutoff, LocalDateTime now) {
+        List<String> expiredPassengerIds = new ArrayList<>();
+        for (Participant participant : this.participants) {
+            if (participant.getRole() == ParticipationRole.PASSENGER
+                    && participant.getStatus() == ParticipantStatus.REQUESTED
+                    && !participant.getRequestedAt().isAfter(cutoff)) {
+                participant.expire(now);
+                expiredPassengerIds.add(participant.getUserId());
+            }
+        }
+        if (!expiredPassengerIds.isEmpty()) {
+            this.updatedAt = now;
+        }
+        return expiredPassengerIds;
+    }
+
+    public List<String> expireWithoutParticipants(String reason, LocalDateTime now) {
+        if (this.status != RideStatus.AWAITING_CONFIRMATION && this.status != RideStatus.CONFIRMED) {
+            throw new ApplicationException(
+                    ErrorCode.BAD_REQUEST,
+                    "Só é possível expirar viagens que ainda não foram iniciadas.",
+                    Set.of("status")
+            );
+        }
+
+        this.markCancelled(this.driverId, reason);
+        this.updatedAt = now;
+
+        List<String> expiredPassengerIds = new ArrayList<>();
+        for (Participant participant : this.participants) {
+            if (participant.getRole() == ParticipationRole.PASSENGER
+                    && participant.getStatus() == ParticipantStatus.REQUESTED) {
+                participant.expire(now);
+                expiredPassengerIds.add(participant.getUserId());
+            }
+        }
+        return expiredPassengerIds;
     }
 
     private void validateCanRespondToRequests() {

@@ -12,5 +12,6 @@ public enum NotificationType {
     PAYMENT_DUE,
     PAYMENT_CONFIRMED,
     SEAT_RELEASED,
+    REQUEST_EXPIRED,
     GENERIC
 }

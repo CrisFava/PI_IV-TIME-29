@@ -15,3 +15,9 @@ google:
   maps:
     api-key: ${GOOGLE_MAPS_API_KEY:}
     timeout: 5s
+
+converge:
+  ride:
+    request-timeout: 3m
+    request-timeout-check-interval: PT30S
+    departure-expiration-check-interval: PT1M
