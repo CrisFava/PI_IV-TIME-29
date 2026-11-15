@@ -44,7 +44,7 @@ public class RideRepositoryImpl implements RideRepositoryCustom {
                 .and("status").is(ParticipantStatus.REQUESTED);
 
         if (requestCutoff != null) {
-            participantCriteria = participantCriteria.and("requestedAt").gte(requestCutoff);
+            participantCriteria = participantCriteria.and("requestedAt").gt(requestCutoff);
         }
 
         Query query = new Query(new Criteria().andOperator(
