@@ -8,6 +8,7 @@ abstract class AppRoutes {
   static const String forgotPassword = '/forgot-password';
   static const String completeProfile = '/complete-profile';
   static const String home = '/';
+  static const String indicators = '/indicators';
 
   /// Conversa entre o motorista e um passageiro de uma viagem.
   static const String chat = '/chat/:rideId/:passengerId';

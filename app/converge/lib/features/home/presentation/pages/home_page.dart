@@ -47,6 +47,7 @@ import '../../../ride/presentation/widgets/ride_history_list.dart';
 import '../../../vehicle/data/repository/vehicle_repository_impl.dart';
 import '../../../vehicle/presentation/widgets/add_vehicle_sheet.dart';
 import '../../../vehicle/presentation/widgets/my_vehicles_section.dart';
+import '../../../indicator/presentation/widgets/my_impact_card.dart';
 import '../../../vehicle/state/driver_access.dart';
 import '../../../vehicle/state/driver_access_provider.dart';
 import '../../../vehicle/state/my_vehicles_controller.dart';
@@ -1530,6 +1531,9 @@ class _HomePageState extends ConsumerState<HomePage> {
             ],
           ),
         ),
+        // Meu impacto: abre os indicadores de mobilidade e ambientais
+        const SizedBox(height: 16),
+        MyImpactCard(onOpen: () => context.push(AppRoutes.indicators)),
         // Motorista: carros cadastrados (sem nenhum, o acesso fica bloqueado)
         if (user.isDriver as bool) ...[
           const SizedBox(height: 16),
