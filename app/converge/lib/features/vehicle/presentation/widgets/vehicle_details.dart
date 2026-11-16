@@ -38,11 +38,13 @@ class _VehicleDetailsState extends State<VehicleDetails> {
   }
 
   Future<void> _delete() async {
+    // A folha de detalhes antes da espera: depois dela, só fecha se ainda for a da frente
+    final sheet = ModalRoute.of(context);
     setState(() => _deleting = true);
     final deleted = await widget.onDelete();
     if (!mounted) return;
     if (deleted) {
-      Navigator.of(context).pop();
+      if (sheet != null && sheet.isCurrent) Navigator.of(context).pop();
       return;
     }
     setState(() => _deleting = false);

@@ -51,11 +51,13 @@ class _DriverOfferDetailsState extends ConsumerState<DriverOfferDetails> {
       value.toStringAsFixed(1).replaceAll('.', ',');
 
   Future<void> _cancel(String routeId) async {
+    // A folha de detalhes antes da espera: depois dela, só fecha se ainda for a da frente
+    final sheet = ModalRoute.of(context);
     setState(() => _cancelling = true);
     final cancelled = await widget.onCancelOffer(routeId);
     if (!mounted) return;
     if (cancelled) {
-      Navigator.of(context).pop();
+      if (sheet != null && sheet.isCurrent) Navigator.of(context).pop();
       return;
     }
     setState(() => _cancelling = false);

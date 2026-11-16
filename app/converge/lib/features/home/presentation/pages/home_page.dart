@@ -669,7 +669,7 @@ class _HomePageState extends ConsumerState<HomePage> {
       vehicleId: vehicle.id,
       totalSeats: vehicle.seats,
       schedule: RouteSchedule.startingAt(
-        _offerDeparture ?? DateTime.now(),
+        _offerDeparture ?? DateTime.now().add(RouteSchedule.immediateOfferLead),
         repeatWeekly: _offerRepeatWeekly,
       ),
       maxDetourKm: maxDetourKm,

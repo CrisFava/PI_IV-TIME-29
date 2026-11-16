@@ -18,6 +18,7 @@ import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.context.ApplicationEventPublisher;
 import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Transactional;
 
 import java.util.List;
 import java.util.Map;
@@ -37,7 +38,9 @@ public class CancelRideUseCase implements UseCase<CancelRideCommand, Ride> {
     private final ApplicationEventPublisher eventPublisher;
     private final RouteAccess routeAccess;
 
+    // A viagem cancelada e o fim da carona de um dia só são gravados juntos
     @Override
+    @Transactional(transactionManager = "mongoTransactionManager")
     public Ride execute(CancelRideCommand command) {
         Ride ride = rideAccess.getOwnedRide(command.rideId(), command.firebaseUid());
         String driverId = rideAccess.currentUserId(command.firebaseUid());

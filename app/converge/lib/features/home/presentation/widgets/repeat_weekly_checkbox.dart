@@ -11,10 +11,14 @@ class RepeatWeeklyCheckbox extends StatelessWidget {
   final bool value;
   final ValueChanged<bool> onChanged;
 
+  /// Falso enquanto a carona é publicada: a recorrência não muda no meio.
+  final bool enabled;
+
   const RepeatWeeklyCheckbox({
     super.key,
     required this.value,
     required this.onChanged,
+    this.enabled = true,
   });
 
   @override
@@ -22,20 +26,24 @@ class RepeatWeeklyCheckbox extends StatelessWidget {
     return InkWell(
       key: const ValueKey('repeat_weekly_checkbox'),
       borderRadius: BorderRadius.circular(12),
-      onTap: () {
-        HapticFeedback.lightImpact();
-        onChanged(!value);
-      },
+      onTap: enabled
+          ? () {
+              HapticFeedback.lightImpact();
+              onChanged(!value);
+            }
+          : null,
       child: Padding(
         padding: const EdgeInsets.symmetric(vertical: 4),
         child: Row(
           children: [
             Checkbox(
               value: value,
-              onChanged: (checked) {
-                HapticFeedback.lightImpact();
-                onChanged(checked ?? false);
-              },
+              onChanged: enabled
+                  ? (checked) {
+                      HapticFeedback.lightImpact();
+                      onChanged(checked ?? false);
+                    }
+                  : null,
               activeColor: AppColors.primary,
               checkColor: AppColors.textLight,
               side: const BorderSide(color: AppColors.borderMedium, width: 1.5),

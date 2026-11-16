@@ -512,6 +512,7 @@ class _HomeDriverFormSheetState extends ConsumerState<HomeDriverFormSheet> {
                             RepeatWeeklyCheckbox(
                               value: widget.repeatWeekly,
                               onChanged: widget.onRepeatWeeklyChanged!,
+                              enabled: !widget.isPublishing,
                             ),
                             const SizedBox(height: 8),
                           ],

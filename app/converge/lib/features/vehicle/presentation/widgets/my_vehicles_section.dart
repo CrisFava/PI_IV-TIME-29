@@ -35,7 +35,7 @@ class _MyVehiclesSectionState extends ConsumerState<MyVehiclesSection> {
     await showAddVehicleSheet(context);
   }
 
-  void _openDetails(VehicleModel vehicle, int total) {
+  void _openDetails(VehicleModel vehicle) {
     showDetailsSheet<void>(
       context,
       title: 'Detalhes do carro',
@@ -46,7 +46,9 @@ class _MyVehiclesSectionState extends ConsumerState<MyVehiclesSection> {
           Navigator.of(sheetContext).pop();
           showEditVehicleSheet(context, vehicle);
         },
-        onDelete: () => _delete(vehicle, total),
+        // Quantos carros há agora: a lista pode ter mudado com os detalhes abertos
+        onDelete: () =>
+            _delete(vehicle, ref.read(myVehiclesProvider).value?.length ?? 1),
       ),
     );
   }
@@ -134,7 +136,7 @@ class _MyVehiclesSectionState extends ConsumerState<MyVehiclesSection> {
                   child: VehicleListTile(
                     vehicle: vehicle,
                     isDeleting: _deletingIds.contains(vehicle.id),
-                    onOpenDetails: () => _openDetails(vehicle, value.length),
+                    onOpenDetails: () => _openDetails(vehicle),
                   ),
                 ),
             ],

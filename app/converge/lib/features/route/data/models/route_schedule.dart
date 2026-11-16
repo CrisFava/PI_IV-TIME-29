@@ -12,6 +12,11 @@ class RouteSchedule {
   /// Tempo de viagem usado na chegada prevista enquanto a rota real não é calculada.
   static const Duration defaultTripDuration = Duration(minutes: 45);
 
+  /// Carona oferecida "Agora": sai daqui a pouco, para dar tempo de alguém pedir
+  /// vaga. Com a saída no minuto atual, ela já teria "saído" para o servidor e não
+  /// apareceria para nenhum passageiro.
+  static const Duration immediateOfferLead = Duration(minutes: 15);
+
   static const List<String> _apiWeekDays = [
     'MONDAY',
     'TUESDAY',

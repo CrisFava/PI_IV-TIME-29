@@ -49,9 +49,22 @@ public final class NextRideDate {
         }
 
         LocalDate date = offerDate != null ? offerDate : searchDate;
-        // Mesma regra do dia a dia: só a partir de hoje e, hoje, só se o motorista ainda não saiu
-        return of(Set.of(date.getDayOfWeek()), departureTime)
-                .filter(date::equals);
+        return onDate(date, departureTime, LocalDateTime.now(APP_ZONE));
+    }
+
+    // Data fixa: vale se for depois de hoje ou, hoje, se o motorista ainda não saiu
+    static Optional<LocalDate> onDate(LocalDate date, String departureTime, LocalDateTime now) {
+        LocalTime departure;
+        try {
+            departure = LocalTime.parse(departureTime);
+        } catch (DateTimeParseException | NullPointerException e) {
+            return Optional.empty();
+        }
+
+        LocalDate today = now.toLocalDate();
+        boolean departed = date.isBefore(today)
+                || (date.equals(today) && !departure.isAfter(now.toLocalTime()));
+        return departed ? Optional.empty() : Optional.of(date);
     }
 
     static Optional<LocalDate> of(Set<DayOfWeek> days, String departureTime, LocalDateTime now) {

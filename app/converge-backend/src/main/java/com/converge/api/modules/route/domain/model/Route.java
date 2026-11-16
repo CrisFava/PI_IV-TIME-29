@@ -185,6 +185,11 @@ public class Route {
 
         this.applyTripData(
                 vehicleId, origin, destination, departureTime, estimatedArrivalTime, weekDays, maxDetourKm, totalSeats, toll, parking);
+
+        // A carona de um dia só continua no dia da sua data, mesmo que outros dias venham na edição
+        if (getRecurrence() == RecurrenceType.ONCE && this.date != null) {
+            this.weekDays = new HashSet<>(Set.of(this.date.getDayOfWeek()));
+        }
     }
 
     public void deactivate() {
