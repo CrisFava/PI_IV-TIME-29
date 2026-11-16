@@ -63,14 +63,34 @@ class _DepartureTimePickerState extends State<DepartureTimePicker> {
   @override
   void initState() {
     super.initState();
-    final base = widget.current ?? DateTime.now();
-    _selected = _onDay(_roundUp(base));
+    final rounded = _roundUp(widget.current ?? DateTime.now());
+    final sameDay =
+        rounded.year == widget.day.year &&
+        rounded.month == widget.day.month &&
+        rounded.day == widget.day.day;
+    // Arredondar perto da meia-noite pode virar o dia seguinte: no dia escolhido
+    // fica o último horário dele (23:55), e não 00:00, que já teria passado
+    _selected = sameDay
+        ? rounded
+        : (rounded.isAfter(widget.day)
+              ? DateTime(
+                  widget.day.year,
+                  widget.day.month,
+                  widget.day.day,
+                  23,
+                  55,
+                )
+              : _onDay(rounded));
   }
 
-  // A roda anda de 5 em 5 min: arredonda para o próximo múltiplo
+  // A roda anda de 5 em 5 min: arredonda para o próximo múltiplo. Com segundos,
+  // 10:30:20 vira 10:35 (10:30 já passou); 10:30:00 exato fica 10:30.
   static DateTime _roundUp(DateTime time) {
-    final extra = (_step - time.minute % _step) % _step;
-    final rounded = time.add(Duration(minutes: extra));
+    final hasSeconds =
+        time.second > 0 || time.millisecond > 0 || time.microsecond > 0;
+    final base = hasSeconds ? time.add(const Duration(minutes: 1)) : time;
+    final extra = (_step - base.minute % _step) % _step;
+    final rounded = base.add(Duration(minutes: extra));
     return DateTime(
       rounded.year,
       rounded.month,

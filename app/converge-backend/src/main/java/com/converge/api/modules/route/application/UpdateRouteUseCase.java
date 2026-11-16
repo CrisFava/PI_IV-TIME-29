@@ -14,6 +14,8 @@ import lombok.RequiredArgsConstructor;
 import org.springframework.context.ApplicationEventPublisher;
 import org.springframework.stereotype.Service;
 
+import java.time.LocalDate;
+
 @Service
 @RequiredArgsConstructor
 public class UpdateRouteUseCase implements UseCase<UpdateRouteCommand, Route> {
@@ -23,6 +25,7 @@ public class UpdateRouteUseCase implements UseCase<UpdateRouteCommand, Route> {
     private final RouteMapper routeMapper;
     private final RouteGeometryService routeGeometryService;
     private final ApplicationEventPublisher eventPublisher;
+    private final OfferOverlapValidator offerOverlapValidator;
 
     @Override
     public Route execute(UpdateRouteCommand command) {
@@ -43,6 +46,8 @@ public class UpdateRouteUseCase implements UseCase<UpdateRouteCommand, Route> {
 
         RouteGeometry geometry = routeGeometryService.compute(route.getOrigin(), route.getDestination());
         route.defineGeometry(geometry.distanceKm(), geometry.encodedPolyline(), geometry.durationMinutes());
+        // Depois da nova chegada estimada: o horário editado não pode se sobrepor a outra carona
+        offerOverlapValidator.validate(route, LocalDate.now(RouteAccess.APP_ZONE));
 
         Route saved = routeRepository.save(route);
         eventPublisher.publishEvent(new RouteChangedEvent(command.routeId()));

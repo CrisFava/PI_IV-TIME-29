@@ -58,6 +58,9 @@ class RidePlaceStepSheet extends ConsumerStatefulWidget {
 class _RidePlaceStepSheetState extends ConsumerState<RidePlaceStepSheet> {
   final _searchController = TextEditingController();
 
+  // Buscando os detalhes da sugestão tocada: as outras ficam desabilitadas
+  bool _resolving = false;
+
   @override
   void dispose() {
     _searchController.dispose();
@@ -75,12 +78,15 @@ class _RidePlaceStepSheetState extends ConsumerState<RidePlaceStepSheet> {
   }
 
   Future<void> _chooseSuggestion(PlaceSuggestionModel suggestion) async {
+    if (_resolving) return;
     HapticFeedback.lightImpact();
     FocusScope.of(context).unfocus();
+    setState(() => _resolving = true);
     final details = await ref
         .read(placesAutocompleteProvider.notifier)
         .getPlaceDetails(suggestion.placeId);
     if (!mounted) return;
+    setState(() => _resolving = false);
     if (details == null) {
       showAppNotice(
         context,
@@ -235,7 +241,14 @@ class _RidePlaceStepSheetState extends ConsumerState<RidePlaceStepSheet> {
         const SizedBox(height: 10),
 
         // Sugestões do Google enquanto digita; sem busca, os pontos do campus
-        if (typing)
+        if (typing && _resolving)
+          const Padding(
+            padding: EdgeInsets.all(16),
+            child: Center(
+              child: CircularProgressIndicator(color: AppColors.primary),
+            ),
+          )
+        else if (typing)
           for (final suggestion in autocomplete.suggestions)
             _placeOption(
               title: suggestion.mainText,

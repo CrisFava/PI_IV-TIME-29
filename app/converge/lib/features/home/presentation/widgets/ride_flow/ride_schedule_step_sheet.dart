@@ -98,28 +98,32 @@ class RideScheduleStepSheet extends StatelessWidget {
         const SizedBox(height: 14),
 
         // O trajeto escolhido: tocar volta para trocar a partida ou o destino
-        Container(
-          decoration: BoxDecoration(
-            color: AppColors.neutralLight,
-            borderRadius: BorderRadius.circular(16),
-            border: Border.all(color: AppColors.borderSubtle),
-          ),
-          child: Column(
-            children: [
-              _placeRow(
-                badge: const OriginDotBadge(size: 16),
-                label: 'Saindo de',
-                address: originAddress,
-                onTap: onEditOrigin,
-              ),
-              const Divider(height: 1, color: AppColors.borderSubtle),
-              _placeRow(
-                badge: const DestinationDotBadge(size: 16),
-                label: 'Indo para',
-                address: destinationAddress,
-                onTap: onEditDestination,
-              ),
-            ],
+        // (travado enquanto envia)
+        AbsorbPointer(
+          absorbing: isSubmitting,
+          child: Container(
+            decoration: BoxDecoration(
+              color: AppColors.neutralLight,
+              borderRadius: BorderRadius.circular(16),
+              border: Border.all(color: AppColors.borderSubtle),
+            ),
+            child: Column(
+              children: [
+                _placeRow(
+                  badge: const OriginDotBadge(size: 16),
+                  label: 'Saindo de',
+                  address: originAddress,
+                  onTap: onEditOrigin,
+                ),
+                const Divider(height: 1, color: AppColors.borderSubtle),
+                _placeRow(
+                  badge: const DestinationDotBadge(size: 16),
+                  label: 'Indo para',
+                  address: destinationAddress,
+                  onTap: onEditDestination,
+                ),
+              ],
+            ),
           ),
         ),
         const SizedBox(height: 10),
@@ -157,7 +161,13 @@ class RideScheduleStepSheet extends StatelessWidget {
         ),
         const SizedBox(height: 14),
 
-        RideDepartureTile(label: departureLabel, onTap: onChangeDeparture),
+        AbsorbPointer(
+          absorbing: isSubmitting,
+          child: RideDepartureTile(
+            label: departureLabel,
+            onTap: onChangeDeparture,
+          ),
+        ),
 
         if (isDriver && repeatChanged != null) ...[
           const SizedBox(height: 4),

@@ -16,10 +16,9 @@ import '../../../../app_routes.dart';
 
 import '../../../route/data/models/create_route_request.dart';
 import '../../../route/data/models/route_place_model.dart';
-import '../../../route/data/models/route_estimate_model.dart';
 import '../../../route/data/models/route_schedule.dart';
 import '../../../route/state/offer_route_controller.dart';
-import '../../../route/state/route_estimate_provider.dart';
+import '../../../route/state/trip_estimate_controller.dart';
 
 import '../../../../core/config/styles.dart';
 import '../../../../core/services/maps/google_maps_service.dart';
@@ -88,9 +87,8 @@ class _HomePageState extends ConsumerState<HomePage> {
   /// Carona oferecida se repete toda semana (por padrão, é de um dia só).
   bool _offerRepeatWeekly = false;
 
-  // Tempo e distância de carro da partida ao destino (etapa 3), pelo backend
-  RouteEstimateModel? _tripEstimate;
-  bool _estimatingTrip = false;
+  // Publicando a carona (inclui a busca do carro antes do envio)
+  bool _publishingOffer = false;
 
   // Pedido de carona em andamento com o painel escondido: a busca continua e o
   // botão do carro fica azul; o menu do carro reabre os detalhes
@@ -125,9 +123,16 @@ class _HomePageState extends ConsumerState<HomePage> {
       if (_samePoint(target, _pickupLocation) && _pickupAddress.isNotEmpty) {
         return;
       }
-      _pickupLocation = target;
+      // Sem endereço enquanto busca: o "Confirmar" fica desabilitado
+      setState(() {
+        _pickupLocation = target;
+        _pickupAddress = '';
+      });
       final addr = await GoogleMapsService.getAddressFromCoordinates(target);
-      if (mounted && _passengerStep == PassengerRideStep.dragMapPickup) {
+      // Só vale se o pino ainda está nesse ponto (o mapa pode ter sido arrastado de novo)
+      if (mounted &&
+          _passengerStep == PassengerRideStep.dragMapPickup &&
+          _samePoint(target, _pickupLocation)) {
         setState(() => _pickupAddress = addr);
       }
     } else if (_passengerStep == PassengerRideStep.dragMapDestination) {
@@ -137,9 +142,16 @@ class _HomePageState extends ConsumerState<HomePage> {
           _destinationAddress.isNotEmpty) {
         return;
       }
-      _destinationLocation = target;
+      setState(() {
+        _destinationLocation = target;
+        _destinationAddress = '';
+      });
       final addr = await GoogleMapsService.getAddressFromCoordinates(target);
-      if (mounted && _passengerStep == PassengerRideStep.dragMapDestination) {
+      final current = _destinationLocation;
+      if (mounted &&
+          _passengerStep == PassengerRideStep.dragMapDestination &&
+          current != null &&
+          _samePoint(target, current)) {
         setState(() => _destinationAddress = addr);
       }
     }
@@ -196,58 +208,16 @@ class _HomePageState extends ConsumerState<HomePage> {
 
   void _handleConfirmDestination() => _goToSchedule();
 
-  /// Etapa 3: mostra o horário na hora e busca, em paralelo, o tempo e o desenho
-  /// do caminho pelo backend (Routes API do Google).
-  Future<void> _goToSchedule() async {
+  /// Etapa 3: mostra o horário na hora; o tempo e o desenho do caminho chegam
+  /// do controlador (backend com a Routes API do Google).
+  void _goToSchedule() {
     final destination = _destinationLocation;
     if (destination == null) return;
 
-    final generation = ++_draftGeneration;
-    setState(() {
-      _passengerStep = PassengerRideStep.routeConfirmation;
-      _tripEstimate = null;
-      _estimatingTrip = true;
-      _tripRoutePoints = null;
-    });
-
-    // O rascunho foi fechado ou mudou enquanto o caminho era calculado
-    bool isStale() => !mounted || generation != _draftGeneration;
-
-    RouteEstimateModel? estimate;
-    try {
-      estimate = await ref.read(
-        routeEstimateProvider((
-          originLatitude: _pickupLocation.latitude,
-          originLongitude: _pickupLocation.longitude,
-          destinationLatitude: destination.latitude,
-          destinationLongitude: destination.longitude,
-        )).future,
-      );
-    } catch (e) {
-      debugPrint('Não foi possível estimar o trajeto: $e');
-    }
-    if (isStale()) return;
-
-    var points = <LatLng>[];
-    final polyline = estimate?.encodedPolyline;
-    if (polyline != null && polyline.isNotEmpty) {
-      points = GoogleMapsService.decodePolyline(polyline);
-    } else {
-      // Sem o desenho do backend, o app calcula a rota só para o mapa
-      try {
-        points = await GoogleMapsService.computeRoutes(
-          origin: _pickupLocation,
-          destination: destination,
-        );
-      } catch (_) {}
-      if (isStale()) return;
-    }
-
-    setState(() {
-      _tripEstimate = estimate;
-      _estimatingTrip = false;
-      _tripRoutePoints = points;
-    });
+    setState(() => _passengerStep = PassengerRideStep.routeConfirmation);
+    ref
+        .read(tripEstimateProvider.notifier)
+        .load(origin: _pickupLocation, destination: destination);
   }
 
   /// Salva (ou reaproveita) o trajeto de procura e busca os motoristas compatíveis.
@@ -448,8 +418,7 @@ class _HomePageState extends ConsumerState<HomePage> {
     _destinationLocation = null;
     _destinationAddress = '';
     _tripRoutePoints = null;
-    _tripEstimate = null;
-    _estimatingTrip = false;
+    ref.read(tripEstimateProvider.notifier).reset();
   }
 
   void _onStartDriverShiftFromDock(bool canDrive) {
@@ -602,7 +571,7 @@ class _HomePageState extends ConsumerState<HomePage> {
   /// ("agora" por padrão), com o raio de busca como desvio máximo. Os passageiros já
   /// podem pedir vaga; a viagem só começa no "Iniciar trajeto" da carona.
   Future<void> _handlePublishOffer() async {
-    if (ref.read(offerRouteProvider)) return;
+    if (_publishingOffer || ref.read(offerRouteProvider)) return;
     if (_pickupAddress.isEmpty) {
       _showError('Escolha de onde a carona sai.');
       return;
@@ -613,9 +582,18 @@ class _HomePageState extends ConsumerState<HomePage> {
     }
 
     HapticFeedback.mediumImpact();
+    // O rascunho revisado: se ele for fechado ou trocado durante a busca do
+    // carro, nada é publicado
+    final generation = _draftGeneration;
+    setState(() => _publishingOffer = true);
     final vehicle = await _findDriverVehicle();
     if (!mounted) return;
+    if (generation != _draftGeneration) {
+      setState(() => _publishingOffer = false);
+      return;
+    }
     if (vehicle == null) {
+      setState(() => _publishingOffer = false);
       _showError('Cadastre um veículo antes de publicar a carona.');
       return;
     }
@@ -633,10 +611,14 @@ class _HomePageState extends ConsumerState<HomePage> {
     try {
       await ref.read(offerRouteProvider.notifier).publish(request);
     } catch (e) {
-      if (mounted) _showError(authErrorMessage(e));
+      if (mounted) {
+        setState(() => _publishingOffer = false);
+        _showError(authErrorMessage(e));
+      }
       return;
     }
     if (!mounted) return;
+    setState(() => _publishingOffer = false);
 
     ref.invalidate(myOfferRoutesProvider);
     setState(() {
@@ -670,6 +652,13 @@ class _HomePageState extends ConsumerState<HomePage> {
 
   /// "Oferecer carona" no painel: abre a folha para publicar uma carona nova.
   void _openOfferForm() {
+    // Os dois fluxos usam as mesmas etapas: abrir a oferta apagaria o pedido
+    if (_hasActiveRideRequest) {
+      _showError(
+        'Você tem um pedido de carona em andamento. Cancele o pedido antes de oferecer uma carona.',
+      );
+      return;
+    }
     setState(() {
       _currentMode = AppRideMode.driver;
       _showRideRequests = false;
@@ -1029,6 +1018,10 @@ class _HomePageState extends ConsumerState<HomePage> {
 
   // --- VIEW 0: TELA PRINCIPAL COM GOOGLE MAPS REAL ---
   Widget _buildUberHomeView(dynamic user, bool canDrive, double bottomPadding) {
+    // O desenho do caminho do rascunho vem do controlador da estimativa
+    ref.listen(tripEstimateProvider, (_, next) {
+      setState(() => _tripRoutePoints = next.points.isEmpty ? null : next.points);
+    });
     // Com a viagem em andamento (e sem um pedido de carona aberto), o mapa
     // mostra a rota da viagem com as paradas: buscar e deixar cada passageiro
     final shiftRide = ref.watch(driverRideInProgressProvider);
@@ -1165,7 +1158,7 @@ class _HomePageState extends ConsumerState<HomePage> {
         isDriver ? _offerDeparture : _rideDeparture,
         DateTime.now(),
       ),
-      estimate: _tripEstimate,
+      estimate: ref.read(tripEstimateProvider).estimate,
       repeatWeekly: _offerRepeatWeekly,
       searchRadiusKm: _driverSearchRadiusKm,
     );
@@ -1193,6 +1186,7 @@ class _HomePageState extends ConsumerState<HomePage> {
   /// As 3 etapas, iguais para motorista e passageiro: partida, destino e horário.
   Widget _buildRideFlowStep(double bottomPadding) {
     final isDriver = _currentMode.isDriver;
+    final tripEstimate = ref.watch(tripEstimateProvider);
     return switch (_passengerStep) {
       PassengerRideStep.dragMapPickup => RideMapPickCard(
         isOrigin: true,
@@ -1224,8 +1218,8 @@ class _HomePageState extends ConsumerState<HomePage> {
         isDriver: isDriver,
         originAddress: _pickupAddress,
         destinationAddress: _destinationAddress,
-        estimate: _tripEstimate,
-        isEstimating: _estimatingTrip,
+        estimate: tripEstimate.estimate,
+        isEstimating: tripEstimate.isLoading,
         departureLabel: rideDepartureLabel(
           isDriver ? _offerDeparture : _rideDeparture,
           DateTime.now(),
@@ -1247,7 +1241,8 @@ class _HomePageState extends ConsumerState<HomePage> {
         onSearchRadiusChanged: isDriver
             ? (value) => setState(() => _driverSearchRadiusKm = value)
             : null,
-        isSubmitting: isDriver && ref.watch(offerRouteProvider),
+        isSubmitting:
+            isDriver && (_publishingOffer || ref.watch(offerRouteProvider)),
         onSubmit: _reviewAndSubmit,
         onEditOrigin: () => _goToStep(PassengerRideStep.selectPickup),
         onEditDestination: () => _goToStep(PassengerRideStep.searchDestination),
