@@ -24,6 +24,7 @@
 | 05/11/2026 | Daniela Mikie Kikuchi Gonçalves | 1.4.0 | Indicador por usuário (`indicators`) ajustado para a versão enxuta do MVP (campos planos, `carsAvoided`); `financial` e `series` marcados como evolução futura |
 | 12/11/2026 | Cristian Eduardo Fava | 1.5.0 | Cobrança combinada no chat na Participação (`requestedAmount`, `paymentRequestedAt`, `paidAt`); estrutura do chat no Firebase Realtime Database; indicadores atualizados ao concluir a viagem |
 | 13/11/2026 | Daniela Mikie Kikuchi Gonçalves | 1.5.1 | Avaliação: quem pode avaliar (participante que concluiu a viagem), avaliação imutável e sem prazo no MVP, média calculada a partir das avaliações; índice de duplicidade corrigido para `rideId + reviewerId + reviewedId` |
+| 15/11/2026 | Allan Giovanni Matias Paes | 1.6.0 | Alinhamento com as entidades Java: `toll` e `parking` no Trajeto; `EXPIRED` e `version` na Viagem; `appliedRideIds` nos Indicadores e Plataforma; `IdempotencyKey` completo com replay e fingerprint; `REQUEST_EXPIRED` em Notificação; complementação dos schemas JSON 4.11 a 4.15 e índices de integridade |
 
 ---
 
@@ -114,6 +115,8 @@ Route é o registro de um deslocamento recorrente cadastrado por um usuário. Po
 | `estimatedArrivalTime` | Hora | Sim | Simples | `08:10`, `19:00` | hora anterior à partida | Formato `HH:mm`. Calculado ou informado pelo usuário. |
 | `weekDays` | Elemento de lista enumerada | Sim | Multivalorado (M) | `["MONDAY","TUESDAY"]` | lista vazia | Mínimo 1 dia. Valores: `MONDAY`, `TUESDAY`, `WEDNESDAY`, `THURSDAY`, `FRIDAY`, `SATURDAY`, `SUNDAY`. |
 | `maxDetourKm` | Número decimal | Sim | Simples | `2.0`, `0.5`, `5.0` | negativo, zero | Somente para `OFFER`. Distância máxima de desvio aceita pelo motorista. Usado no matching. |
+| `toll` | Número decimal monetário | Não | Simples | `12.50`, `null` | negativo | Somente para `OFFER`. Valor estimado de pedágio informado pelo motorista na oferta. `Decimal128`. |
+| `parking` | Número decimal monetário | Não | Simples | `20.00`, `null` | negativo | Somente para `OFFER`. Valor estimado de estacionamento informado pelo motorista na oferta. `Decimal128`. |
 | `totalSeats` | Número inteiro | Não | Simples | `3`, `8` | `0`, negativo | Somente para `OFFER`. Calculado como `totalCapacity do veículo - 1`. |
 | `availableSeats` | Número inteiro | Não | Simples | `3`, `1`, `0` | negativo, maior que totalSeats | Somente para `OFFER`. Decrementado ao confirmar; incrementado ao cancelar. |
 | `routeDistanceKm` | Número decimal | Não | Simples | `12.4`, `5.8` | negativo, zero | Distância pelas ruas, calculada pela Routes API (Google Maps) na criação e em cada edição. Se o Google estiver indisponível, recebe a distância em linha reta (Haversine). Base para custos e desvios. |
@@ -134,6 +137,7 @@ Ride é o evento central do sistema. Representa uma viagem concreta com data, ho
 | :--- | :---: | :---: | :---: | :--- | :--- | :--- |
 | `_id` | Texto alfanumérico | Sim | Simples | `64d4c3b2...` | vazio, nulo | Gerado pelo banco. Referenciado por reviews e reports. |
 | `sequentialNumber` | Número inteiro | Sim | Simples | `42`, `1`, `1000` | negativo, zero, duplicado para o mesmo motorista | Número amigável exibido na UI: `Ride #042`. **Sequencial por motorista** (único em `driverId + sequentialNumber`), não global — evita vazar o volume total de viagens da plataforma. |
+| `version` | Número inteiro longo | Não | Simples | `0`, `1`, `2` | negativo | Controle de concorrência otimista (`@Version` no Spring Data MongoDB). Incrementado a cada mutação concorrente. |
 | `driverId` | Texto alfanumérico | Sim | Simples | `64a1f3c2...` | nulo | Referência ao `_id` do User motorista. |
 | `vehicleId` | Texto alfanumérico | Sim | Simples | `64b2e1d3...` | nulo | Referência ao `_id` do Vehicle. Dados copiados no snapshot. |
 | `vehicleSnapshot` | Dados do veículo | Sim | Composto (C) | ver tipo especial 3.6 | nulo | Cópia imutável dos dados do veículo no momento da criação da viagem. |
@@ -279,11 +283,15 @@ Indicator é o conjunto de métricas de mobilidade, sustentabilidade e financeir
 | `userId` | Texto alfanumérico | Sim | Simples | `64a1f3c2...` | nulo | Referência ao `_id` do User dono dos indicadores. |
 | `period` | Elemento de lista enumerada | Sim | Simples | `MONTHLY`, `WEEKLY` | `TOTAL`, valor fora do enum | Valores: `WEEKLY`, `MONTHLY`, `SEMESTERLY`. O período `TOTAL` não existe mais como documento — é calculado somando os meses na leitura. |
 | `reference` | Texto alfanumérico | Sim | Simples | `2025-05`, `2025-S1`, `2025-W20` | vazio | Para mensal: `AAAA-MM`. Para semestral: `AAAA-S1/S2`. Para semanal: `AAAA-W##`. |
-| `mobility` | Dados de mobilidade | Sim | Composto (C) | ver tipo especial 3.9 | nulo | Totais de viagens, km e carros evitados no período. |
-| `sustainability` | Dados ambientais | Sim | Composto (C) | ver tipo especial 3.10 | nulo | Energia economizada, CO₂ evitado e equivalência em árvores. |
-| `financial` | Dados financeiros | Sim | Composto (C) | ver tipo especial 3.11 | nulo | Economia do passageiro e receita do motorista no período. Valores em `Decimal128`. |
-| `series` | Ponto de série temporal | Sim | Multivalorado e Composto (MC) | ver tipo especial 3.12 | lista vazia | Array de pontos para os gráficos de evolução. Máximo controlado por período. |
+| `ridesAsDriver` | Número inteiro | Sim | Simples | `12`, `0` | negativo | Total de viagens concluídas como motorista no período. |
+| `ridesAsPassenger` | Número inteiro | Sim | Simples | `22`, `0` | negativo | Total de viagens concluídas como passageiro no período. |
+| `sharedKm` | Número decimal | Sim | Simples | `272.8`, `0.0` | negativo | Total de quilômetros compartilhados no período (`Double`). |
+| `carsAvoided` | Número inteiro | Sim | Simples | `22`, `0` | negativo | Quantidade estimada de veículos individuais evitados no trânsito. |
+| `co2AvoidedKg` | Número decimal | Sim | Simples | `50.7`, `0.0` | negativo | Estimativa de emissão de CO₂ evitada em quilogramas (`Double`). |
+| `appliedRideIds` | Texto alfanumérico | Sim | Multivalorado (M) | `["64d4c3b2..."]` | lista nula | Lista de `rides._id` cujos dados já foram agregados neste indicador (garante idempotência). |
 | `updatedAt` | Data e hora | Sim | Simples | `2025-05-12T08:20:00Z` | anterior à criação | Atualizado sempre que uma viagem do período é concluída. |
+
+> **Nota de compatibilidade conceitual:** Para o MVP, a entidade utiliza campos planos acima para simplicidade e performance. Estruturas aninhadas como `financial` e `series` (seções 3.9 a 3.12) representam expansões planejadas para versões futuras.
 
 ---
 
@@ -303,6 +311,7 @@ Indicadores **globais** agregados de toda a plataforma, por período, para atend
 | `totalCarsAvoided` | Número inteiro | Sim | Simples | `340` | negativo | Estimativa de carros evitados no período. |
 | `totalCo2AvoidedKg` | Número decimal | Sim | Simples | `3100.0` | negativo | Total de CO₂ evitado. `Double`. |
 | `activeUsers` | Número inteiro | Sim | Simples | `214` | negativo | Usuários ativos no período. |
+| `appliedRideIds` | Texto alfanumérico | Sim | Multivalorado (M) | `["64d4c3b2..."]` | lista nula | Lista de IDs de caronas (`rides._id`) já processadas para garantia de idempotência no recálculo. |
 | `calculatedAt` | Data e hora | Sim | Simples | `2025-05-31T23:00:00Z` | — | Timestamp do último recálculo pelo job. |
 
 ---
@@ -353,7 +362,7 @@ Aviso destinado ao usuário dentro do app. Mantida simples: só o aviso, o tipo 
 | :--- | :---: | :---: | :---: | :--- | :--- | :--- |
 | `_id` | Texto alfanumérico | Sim | Simples | `64n1o2t3...` | vazio, nulo | Gerado pelo banco. |
 | `userId` | Texto alfanumérico | Sim | Simples | `64a1f3c2...` | nulo | Referência ao User destinatário. |
-| `type` | Elemento de lista enumerada | Sim | Simples | `PAYMENT_DUE`, `RIDE_CONFIRMED` | valor fora do enum | Ver enum `NotificationType`. |
+| `type` | Elemento de lista enumerada | Sim | Simples | `PAYMENT_DUE`, `REQUEST_EXPIRED` | valor fora do enum | Ver enum `NotificationType` (`RIDE_REQUEST`, `RIDE_CONFIRMED`, `RIDE_CANCELLED`, `REQUEST_EXPIRED`, `PAYMENT_DUE`, `PAYMENT_CONFIRMED`, `SEAT_RELEASED`, `GENERIC`). |
 | `title` | Texto | Sim | Simples | `Pagamento pendente` | vazio | Título curto do aviso. |
 | `message` | Texto | Sim | Simples | `Você tem uma carona a pagar.` | vazio | Corpo do aviso. |
 | `relatedEntityType` | Texto | Não | Simples | `RIDE`, `RESERVED_SEAT` | — | Tipo da entidade relacionada, para navegação ao tocar no aviso. |
@@ -372,10 +381,16 @@ Registra as chaves de idempotência já processadas, para evitar que uma operaç
 | Atributo / Dado | Tipo conceitual | Obrigatório | Característica | Ex. aceitos | Ex. não aceitos | Comentários |
 | :--- | :---: | :---: | :---: | :--- | :--- | :--- |
 | `_id` | Texto alfanumérico | Sim | Simples | `64i1d2k3...` | vazio, nulo | Gerado pelo banco. |
-| `key` | Texto alfanumérico | Sim | Simples | `uuid-v4...` | duplicada, vazio | Chave enviada pelo app no cabeçalho `Idempotency-Key`. Única. |
-| `endpoint` | Texto | Sim | Simples | `POST /rides/{id}/confirm` | vazio | Operação à qual a chave se refere. |
-| `userId` | Texto alfanumérico | Sim | Simples | `64a1f3c2...` | nulo | Referência ao User que fez a requisição. |
-| `createdAt` | Data e hora | Sim | Simples | `2025-05-12T08:20:00Z` | — | Momento do processamento. Expira por TTL em 24-48h. |
+| `key` | Texto alfanumérico | Sim | Simples | `c3f8e562-b13c...` | duplicada, vazio | Chave UUID v4 enviada pelo cliente no cabeçalho `Idempotency-Key`. Única. |
+| `userId` | Texto alfanumérico | Sim | Simples | `64a1f3c2...` | nulo | Referência ao `_id` do User que originou a requisição. |
+| `method` | Texto | Sim | Simples | `POST`, `PUT`, `DELETE` | vazio | Método HTTP da operação protegida. |
+| `path` | Texto | Sim | Simples | `/api/v1/rides/64d.../accept` | vazio | URI do recurso acionado. |
+| `requestFingerprint` | Texto | Sim | Simples | hash SHA-256 | vazio | Hash do corpo da requisição para verificar consistência em caso de repetição. |
+| `status` | Elemento de lista enumerada | Sim | Simples | `IN_PROGRESS`, `COMPLETED`, `UNKNOWN_OUTCOME` | fora do enum | Estado da execução da operação associada à chave. |
+| `responseStatus` | Número inteiro | Não | Simples | `200`, `201`, `400` | — | Código HTTP de retorno para replay transparente ao cliente. |
+| `contentType` | Texto | Não | Simples | `application/json` | — | Tipo de mídia da resposta cacheada. |
+| `responseBody` | Texto | Não | Simples | payload JSON serializado | — | Resposta retornada para responder requisições repetidas sem reprocessar mutações. |
+| `createdAt` | Data e hora | Sim | Simples | `2025-05-12T08:20:00Z` | — | Momento do primeiro recebimento. Expira por TTL de 24 horas. |
 
 ---
 
@@ -544,7 +559,7 @@ Estrutura composta e multivalorada que representa cada participante de uma viage
 | `boardingLocation` | Location (C) | Não | Ponto de embarque do passageiro. Nulo para o motorista. |
 | `dropOffLocation` | Location (C) | Não | Ponto de desembarque do passageiro. Nulo para o motorista. |
 | `detourGeneratedKm` | Número decimal | Não | Desvio gerado por este passageiro. `Double`. Calculado no matching. Nulo para o motorista. |
-| `status` | Elemento de lista enumerada | Sim | Valores: `REQUESTED`, `REJECTED`, `CONFIRMED`, `CANCELLED`, `NO_SHOW`, `COMPLETED`. |
+| `status` | Elemento de lista enumerada | Sim | Valores: `REQUESTED`, `REJECTED`, `CONFIRMED`, `CANCELLED`, `NO_SHOW`, `COMPLETED`, `EXPIRED`. |
 | `requestedAt` | Data e hora | Sim | Momento em que o passageiro solicitou a vaga (RF19). |
 | `respondedAt` | Data e hora | Não | Momento em que o motorista aceitou ou recusou. Nulo enquanto `REQUESTED`. |
 | `rejectionReason` | Texto | Não | Motivo da recusa pelo motorista. Presente somente quando `status = REJECTED`. |
@@ -787,6 +802,8 @@ Estrutura composta que representa a CNH do motorista. Opcional — só preenchid
   "estimatedArrivalTime": "08:10",
   "weekDays": ["MONDAY", "TUESDAY", "WEDNESDAY", "THURSDAY", "FRIDAY"],
   "maxDetourKm": 2.0,
+  "toll": { "$numberDecimal": "12.50" },
+  "parking": { "$numberDecimal": "0.00" },
   "totalSeats": 3,
   "availableSeats": 1,
   "routeDistanceKm": 12.4,
@@ -804,6 +821,7 @@ Estrutura composta que representa a CNH do motorista. Opcional — só preenchid
 {
   "_id": "64d4c3b2f7e3d4c5b6a7f8e9",
   "sequentialNumber": 42,
+  "version": 1,
   "driverId": "64a1f3c2e4b0a1b2c3d4e5f6",
   "vehicleId": "64b2e1d3f5c1b2a3d4e5f6a7",
   "vehicleSnapshot": {
@@ -1008,6 +1026,9 @@ Estrutura composta que representa a CNH do motorista. Opcional — só preenchid
   "sharedKm": 272.8,
   "carsAvoided": 22,
   "co2AvoidedKg": 50.7,
+  "appliedRideIds": [
+    "64d4c3b2f7e3d4c5b6a7f8e9"
+  ],
   "updatedAt": "2025-05-30T09:00:00Z"
 }
 ```
@@ -1018,11 +1039,108 @@ Estrutura composta que representa a CNH do motorista. Opcional — só preenchid
 
 ---
 
+### 4.11. Coleção `platform_indicators`
+
+```json
+{
+  "_id": "64f1a2b3f4e5d6c7b8a9f0e1",
+  "period": "MONTHLY",
+  "reference": "2025-05",
+  "totalRides": 1248,
+  "totalSharedKm": 18420.5,
+  "totalCarsAvoided": 340,
+  "totalCo2AvoidedKg": 3100.0,
+  "activeUsers": 214,
+  "appliedRideIds": [
+    "64d4c3b2f7e3d4c5b6a7f8e9"
+  ],
+  "calculatedAt": "2025-05-31T23:00:00Z"
+}
+```
+
+---
+
+### 4.12. Coleção `audit_logs`
+
+```json
+{
+  "_id": "64a1d2e3f4e5d6c7b8a9f0e2",
+  "action": "PAYMENT_CONFIRMED",
+  "actorId": "64a1f3c2e4b0a1b2c3d4e5f6",
+  "targetUserId": "64a9f8e7d6c5b4a3f2e1d0c9",
+  "entityType": "RIDE",
+  "entityId": "64d4c3b2f7e3d4c5b6a7f8e9",
+  "metadata": {
+    "amount": "2.51",
+    "method": "PIX_MANUAL"
+  },
+  "createdAt": "2025-05-12T08:20:00Z"
+}
+```
+
+---
+
+### 4.13. Coleção `universities`
+
+```json
+{
+  "_id": "64b1c2d3f4e5d6c7b8a9f0e3",
+  "name": "Pontifícia Universidade Católica de Campinas",
+  "acronym": "PUC-Campinas",
+  "city": "Campinas",
+  "emailDomains": [
+    "puc-campinas.edu.br"
+  ],
+  "active": true
+}
+```
+
+---
+
+### 4.14. Coleção `notifications`
+
+```json
+{
+  "_id": "64c1e2f3f4e5d6c7b8a9f0e4",
+  "userId": "64a9f8e7d6c5b4a3f2e1d0c9",
+  "type": "REQUEST_EXPIRED",
+  "title": "Solicitação expirada",
+  "message": "Sua solicitação de vaga na carona expirou por falta de resposta do motorista dentro do prazo.",
+  "relatedEntityType": "RIDE",
+  "relatedEntityId": "64d4c3b2f7e3d4c5b6a7f8e9",
+  "read": false,
+  "createdAt": "2025-05-12T08:20:00Z"
+}
+```
+
+---
+
+### 4.15. Coleção `idempotency_keys`
+
+```json
+{
+  "_id": "64d1e2f3f4e5d6c7b8a9f0e5",
+  "key": "c3f8e562-b13c-4e89-9a2d-22fa10b98091",
+  "userId": "64a1f3c2e4b0a1b2c3d4e5f6",
+  "method": "POST",
+  "path": "/api/v1/rides/64d4c3b2f7e3d4c5b6a7f8e9/passengers/64a9f8e7d6c5b4a3f2e1d0c9/accept",
+  "requestFingerprint": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+  "status": "COMPLETED",
+  "responseStatus": 200,
+  "contentType": "application/json",
+  "responseBody": "{\"success\":true,\"data\":{\"status\":\"CONFIRMED\"}}",
+  "createdAt": "2025-05-12T08:20:00Z"
+}
+```
+
+---
+
 ## 5. Consultas, índices e observações de arquitetura
 
 | Consulta esperada | Campos envolvidos | Índices sugeridos | Observações |
 | :--- | :--- | :--- | :--- |
 | Buscar usuário por e-mail (login) | `email` | `{ email: 1 }` único | Consulta crítica no fluxo de autenticação. |
+| Validar unicidade de e-mail institucional | `academicRecord.institutionalEmail` | `{ "academicRecord.institutionalEmail": 1 }` único parcial (`$type: 'string'`) | Garante que cada e-mail universitário pertença a no máximo uma conta. |
 | Buscar usuário por UID Firebase | `firebaseUid` | `{ firebaseUid: 1 }` único | Executada a cada requisição autenticada. |
 | Verificar inadimplência no matching | `isDefaulter` | `{ isDefaulter: 1 }` | Checagem rápida antes de exibir combinações. |
 | Tela de pendências do passageiro | `participants.userId`, `participants.paymentStatus` | `{ "participants.userId": 1, "participants.paymentStatus": 1 }` | Lista viagens com pagamento `PENDING` ou `AWAITING_DRIVER_CONFIRMATION`. |
@@ -1037,6 +1155,7 @@ Estrutura composta que representa a CNH do motorista. Opcional — só preenchid
 | Listar viagens de um motorista | `driverId`, `status` | `{ driverId: 1, status: 1 }` | Histórico e painel do motorista. |
 | Listar viagens de um passageiro | `participants.userId` | `{ "participants.userId": 1 }` | Histórico e viagem ativa do passageiro. |
 | Buscar viagem por número sequencial do motorista | `driverId`, `sequentialNumber` | `{ driverId: 1, sequentialNumber: 1 }` único | Referência amigável `Ride #042` por motorista. |
+| Garantir apenas uma carona aberta por trajeto e horário | `driverRouteId`, `departureDateTime` | `{ driverRouteId: 1, departureDateTime: 1 }` único parcial (`status in [AWAITING_CONFIRMATION, CONFIRMED, IN_PROGRESS, COMPLETED]`) | Garante que o motorista tenha apenas uma viagem aberta por data/horário em um trajeto. |
 | Buscar combinações válidas por passageiro | `passengerRouteId`, `valid`, `compatibilityScore` | `{ passengerRouteId: 1, valid: 1, compatibilityScore: -1 }` | Lista ordenada por score. |
 | Verificar bloqueio entre dois usuários | `userId`, `blockedUserId` | `{ userId: 1, blockedUserId: 1 }` único | Executada no matching, aceite de carona e chat. |
 | Verificar avaliação duplicada | `rideId`, `reviewerId`, `reviewedId` | `{ rideId: 1, reviewerId: 1, reviewedId: 1 }` único | Impede dupla avaliação do mesmo par na mesma viagem. O `reviewedId` é necessário porque o motorista avalia cada passageiro da mesma viagem. Também atende "avaliações que o usuário já fez na viagem" (`rideId + reviewerId`). |

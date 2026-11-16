@@ -122,6 +122,7 @@
 |---|---|---|
 | `email` | Único | Login e identificação — nunca duplicar |
 | `firebaseUid` | Único | Chave de autenticação Firebase |
+| `academicRecord.institutionalEmail` | Único Parcial (`$type: 'string'`) | Garante unicidade do e-mail institucional acadêmico |
 | `academicRecord.university` | Simples | Filtro de matching por universidade |
 | `academicRecord.status` | Simples | Consultas de moderação e verificação |
 | `reputation.driver.level` | Simples | Consultas de reputação de motoristas |
@@ -161,7 +162,7 @@ O selo `SUSTAINABILITY` reconhece o impacto ambiental acumulado do usuário. É 
 | Base para concessão | ≥ 50 kg de CO₂ evitado | ~2 árvores/ano |
 | (opcional — exibição de destaque) | ≥ 200 kg de CO₂ evitado | ~9 árvores/ano |
 
-- O cálculo de CO₂ evitado já é feito e armazenado em `indicators.sustainability.co2AvoidedKg`, com base na energia economizada × fator de emissão da fonte do veículo (metodologia verídica — ver dicionário).
+- O cálculo de CO₂ evitado já é feito e armazenado em `indicators.co2AvoidedKg`, com base na energia economizada × fator de emissão da fonte do veículo (metodologia verídica — ver dicionário).
 - O selo considera **apenas viagens concluídas com pelo menos um passageiro efetivo** — garante que o impacto seja real (compartilhamento de fato), não apenas o motorista rodando sozinho.
 - Recalculado semanalmente junto com o selo de confiança.
 
@@ -322,6 +323,8 @@ Quando `active = false` (conta suspensa ou excluída):
   "estimatedArrivalTime": "String (HH:mm)",
   "weekDays": ["MONDAY | TUESDAY | WEDNESDAY | THURSDAY | FRIDAY | SATURDAY | SUNDAY"],
   "maxDetourKm": "Double",
+  "toll": "Decimal128 | null",
+  "parking": "Decimal128 | null",
   "totalSeats": "Integer | null",
   "availableSeats": "Integer | null",
   "routeDistanceKm": "Double | null",
@@ -355,6 +358,7 @@ Quando `active = false` (conta suspensa ou excluída):
   "_id": "ObjectId (String)",
   "driverId": "String (ref: users._id)",
   "sequentialNumber": "Integer (sequencial por motorista)",
+  "version": "Long (optimistic locking)",
   "vehicleId": "String (ref: vehicles._id)",
   "vehicleSnapshot": {
     "model": "String",
@@ -419,7 +423,7 @@ Quando `active = false` (conta suspensa ou excluída):
         }
       },
       "detourGeneratedKm": "Double | null",
-      "status": "REQUESTED | REJECTED | CONFIRMED | CANCELLED | NO_SHOW | COMPLETED",
+      "status": "REQUESTED | REJECTED | CONFIRMED | CANCELLED | NO_SHOW | COMPLETED | EXPIRED",
       "requestedAt": "ISODate",
       "respondedAt": "ISODate | null",
       "rejectionReason": "String | null",
@@ -465,6 +469,7 @@ O motorista vai até cada passageiro: `itinerary` guarda as paradas na ordem em 
 | Campo(s) | Tipo | Justificativa |
 |---|---|---|
 | `driverId` + `sequentialNumber` | Composto Único | Referência amigável por motorista (Ride #042). Sequencial por motorista — não vaza volume total da plataforma |
+| `driverRouteId` + `departureDateTime` | Composto Único Parcial (`status in [AWAITING_CONFIRMATION, CONFIRMED, IN_PROGRESS, COMPLETED]`) | Garante que o motorista tenha apenas uma viagem aberta por data/horário em um trajeto |
 | `driverId` | Simples | Listar viagens do motorista |
 | `participants.userId` | Simples | Listar viagens de um passageiro |
 | `status` | Simples | Filtrar viagens ativas, concluídas, etc. |
@@ -925,7 +930,7 @@ A tela de Dados (ver wireframes `indicadores` e `indicadores ambientais`) exibe 
 {
   "_id": "ObjectId (String)",
   "userId": "String (ref: users._id)",
-  "type": "RIDE_REQUEST | RIDE_CONFIRMED | RIDE_CANCELLED | PAYMENT_DUE | PAYMENT_CONFIRMED | SEAT_RELEASED | GENERIC",
+  "type": "RIDE_REQUEST | RIDE_CONFIRMED | RIDE_CANCELLED | REQUEST_EXPIRED | PAYMENT_DUE | PAYMENT_CONFIRMED | SEAT_RELEASED | GENERIC",
   "title": "String",
   "message": "String",
   "relatedEntityType": "RIDE | RESERVED_SEAT | REPORT | null",
@@ -958,10 +963,16 @@ A tela de Dados (ver wireframes `indicadores` e `indicadores ambientais`) exibe 
 ```json
 {
   "_id": "ObjectId (String)",
-  "key": "String (UUID v4 enviado pelo cliente)",
-  "endpoint": "String (ex: 'POST /rides/{id}/confirm')",
+  "key": "String (UUID v4 enviado pelo cliente no header Idempotency-Key)",
   "userId": "String (ref: users._id)",
-  "createdAt": "ISODate"
+  "method": "String (ex: 'POST')",
+  "path": "String (ex: '/api/v1/rides/64d.../confirm')",
+  "requestFingerprint": "String (hash SHA-256 do payload para validar consistência)",
+  "status": "IN_PROGRESS | COMPLETED | UNKNOWN_OUTCOME",
+  "responseStatus": "Integer (código HTTP retornado, ex: 200, 201)",
+  "contentType": "String (ex: 'application/json')",
+  "responseBody": "String (payload da resposta cacheada para replay)",
+  "createdAt": "ISODate (TTL: expireAfter = '24h')"
 }
 ```
 
@@ -1173,6 +1184,7 @@ Formato geoespacial padrão do MongoDB para o índice `2dsphere`.
 | `CANCELLED` | Cancelou antes da viagem |
 | `NO_SHOW` | Não compareceu (registrado pelo motorista) |
 | `COMPLETED` | Participou até o fim |
+| `EXPIRED` | Solicitação expirada por inatividade do motorista após a janela de timeout |
 
 ### `PaymentStatus` (rides.participants[].paymentStatus)
 | Valor | Descrição |
@@ -1239,6 +1251,7 @@ Formato geoespacial padrão do MongoDB para o índice `2dsphere`.
 | `RIDE_REQUEST` | Passageiro solicitou vaga (aviso ao motorista) |
 | `RIDE_CONFIRMED` | Carona confirmada |
 | `RIDE_CANCELLED` | Carona cancelada |
+| `REQUEST_EXPIRED` | Aviso ao passageiro de que sua solicitação de vaga expirou por tempo limite |
 | `PAYMENT_DUE` | Lembrete de pagamento pendente |
 | `PAYMENT_CONFIRMED` | Motorista confirmou recebimento |
 | `SEAT_RELEASED` | Vaga reservada foi liberada (passageiro recorrente não vai) |
