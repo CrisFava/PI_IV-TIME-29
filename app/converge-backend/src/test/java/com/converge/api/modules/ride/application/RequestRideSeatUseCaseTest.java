@@ -39,6 +39,7 @@ import static org.assertj.core.api.Assertions.assertThat;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.Mockito.doThrow;
+import static org.mockito.Mockito.lenient;
 import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.times;
 import static org.mockito.Mockito.verify;
@@ -106,13 +107,15 @@ class RequestRideSeatUseCaseTest {
         when(routeAccess.getOwnedRoute(passengerRouteObjectId.toHexString(), PASSENGER_ID)).thenReturn(passengerRoute);
         when(passengerRoute.getType()).thenReturn(RouteType.SEARCH);
         when(passengerRoute.getStatus()).thenReturn(RouteStatus.ACTIVE);
-        when(passengerRoute.getWeekDays()).thenReturn(Set.of(date.getDayOfWeek()));
+        when(passengerRoute.runsOn(date)).thenReturn(true);
     }
 
     private void driverRouteIsValid() {
         when(routeAccess.getActiveRoute(driverRouteObjectId.toHexString())).thenReturn(driverRoute);
         when(driverRoute.getType()).thenReturn(RouteType.OFFER);
-        when(driverRoute.getWeekDays()).thenReturn(Set.of(date.getDayOfWeek()));
+        when(driverRoute.runsOn(date)).thenReturn(true);
+        // A viagem criada copia os dias da semana do trajeto (nem todo teste chega a criar)
+        lenient().when(driverRoute.getWeekDays()).thenReturn(Set.of(date.getDayOfWeek()));
         when(driverRoute.getTotalSeats()).thenReturn(3);
         when(driverRoute.getDepartureTime()).thenReturn("08:00");
         when(driverRoute.getId()).thenReturn(driverRouteObjectId);
@@ -366,7 +369,7 @@ class RequestRideSeatUseCaseTest {
         passengerRouteIsValid();
         when(routeAccess.getActiveRoute(driverRouteObjectId.toHexString())).thenReturn(driverRoute);
         when(driverRoute.getType()).thenReturn(RouteType.OFFER);
-        when(driverRoute.getWeekDays()).thenReturn(Set.of(date.getDayOfWeek()));
+        when(driverRoute.runsOn(date)).thenReturn(true);
         when(driverRoute.isOwnedBy(PASSENGER_ID)).thenReturn(true);
 
         assertThrows(ApplicationException.class, () -> requestSeat.execute(command()));
@@ -380,7 +383,7 @@ class RequestRideSeatUseCaseTest {
         passengerRouteIsValid();
         when(routeAccess.getActiveRoute(driverRouteObjectId.toHexString())).thenReturn(driverRoute);
         when(driverRoute.getType()).thenReturn(RouteType.OFFER);
-        when(driverRoute.getWeekDays()).thenReturn(Set.of(date.plusDays(1).getDayOfWeek()));
+        when(driverRoute.runsOn(date)).thenReturn(false);
 
         assertThrows(ApplicationException.class, () -> requestSeat.execute(command()));
 

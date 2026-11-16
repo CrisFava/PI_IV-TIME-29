@@ -22,6 +22,7 @@ import org.springframework.data.mongodb.core.mapping.MongoMappingContext;
 import org.springframework.data.mongodb.core.query.Query;
 
 import java.time.DayOfWeek;
+import java.time.LocalDate;
 import java.util.List;
 import java.util.Set;
 
@@ -49,7 +50,8 @@ class RouteRepositoryImplTest {
         Coordinates origin = new Coordinates(-22.9056, -47.0608);
         Coordinates destination = new Coordinates(-22.8337, -47.0524);
 
-        repository.findActiveNear(RouteType.OFFER, Set.of(DayOfWeek.MONDAY), origin, destination, 10.0);
+        repository.findActiveNear(RouteType.OFFER, Set.of(DayOfWeek.MONDAY), origin, destination, 10.0,
+                LocalDate.of(2026, 11, 16));
 
         ArgumentCaptor<Query> captor = ArgumentCaptor.forClass(Query.class);
         verify(mongoTemplate).find(captor.capture(), eq(Route.class));
@@ -59,8 +61,10 @@ class RouteRepositoryImplTest {
         assertThat(and.get(0).get("type")).isEqualTo("OFFER");
         assertThat(and.get(1).get("status")).isEqualTo("ACTIVE");
         assertThat(((Document) and.get(2).get("weekDays")).getList("$in", Object.class)).containsExactly("MONDAY");
-        assertCenterSphere(and.get(3), "origin.location", origin, 10.0);
-        assertCenterSphere(and.get(4), "destination.location", destination, 10.0);
+        // Carona de um dia só que já passou fica de fora; sem data, ela se repete
+        assertThat(and.get(3).toJson()).contains("\"recurrence\": {\"$ne\": \"ONCE\"}").contains("$gte");
+        assertCenterSphere(and.get(4), "origin.location", origin, 10.0);
+        assertCenterSphere(and.get(5), "destination.location", destination, 10.0);
     }
 
     // Converte a query no documento que vai para o MongoDB, como o MongoTemplate faz
@@ -92,6 +96,6 @@ class RouteRepositoryImplTest {
         Coordinates point = new Coordinates(-22.9, -47.0);
         org.mockito.Mockito.when(mongoTemplate.find(any(Query.class), eq(Route.class))).thenReturn(List.of());
 
-        assertThat(repository.findActiveNear(RouteType.SEARCH, Set.of(DayOfWeek.FRIDAY), point, point, 5.0)).isEmpty();
+        assertThat(repository.findActiveNear(RouteType.SEARCH, Set.of(DayOfWeek.FRIDAY), point, point, 5.0, LocalDate.now())).isEmpty();
     }
 }

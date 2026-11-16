@@ -15,6 +15,7 @@ import com.converge.api.modules.ride.domain.model.Ride;
 import com.converge.api.modules.ride.domain.model.subtypes.VehicleSnapshot;
 import com.converge.api.modules.ride.domain.repository.RideRepository;
 import com.converge.api.modules.ride.infrastructure.RideCostCalculator;
+import com.converge.api.modules.route.application.RouteAccess;
 import com.converge.api.modules.route.domain.model.subtypes.Coordinates;
 import com.converge.api.modules.route.domain.model.subtypes.Place;
 import com.converge.api.modules.user.application.RecordReputationPenaltyUseCase;
@@ -137,7 +138,7 @@ class RideUseCasesTest {
     @DisplayName("O motorista deve cancelar a própria viagem sem penalidade quando não há passageiros confirmados")
     void shouldCancelRideWhenUserIsTheDriver() {
         CancelRideUseCase cancelRide = new CancelRideUseCase(
-                rideAccess, rideRepository, recordReputationPenalty, auditLogService, eventPublisher);
+                rideAccess, rideRepository, recordReputationPenalty, auditLogService, eventPublisher, mock(RouteAccess.class));
         Ride ride = rideOf(userObjectId.toHexString(), LocalDateTime.now().plusDays(1));
         currentUserIs(userObjectId);
         when(rideRepository.findById(rideObjectId)).thenReturn(Optional.of(ride));
@@ -159,7 +160,7 @@ class RideUseCasesTest {
     @DisplayName("Cancelar viagem com passageiros confirmados deve notificar, penalizar motorista e gravar auditoria")
     void shouldNotifyPenalizeAndAuditWhenDriverCancelsRideWithConfirmedPassengers() {
         CancelRideUseCase cancelRide = new CancelRideUseCase(
-                rideAccess, rideRepository, recordReputationPenalty, auditLogService, eventPublisher);
+                rideAccess, rideRepository, recordReputationPenalty, auditLogService, eventPublisher, mock(RouteAccess.class));
         String driverId = userObjectId.toHexString();
         Ride ride = rideOf(driverId, LocalDateTime.now().plusDays(1));
         ride.requestSeat("passenger-1", "route-1", place("Rua A"), place("Campus PUC"));
@@ -190,7 +191,7 @@ class RideUseCasesTest {
     @DisplayName("Cancelar viagem deve isolar falhas nas etapas de penalidade, auditoria e notificação")
     void shouldSucceedWhenSideEffectsFailOnCancelRideWithConfirmedPassengers() {
         CancelRideUseCase cancelRide = new CancelRideUseCase(
-                rideAccess, rideRepository, recordReputationPenalty, auditLogService, eventPublisher);
+                rideAccess, rideRepository, recordReputationPenalty, auditLogService, eventPublisher, mock(RouteAccess.class));
         String driverId = userObjectId.toHexString();
         Ride ride = rideOf(driverId, LocalDateTime.now().plusDays(1));
         ride.requestSeat("passenger-1", "route-1", place("Rua A"), place("Campus PUC"));
@@ -217,7 +218,7 @@ class RideUseCasesTest {
     @DisplayName("Quem não é o motorista não pode cancelar a viagem")
     void shouldNotCancelRideWhenUserIsNotTheDriver() {
         CancelRideUseCase cancelRide = new CancelRideUseCase(
-                rideAccess, rideRepository, recordReputationPenalty, auditLogService, eventPublisher);
+                rideAccess, rideRepository, recordReputationPenalty, auditLogService, eventPublisher, mock(RouteAccess.class));
         Ride ride = rideOf("outro-motorista", LocalDateTime.now().plusDays(1));
         currentUserIs(userObjectId);
         when(rideRepository.findById(rideObjectId)).thenReturn(Optional.of(ride));
@@ -572,7 +573,7 @@ class RideUseCasesTest {
     void shouldStartAndCompleteRideWhenUserIsTheDriver() {
         StartRideUseCase startRide = new StartRideUseCase(rideAccess, rideRepository);
         CompleteRideUseCase completeRide = new CompleteRideUseCase(
-                rideAccess, rideCostCalculator, rideRepository, completionPublisher);
+                rideAccess, rideCostCalculator, rideRepository, completionPublisher, mock(RouteAccess.class));
         Ride ride = rideOf(userObjectId.toHexString(), LocalDateTime.now().plusDays(1));
         ride.requestSeat("passenger-456", "route-456", place("Rua A"), place("Campus PUC"));
         ride.acceptPassenger("passenger-456");
@@ -590,7 +591,8 @@ class RideUseCasesTest {
     @Test
     @DisplayName("Falha ao contabilizar os indicadores não deve falhar a conclusão já gravada")
     void shouldCompleteRideEvenWhenIndicatorPublishingFails() {
-        CompleteRideUseCase completeRide = new CompleteRideUseCase(rideAccess, rideCostCalculator, rideRepository, completionPublisher);
+        CompleteRideUseCase completeRide = new CompleteRideUseCase(
+                rideAccess, rideCostCalculator, rideRepository, completionPublisher, mock(RouteAccess.class));
         Ride ride = rideOf(userObjectId.toHexString(), LocalDateTime.now().plusDays(1));
         ride.requestSeat("passenger-456", "route-456", place("Rua A"), place("Campus PUC"));
         ride.acceptPassenger("passenger-456");

@@ -2,6 +2,7 @@
 
 package com.converge.api.modules.route.application;
 
+import com.converge.api.modules.route.domain.enums.RecurrenceType;
 import com.converge.api.modules.route.domain.enums.RouteStatus;
 import com.converge.api.modules.route.domain.enums.RouteType;
 import com.converge.api.modules.route.domain.model.Route;
@@ -14,6 +15,8 @@ import org.bson.types.ObjectId;
 import org.springframework.stereotype.Component;
 
 import java.time.DayOfWeek;
+import java.time.LocalDate;
+import java.time.ZoneId;
 import java.util.List;
 import java.util.Optional;
 import java.util.Set;
@@ -26,6 +29,9 @@ import java.util.Set;
 @Component
 @RequiredArgsConstructor
 public class RouteAccess {
+
+    // Fuso oficial da aplicação: é nele que "hoje" e os horários HH:mm valem
+    public static final ZoneId APP_ZONE = ZoneId.of("America/Sao_Paulo");
 
     private final RouteRepository routeRepository;
 
@@ -59,7 +65,22 @@ public class RouteAccess {
             return List.of();
         }
 
-        return routeRepository.findActiveNear(type, weekDays, origin, destination, radiusKm);
+        return routeRepository.findActiveNear(
+                type, weekDays, origin, destination, radiusKm, LocalDate.now(APP_ZONE));
+    }
+
+    /**
+     * A carona de um dia só termina junto com a viagem dela (concluída ou cancelada):
+     * sai de "Minhas caronas" e da busca. A semanal continua valendo nas próximas semanas.
+     */
+    public void endIfOnce(String routeId) {
+        findById(routeId)
+                .filter(route -> route.getRecurrence() == RecurrenceType.ONCE)
+                .filter(route -> route.getStatus() == RouteStatus.ACTIVE)
+                .ifPresent(route -> {
+                    route.deactivate();
+                    routeRepository.save(route);
+                });
     }
 
     private Optional<Route> findById(String routeId) {

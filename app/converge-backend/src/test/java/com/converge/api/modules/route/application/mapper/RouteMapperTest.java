@@ -33,7 +33,7 @@ class RouteMapperTest {
     private CreateRouteRequestDTO offerRequest() {
         return new CreateRouteRequestDTO(
                 RouteType.OFFER, "vehicle-456", HOME, PUC, "07:00", "07:40",
-                Set.of(DayOfWeek.MONDAY, DayOfWeek.FRIDAY), 2.0, 3, new BigDecimal("12.5"), null
+                Set.of(DayOfWeek.MONDAY, DayOfWeek.FRIDAY), null, null, 2.0, 3, new BigDecimal("12.5"), null
         );
     }
 

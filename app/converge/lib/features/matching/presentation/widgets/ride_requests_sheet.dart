@@ -9,10 +9,12 @@ import 'package:go_router/go_router.dart';
 
 import '../../../../app_routes.dart';
 import '../../../../core/config/styles.dart';
+import '../../../../core/widgets/details_sheet.dart';
 import '../../../../core/widgets/show_app_notice.dart';
 import '../../../auth/state/auth_action_controller.dart';
 import '../../../ride/data/models/participant_status.dart';
 import '../../../ride/state/ride_providers.dart';
+import '../../data/models/driver_offer.dart';
 import '../../data/models/driver_ride_request.dart';
 import '../../state/driver_ride_actions_controller.dart';
 import '../../state/driver_ride_requests_provider.dart';
@@ -20,6 +22,7 @@ import '../../state/driver_offers_provider.dart';
 import '../../state/ride_request_actions_controller.dart';
 import '../../../route/state/offer_route_controller.dart';
 import 'driver_offer_card.dart';
+import 'driver_offer_details.dart';
 import 'matching_message.dart';
 import 'matching_section_title.dart';
 import 'ride_request_card.dart';
@@ -75,10 +78,29 @@ class _RideRequestsSheetState extends ConsumerState<RideRequestsSheet> {
     ref.invalidate(myOfferRoutesProvider);
   }
 
-  // Ofertas sendo canceladas (o botão vira progresso)
-  final Set<String> _cancellingOfferIds = {};
+  void _openDetails(DriverOffer offer) {
+    showDetailsSheet<void>(
+      context,
+      title: 'Detalhes da carona',
+      builder: (sheetContext) => DriverOfferDetails(
+        offerKey: offer.key,
+        // Iniciar ou concluir fecha os detalhes e volta para o mapa
+        onStartRide: (rideId) {
+          Navigator.of(sheetContext).pop();
+          _startRide(rideId);
+        },
+        onCompleteRide: (rideId) {
+          Navigator.of(sheetContext).pop();
+          _completeRide(rideId);
+        },
+        onOpenChat: _openChatWith,
+        onCancelOffer: _cancelOffer,
+      ),
+    );
+  }
 
-  Future<void> _cancelOffer(String routeId) async {
+  /// Pede a confirmação e cancela a carona; devolve se cancelou.
+  Future<bool> _cancelOffer(String routeId) async {
     final confirmed = await showDialog<bool>(
       context: context,
       builder: (context) => AlertDialog(
@@ -100,16 +122,15 @@ class _RideRequestsSheetState extends ConsumerState<RideRequestsSheet> {
         ],
       ),
     );
-    if (confirmed != true || !mounted) return;
+    if (confirmed != true || !mounted) return false;
 
-    setState(() => _cancellingOfferIds.add(routeId));
     try {
       await ref.read(offerRouteProvider.notifier).cancel(routeId);
       ref.invalidate(myOfferRoutesProvider);
+      return true;
     } catch (e) {
       if (mounted) _showMessage(authErrorMessage(e));
-    } finally {
-      if (mounted) setState(() => _cancellingOfferIds.remove(routeId));
+      return false;
     }
   }
 
@@ -244,7 +265,9 @@ class _RideRequestsSheetState extends ConsumerState<RideRequestsSheet> {
                     ],
                     const SizedBox(height: 18),
                     // Pedidos de vaga primeiro: é o que pede uma resposta
+                    // skipLoadingOnReload: a recarga automática mantém a lista na tela
                     ...requests.when(
+                      skipLoadingOnReload: true,
                       data: (list) => _requestSections(list, busy),
                       loading: () => const [SizedBox.shrink()],
                       error: (error, _) => [
@@ -253,6 +276,7 @@ class _RideRequestsSheetState extends ConsumerState<RideRequestsSheet> {
                     ),
                     const MatchingSectionTitle(title: 'Caronas oferecidas'),
                     ...offers.when(
+                      skipLoadingOnReload: true,
                       data: (list) => list.isEmpty
                           ? const [
                               MatchingMessage(
@@ -266,14 +290,9 @@ class _RideRequestsSheetState extends ConsumerState<RideRequestsSheet> {
                                   child: DriverOfferCard(
                                     offer: offer,
                                     busyRideIds: rideActions,
-                                    isCancelling: _cancellingOfferIds.contains(
-                                      offer.route?.id,
-                                    ),
+                                    onOpenDetails: () => _openDetails(offer),
                                     onStartRide: _startRide,
                                     onCompleteRide: _completeRide,
-                                    onOpenChat: _openChatWith,
-                                    onCancelOffer: () =>
-                                        _cancelOffer(offer.route!.id),
                                   ),
                                 ),
                             ],

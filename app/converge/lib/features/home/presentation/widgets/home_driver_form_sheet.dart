@@ -10,6 +10,7 @@ import 'package:google_maps_flutter/google_maps_flutter.dart';
 import '../../../../core/config/styles.dart';
 import '../../../route/data/models/place_suggestion_model.dart';
 import '../../../route/state/places_autocomplete_controller.dart';
+import 'repeat_weekly_checkbox.dart';
 import 'ride_departure_tile.dart';
 
 /// ============================================================================
@@ -41,6 +42,10 @@ class HomeDriverFormSheet extends ConsumerStatefulWidget {
   final String departureLabel;
   final VoidCallback? onChangeDeparture;
 
+  /// "Repetir toda semana": desmarcado, a carona é só no dia escolhido.
+  final bool repeatWeekly;
+  final ValueChanged<bool>? onRepeatWeeklyChanged;
+
   const HomeDriverFormSheet({
     super.key,
     this.initialSearchRadiusKm = 3.0,
@@ -54,6 +59,8 @@ class HomeDriverFormSheet extends ConsumerStatefulWidget {
     this.isPublishing = false,
     this.departureLabel = 'Agora',
     this.onChangeDeparture,
+    this.repeatWeekly = false,
+    this.onRepeatWeeklyChanged,
   });
 
   @override
@@ -499,7 +506,14 @@ class _HomeDriverFormSheetState extends ConsumerState<HomeDriverFormSheet> {
                               label: widget.departureLabel,
                               onTap: widget.onChangeDeparture!,
                             ),
-                            const SizedBox(height: 12),
+                            const SizedBox(height: 4),
+                          ],
+                          if (widget.onRepeatWeeklyChanged != null) ...[
+                            RepeatWeeklyCheckbox(
+                              value: widget.repeatWeekly,
+                              onChanged: widget.onRepeatWeeklyChanged!,
+                            ),
+                            const SizedBox(height: 8),
                           ],
                           SizedBox(
                             height: 50,

@@ -14,6 +14,7 @@ import com.converge.api.shared.presentation.exception.ErrorCode;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
 
+import java.time.LocalDate;
 import java.util.Set;
 
 @Service
@@ -30,6 +31,7 @@ public class CreateRouteUseCase implements UseCase<CreateRouteCommand, Route> {
     @Override
     public Route execute(CreateRouteCommand command) {
         Route route = routeMapper.toEntity(command.userId(), command.request());
+        route.schedule(command.request().recurrence(), command.request().date(), LocalDate.now(RouteAccess.APP_ZONE));
         validateNotDuplicated(route);
         applyGeometry(route);
         return routeRepository.save(route);
@@ -47,13 +49,14 @@ public class CreateRouteUseCase implements UseCase<CreateRouteCommand, Route> {
             route.getOrigin().address(),
             route.getDestination().address(),
             route.getDepartureTime(),
+            route.getDate(),
             LIVE_STATUSES
         );
 
         if (alreadyExists) {
             throw new ApplicationException(
                     ErrorCode.ROUTE_ALREADY_EXISTS,
-                    "Você já possui um trajeto ativo com essa origem, destino e horário."
+                    "Você já possui um trajeto ativo com essa origem, destino, horário e data."
             );
         }   
     }

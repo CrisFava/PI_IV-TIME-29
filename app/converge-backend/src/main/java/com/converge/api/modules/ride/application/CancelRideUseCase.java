@@ -6,6 +6,7 @@ import com.converge.api.modules.ride.application.dto.CancelRideCommand;
 import com.converge.api.modules.ride.application.event.RideNotificationEvent;
 import com.converge.api.modules.ride.domain.model.Ride;
 import com.converge.api.modules.ride.domain.repository.RideRepository;
+import com.converge.api.modules.route.application.RouteAccess;
 import com.converge.api.modules.user.application.RecordReputationPenaltyUseCase;
 import com.converge.api.shared.application.AuditLogService;
 import com.converge.api.shared.application.SafeActionHandler;
@@ -34,6 +35,7 @@ public class CancelRideUseCase implements UseCase<CancelRideCommand, Ride> {
     private final RecordReputationPenaltyUseCase recordReputationPenalty;
     private final AuditLogService auditLogService;
     private final ApplicationEventPublisher eventPublisher;
+    private final RouteAccess routeAccess;
 
     @Override
     public Ride execute(CancelRideCommand command) {
@@ -45,6 +47,7 @@ public class CancelRideUseCase implements UseCase<CancelRideCommand, Ride> {
 
         ride.cancel(driverId, reason);
         Ride saved = rideRepository.save(ride);
+        routeAccess.endIfOnce(saved.getDriverRouteId());
 
         if (!confirmedPassengerIds.isEmpty()) {
             handleCancellationWithConfirmedPassengers(driverId, command.rideId(), confirmedPassengerIds, reason);

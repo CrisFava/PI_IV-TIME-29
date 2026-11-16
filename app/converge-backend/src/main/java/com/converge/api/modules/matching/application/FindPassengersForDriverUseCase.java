@@ -67,6 +67,8 @@ public class FindPassengersForDriverUseCase implements UseCase<FindMatchesComman
         List<MatchingRoute> candidates = nearbySearches.stream()
                 .filter(search -> !search.isOwnedBy(command.userId()))
                 .filter(search -> !blockedUserIds.contains(search.getUserId()))
+                // Caronas de um dia só precisam ser no mesmo dia do pedido
+                .filter(search -> FindMatchesForPassengerUseCase.sameDayWhenFixed(offer, search))
                 .filter(search -> !rejectedPassengerIds.contains(search.getUserId()))
                 .filter(search -> canJoinByPassenger.computeIfAbsent(search.getUserId(), matchCandidates::canJoin))
                 .map(search -> {

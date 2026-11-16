@@ -2,6 +2,7 @@
 
 package com.converge.api.modules.route.domain.repository;
 
+import com.converge.api.modules.route.domain.enums.RecurrenceType;
 import com.converge.api.modules.route.domain.enums.RouteStatus;
 import com.converge.api.modules.route.domain.enums.RouteType;
 import com.converge.api.modules.route.domain.model.Route;
@@ -17,6 +18,7 @@ import org.springframework.data.mongodb.core.query.Query;
 import org.springframework.stereotype.Repository;
 
 import java.time.DayOfWeek;
+import java.time.LocalDate;
 import java.util.Collection;
 import java.util.List;
 
@@ -34,12 +36,15 @@ public class RouteRepositoryImpl implements RouteRepositoryCustom {
             Collection<DayOfWeek> weekDays,
             Coordinates origin,
             Coordinates destination,
-            double radiusKm
+            double radiusKm,
+            LocalDate today
     ) {
         Query query = new Query(new Criteria().andOperator(
                 where("type").is(type),
                 where("status").is(RouteStatus.ACTIVE),
                 where("weekDays").in(weekDays),
+                // Carona de um dia só (ONCE) que já passou não entra; as semanais (ou antigas, sem o campo) entram
+                new Criteria().orOperator(where("recurrence").ne(RecurrenceType.ONCE), where("date").gte(today)),
                 // $geoWithin + $centerSphere: raio em cima da esfera, sobre os índices 2dsphere
                 where("origin.location").withinSphere(circle(origin, radiusKm)),
                 where("destination.location").withinSphere(circle(destination, radiusKm))

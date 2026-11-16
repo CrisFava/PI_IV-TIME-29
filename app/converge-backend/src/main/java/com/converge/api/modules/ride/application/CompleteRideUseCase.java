@@ -7,6 +7,7 @@ import com.converge.api.modules.ride.domain.enums.RideStatus;
 import com.converge.api.modules.ride.domain.model.Ride;
 import com.converge.api.modules.ride.domain.repository.RideRepository;
 import com.converge.api.modules.ride.infrastructure.RideCostCalculator;
+import com.converge.api.modules.route.application.RouteAccess;
 import com.converge.api.shared.application.UseCase;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
@@ -24,6 +25,7 @@ public class CompleteRideUseCase implements UseCase<RideRefCommand, Ride> {
     private final RideCostCalculator rideCostCalculator;
     private final RideRepository rideRepository;
     private final RideCompletionPublisher completionPublisher;
+    private final RouteAccess routeAccess;
 
     @Override
     public Ride execute(RideRefCommand command) {
@@ -35,6 +37,7 @@ public class CompleteRideUseCase implements UseCase<RideRefCommand, Ride> {
         }
 
         Ride saved = rideRepository.save(ride);
+        routeAccess.endIfOnce(saved.getDriverRouteId());
 
         // A viagem já está gravada como concluída, que é o registro durável. Se os indicadores
         // falharem aqui, o CompletedRidesIndicatorReconciler reprocessa a viagem depois.

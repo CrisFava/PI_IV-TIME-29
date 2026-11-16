@@ -1,7 +1,9 @@
 // Autor: Allan Giovanni Matias Paes - RA 25008211
 
 import 'package:flutter/foundation.dart';
+
 import 'route_place_model.dart';
+import 'route_recurrence.dart';
 
 enum AppRouteType {
   search('SEARCH'),
@@ -34,6 +36,8 @@ class CreateRouteRequest {
   final String departureTime;
   final String estimatedArrivalTime;
   final Set<String> weekDays;
+  final RouteRecurrence recurrence;
+  final String? date;
   final double? maxDetourKm;
   final int? totalSeats;
 
@@ -45,6 +49,8 @@ class CreateRouteRequest {
     required this.departureTime,
     required this.estimatedArrivalTime,
     required this.weekDays,
+    this.recurrence = RouteRecurrence.weekly,
+    this.date,
     this.maxDetourKm,
     this.totalSeats,
   });
@@ -58,6 +64,8 @@ class CreateRouteRequest {
       'departureTime': departureTime,
       'estimatedArrivalTime': estimatedArrivalTime,
       'weekDays': weekDays.toList(),
+      'recurrence': recurrence.apiValue,
+      if (date != null) 'date': date,
       if (maxDetourKm != null) 'maxDetourKm': maxDetourKm,
       if (totalSeats != null) 'totalSeats': totalSeats,
     };

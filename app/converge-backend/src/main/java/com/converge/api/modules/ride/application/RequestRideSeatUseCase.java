@@ -140,10 +140,10 @@ public class RequestRideSeatUseCase implements UseCase<RequestRideSeatCommand, R
             );
         }
 
-        if (!route.getWeekDays().contains(date.getDayOfWeek())) {
+        if (!route.runsOn(date)) {
             throw new ApplicationException(
                     ErrorCode.BAD_REQUEST,
-                    "A data escolhida não cai em nenhum dos dias da semana do seu trajeto.",
+                    "O seu pedido de carona não é para a data escolhida.",
                     Set.of("date")
             );
         }
@@ -158,10 +158,10 @@ public class RequestRideSeatUseCase implements UseCase<RequestRideSeatCommand, R
             );
         }
 
-        if (!route.getWeekDays().contains(date.getDayOfWeek())) {
+        if (!route.runsOn(date)) {
             throw new ApplicationException(
                     ErrorCode.BAD_REQUEST,
-                    "A data escolhida não cai em nenhum dos dias da semana do trajeto do motorista.",
+                    "A carona do motorista não acontece na data escolhida.",
                     Set.of("date")
             );
         }

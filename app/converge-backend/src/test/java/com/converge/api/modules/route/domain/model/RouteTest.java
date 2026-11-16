@@ -2,6 +2,7 @@
 
 package com.converge.api.modules.route.domain.model;
 
+import com.converge.api.modules.route.domain.enums.RecurrenceType;
 import com.converge.api.modules.route.domain.enums.RouteStatus;
 import com.converge.api.modules.route.domain.enums.RouteType;
 import com.converge.api.modules.route.domain.model.subtypes.Coordinates;
@@ -14,6 +15,7 @@ import org.springframework.test.util.ReflectionTestUtils;
 
 import java.math.BigDecimal;
 import java.time.DayOfWeek;
+import java.time.LocalDate;
 import java.util.Set;
 
 import static org.assertj.core.api.Assertions.assertThat;
@@ -94,6 +96,26 @@ class RouteTest {
         );
 
         assertThat(ex.getError().fields()).containsExactlyInAnyOrder("maxDetourKm", "totalSeats");
+    }
+
+    @Test
+    @DisplayName("Carona de um dia só vale só na data marcada; a semanal, nos dias da semana")
+    void shouldRunOnlyOnTheDateWhenOnce() {
+        LocalDate today = LocalDate.of(2026, 11, 16);
+        LocalDate saturday = LocalDate.of(2026, 11, 21);
+
+        Route once = offer(2.0, 3);
+        once.schedule(RecurrenceType.ONCE, saturday, today);
+        assertThat(once.getWeekDays()).containsExactly(DayOfWeek.SATURDAY);
+        assertThat(once.runsOn(saturday)).isTrue();
+        assertThat(once.runsOn(saturday.plusWeeks(1))).isFalse();
+
+        Route weekly = offer(2.0, 3);
+        weekly.schedule(RecurrenceType.WEEKLY, null, today);
+        assertThat(weekly.runsOn(today)).isTrue();
+        assertThat(weekly.runsOn(today.plusWeeks(1))).isTrue();
+
+        assertThrows(ApplicationException.class, () -> offer(2.0, 3).schedule(RecurrenceType.ONCE, today.minusDays(1), today));
     }
 
     @Test

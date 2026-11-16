@@ -80,7 +80,9 @@ class PassengerMatchController extends Notifier<PassengerMatchState> {
           route.status == 'ACTIVE' &&
           route.origin.address == request.origin.address &&
           route.destination.address == request.destination.address &&
-          route.departureTime == request.departureTime) {
+          route.departureTime == request.departureTime &&
+          route.recurrence == request.recurrence &&
+          route.date == request.date) {
         return route;
       }
     }

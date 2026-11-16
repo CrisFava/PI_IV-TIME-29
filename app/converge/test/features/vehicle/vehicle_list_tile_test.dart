@@ -16,25 +16,23 @@ void main() {
     totalCapacity: 5,
   );
 
-  testWidgets('tocar no cartão abre a edição; a lixeira apaga', (tester) async {
-    final taps = <String>[];
+  testWidgets('tocar no cartão abre os detalhes; não há lixeira no card', (
+    tester,
+  ) async {
+    var opened = 0;
     await tester.pumpWidget(
       MaterialApp(
         home: Scaffold(
-          body: VehicleListTile(
-            vehicle: onix,
-            onEdit: () => taps.add('editar'),
-            onDelete: () => taps.add('apagar'),
-          ),
+          body: VehicleListTile(vehicle: onix, onOpenDetails: () => opened++),
         ),
       ),
     );
 
-    expect(find.byIcon(Icons.edit_rounded), findsNothing);
+    expect(find.byIcon(Icons.delete_outline_rounded), findsNothing);
+    expect(find.text('Mais informações'), findsOneWidget);
 
     await tester.tap(find.text('Onix'));
-    await tester.tap(find.byIcon(Icons.delete_outline_rounded));
 
-    expect(taps, ['editar', 'apagar']);
+    expect(opened, 1);
   });
 }

@@ -95,7 +95,7 @@ class FindMatchesForPassengerUseCaseTest {
         List<CompatibleMatch> matches = List.of(matchWith(eligible, search));
         when(matchingGateway.findDriversFor(any(), anyList())).thenReturn(matches);
         List<MatchResponseDTO> view = List.of();
-        when(matchViewAssembler.forPassenger(eq(matches), anyMap(), anyMap())).thenReturn(view);
+        when(matchViewAssembler.forPassenger(eq(matches), anyMap(), anyMap(), any())).thenReturn(view);
 
         assertThat(useCase.execute(command())).isSameAs(view);
 
@@ -123,7 +123,7 @@ class FindMatchesForPassengerUseCaseTest {
 
         @SuppressWarnings("unchecked")
         ArgumentCaptor<Map<String, Route>> offers = ArgumentCaptor.forClass(Map.class);
-        verify(matchViewAssembler).forPassenger(eq(matches), offers.capture(), anyMap());
+        verify(matchViewAssembler).forPassenger(eq(matches), offers.capture(), anyMap(), any());
         assertThat(offers.getValue()).containsEntry(MatchingTestRoutes.id(offer), offer);
     }
 

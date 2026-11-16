@@ -2,6 +2,7 @@
 
 package com.converge.api.modules.route.application;
 
+import com.converge.api.modules.route.domain.enums.RecurrenceType;
 import com.converge.api.modules.route.domain.enums.RouteStatus;
 import com.converge.api.modules.route.domain.enums.RouteType;
 import com.converge.api.modules.route.domain.model.Route;
@@ -20,12 +21,17 @@ import org.mockito.junit.jupiter.MockitoExtension;
 import org.springframework.test.util.ReflectionTestUtils;
 
 import java.time.DayOfWeek;
+import java.time.LocalDate;
 import java.util.List;
 import java.util.Optional;
 import java.util.Set;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.junit.jupiter.api.Assertions.assertThrows;
+import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.ArgumentMatchers.eq;
+import static org.mockito.Mockito.times;
+import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.verifyNoInteractions;
 import static org.mockito.Mockito.when;
 
@@ -60,6 +66,27 @@ class RouteAccessTest {
         );
 
         assertThat(ex.getError().code()).isEqualTo(ErrorCode.ROUTE_NOT_FOUND);
+    }
+
+    @Test
+    @DisplayName("A carona de um dia só termina com a viagem; a semanal continua ativa")
+    void shouldEndOnlyOneTimeRoutes() {
+        Route once = routeOwnedBy("user-123");
+        once.schedule(RecurrenceType.ONCE, LocalDate.now(RouteAccess.APP_ZONE), LocalDate.now(RouteAccess.APP_ZONE));
+        when(routeRepository.findById(new ObjectId(ROUTE_ID))).thenReturn(Optional.of(once));
+
+        routeAccess.endIfOnce(ROUTE_ID);
+
+        assertThat(once.getStatus()).isEqualTo(RouteStatus.INACTIVE);
+
+        Route weekly = routeOwnedBy("user-123");
+        when(routeRepository.findById(new ObjectId(ROUTE_ID))).thenReturn(Optional.of(weekly));
+
+        routeAccess.endIfOnce(ROUTE_ID);
+
+        assertThat(weekly.getStatus()).isEqualTo(RouteStatus.ACTIVE);
+        // Só a carona de um dia só foi gravada
+        verify(routeRepository, times(1)).save(any(Route.class));
     }
 
     @Test
@@ -163,7 +190,8 @@ class RouteAccessTest {
         Set<DayOfWeek> days = Set.of(DayOfWeek.MONDAY, DayOfWeek.FRIDAY);
         Coordinates origin = new Coordinates(-22.90, -47.06);
         Coordinates destination = new Coordinates(-22.83, -47.05);
-        when(routeRepository.findActiveNear(RouteType.OFFER, days, origin, destination, 12.0)).thenReturn(offers);
+        when(routeRepository.findActiveNear(eq(RouteType.OFFER), eq(days), eq(origin), eq(destination), eq(12.0), any()))
+                .thenReturn(offers);
 
         assertThat(routeAccess.listActiveNear(RouteType.OFFER, days, origin, destination, 12.0)).isEqualTo(offers);
     }

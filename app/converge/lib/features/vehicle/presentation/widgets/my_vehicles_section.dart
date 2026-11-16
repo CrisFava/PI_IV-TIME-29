@@ -4,16 +4,19 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../../../core/config/styles.dart';
+import '../../../../core/widgets/details_sheet.dart';
 import '../../../../core/widgets/show_app_notice.dart';
 import '../../../auth/state/auth_action_controller.dart';
 import '../../data/models/vehicle_model.dart';
 import '../../state/my_vehicles_controller.dart';
 import 'add_vehicle_sheet.dart';
 import 'confirm_delete_vehicle_dialog.dart';
+import 'vehicle_details.dart';
 import 'vehicle_list_tile.dart';
 import 'vehicles_empty_state.dart';
 
-/// Seção "Meus carros" do perfil do motorista: lista, adicionar e apagar.
+/// Seção "Meus carros" do perfil do motorista: lista e adicionar. Tocar num
+/// carro abre os detalhes, com editar e excluir.
 class MyVehiclesSection extends ConsumerStatefulWidget {
   const MyVehiclesSection({super.key});
 
@@ -32,24 +35,42 @@ class _MyVehiclesSectionState extends ConsumerState<MyVehiclesSection> {
     await showAddVehicleSheet(context);
   }
 
-  Future<void> _edit(VehicleModel vehicle) =>
-      showEditVehicleSheet(context, vehicle);
+  void _openDetails(VehicleModel vehicle, int total) {
+    showDetailsSheet<void>(
+      context,
+      title: 'Detalhes do carro',
+      builder: (sheetContext) => VehicleDetails(
+        vehicle: vehicle,
+        // Editar troca os detalhes pela folha de edição
+        onEdit: () {
+          Navigator.of(sheetContext).pop();
+          showEditVehicleSheet(context, vehicle);
+        },
+        onDelete: () => _delete(vehicle, total),
+      ),
+    );
+  }
 
-  Future<void> _delete(VehicleModel vehicle, int total) async {
-    if (_deletingIds.contains(vehicle.id)) return;
+  /// Pede a confirmação e apaga o carro; devolve se apagou.
+  Future<bool> _delete(VehicleModel vehicle, int total) async {
+    if (_deletingIds.contains(vehicle.id)) return false;
     final isLast = total == 1;
     final confirmed = await confirmDeleteVehicle(
       context,
       vehicle: vehicle,
       isLastVehicle: isLast,
     );
-    if (!confirmed || !mounted || _deletingIds.contains(vehicle.id)) return;
+    if (!confirmed || !mounted || _deletingIds.contains(vehicle.id)) {
+      return false;
+    }
 
     setState(() => _deletingIds.add(vehicle.id));
     try {
       await ref.read(myVehiclesProvider.notifier).remove(vehicle.id);
+      return true;
     } catch (e) {
       if (mounted) _showMessage(authErrorMessage(e));
+      return false;
     } finally {
       if (mounted) setState(() => _deletingIds.remove(vehicle.id));
     }
@@ -113,8 +134,7 @@ class _MyVehiclesSectionState extends ConsumerState<MyVehiclesSection> {
                   child: VehicleListTile(
                     vehicle: vehicle,
                     isDeleting: _deletingIds.contains(vehicle.id),
-                    onEdit: () => _edit(vehicle),
-                    onDelete: () => _delete(vehicle, value.length),
+                    onOpenDetails: () => _openDetails(vehicle, value.length),
                   ),
                 ),
             ],

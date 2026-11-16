@@ -62,7 +62,8 @@ class MatchViewAssemblerTest {
                 .thenReturn(reviews);
 
         MatchResponseDTO view = assembler.forPassenger(List.of(match), Map.of(offerId, offer),
-                Map.of(offerId, Optional.of(MatchingTestRoutes.vehicle("driver-1")))).getFirst();
+                Map.of(offerId, Optional.of(MatchingTestRoutes.vehicle("driver-1"))),
+                MatchingTestRoutes.search("passenger-1")).getFirst();
 
         assertThat(view.otherUserId()).isEqualTo("driver-1");
         assertThat(view.otherUserName()).isEqualTo("Ana Souza");
