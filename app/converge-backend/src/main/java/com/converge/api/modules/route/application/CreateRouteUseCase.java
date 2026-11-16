@@ -6,6 +6,7 @@ import com.converge.api.modules.route.application.dto.CreateRouteCommand;
 import com.converge.api.modules.route.application.gateway.RouteGeometry;
 import com.converge.api.modules.route.application.mapper.RouteMapper;
 import com.converge.api.modules.route.domain.enums.RouteStatus;
+import com.converge.api.modules.route.domain.enums.RouteType;
 import com.converge.api.modules.route.domain.model.Route;
 import com.converge.api.modules.route.domain.repository.RouteRepository;
 import com.converge.api.shared.application.UseCase;
@@ -27,13 +28,17 @@ public class CreateRouteUseCase implements UseCase<CreateRouteCommand, Route> {
     private final RouteRepository routeRepository;
     private final RouteMapper routeMapper;
     private final RouteGeometryService routeGeometryService;
+    private final OfferOverlapValidator offerOverlapValidator;
 
     @Override
     public Route execute(CreateRouteCommand command) {
         Route route = routeMapper.toEntity(command.userId(), command.request());
-        route.schedule(command.request().recurrence(), command.request().date(), LocalDate.now(RouteAccess.APP_ZONE));
+        LocalDate today = LocalDate.now(RouteAccess.APP_ZONE);
+        route.schedule(command.request().recurrence(), command.request().date(), today);
         validateNotDuplicated(route);
+        // A chegada estimada vem da rota: é ela que define até quando o motorista está dirigindo
         applyGeometry(route);
+        offerOverlapValidator.validate(route, today);
         return routeRepository.save(route);
     }
 
@@ -50,13 +55,17 @@ public class CreateRouteUseCase implements UseCase<CreateRouteCommand, Route> {
             route.getDestination().address(),
             route.getDepartureTime(),
             route.getDate(),
+            route.getWeekDays(),
             LIVE_STATUSES
         );
 
+        // Uma segunda carona igual dividiria os passageiros entre as duas
         if (alreadyExists) {
             throw new ApplicationException(
                     ErrorCode.ROUTE_ALREADY_EXISTS,
-                    "Você já possui um trajeto ativo com essa origem, destino, horário e data."
+                    route.getType() == RouteType.OFFER
+                            ? "Você já tem uma carona igual a essa: mesma partida, destino, dia e horário."
+                            : "Você já tem um pedido igual a esse: mesma partida, destino, dia e horário."
             );
         }   
     }

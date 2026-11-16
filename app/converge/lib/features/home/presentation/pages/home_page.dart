@@ -1,6 +1,5 @@
 // Autor: Allan Giovanni Matias Paes - RA 25008211
 
-import 'package:converge/features/home/presentation/widgets/home_driver_form_sheet.dart';
 import 'package:converge/features/home/presentation/widgets/home_mode_selector_header.dart';
 import 'package:converge/features/home/presentation/widgets/home_passenger_sheet.dart';
 import 'package:converge/features/home/presentation/widgets/home_real_map_background.dart';
@@ -15,15 +14,11 @@ import 'package:google_maps_flutter/google_maps_flutter.dart';
 
 import '../../../../app_routes.dart';
 
-import '../../../../core/network/api_error_code.dart';
-import '../../../../core/network/api_exception.dart';
-import '../../../../core/services/auth/auth_providers.dart';
 import '../../../route/data/models/create_route_request.dart';
 import '../../../route/data/models/route_place_model.dart';
-import '../../../route/data/models/route_response_model.dart';
 import '../../../route/data/models/route_schedule.dart';
 import '../../../route/state/offer_route_controller.dart';
-import '../../../route/state/saved_routes_controller.dart';
+import '../../../route/state/trip_estimate_controller.dart';
 
 import '../../../../core/config/styles.dart';
 import '../../../../core/services/maps/google_maps_service.dart';
@@ -54,7 +49,12 @@ import '../../../vehicle/state/my_vehicles_controller.dart';
 import '../../../auth/presentation/widgets/edit_profile_sheet.dart';
 import '../widgets/campus_spots.dart';
 import '../widgets/passenger_ride_step.dart';
+import '../widgets/departure_time_sheet.dart';
 import '../widgets/ride_departure_label.dart';
+import '../widgets/ride_flow/ride_map_pick_card.dart';
+import '../widgets/ride_flow/ride_place_step_sheet.dart';
+import '../widgets/ride_flow/ride_review.dart';
+import '../widgets/ride_flow/ride_schedule_step_sheet.dart';
 import '../../../auth/state/auth_action_controller.dart';
 import '../../../auth/state/auth_controller.dart';
 import '../../../auth/state/session/auth_session.dart';
@@ -87,9 +87,8 @@ class _HomePageState extends ConsumerState<HomePage> {
   /// Carona oferecida se repete toda semana (por padrão, é de um dia só).
   bool _offerRepeatWeekly = false;
 
-  // De onde sai a carona que o motorista vai publicar (escolhido no campo "Saindo de")
-  String _offerOriginAddress = '';
-  LatLng? _offerOriginLocation;
+  // Publicando a carona (inclui a busca do carro antes do envio)
+  bool _publishingOffer = false;
 
   // Pedido de carona em andamento com o painel escondido: a busca continua e o
   // botão do carro fica azul; o menu do carro reabre os detalhes
@@ -102,10 +101,11 @@ class _HomePageState extends ConsumerState<HomePage> {
   // que termine depois disso não reabre o painel
   int _draftGeneration = 0;
 
-  // Estado do fluxo Uber-like do passageiro (etapas graduais)
+  // Etapas de criar (motorista) ou pedir (passageiro) carona: partida, destino e
+  // horário são as mesmas nos dois; depois, o passageiro segue para a busca
   PassengerRideStep _passengerStep = PassengerRideStep.idle;
   LatLng _pickupLocation = campusCoordinates;
-  String _pickupAddress = 'PUC-Campinas - Portaria Principal';
+  String _pickupAddress = '';
   LatLng? _destinationLocation;
   String _destinationAddress = '';
 
@@ -117,26 +117,50 @@ class _HomePageState extends ConsumerState<HomePage> {
   double _driverSearchRadiusKm = 3.0;
 
   void _onCameraCenterChanged(LatLng target) async {
-    if (_passengerStep == PassengerRideStep.dragMapPickup ||
-        _passengerStep == PassengerRideStep.selectPickup) {
-      _pickupLocation = target;
+    // Só na confirmação no mapa o ponto segue o centro. Se o pino continua no
+    // ponto escolhido, o nome dele (ex.: "PUC-Campinas - Portaria 2") é mantido.
+    if (_passengerStep == PassengerRideStep.dragMapPickup) {
+      if (_samePoint(target, _pickupLocation) && _pickupAddress.isNotEmpty) {
+        return;
+      }
+      // Sem endereço enquanto busca: o "Confirmar" fica desabilitado
+      setState(() {
+        _pickupLocation = target;
+        _pickupAddress = '';
+      });
       final addr = await GoogleMapsService.getAddressFromCoordinates(target);
+      // Só vale se o pino ainda está nesse ponto (o mapa pode ter sido arrastado de novo)
       if (mounted &&
-          (_passengerStep == PassengerRideStep.dragMapPickup ||
-              _passengerStep == PassengerRideStep.selectPickup)) {
+          _passengerStep == PassengerRideStep.dragMapPickup &&
+          _samePoint(target, _pickupLocation)) {
         setState(() => _pickupAddress = addr);
       }
-    } else if (_passengerStep == PassengerRideStep.dragMapDestination ||
-        _passengerStep == PassengerRideStep.searchDestination) {
-      _destinationLocation = target;
+    } else if (_passengerStep == PassengerRideStep.dragMapDestination) {
+      final destination = _destinationLocation;
+      if (destination != null &&
+          _samePoint(target, destination) &&
+          _destinationAddress.isNotEmpty) {
+        return;
+      }
+      setState(() {
+        _destinationLocation = target;
+        _destinationAddress = '';
+      });
       final addr = await GoogleMapsService.getAddressFromCoordinates(target);
+      final current = _destinationLocation;
       if (mounted &&
-          (_passengerStep == PassengerRideStep.dragMapDestination ||
-              _passengerStep == PassengerRideStep.searchDestination)) {
+          _passengerStep == PassengerRideStep.dragMapDestination &&
+          current != null &&
+          _samePoint(target, current)) {
         setState(() => _destinationAddress = addr);
       }
     }
   }
+
+  // Mesmo ponto no mapa (a câmera parou onde o ponto já estava)
+  static bool _samePoint(LatLng a, LatLng b) =>
+      (a.latitude - b.latitude).abs() < 0.00002 &&
+      (a.longitude - b.longitude).abs() < 0.00002;
 
   void _handleStartDragMapPickup() {
     setState(() {
@@ -145,11 +169,13 @@ class _HomePageState extends ConsumerState<HomePage> {
     _onCameraCenterChanged(_pickupLocation);
   }
 
+  /// Endereço escolhido na busca ou no campus: o mapa vai até ele e pergunta
+  /// "Saindo de X, confirma?" antes de seguir.
   void _handlePickupChosen(String title, LatLng pos) {
     setState(() {
       _pickupAddress = title;
       _pickupLocation = pos;
-      _passengerStep = PassengerRideStep.searchDestination;
+      _passengerStep = PassengerRideStep.dragMapPickup;
     });
   }
 
@@ -172,49 +198,26 @@ class _HomePageState extends ConsumerState<HomePage> {
     }
   }
 
-  Future<void> _handleDestinationChosen(String title, LatLng pos) async {
+  void _handleDestinationChosen(String title, LatLng pos) {
     setState(() {
       _destinationAddress = title;
       _destinationLocation = pos;
+      _passengerStep = PassengerRideStep.dragMapDestination;
     });
-    await _calculateRouteAndConfirm();
   }
 
-  Future<void> _handleConfirmDestination() async {
-    await _calculateRouteAndConfirm();
-  }
+  void _handleConfirmDestination() => _goToSchedule();
 
-  Future<void> _calculateRouteAndConfirm() async {
-    final generation = _draftGeneration;
-    final step = _passengerStep;
-    // O rascunho foi fechado (ou mudou de etapa) enquanto a rota era calculada
-    bool isStale() =>
-        !mounted || generation != _draftGeneration || step != _passengerStep;
+  /// Etapa 3: mostra o horário na hora; o tempo e o desenho do caminho chegam
+  /// do controlador (backend com a Routes API do Google).
+  void _goToSchedule() {
+    final destination = _destinationLocation;
+    if (destination == null) return;
 
-    List<LatLng>? routePoints;
-    if (_destinationLocation != null) {
-      try {
-        routePoints = await GoogleMapsService.computeRoutes(
-          origin: _pickupLocation,
-          destination: _destinationLocation!,
-        );
-      } on RoutesException catch (e) {
-        if (!isStale()) _showError(e.message);
-        return;
-      } catch (e) {
-        if (!isStale()) {
-          _showError('Não foi possível calcular o trajeto. Tente de novo.');
-        }
-        return;
-      }
-    }
-
-    if (!isStale()) {
-      setState(() {
-        _tripRoutePoints = routePoints;
-        _passengerStep = PassengerRideStep.routeConfirmation;
-      });
-    }
+    setState(() => _passengerStep = PassengerRideStep.routeConfirmation);
+    ref
+        .read(tripEstimateProvider.notifier)
+        .load(origin: _pickupLocation, destination: destination);
   }
 
   /// Salva (ou reaproveita) o trajeto de procura e busca os motoristas compatíveis.
@@ -244,7 +247,6 @@ class _HomePageState extends ConsumerState<HomePage> {
       return;
     }
 
-    ref.read(savedRoutesProvider.notifier).loadMyRoutes();
     await controller.findDrivers(routeId);
   }
 
@@ -334,6 +336,12 @@ class _HomePageState extends ConsumerState<HomePage> {
   }
 
   Future<void> _handleCancelFlow() async {
+    // Na carona do motorista, fechar limpa o mapa
+    if (_currentMode.isDriver) {
+      _handleCloseDriverFormSheet();
+      return;
+    }
+
     final matchController = ref.read(passengerMatchProvider.notifier);
     if (_passengerStep == PassengerRideStep.waitingDriver) {
       await matchController.cancelRequest();
@@ -343,63 +351,13 @@ class _HomePageState extends ConsumerState<HomePage> {
     setState(() {
       _draftGeneration++;
       _passengerSheetHidden = false;
-      if (_passengerStep == PassengerRideStep.selectPickup) {
-        _passengerStep = PassengerRideStep.chooseRouteOption;
-      } else {
-        _passengerStep = PassengerRideStep.idle;
-        _rideDeparture = null;
-        _destinationLocation = null;
-        _destinationAddress = '';
-        _tripRoutePoints = null;
-        _driverApproachRoutePoints = null;
-      }
+      _passengerStep = PassengerRideStep.idle;
+      _rideDeparture = null;
+      _resetDraftPlaces();
+      _driverApproachRoutePoints = null;
     });
 
     if (_passengerStep == PassengerRideStep.idle) matchController.reset();
-  }
-
-  Future<void> _handleSelectSavedRoute(RouteResponseModel route) async {
-    HapticFeedback.mediumImpact();
-    setState(() {
-      _pickupAddress = route.origin.address;
-      _pickupLocation = LatLng(route.origin.latitude, route.origin.longitude);
-      _destinationAddress = route.destination.address;
-      _destinationLocation = LatLng(
-        route.destination.latitude,
-        route.destination.longitude,
-      );
-      if (route.encodedPolyline != null && route.encodedPolyline!.isNotEmpty) {
-        _tripRoutePoints = GoogleMapsService.decodePolyline(
-          route.encodedPolyline!,
-        );
-      } else {
-        _tripRoutePoints = [];
-      }
-      _passengerStep = PassengerRideStep.driverList;
-    });
-
-    if (route.type == AppRouteType.search) {
-      ref.read(passengerMatchProvider.notifier).findDrivers(route.id);
-    } else {
-      // Trajeto de oferta: quem pede carona é o passageiro. O motorista vê os pedidos no painel.
-      setState(() => _passengerStep = PassengerRideStep.idle);
-      return;
-    }
-
-    if ((_tripRoutePoints == null || _tripRoutePoints!.isEmpty) &&
-        _destinationLocation != null) {
-      try {
-        final result = await GoogleMapsService.computeRoutes(
-          origin: _pickupLocation,
-          destination: _destinationLocation!,
-        );
-        if (mounted && result.isNotEmpty) {
-          setState(() {
-            _tripRoutePoints = result;
-          });
-        }
-      } catch (_) {}
-    }
   }
 
   void _onTabSelected(int index) {
@@ -434,9 +392,9 @@ class _HomePageState extends ConsumerState<HomePage> {
       onSuccess: () {
         setState(() {
           _isCarMenuOpen = false;
-          _currentMode = AppRideMode.driver;
           _currentTabIndex = 0;
         });
+        _openOfferForm();
       },
     );
   }
@@ -446,10 +404,21 @@ class _HomePageState extends ConsumerState<HomePage> {
       _isCarMenuOpen = false;
       _currentMode = AppRideMode.passenger;
       _currentTabIndex = 0;
-      _passengerStep = PassengerRideStep.chooseRouteOption;
+      _passengerStep = PassengerRideStep.selectPickup;
       _passengerSheetHidden = false;
+      _resetDraftPlaces();
     });
-    ref.read(savedRoutesProvider.notifier).loadMyRoutes();
+  }
+
+  /// Limpa a partida, o destino e o caminho do rascunho de carona.
+  void _resetDraftPlaces() {
+    _draftGeneration++;
+    _pickupAddress = '';
+    _pickupLocation = campusCoordinates;
+    _destinationLocation = null;
+    _destinationAddress = '';
+    _tripRoutePoints = null;
+    ref.read(tripEstimateProvider.notifier).reset();
   }
 
   void _onStartDriverShiftFromDock(bool canDrive) {
@@ -468,57 +437,16 @@ class _HomePageState extends ConsumerState<HomePage> {
     }
   }
 
-  /// Fechar a folha de nova carona volta para "Minhas caronas".
+  /// Fechar a nova carona deixa o mapa limpo (sem voltar para "Minhas caronas").
   void _handleCloseDriverFormSheet() {
     setState(() {
-      _currentMode = AppRideMode.driver;
-      _showRideRequests = true;
+      _currentMode = AppRideMode.passenger;
+      _showRideRequests = false;
+      _passengerStep = PassengerRideStep.idle;
       _offerDeparture = null;
       _offerRepeatWeekly = false;
-      _offerOriginAddress = '';
-      _offerOriginLocation = null;
-      _destinationLocation = null;
-      _destinationAddress = '';
-      _tripRoutePoints = null;
+      _resetDraftPlaces();
     });
-  }
-
-  Future<void> _handleDriverDestinationSelected(
-    String address,
-    LatLng position,
-  ) async {
-    setState(() {
-      _destinationAddress = address;
-      _destinationLocation = position;
-    });
-    await _previewOfferRoute();
-  }
-
-  Future<void> _handleDriverOriginSelected(
-    String address,
-    LatLng position,
-  ) async {
-    setState(() {
-      _offerOriginAddress = address;
-      _offerOriginLocation = position;
-    });
-    await _previewOfferRoute();
-  }
-
-  /// Desenha no mapa o caminho da carona assim que a origem e o destino estão escolhidos.
-  Future<void> _previewOfferRoute() async {
-    final origin = _offerOriginLocation;
-    final destination = _destinationLocation;
-    if (origin == null || destination == null) return;
-    try {
-      final points = await GoogleMapsService.computeRoutes(
-        origin: origin,
-        destination: destination,
-      );
-      if (mounted && points.isNotEmpty) {
-        setState(() => _tripRoutePoints = points);
-      }
-    } catch (_) {}
   }
 
   /// Pedido de carona em andamento: procurando motorista, aguardando a resposta ou aceito.
@@ -548,9 +476,7 @@ class _HomePageState extends ConsumerState<HomePage> {
         _passengerStep = PassengerRideStep.idle;
         _rideDeparture = null;
       }
-      _destinationLocation = null;
-      _destinationAddress = '';
-      _tripRoutePoints = null;
+      _resetDraftPlaces();
     });
     if (draftOpen) ref.read(passengerMatchProvider.notifier).reset();
   }
@@ -576,21 +502,20 @@ class _HomePageState extends ConsumerState<HomePage> {
     );
     if (date == null || !mounted) return;
 
-    final time = await showTimePicker(
-      context: context,
-      initialTime: TimeOfDay.fromDateTime(initial),
-      helpText: 'Horário de saída',
-      builder: _pickerTheme,
+    // Horário: atalhos (Agora, Em 30 min, Em 1 h) e a roda de 5 em 5 min
+    final picked = await showDepartureTimeSheet(
+      context,
+      day: date,
+      current: current,
     );
-    if (time == null || !mounted) return;
+    if (picked == null || !mounted) return;
 
-    final chosen = DateTime(
-      date.year,
-      date.month,
-      date.day,
-      time.hour,
-      time.minute,
-    );
+    final chosen = picked.departure;
+    if (chosen == null) {
+      HapticFeedback.selectionClick();
+      setState(() => onPicked(null));
+      return;
+    }
     // Um horário que já passou vira "agora"
     if (!chosen.isAfter(DateTime.now())) {
       setState(() => onPicked(null));
@@ -645,9 +570,9 @@ class _HomePageState extends ConsumerState<HomePage> {
   /// Publica a carona agendada: um trajeto de oferta no dia e horário escolhidos
   /// ("agora" por padrão), com o raio de busca como desvio máximo. Os passageiros já
   /// podem pedir vaga; a viagem só começa no "Iniciar trajeto" da carona.
-  Future<void> _handlePublishOffer(double maxDetourKm) async {
-    if (ref.read(offerRouteProvider)) return;
-    if (_offerOriginLocation == null) {
+  Future<void> _handlePublishOffer() async {
+    if (_publishingOffer || ref.read(offerRouteProvider)) return;
+    if (_pickupAddress.isEmpty) {
       _showError('Escolha de onde a carona sai.');
       return;
     }
@@ -657,9 +582,18 @@ class _HomePageState extends ConsumerState<HomePage> {
     }
 
     HapticFeedback.mediumImpact();
+    // O rascunho revisado: se ele for fechado ou trocado durante a busca do
+    // carro, nada é publicado
+    final generation = _draftGeneration;
+    setState(() => _publishingOffer = true);
     final vehicle = await _findDriverVehicle();
     if (!mounted) return;
+    if (generation != _draftGeneration) {
+      setState(() => _publishingOffer = false);
+      return;
+    }
     if (vehicle == null) {
+      setState(() => _publishingOffer = false);
       _showError('Cadastre um veículo antes de publicar a carona.');
       return;
     }
@@ -672,27 +606,26 @@ class _HomePageState extends ConsumerState<HomePage> {
         _offerDeparture ?? DateTime.now().add(RouteSchedule.immediateOfferLead),
         repeatWeekly: _offerRepeatWeekly,
       ),
-      maxDetourKm: maxDetourKm,
-      originAddress: _offerOriginAddress,
-      originLocation: _offerOriginLocation,
+      maxDetourKm: _driverSearchRadiusKm,
     );
     try {
       await ref.read(offerRouteProvider.notifier).publish(request);
     } catch (e) {
-      if (mounted) _showError(authErrorMessage(e));
+      if (mounted) {
+        setState(() => _publishingOffer = false);
+        _showError(authErrorMessage(e));
+      }
       return;
     }
     if (!mounted) return;
+    setState(() => _publishingOffer = false);
 
     ref.invalidate(myOfferRoutesProvider);
     setState(() {
+      _passengerStep = PassengerRideStep.idle;
       _offerDeparture = null;
       _offerRepeatWeekly = false;
-      _offerOriginAddress = '';
-      _offerOriginLocation = null;
-      _destinationLocation = null;
-      _destinationAddress = '';
-      _tripRoutePoints = null;
+      _resetDraftPlaces();
     });
     // Abre o painel: a carona aparece com os passageiros compatíveis
     _openRideRequests();
@@ -719,9 +652,18 @@ class _HomePageState extends ConsumerState<HomePage> {
 
   /// "Oferecer carona" no painel: abre a folha para publicar uma carona nova.
   void _openOfferForm() {
+    // Os dois fluxos usam as mesmas etapas: abrir a oferta apagaria o pedido
+    if (_hasActiveRideRequest) {
+      _showError(
+        'Você tem um pedido de carona em andamento. Cancele o pedido antes de oferecer uma carona.',
+      );
+      return;
+    }
     setState(() {
       _currentMode = AppRideMode.driver;
       _showRideRequests = false;
+      _passengerStep = PassengerRideStep.selectPickup;
+      _resetDraftPlaces();
     });
   }
 
@@ -819,14 +761,10 @@ class _HomePageState extends ConsumerState<HomePage> {
     String? vehicleId,
     int? totalSeats,
     double maxDetourKm = 3.0,
-    String? originAddress,
-    LatLng? originLocation,
   }) {
-    // A carona do motorista sai do ponto escolhido; o pedido do passageiro, do embarque marcado
-    final from = originLocation ?? _pickupLocation;
-    final fromAddress = originLocation != null
-        ? (originAddress ?? '')
-        : _pickupAddress;
+    // A partida escolhida na etapa 1 (carona do motorista ou embarque do passageiro)
+    final from = _pickupLocation;
+    final fromAddress = _pickupAddress;
     return CreateRouteRequest(
       type: isDriver ? AppRouteType.offer : AppRouteType.search,
       vehicleId: vehicleId,
@@ -871,77 +809,6 @@ class _HomePageState extends ConsumerState<HomePage> {
       debugPrint('Erro ao buscar os veículos do motorista: $e');
     }
     return null;
-  }
-
-  Future<void> _handleSaveRoute() async {
-    HapticFeedback.lightImpact();
-    if (_destinationLocation == null) {
-      _showError('Selecione uma origem e destino antes de salvar o trajeto.');
-      return;
-    }
-
-    final isDriver = _currentMode == AppRideMode.driver;
-    if (isDriver && _offerOriginLocation == null) {
-      _showError('Escolha de onde a carona sai antes de salvar o trajeto.');
-      return;
-    }
-    final vehicle = isDriver ? await _findDriverVehicle() : null;
-    if (!mounted) return;
-    if (isDriver && vehicle == null) {
-      _showError('Cadastre um veículo antes de salvar um trajeto de oferta.');
-      return;
-    }
-
-    // Trajeto frequente: o mesmo horário nos dias úteis
-    final request = _buildRouteRequest(
-      isDriver: isDriver,
-      schedule: RouteSchedule.weekdayCommute,
-      vehicleId: vehicle?.id,
-      totalSeats: vehicle?.seats,
-      originAddress: isDriver ? _offerOriginAddress : null,
-      originLocation: isDriver ? _offerOriginLocation : null,
-    );
-
-    final authService = ref.read(authServiceProvider);
-    if (authService.currentUser == null) {
-      ref.read(savedRoutesProvider.notifier).saveLocalRoute(request);
-      await ref.read(authControllerProvider.notifier).signOut();
-      return;
-    }
-
-    try {
-      final saved = await ref
-          .read(savedRoutesProvider.notifier)
-          .saveRoute(request);
-      if (saved.encodedPolyline != null && saved.encodedPolyline!.isNotEmpty) {
-        final points = GoogleMapsService.decodePolyline(saved.encodedPolyline!);
-        if (points.isNotEmpty && mounted) {
-          setState(() {
-            _tripRoutePoints = points;
-          });
-        }
-      }
-      if (mounted) {
-        HapticFeedback.mediumImpact();
-      }
-    } on ApiException catch (e) {
-      ref.read(savedRoutesProvider.notifier).saveLocalRoute(request);
-      if (e.isUnauthorized || e.code == ApiErrorCode.invalidCredentials) {
-        // Desloga o usuário imediatamente sem emitir alerta de sessão expirada
-        await ref.read(authControllerProvider.notifier).signOut();
-        return;
-      }
-      if (mounted) {
-        _showError(e.message);
-      }
-    } catch (e) {
-      ref.read(savedRoutesProvider.notifier).saveLocalRoute(request);
-      if (mounted) {
-        _showError(
-          'Não foi possível salvar o trajeto no servidor. Ele ficou só neste aparelho.',
-        );
-      }
-    }
   }
 
   Future<void> _confirmSignOut() async {
@@ -1151,6 +1018,10 @@ class _HomePageState extends ConsumerState<HomePage> {
 
   // --- VIEW 0: TELA PRINCIPAL COM GOOGLE MAPS REAL ---
   Widget _buildUberHomeView(dynamic user, bool canDrive, double bottomPadding) {
+    // O desenho do caminho do rascunho vem do controlador da estimativa
+    ref.listen(tripEstimateProvider, (_, next) {
+      setState(() => _tripRoutePoints = next.points.isEmpty ? null : next.points);
+    });
     // Com a viagem em andamento (e sem um pedido de carona aberto), o mapa
     // mostra a rota da viagem com as paradas: buscar e deixar cada passageiro
     final shiftRide = ref.watch(driverRideInProgressProvider);
@@ -1158,9 +1029,13 @@ class _HomePageState extends ConsumerState<HomePage> {
         shiftRide != null &&
         _passengerStep == PassengerRideStep.idle &&
         (_currentMode.isPassenger || _showRideRequests);
-    // Os painéis do motorista abrem em 46% da tela: o mapa enquadra só a parte de cima
-    final mapBottomPadding = _currentMode.isDriver
-        ? MediaQuery.sizeOf(context).height * 0.46
+    // Os painéis do motorista abrem em 52% da tela: o mapa enquadra só a parte de cima
+    // Escolhendo no mapa, o mapa ocupa a tela toda (só o cartão fica embaixo)
+    final pickingOnMap =
+        _passengerStep == PassengerRideStep.dragMapPickup ||
+        _passengerStep == PassengerRideStep.dragMapDestination;
+    final mapBottomPadding = _currentMode.isDriver && !pickingOnMap
+        ? MediaQuery.sizeOf(context).height * 0.52
         : 0.0;
 
     return Stack(
@@ -1179,8 +1054,6 @@ class _HomePageState extends ConsumerState<HomePage> {
                 : null,
             pickupLocation: showShiftRoute
                 ? _latLngOf(shiftRide.origin)
-                : (_currentMode.isDriver && _offerOriginLocation != null)
-                ? _offerOriginLocation
                 : _pickupLocation,
             destinationLocation: showShiftRoute
                 ? _latLngOf(shiftRide.destination)
@@ -1204,10 +1077,9 @@ class _HomePageState extends ConsumerState<HomePage> {
             bottomPadding: mapBottomPadding,
             showTrajectory:
                 showShiftRoute ||
-                (_currentMode.isDriver && _destinationLocation != null) ||
+                _passengerStep == PassengerRideStep.routeConfirmation ||
                 (_currentMode.isPassenger &&
-                    (_passengerStep == PassengerRideStep.routeConfirmation ||
-                        _passengerStep == PassengerRideStep.driverList ||
+                    (_passengerStep == PassengerRideStep.driverList ||
                         _passengerStep == PassengerRideStep.waitingDriver ||
                         _passengerStep == PassengerRideStep.driverAccepted)),
             tripRoutePoints: showShiftRoute
@@ -1215,16 +1087,12 @@ class _HomePageState extends ConsumerState<HomePage> {
                 : _tripRoutePoints,
             driverApproachRoutePoints: _driverApproachRoutePoints,
             isDraggingPin:
-                _currentMode.isPassenger &&
-                (_passengerStep == PassengerRideStep.dragMapPickup ||
-                    _passengerStep == PassengerRideStep.dragMapDestination),
+                _passengerStep == PassengerRideStep.dragMapPickup ||
+                _passengerStep == PassengerRideStep.dragMapDestination,
             centralPinType:
                 _passengerStep == PassengerRideStep.dragMapDestination
                 ? CentralPinType.destination
                 : CentralPinType.pickup,
-            pinLabel: _passengerStep == PassengerRideStep.dragMapDestination
-                ? 'Ponto de Desembarque'
-                : 'Ponto de Embarque',
             onCameraCenterChanged: _onCameraCenterChanged,
             universityName: user.academicRecord.university.toString(),
             onDriverSelected: _handleSelectDriver,
@@ -1249,86 +1117,151 @@ class _HomePageState extends ConsumerState<HomePage> {
               ),
             ),
           )
-        else if (_currentMode.isDriver)
+        else if (_isDraftStep)
           Positioned.fill(
             child: SheetDragToDismiss(
-              onDismiss: _handleCloseDriverFormSheet,
-              child: HomeDriverFormSheet(
-                initialSearchRadiusKm: _driverSearchRadiusKm,
-                bottomSafeArea: bottomPadding,
-                onSearchRadiusChanged: (newRadius) {
-                  setState(() => _driverSearchRadiusKm = newRadius);
-                },
-                onPublish: _handlePublishOffer,
-                isPublishing: ref.watch(offerRouteProvider),
-                departureLabel: rideDepartureLabel(
-                  _offerDeparture,
-                  DateTime.now(),
-                ),
-                onChangeDeparture: () => _pickDeparture(
-                  current: _offerDeparture,
-                  onPicked: (departure) => _offerDeparture = departure,
-                ),
-                repeatWeekly: _offerRepeatWeekly,
-                onRepeatWeeklyChanged: (value) =>
-                    setState(() => _offerRepeatWeekly = value),
-                onSaveRoute: _handleSaveRoute,
-                onClose: _handleCloseDriverFormSheet,
-                onDestinationSelected: _handleDriverDestinationSelected,
-                onOriginSelected: _handleDriverOriginSelected,
-              ),
+              onDismiss: _handleCancelFlow,
+              child: _buildRideFlowStep(bottomPadding),
             ),
           )
-        else if (_passengerStep != PassengerRideStep.idle &&
+        else if (_currentMode.isPassenger &&
+            _passengerStep != PassengerRideStep.idle &&
             !_passengerSheetHidden)
           Positioned.fill(
             child: SheetDragToDismiss(
               onDismiss: _handlePassengerSheetDismissed,
               child: HomePassengerSheet(
                 step: _passengerStep,
-                pickupAddress: _pickupAddress,
-                destinationAddress: _destinationAddress,
-                pickupLocation: _pickupLocation,
-                destinationLocation: _destinationLocation,
                 bottomSafeArea: bottomPadding,
-                onStartRideFlow: () {
-                  setState(
-                    () => _passengerStep = PassengerRideStep.chooseRouteOption,
-                  );
-                  ref.read(savedRoutesProvider.notifier).loadMyRoutes();
-                },
-                onChooseMapOption: () {
-                  setState(
-                    () => _passengerStep = PassengerRideStep.selectPickup,
-                  );
-                },
-                onSelectSavedRoute: _handleSelectSavedRoute,
-                onStartDragMapPickup: _handleStartDragMapPickup,
-                onStartDragMapDestination: _handleStartDragMapDestination,
-                onPickupChosen: _handlePickupChosen,
-                onDestinationChosen: _handleDestinationChosen,
-                onConfirmPickup: _handleConfirmPickup,
-                onConfirmDestination: _handleConfirmDestination,
-                onConfirmRideOrder: _handleConfirmRideOrder,
-                departureLabel: rideDepartureLabel(
-                  _rideDeparture,
-                  DateTime.now(),
-                ),
-                onChangeDeparture: () => _pickDeparture(
-                  current: _rideDeparture,
-                  onPicked: (departure) => _rideDeparture = departure,
-                ),
                 onSelectDriver: _handleSelectDriver,
                 onRetryMatches: _handleRetryMatches,
                 onCancelRequest: _handleCancelRequest,
                 onSendMessageToDriver: _handleSendMessageToDriver,
                 onCancelFlow: _handleCancelFlow,
-                onSaveRoute: _handleSaveRoute,
               ),
             ),
           ),
       ],
     );
+  }
+
+  /// Revisão final com tudo o que foi escolhido; confirmando, publica a carona
+  /// (motorista) ou busca os motoristas (passageiro).
+  Future<void> _reviewAndSubmit() async {
+    final isDriver = _currentMode.isDriver;
+    final confirmed = await showRideReview(
+      context,
+      isDriver: isDriver,
+      originAddress: _pickupAddress,
+      destinationAddress: _destinationAddress,
+      departureLabel: rideDepartureLabel(
+        isDriver ? _offerDeparture : _rideDeparture,
+        DateTime.now(),
+      ),
+      estimate: ref.read(tripEstimateProvider).estimate,
+      repeatWeekly: _offerRepeatWeekly,
+      searchRadiusKm: _driverSearchRadiusKm,
+    );
+    if (!confirmed || !mounted) return;
+    if (isDriver) {
+      await _handlePublishOffer();
+    } else {
+      await _handleConfirmRideOrder();
+    }
+  }
+
+  /// Partida, destino ou horário: as etapas de criar ou pedir carona.
+  bool get _isDraftStep => switch (_passengerStep) {
+    PassengerRideStep.selectPickup ||
+    PassengerRideStep.dragMapPickup ||
+    PassengerRideStep.searchDestination ||
+    PassengerRideStep.dragMapDestination ||
+    PassengerRideStep.routeConfirmation => true,
+    _ => false,
+  };
+
+  void _goToStep(PassengerRideStep step) =>
+      setState(() => _passengerStep = step);
+
+  /// As 3 etapas, iguais para motorista e passageiro: partida, destino e horário.
+  Widget _buildRideFlowStep(double bottomPadding) {
+    final isDriver = _currentMode.isDriver;
+    final tripEstimate = ref.watch(tripEstimateProvider);
+    return switch (_passengerStep) {
+      PassengerRideStep.dragMapPickup => RideMapPickCard(
+        isOrigin: true,
+        address: _pickupAddress,
+        onConfirm: _handleConfirmPickup,
+        onBack: () => _goToStep(PassengerRideStep.selectPickup),
+        bottomSafeArea: bottomPadding,
+      ),
+      PassengerRideStep.searchDestination => RidePlaceStepSheet(
+        key: const ValueKey('ride_flow_destination'),
+        isOrigin: false,
+        isDriver: isDriver,
+        selectedAddress: _destinationAddress,
+        onPickOnMap: _handleStartDragMapDestination,
+        onPlaceChosen: _handleDestinationChosen,
+        onContinue: _handleConfirmDestination,
+        onBack: () => _goToStep(PassengerRideStep.selectPickup),
+        onClose: _handleCancelFlow,
+        bottomSafeArea: bottomPadding,
+      ),
+      PassengerRideStep.dragMapDestination => RideMapPickCard(
+        isOrigin: false,
+        address: _destinationAddress,
+        onConfirm: _handleConfirmDestination,
+        onBack: () => _goToStep(PassengerRideStep.searchDestination),
+        bottomSafeArea: bottomPadding,
+      ),
+      PassengerRideStep.routeConfirmation => RideScheduleStepSheet(
+        isDriver: isDriver,
+        originAddress: _pickupAddress,
+        destinationAddress: _destinationAddress,
+        estimate: tripEstimate.estimate,
+        isEstimating: tripEstimate.isLoading,
+        departureLabel: rideDepartureLabel(
+          isDriver ? _offerDeparture : _rideDeparture,
+          DateTime.now(),
+        ),
+        onChangeDeparture: () => isDriver
+            ? _pickDeparture(
+                current: _offerDeparture,
+                onPicked: (departure) => _offerDeparture = departure,
+              )
+            : _pickDeparture(
+                current: _rideDeparture,
+                onPicked: (departure) => _rideDeparture = departure,
+              ),
+        repeatWeekly: _offerRepeatWeekly,
+        onRepeatWeeklyChanged: isDriver
+            ? (value) => setState(() => _offerRepeatWeekly = value)
+            : null,
+        searchRadiusKm: _driverSearchRadiusKm,
+        onSearchRadiusChanged: isDriver
+            ? (value) => setState(() => _driverSearchRadiusKm = value)
+            : null,
+        isSubmitting:
+            isDriver && (_publishingOffer || ref.watch(offerRouteProvider)),
+        onSubmit: _reviewAndSubmit,
+        onEditOrigin: () => _goToStep(PassengerRideStep.selectPickup),
+        onEditDestination: () => _goToStep(PassengerRideStep.searchDestination),
+        onBack: () => _goToStep(PassengerRideStep.searchDestination),
+        onClose: _handleCancelFlow,
+        bottomSafeArea: bottomPadding,
+      ),
+      _ => RidePlaceStepSheet(
+        key: const ValueKey('ride_flow_origin'),
+        isOrigin: true,
+        isDriver: isDriver,
+        selectedAddress: _pickupAddress,
+        onPickOnMap: _handleStartDragMapPickup,
+        onPlaceChosen: _handlePickupChosen,
+        onContinue: _handleConfirmPickup,
+        onClose: _handleCancelFlow,
+        bottomSafeArea: bottomPadding,
+      ),
+    };
   }
 
   // --- VIEW ALTERNATIVA: DEMAIS ABAS (BUSCAR, CHAT, PERFIL) ---

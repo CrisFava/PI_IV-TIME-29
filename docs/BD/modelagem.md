@@ -356,7 +356,8 @@ Quando `active = false` (conta suspensa ou excluída):
   - A carona semanal continua ativa até o motorista cancelar. Cada semana em que alguém pede vaga gera uma viagem nova (uma por data), e as viagens concluídas vão para o histórico.
 - Documentos antigos, sem o campo, valem como `WEEKLY`. Se o app não envia `recurrence`, o backend também usa `WEEKLY`.
 - **Matching:** um trajeto `ONCE` com a data já passada sai da busca. Se o passageiro procura num dia específico, só aparecem motoristas que saem nesse dia.
-- **Duplicidade:** dois trajetos iguais em datas diferentes não são duplicados.
+- **Duplicidade:** é duplicado quando tudo bate: mesmo usuário, tipo, partida, destino, horário e recorrência, no mesmo dia. No `ONCE`, a mesma data; no `WEEKLY`, um dia da semana em comum (duas semanais que compartilham a segunda-feira dividiriam os passageiros da segunda). Vale entre os trajetos vivos (`ACTIVE` ou `PAUSED`), e a criação é recusada com `ROUTE_ALREADY_EXISTS` ("Você já tem uma carona igual a essa"). Se qualquer item mudar (outra data, nenhum dia em comum, outro horário, outra partida ou destino, ou outra recorrência), é outra carona.
+- **Caronas que se sobrepõem:** um motorista não pode ter duas caronas vivas (`OFFER`) no mesmo dia com as viagens se sobrepondo, seja qual for o endereço (ele não faz as duas, e os passageiros se dividiriam). Cada viagem vai de `departureTime` até `estimatedArrivalTime` (o tempo da rota do Google), com no mínimo 15 min. Uma pode sair exatamente quando a outra chega (ex.: a volta). "Mesmo dia" é a mesma data, um dia da semana em comum, ou a data de uma de um dia só caindo num dos dias da semanal. A criação é recusada com `ROUTE_ALREADY_EXISTS` ("Você já tem uma carona das 07:00 às 07:40 nesse dia..."). Pedidos de passageiro (`SEARCH`) não entram nessa regra.
 
 ---
 
@@ -472,6 +473,7 @@ Quando `active = false` (conta suspensa ou excluída):
 ### Chegada estimada
 
 A chegada não usa mais um valor fixo enviado pelo app: ela sai do tempo de carro calculado pela Routes API (`routes.duration`).
+- **Prévia no app:** antes de publicar ou pedir a carona, `GET /api/v1/routes/estimate?originLat=&originLng=&destinationLat=&destinationLng=` devolve a distância, o tempo de carro e o desenho do caminho, sem gravar nada. O app mostra o tempo na etapa de horário ("~25 min de viagem · 12,4 km").
 - **Trajeto:** `estimatedArrivalTime` = `departureTime` + o tempo da rota entre a origem e o destino. Sem o Google, o tempo é estimado pela distância, a 30 km/h de média na cidade.
 - **Viagem:** quando o itinerário é recalculado, `estimatedArrivalDateTime` = `departureDateTime` + o tempo da rota passando pelas paradas, porque buscar e deixar os passageiros leva mais tempo. Quando o último passageiro sai, volta a valer `directArrivalDateTime`, a chegada pela rota direta guardada na criação da viagem.
 

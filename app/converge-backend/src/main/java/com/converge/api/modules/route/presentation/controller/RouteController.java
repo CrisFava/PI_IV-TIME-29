@@ -4,11 +4,14 @@ package com.converge.api.modules.route.presentation.controller;
 
 import com.converge.api.modules.route.application.CreateRouteUseCase;
 import com.converge.api.modules.route.application.DeleteRouteUseCase;
+import com.converge.api.modules.route.application.EstimateRouteUseCase;
 import com.converge.api.modules.route.application.GetRouteUseCase;
 import com.converge.api.modules.route.application.ListMyRoutesUseCase;
 import com.converge.api.modules.route.application.UpdateRouteUseCase;
 import com.converge.api.modules.route.application.dto.CreateRouteCommand;
 import com.converge.api.modules.route.application.dto.CreateRouteRequestDTO;
+import com.converge.api.modules.route.application.dto.RouteEstimateDTO;
+import com.converge.api.modules.route.application.dto.RouteEstimateQuery;
 import com.converge.api.modules.route.application.dto.RouteRefCommand;
 import com.converge.api.modules.route.application.dto.RouteResponseDTO;
 import com.converge.api.modules.route.application.dto.UpdateRouteCommand;
@@ -30,6 +33,7 @@ import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.PutMapping;
 import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
+import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
 
 import java.util.List;
@@ -44,6 +48,7 @@ public class RouteController {
     private final GetRouteUseCase getRoute;
     private final UpdateRouteUseCase updateRoute;
     private final DeleteRouteUseCase deleteRoute;
+    private final EstimateRouteUseCase estimateRoute;
     private final UserUtils userUtils;
     private final RouteMapper mapper;
 
@@ -69,6 +74,21 @@ public class RouteController {
                 .toList();
 
         return ResponseEntity.ok(ApplicationResponse.success(routes));
+    }
+
+    // GET /api/v1/routes/estimate?originLat=..&originLng=..&destinationLat=..&destinationLng=..
+    // Tempo e distância de carro antes de publicar ou pedir a carona
+    @GetMapping("/estimate")
+    public ResponseEntity<ApplicationResponse<RouteEstimateDTO>> estimate(
+            @RequestParam double originLat,
+            @RequestParam double originLng,
+            @RequestParam double destinationLat,
+            @RequestParam double destinationLng
+    ) {
+        RouteEstimateDTO estimate = estimateRoute.execute(
+                new RouteEstimateQuery(originLat, originLng, destinationLat, destinationLng));
+
+        return ResponseEntity.ok(ApplicationResponse.success(estimate));
     }
 
     @GetMapping("/{routeId}")

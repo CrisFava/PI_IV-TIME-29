@@ -2,6 +2,7 @@
 
 import 'package:converge/core/network/api_error_code.dart';
 import 'package:converge/core/network/api_exception.dart';
+import 'package:converge/features/route/data/models/route_estimate_model.dart';
 import 'package:converge/features/route/data/models/create_route_request.dart';
 import 'package:converge/features/route/data/models/place_details_model.dart';
 import 'package:converge/features/route/data/models/place_suggestion_model.dart';
@@ -82,4 +83,12 @@ class FakeMatchingRouteRepository implements RouteRepository {
     }
     routes.removeWhere((route) => route.id == routeId);
   }
+
+  @override
+  Future<RouteEstimateModel> estimate({
+    required double originLatitude,
+    required double originLongitude,
+    required double destinationLatitude,
+    required double destinationLongitude,
+  }) async => const RouteEstimateModel(distanceKm: 10, durationMinutes: 20);
 }

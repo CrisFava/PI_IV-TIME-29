@@ -3,6 +3,7 @@
 import 'package:converge/features/route/data/models/create_route_request.dart';
 import 'package:converge/features/route/data/models/place_details_model.dart';
 import 'package:converge/features/route/data/models/place_suggestion_model.dart';
+import 'package:converge/features/route/data/models/route_estimate_model.dart';
 import 'package:converge/features/route/data/models/route_response_model.dart';
 import 'package:converge/features/route/data/repository/route_repository.dart';
 import 'package:converge/features/route/data/repository/route_repository_impl.dart';
@@ -60,6 +61,16 @@ class FakeRouteRepository implements RouteRepository {
 
   @override
   Future<void> deleteRoute(String routeId) {
+    throw UnimplementedError();
+  }
+
+  @override
+  Future<RouteEstimateModel> estimate({
+    required double originLatitude,
+    required double originLongitude,
+    required double destinationLatitude,
+    required double destinationLongitude,
+  }) {
     throw UnimplementedError();
   }
 }

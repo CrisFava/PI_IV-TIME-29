@@ -45,6 +45,12 @@ public class Route {
 
     private static final String TIME_PATTERN = "^([01]\\d|2[0-3]):[0-5]\\d$";
 
+    // Tempo mínimo considerado para uma viagem ao checar se duas caronas se sobrepõem
+    // (rota muito curta ou chegada estimada sem o Google)
+    public static final int MIN_TRIP_MINUTES = 15;
+
+    private static final int MINUTES_PER_DAY = 24 * 60;
+
     @Id
     @EqualsAndHashCode.Include
     private ObjectId id;
@@ -246,6 +252,52 @@ public class Route {
     // Carona de um dia só cuja data já passou: não acontece mais
     public boolean isPast(LocalDate today) {
         return getRecurrence() == RecurrenceType.ONCE && this.date != null && this.date.isBefore(today);
+    }
+
+    /**
+     * Acontece num mesmo dia que o outro trajeto: a mesma data (dois de um dia só),
+     * um dia da semana em comum (dois semanais) ou a data de um caindo num dos dias
+     * da semana do outro.
+     */
+    public boolean sharesDayWith(Route other) {
+        boolean thisOnce = getRecurrence() == RecurrenceType.ONCE && this.date != null;
+        boolean otherOnce = other.getRecurrence() == RecurrenceType.ONCE && other.date != null;
+
+        if (thisOnce && otherOnce) {
+            return this.date.equals(other.date);
+        }
+        if (thisOnce) {
+            return other.weekDays.contains(this.date.getDayOfWeek());
+        }
+        if (otherOnce) {
+            return this.weekDays.contains(other.date.getDayOfWeek());
+        }
+        return this.weekDays.stream().anyMatch(other.weekDays::contains);
+    }
+
+    /**
+     * As viagens se sobrepõem no horário: uma sai antes de a outra chegar. Cada uma
+     * vai da saída até a chegada estimada (tempo da rota do Google), com no mínimo
+     * MIN_TRIP_MINUTES. Uma pode sair exatamente quando a outra chega.
+     */
+    public boolean overlapsInTimeWith(Route other) {
+        int start = minuteOfDay(this.departureTime);
+        int otherStart = minuteOfDay(other.departureTime);
+        return start < otherStart + other.tripMinutes() && otherStart < start + tripMinutes();
+    }
+
+    // Duração da viagem pela chegada estimada (que pode passar da meia-noite)
+    public int tripMinutes() {
+        int minutes = minuteOfDay(this.estimatedArrivalTime) - minuteOfDay(this.departureTime);
+        if (minutes < 0) {
+            minutes += MINUTES_PER_DAY;
+        }
+        return Math.max(minutes, MIN_TRIP_MINUTES);
+    }
+
+    private static int minuteOfDay(String hhmm) {
+        LocalTime time = LocalTime.parse(hhmm);
+        return time.getHour() * 60 + time.getMinute();
     }
 
     // O trajeto acontece nesta data: no dia marcado, ou num dos dias da semana se ele se repete

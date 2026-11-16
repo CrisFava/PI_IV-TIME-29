@@ -9,6 +9,7 @@ import '../../../../core/network/dio_client.dart';
 import '../models/create_route_request.dart';
 import '../models/place_details_model.dart';
 import '../models/place_suggestion_model.dart';
+import '../models/route_estimate_model.dart';
 import '../models/route_response_model.dart';
 import 'route_endpoints.dart';
 import 'route_repository.dart';
@@ -116,6 +117,33 @@ class RouteRepositoryImpl implements RouteRepository {
   Future<void> deleteRoute(String routeId) async {
     try {
       await _dio.delete<dynamic>(RouteEndpoints.routeById(routeId));
+    } on DioException catch (e) {
+      throw e.toApiException();
+    }
+  }
+
+  @override
+  Future<RouteEstimateModel> estimate({
+    required double originLatitude,
+    required double originLongitude,
+    required double destinationLatitude,
+    required double destinationLongitude,
+  }) async {
+    try {
+      final response = await _dio.get<dynamic>(
+        RouteEndpoints.routeEstimate,
+        queryParameters: {
+          'originLat': originLatitude,
+          'originLng': originLongitude,
+          'destinationLat': destinationLatitude,
+          'destinationLng': destinationLongitude,
+        },
+      );
+      return unwrapApiResponse<RouteEstimateModel>(
+        response.data,
+        RouteEstimateModel.fromJson,
+        status: response.statusCode ?? 200,
+      );
     } on DioException catch (e) {
       throw e.toApiException();
     }
