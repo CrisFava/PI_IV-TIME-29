@@ -58,13 +58,6 @@ class RouteSchedule {
     );
   }
 
-  /// Trajeto frequente salvo pelo usuário: dias úteis, às 08:00.
-  static const RouteSchedule weekdayCommute = RouteSchedule(
-    departureTime: '08:00',
-    estimatedArrivalTime: '08:45',
-    weekDays: {'MONDAY', 'TUESDAY', 'WEDNESDAY', 'THURSDAY', 'FRIDAY'},
-  );
-
   static String _isoDate(DateTime day) =>
       '${day.year}-${day.month.toString().padLeft(2, '0')}-'
       '${day.day.toString().padLeft(2, '0')}';

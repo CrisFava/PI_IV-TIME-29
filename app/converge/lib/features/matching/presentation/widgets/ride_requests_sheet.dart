@@ -194,11 +194,12 @@ class _RideRequestsSheetState extends ConsumerState<RideRequestsSheet> {
     final rideActions = ref.watch(driverRideActionsProvider);
 
     return DraggableScrollableSheet(
-      initialChildSize: 0.46,
+      // Abre um pouco acima da metade, para o conteúdo não ficar atrás da navbar
+      initialChildSize: 0.52,
       minChildSize: 0.10,
       maxChildSize: 0.88,
       snap: true,
-      snapSizes: const [0.22, 0.46, 0.88],
+      snapSizes: const [0.22, 0.52, 0.88],
       builder: (context, scrollController) {
         return Container(
           decoration: BoxDecoration(

@@ -155,7 +155,6 @@ class HomeRealMapBackground extends StatefulWidget {
   // Modo arrasto de mapa estilo Uber com pino fixo
   final bool isDraggingPin;
   final CentralPinType centralPinType;
-  final String pinLabel;
   final ValueChanged<LatLng>? onCameraCenterChanged;
 
   final ValueChanged<MatchModel>? onDriverSelected;
@@ -183,7 +182,6 @@ class HomeRealMapBackground extends StatefulWidget {
     this.driverApproachRoutePoints,
     this.isDraggingPin = false,
     this.centralPinType = CentralPinType.destination,
-    this.pinLabel = '',
     this.onCameraCenterChanged,
     this.onDriverSelected,
     this.onMapTap,
@@ -203,7 +201,7 @@ class _HomeRealMapBackgroundState extends State<HomeRealMapBackground> {
 
   // Cache estático dos marcadores customizados desenhados no canvas
   static BitmapDescriptor? _originDotIcon;
-  static BitmapDescriptor? _checkeredDestIcon;
+  static BitmapDescriptor? _destinationDotIcon;
   static BitmapDescriptor? _blackCarIcon;
 
   @override
@@ -215,10 +213,10 @@ class _HomeRealMapBackgroundState extends State<HomeRealMapBackground> {
   Future<void> _initCustomMonochromeIcons() async {
     try {
       final origin = _originDotIcon ?? await _generateOriginDotDescriptor();
-      final dest = _checkeredDestIcon ?? await _generateCheckeredDestDescriptor();
+      final dest = _destinationDotIcon ?? await _generateDestinationDotDescriptor();
       final car = _blackCarIcon ?? await _generateBlackCarDescriptor();
       _originDotIcon = origin;
-      _checkeredDestIcon = dest;
+      _destinationDotIcon = dest;
       _blackCarIcon = car;
       if (mounted) {
         setState(() {});
@@ -236,6 +234,19 @@ class _HomeRealMapBackgroundState extends State<HomeRealMapBackground> {
   @override
   void didUpdateWidget(covariant HomeRealMapBackground oldWidget) {
     super.didUpdateWidget(oldWidget);
+    // Começou a escolher no mapa: a câmera vai até o ponto atual, para o
+    // endereço mostrado ser o que está sob o pino
+    if (widget.isDraggingPin &&
+        (!oldWidget.isDraggingPin ||
+            widget.centralPinType != oldWidget.centralPinType)) {
+      final target = widget.centralPinType == CentralPinType.destination
+          ? widget.destinationLocation
+          : widget.pickupLocation;
+      if (target != null) {
+        _mapController?.animateCamera(CameraUpdate.newLatLng(target));
+      }
+      return;
+    }
     if (widget.pickupLocation != oldWidget.pickupLocation ||
         widget.destinationLocation != oldWidget.destinationLocation ||
         widget.acceptedDriver != oldWidget.acceptedDriver ||
@@ -271,12 +282,8 @@ class _HomeRealMapBackgroundState extends State<HomeRealMapBackground> {
     if (widget.showTrajectory &&
         widget.pickupLocation != null &&
         widget.destinationLocation != null) {
+      // Sem abrir a janela do destino: partida e destino já estão no painel
       _animateToBounds([widget.pickupLocation!, widget.destinationLocation!]);
-      Future.delayed(const Duration(milliseconds: 500), () {
-        if (mounted) {
-          _mapController?.showMarkerInfoWindow(const MarkerId('destination_marker'));
-        }
-      });
       return;
     }
 
@@ -365,7 +372,7 @@ class _HomeRealMapBackgroundState extends State<HomeRealMapBackground> {
         Marker(
           markerId: const MarkerId('destination_marker'),
           position: widget.destinationLocation!,
-          icon: _checkeredDestIcon ??
+          icon: _destinationDotIcon ??
               BitmapDescriptor.defaultMarkerWithHue(BitmapDescriptor.hueRed),
           anchor: const Offset(0.5, 0.5),
           infoWindow: InfoWindow(
@@ -501,10 +508,6 @@ class _HomeRealMapBackgroundState extends State<HomeRealMapBackground> {
       );
     }
 
-    final currentDragAddress = widget.centralPinType == CentralPinType.destination
-        ? widget.destinationAddress
-        : widget.pickupAddress;
-
     return Stack(
       children: [
         Positioned.fill(
@@ -538,14 +541,24 @@ class _HomeRealMapBackgroundState extends State<HomeRealMapBackground> {
 
         // Pino Central Fixo estilo Uber:
         // Monocromático preto e NÃO totalmente filled (vazado no centro)
+        // A ponta do pino fica exatamente no centro da câmera: o mesmo padding do
+        // mapa e o pino subindo metade da própria altura
         if (widget.isDraggingPin)
           Positioned.fill(
             child: IgnorePointer(
-              child: Center(
-                child: _UberStyleCentralPin(
-                  type: widget.centralPinType,
-                  label: widget.pinLabel,
-                  address: currentDragAddress,
+              child: Padding(
+                padding: EdgeInsets.only(bottom: widget.bottomPadding),
+                child: Center(
+                  child: FractionalTranslation(
+                    translation: const Offset(0, -0.5),
+                    child: _UberStyleCentralPin(
+                      type: widget.centralPinType,
+                      address: widget.centralPinType ==
+                              CentralPinType.destination
+                          ? widget.destinationAddress
+                          : widget.pickupAddress,
+                    ),
+                  ),
                 ),
               ),
             ),
@@ -630,65 +643,27 @@ class _HomeRealMapBackgroundState extends State<HomeRealMapBackground> {
     return BitmapDescriptor.bytes(bytes!.buffer.asUint8List());
   }
 
-  /// Bolinha quadriculada remetendo à "chegada"
-  static Future<BitmapDescriptor> _generateCheckeredDestDescriptor() async {
+  /// Destino: o inverso da partida (bolinha branca com borda e centro pretos)
+  static Future<BitmapDescriptor> _generateDestinationDotDescriptor() async {
     const size = 64.0;
     final recorder = ui.PictureRecorder();
     final canvas = Canvas(recorder, const Rect.fromLTWH(0, 0, size, size));
     const center = Offset(size / 2, size / 2);
-    const radius = 16.0;
 
     // Sombra suave
     final shadowPaint = Paint()
-      ..color = Colors.black.withValues(alpha: 0.28)
+      ..color = AppColors.primary.withValues(alpha: 0.28)
       ..maskFilter = const MaskFilter.blur(BlurStyle.normal, 4);
-    canvas.drawCircle(center + const Offset(0, 2), radius + 2, shadowPaint);
+    canvas.drawCircle(center + const Offset(0, 2), 16, shadowPaint);
 
-    // Halo externo branco
-    final haloPaint = Paint()
-      ..color = Colors.white
-      ..style = PaintingStyle.fill;
-    canvas.drawCircle(center, radius + 2, haloPaint);
+    // Anel preto
+    canvas.drawCircle(center, 16, Paint()..color = AppColors.primary);
 
-    // Clip circular para o padrão quadriculado
-    canvas.save();
-    final clipPath = Path()..addOval(Rect.fromCircle(center: center, radius: radius));
-    canvas.clipPath(clipPath);
+    // Miolo branco
+    canvas.drawCircle(center, 11, Paint()..color = AppColors.cardBackground);
 
-    // Base branca
-    final whitePaint = Paint()..color = Colors.white;
-    canvas.drawRect(Rect.fromCircle(center: center, radius: radius), whitePaint);
-
-    // Grade quadriculada 4x4 (preto e branco)
-    final blackPaint = Paint()..color = AppColors.primary;
-    const gridSize = 4;
-    final cellSize = (radius * 2) / gridSize;
-    final startX = center.dx - radius;
-    final startY = center.dy - radius;
-
-    for (int row = 0; row < gridSize; row++) {
-      for (int col = 0; col < gridSize; col++) {
-        if ((row + col) % 2 == 0) {
-          canvas.drawRect(
-            Rect.fromLTWH(
-              startX + (col * cellSize),
-              startY + (row * cellSize),
-              cellSize,
-              cellSize,
-            ),
-            blackPaint,
-          );
-        }
-      }
-    }
-    canvas.restore();
-
-    // Borda preta de acabamento
-    final borderPaint = Paint()
-      ..color = AppColors.primary
-      ..style = PaintingStyle.stroke
-      ..strokeWidth = 2.0;
-    canvas.drawCircle(center, radius, borderPaint);
+    // Centro preto
+    canvas.drawCircle(center, 5, Paint()..color = AppColors.primary);
 
     final picture = recorder.endRecording();
     final image = await picture.toImage(size.toInt(), size.toInt());
@@ -750,74 +725,91 @@ class _HomeRealMapBackgroundState extends State<HomeRealMapBackground> {
 /// ============================================================================
 /// PINO CENTRAL FIXO: MONOCROMÁTICO PRETO NÃO TOTALMENTE FILLED
 /// ============================================================================
+/// Pino fixo do centro com o balão do endereço em cima. A ponta do pino é a
+/// base do widget (o mapa sobe o widget metade da altura para ela ficar no centro).
 class _UberStyleCentralPin extends StatelessWidget {
   final CentralPinType type;
-  final String label;
   final String address;
 
-  const _UberStyleCentralPin({
-    required this.type,
-    required this.label,
-    this.address = '',
-  });
+  const _UberStyleCentralPin({required this.type, this.address = ''});
 
   @override
   Widget build(BuildContext context) {
     final isDest = type == CentralPinType.destination;
-    final typeName = isDest ? 'Destino' : 'Origem';
-    final displayText = address.isNotEmpty
-        ? '$typeName: $address'
-        : (label.isNotEmpty ? label : typeName);
+    final typeName = isDest ? 'Destino' : 'Partida';
+    final displayText = address.isNotEmpty ? '$typeName: $address' : typeName;
 
-    return Transform.translate(
-      offset: const Offset(0, -28),
-      child: Column(
-        mainAxisSize: MainAxisSize.min,
-        children: [
-          // Balão monocromático elegante acima do pinpoint
-          Container(
-            constraints: const BoxConstraints(maxWidth: 270),
-            padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 7),
-            decoration: BoxDecoration(
-              color: AppColors.dockBackground,
-              borderRadius: BorderRadius.circular(16),
-              border: Border.all(color: AppColors.borderSubtle, width: 0.8),
-              boxShadow: [
-                BoxShadow(
-                  color: Colors.black.withValues(alpha: 0.30),
-                  blurRadius: 14,
-                  offset: const Offset(0, 4),
-                ),
-              ],
-            ),
-            child: Row(
-              mainAxisSize: MainAxisSize.min,
-              children: [
-                if (isDest)
-                  const _MiniCheckeredIcon()
-                else
-                  const _MiniOriginIcon(),
-                const SizedBox(width: 8),
-                Flexible(
-                  child: Text(
-                    displayText,
-                    style: const TextStyle(
-                      color: AppColors.textLight,
-                      fontSize: 12,
-                      fontWeight: FontWeight.w700,
-                    ),
-                    maxLines: 1,
-                    overflow: TextOverflow.ellipsis,
-                  ),
-                ),
-              ],
-            ),
+    return Column(
+      mainAxisSize: MainAxisSize.min,
+      children: [
+        // Balão monocromático acima do pino
+        Container(
+          constraints: const BoxConstraints(maxWidth: 270),
+          padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 7),
+          decoration: BoxDecoration(
+            color: AppColors.dockBackground,
+            borderRadius: BorderRadius.circular(16),
+            border: Border.all(color: AppColors.borderSubtle, width: 0.8),
+            boxShadow: [
+              BoxShadow(
+                color: AppColors.primary.withValues(alpha: 0.30),
+                blurRadius: 14,
+                offset: const Offset(0, 4),
+              ),
+            ],
           ),
-          const SizedBox(height: 6),
+          child: Row(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              _MiniPlaceIcon(isDestination: isDest),
+              const SizedBox(width: 8),
+              Flexible(
+                child: Text(
+                  displayText,
+                  style: const TextStyle(
+                    color: AppColors.textLight,
+                    fontSize: 12,
+                    fontWeight: FontWeight.w700,
+                  ),
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                ),
+              ),
+            ],
+          ),
+        ),
+        const SizedBox(height: 6),
+        const _MonochromeHollowPin(size: 46),
+      ],
+    );
+  }
+}
 
-          // Pino monocromático preto não totalmente filled (vazado no centro)
-          const _MonochromeHollowPin(size: 46),
-        ],
+/// Ícone pequeno do balão, sobre fundo escuro: partida (bolinha clara com centro
+/// escuro) ou destino (anel claro com centro claro), como os marcadores do mapa.
+class _MiniPlaceIcon extends StatelessWidget {
+  final bool isDestination;
+
+  const _MiniPlaceIcon({required this.isDestination});
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      width: 14,
+      height: 14,
+      decoration: BoxDecoration(
+        color: isDestination ? AppColors.dockBackground : AppColors.textLight,
+        shape: BoxShape.circle,
+        border: Border.all(color: AppColors.textLight, width: 2),
+      ),
+      alignment: Alignment.center,
+      child: Container(
+        width: isDestination ? 4 : 7,
+        height: isDestination ? 4 : 7,
+        decoration: BoxDecoration(
+          color: isDestination ? AppColors.textLight : AppColors.primary,
+          shape: BoxShape.circle,
+        ),
       ),
     );
   }
@@ -908,67 +900,3 @@ class _HollowPinPainter extends CustomPainter {
   bool shouldRepaint(covariant CustomPainter oldDelegate) => false;
 }
 
-/// Mini bolinha quadriculada para o balão de destino
-class _MiniCheckeredIcon extends StatelessWidget {
-  const _MiniCheckeredIcon();
-
-  @override
-  Widget build(BuildContext context) {
-    return Container(
-      width: 14,
-      height: 14,
-      decoration: BoxDecoration(
-        shape: BoxShape.circle,
-        border: Border.all(color: Colors.white, width: 1.2),
-      ),
-      clipBehavior: Clip.antiAlias,
-      child: Column(
-        children: [
-          Expanded(
-            child: Row(
-              children: [
-                Expanded(child: Container(color: Colors.white)),
-                Expanded(child: Container(color: AppColors.primary)),
-              ],
-            ),
-          ),
-          Expanded(
-            child: Row(
-              children: [
-                Expanded(child: Container(color: AppColors.primary)),
-                Expanded(child: Container(color: Colors.white)),
-              ],
-            ),
-          ),
-        ],
-      ),
-    );
-  }
-}
-
-/// Mini bolinha preta opaca para o balão de origem
-class _MiniOriginIcon extends StatelessWidget {
-  const _MiniOriginIcon();
-
-  @override
-  Widget build(BuildContext context) {
-    return Container(
-      width: 14,
-      height: 14,
-      decoration: BoxDecoration(
-        color: Colors.white,
-        shape: BoxShape.circle,
-        border: Border.all(color: Colors.white, width: 1),
-      ),
-      alignment: Alignment.center,
-      child: Container(
-        width: 8,
-        height: 8,
-        decoration: const BoxDecoration(
-          color: AppColors.primary,
-          shape: BoxShape.circle,
-        ),
-      ),
-    );
-  }
-}

@@ -6,8 +6,11 @@ import com.converge.api.modules.route.application.dto.CreateRouteCommand;
 import com.converge.api.modules.route.application.dto.CreateRouteRequestDTO;
 import com.converge.api.modules.route.application.dto.PlaceRequestDTO;
 import com.converge.api.modules.route.application.mapper.RouteMapper;
+import com.converge.api.modules.route.domain.enums.RouteStatus;
 import com.converge.api.modules.route.domain.enums.RouteType;
 import com.converge.api.modules.route.domain.model.Route;
+import com.converge.api.modules.route.domain.model.subtypes.Coordinates;
+import com.converge.api.modules.route.domain.model.subtypes.Place;
 import com.converge.api.modules.route.domain.repository.RouteRepository;
 import com.converge.api.shared.presentation.exception.ApplicationException;
 import com.converge.api.shared.presentation.exception.ErrorCode;
@@ -19,6 +22,7 @@ import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 
 import java.time.DayOfWeek;
+import java.util.List;
 import java.util.Set;
 
 import static org.assertj.core.api.Assertions.assertThat;
@@ -66,7 +70,7 @@ class CreateRouteUseCaseTest {
 
     private void noDuplicate() {
         when(routeRepository.existsLiveDuplicate(
-                anyString(), any(), anyString(), anyString(), anyString(), any(), anyCollection()
+                anyString(), any(), anyString(), anyString(), anyString(), any(), anyCollection(), anyCollection()
         )).thenReturn(false);
     }
 
@@ -100,15 +104,43 @@ class CreateRouteUseCaseTest {
                 eq("Rod. Dom Pedro I, km 136"),
                 eq("07:00"),
                 isNull(),
+                eq(Set.of(DayOfWeek.MONDAY, DayOfWeek.FRIDAY)),
                 anyCollection()
         );
+    }
+
+    @Test
+    @DisplayName("Motorista não cria uma carona que se sobrepõe a outra no mesmo dia")
+    void shouldRejectOfferOverlappingAnother() {
+        noDuplicate();
+        when(routeRepository.save(any(Route.class))).thenAnswer(invocation -> invocation.getArgument(0));
+        Place elsewhere = Place.of("Outro endereço", null, "Campinas", new Coordinates(-22.90, -47.06));
+
+        // A nova vai das 07:00 às 07:40. Uma das 06:30 às 07:10 ainda está em andamento
+        Route stillDriving = new Route("user-123", "vehicle-456", RouteType.OFFER, elsewhere, elsewhere,
+                "06:30", "07:10", Set.of(DayOfWeek.MONDAY), 2.0, 3);
+        when(routeRepository.findByUserIdAndStatusNot("user-123", RouteStatus.INACTIVE))
+                .thenReturn(List.of(stillDriving));
+
+        ApplicationException ex = assertThrows(ApplicationException.class,
+                () -> createRouteUseCase.execute(offerCommand()));
+        assertThat(ex.getError().code()).isEqualTo(ErrorCode.ROUTE_ALREADY_EXISTS);
+        assertThat(ex.getError().message()).contains("06:30").contains("07:10");
+
+        // Uma que sai às 07:40, quando a nova chega, não se sobrepõe (ex.: a volta)
+        Route afterArrival = new Route("user-123", "vehicle-456", RouteType.OFFER, elsewhere, elsewhere,
+                "07:40", "08:20", Set.of(DayOfWeek.MONDAY), 2.0, 3);
+        when(routeRepository.findByUserIdAndStatusNot("user-123", RouteStatus.INACTIVE))
+                .thenReturn(List.of(afterArrival));
+
+        assertThat(createRouteUseCase.execute(offerCommand()).getDepartureTime()).isEqualTo("07:00");
     }
 
     @Test
     @DisplayName("Deve lançar ROUTE_ALREADY_EXISTS e não salvar quando já houver trajeto igual ativo")
     void shouldRejectDuplicatedRoute() {
         when(routeRepository.existsLiveDuplicate(
-                anyString(), any(), anyString(), anyString(), anyString(), any(), anyCollection()
+                anyString(), any(), anyString(), anyString(), anyString(), any(), anyCollection(), anyCollection()
         )).thenReturn(true);
 
         ApplicationException ex = assertThrows(

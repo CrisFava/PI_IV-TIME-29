@@ -42,52 +42,47 @@ class VehicleListTile extends StatelessWidget {
             borderRadius: BorderRadius.circular(16),
             border: Border.all(color: AppColors.borderMedium),
           ),
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.stretch,
+          // Nome (e modelo) com "Mais informações" embaixo; a placa à direita,
+          // no alto, na linha do nome
+          child: Row(
+            crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              Row(
-                children: [
-                  Expanded(
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        Text(
-                          vehicle.displayName,
-                          style: const TextStyle(
-                            fontSize: 15,
-                            fontWeight: FontWeight.w800,
-                            color: AppColors.textPrimary,
-                          ),
-                        ),
-                        if (vehicle.displayName != vehicle.model)
-                          Text(
-                            vehicle.model,
-                            style: const TextStyle(
-                              fontSize: 12.5,
-                              color: AppColors.textDark,
-                            ),
-                          ),
-                      ],
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      vehicle.displayName,
+                      style: const TextStyle(
+                        fontSize: 15,
+                        fontWeight: FontWeight.w800,
+                        color: AppColors.textPrimary,
+                      ),
                     ),
-                  ),
-                  const SizedBox(width: 10),
-                  LicensePlateBadge(plate: vehicle.formattedPlate),
-                ],
-              ),
-              const SizedBox(height: 6),
-              Align(
-                alignment: Alignment.centerRight,
-                child: isDeleting
-                    ? const SizedBox(
-                        width: 20,
-                        height: 20,
-                        child: CircularProgressIndicator(
-                          strokeWidth: 2,
-                          color: AppColors.error,
+                    if (vehicle.displayName != vehicle.model)
+                      Text(
+                        vehicle.model,
+                        style: const TextStyle(
+                          fontSize: 12.5,
+                          color: AppColors.textDark,
                         ),
-                      )
-                    : const MoreInfoHint(),
+                      ),
+                    const SizedBox(height: 6),
+                    isDeleting
+                        ? const SizedBox(
+                            width: 20,
+                            height: 20,
+                            child: CircularProgressIndicator(
+                              strokeWidth: 2,
+                              color: AppColors.error,
+                            ),
+                          )
+                        : const MoreInfoHint(),
+                  ],
+                ),
               ),
+              const SizedBox(width: 10),
+              LicensePlateBadge(plate: vehicle.formattedPlate),
             ],
           ),
         ),

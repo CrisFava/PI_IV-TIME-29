@@ -1,34 +1,34 @@
 // Autor: Allan Giovanni Matias Paes - RA 25008211
 
-/// Passos do fluxo de solicitação de carona pelo passageiro (Uber-like).
+/// Etapas de criar ou pedir carona. Partida, destino e horário (até
+/// [routeConfirmation]) valem para o motorista e o passageiro; as seguintes,
+/// só para o pedido do passageiro.
 enum PassengerRideStep {
   /// Estado de repouso: mapa limpo, sem motoristas, botão "Pedir carona".
   idle,
 
-  /// Passo 0: Escolha inicial antes do embarque (Usar uma rota salva ou Selecionar no mapa).
-  chooseRouteOption,
-
-  /// Passo 1: Seleção do Ponto de Embarque (Origem).
+  /// Etapa 1: de onde sai (busca ou "Selecionar no mapa").
   selectPickup,
 
-  /// Passo 2: Arrasto do mapa estilo Uber com pino fixo para definir o Embarque.
+  /// Etapa 1 no mapa: pino fixo no centro, arrastando o mapa até a partida.
   dragMapPickup,
 
-  /// Passo 3: Busca/Seleção do Ponto de Desembarque (Destino).
+  /// Etapa 2: para onde vai (o mesmo layout da partida).
   searchDestination,
 
-  /// Passo 4: Arrasto do mapa estilo Uber com pino fixo para definir o Desembarque.
+  /// Etapa 2 no mapa: pino fixo no centro, arrastando o mapa até o destino.
   dragMapDestination,
 
-  /// Passo 5: Confirmação prévia com o trajeto desenhado no mapa antes de confirmar.
+  /// Etapa 3: dia, horário e o tempo estimado; o motorista também escolhe se
+  /// repete toda semana e o raio de busca.
   routeConfirmation,
 
-  /// Passo 6: Lista dos motoristas compatíveis com o trajeto (matching).
+  /// Passageiro: Lista dos motoristas compatíveis com o trajeto (matching).
   driverList,
 
-  /// Passo 7: Pedido de vaga enviado; aguardando o motorista aceitar ou recusar.
+  /// Passageiro: Pedido de vaga enviado; aguardando o motorista aceitar ou recusar.
   waitingDriver,
 
-  /// Passo 8: Motorista aceitou! Exibe o ponto de partida dele e o atalho para o chat.
+  /// Passageiro: Motorista aceitou! Exibe o ponto de partida dele e o atalho para o chat.
   driverAccepted,
 }

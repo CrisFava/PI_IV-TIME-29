@@ -3,6 +3,7 @@
 import '../models/create_route_request.dart';
 import '../models/place_details_model.dart';
 import '../models/place_suggestion_model.dart';
+import '../models/route_estimate_model.dart';
 import '../models/route_response_model.dart';
 
 abstract class RouteRepository {
@@ -29,4 +30,12 @@ abstract class RouteRepository {
 
   /// Remove um trajeto pelo seu [routeId].
   Future<void> deleteRoute(String routeId);
+
+  /// Tempo e distância de carro entre a partida e o destino, sem criar o trajeto.
+  Future<RouteEstimateModel> estimate({
+    required double originLatitude,
+    required double originLongitude,
+    required double destinationLatitude,
+    required double destinationLongitude,
+  });
 }

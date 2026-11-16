@@ -1,5 +1,6 @@
 // Autor: Gustavo Alves de Siqueira Costa - RA 25001650
 
+import 'package:converge/core/network/api_exception.dart';
 import 'package:converge/features/route/data/models/create_route_request.dart';
 import 'package:converge/features/route/data/models/route_place_model.dart';
 import 'package:converge/features/route/data/repository/route_repository_impl.dart';
@@ -47,11 +48,18 @@ void main() {
     container.listen(offerRouteProvider, (_, _) {});
   });
 
-  test('a mesma carona já publicada (409): usa a que existe', () async {
-    routes.conflictOnCreate = true;
+  test(
+    'a mesma carona já publicada (409): o erro chega ao motorista',
+    () async {
+      routes.conflictOnCreate = true;
 
-    final saved = await controller().publish(offerAt('07:30', {'MONDAY'}));
-
-    expect(saved.id, 'saved-elsewhere');
-  });
+      await expectLater(
+        controller().publish(offerAt('07:30', {'MONDAY'})),
+        throwsA(
+          isA<ApiException>().having((e) => e.isConflict, 'isConflict', true),
+        ),
+      );
+      expect(container.read(offerRouteProvider), isFalse);
+    },
+  );
 }
