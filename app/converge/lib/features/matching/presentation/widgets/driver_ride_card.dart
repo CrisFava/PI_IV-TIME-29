@@ -7,12 +7,12 @@ import '../../../../core/config/styles.dart';
 import '../../../ride/data/models/participant_status.dart';
 import '../../../ride/data/models/ride_model.dart';
 import '../../../ride/data/models/ride_status.dart';
-import '../../../ride/presentation/widgets/ride_place_line.dart';
 import 'driver_ride_action_button.dart';
 import 'match_date_label.dart';
 
-/// Uma viagem nos detalhes da carona: quando sai, de onde para onde e quem vai
-/// (com o atalho para o chat). "Iniciar trajeto" só com passageiro confirmado.
+/// Uma viagem nos detalhes da carona: quando sai e quem vai (com o atalho para
+/// o chat). O trajeto já aparece em cima, nos detalhes.
+/// "Iniciar trajeto" só com passageiro confirmado.
 class DriverRideCard extends StatelessWidget {
   final RideModel ride;
   final bool isBusy;
@@ -83,16 +83,7 @@ class DriverRideCard extends StatelessWidget {
               ),
             ],
           ),
-          const SizedBox(height: 8),
-          RidePlaceLine(
-            icon: Icons.trip_origin_rounded,
-            text: ride.origin.address,
-          ),
           const SizedBox(height: 4),
-          RidePlaceLine(
-            icon: Icons.flag_rounded,
-            text: ride.destination.address,
-          ),
           for (final passenger in confirmed)
             Padding(
               padding: const EdgeInsets.only(top: 6),

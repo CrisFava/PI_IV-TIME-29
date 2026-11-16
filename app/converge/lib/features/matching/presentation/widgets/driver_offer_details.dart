@@ -6,6 +6,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../../../../core/config/styles.dart';
 import '../../../../core/widgets/details_danger_button.dart';
 import '../../../../core/widgets/details_section.dart';
+import '../../../../core/widgets/details_stat_tile.dart';
 import '../../../ride/presentation/widgets/ride_place_line.dart';
 import '../../../route/data/models/route_recurrence.dart';
 import '../../data/models/driver_offer.dart';
@@ -77,6 +78,29 @@ class _DriverOfferDetailsState extends ConsumerState<DriverOfferDetails> {
 
     final route = offer.route;
     final firstRide = offer.rides.isEmpty ? null : offer.rides.first;
+    final distanceKm = route?.routeDistanceKm;
+    final detourKm = route?.maxDetourKm;
+    final seats = route?.totalSeats;
+    final stats = [
+      if (distanceKm != null)
+        DetailsStatTile(
+          icon: Icons.route_rounded,
+          value: '${_km(distanceKm)} km',
+          label: 'Percurso',
+        ),
+      if (detourKm != null)
+        DetailsStatTile(
+          icon: Icons.radar_rounded,
+          value: '${_km(detourKm)} km',
+          label: 'Raio de busca',
+        ),
+      if (seats != null)
+        DetailsStatTile(
+          icon: Icons.event_seat_rounded,
+          value: '$seats',
+          label: seats == 1 ? 'Vaga' : 'Vagas',
+        ),
+    ];
 
     return Column(
       crossAxisAlignment: CrossAxisAlignment.stretch,
@@ -96,46 +120,39 @@ class _DriverOfferDetailsState extends ConsumerState<DriverOfferDetails> {
           ),
         ],
         DetailsSection(
-          title: 'Trajeto',
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.stretch,
-            children: [
-              RidePlaceLine(
-                icon: Icons.trip_origin_rounded,
-                text: route?.origin.address ?? firstRide?.origin.address ?? '',
-                maxLines: null,
-                emphasized: true,
-              ),
-              const SizedBox(height: 6),
-              RidePlaceLine(
-                icon: Icons.flag_rounded,
-                text:
-                    route?.destination.address ??
-                    firstRide?.destination.address ??
-                    '',
-                maxLines: null,
-                emphasized: true,
-              ),
-              if (route?.routeDistanceKm != null)
-                _info(
-                  Icons.route_rounded,
-                  '${_km(route!.routeDistanceKm!)} km de percurso',
-                ),
-              if (route?.maxDetourKm != null)
-                _info(
-                  Icons.radar_rounded,
-                  'Passageiros a até ${_km(route!.maxDetourKm!)} km do caminho',
-                ),
-              if (route?.totalSeats != null)
-                _info(
-                  Icons.event_seat_rounded,
-                  route!.totalSeats == 1
-                      ? '1 vaga'
-                      : '${route.totalSeats} vagas',
-                ),
-            ],
+          title: 'Saindo de',
+          child: RidePlaceLine(
+            icon: Icons.trip_origin_rounded,
+            text: route?.origin.address ?? firstRide?.origin.address ?? '',
+            maxLines: null,
+            emphasized: true,
           ),
         ),
+        DetailsSection(
+          title: 'Indo para',
+          child: RidePlaceLine(
+            icon: Icons.flag_rounded,
+            text:
+                route?.destination.address ??
+                firstRide?.destination.address ??
+                '',
+            maxLines: null,
+            emphasized: true,
+          ),
+        ),
+        if (stats.isNotEmpty)
+          Padding(
+            padding: const EdgeInsets.only(top: 12),
+            child: Row(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                for (var i = 0; i < stats.length; i++) ...[
+                  if (i > 0) const SizedBox(width: 8),
+                  Expanded(child: stats[i]),
+                ],
+              ],
+            ),
+          ),
         DetailsSection(
           title: 'Viagens',
           child: offer.rides.isEmpty
@@ -171,24 +188,4 @@ class _DriverOfferDetailsState extends ConsumerState<DriverOfferDetails> {
       ],
     );
   }
-
-  Widget _info(IconData icon, String text) => Padding(
-    padding: const EdgeInsets.only(top: 10),
-    child: Row(
-      children: [
-        Icon(icon, size: 17, color: AppColors.textPrimary),
-        const SizedBox(width: 8),
-        Expanded(
-          child: Text(
-            text,
-            style: const TextStyle(
-              fontSize: 13.5,
-              fontWeight: FontWeight.w600,
-              color: AppColors.textPrimary,
-            ),
-          ),
-        ),
-      ],
-    ),
-  );
 }
