@@ -35,6 +35,26 @@ class IndicatorRepositoryImpl implements IndicatorRepository {
       );
 
   @override
+  Future<List<UserIndicatorModel>> mySeries(
+    IndicatorPeriod period, {
+    int limit = 6,
+  }) async {
+    try {
+      final response = await _dio.get<dynamic>(
+        IndicatorEndpoints.mySeries,
+        queryParameters: {'period': period.apiValue, 'limit': limit},
+      );
+      return unwrapApiListResponse<UserIndicatorModel>(
+        response.data,
+        UserIndicatorModel.fromJson,
+        status: response.statusCode ?? 200,
+      );
+    } on DioException catch (e) {
+      throw e.toApiException();
+    }
+  }
+
+  @override
   Future<List<MethodologyItem>> methodology() async {
     try {
       final response = await _dio.get<dynamic>(IndicatorEndpoints.methodology);

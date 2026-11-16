@@ -10,6 +10,7 @@ import '../../data/models/indicator_period.dart';
 import '../../data/models/user_indicator_model.dart';
 import '../../state/indicator_providers.dart';
 import '../widgets/co2_highlight_card.dart';
+import '../widgets/indicator_chart_card.dart';
 import '../widgets/indicator_format.dart';
 import '../widgets/indicator_period_selector.dart';
 import '../widgets/indicator_stat_card.dart';
@@ -49,6 +50,7 @@ class _IndicatorsPageState extends ConsumerState<IndicatorsPage> {
         onRefresh: () async {
           ref.invalidate(myIndicatorsProvider(_period));
           ref.invalidate(platformIndicatorsProvider(_period));
+          ref.invalidate(myIndicatorSeriesProvider);
           await ref.read(myIndicatorsProvider(_period).future);
         },
         child: ListView(
@@ -192,6 +194,12 @@ class _IndicatorsPageState extends ConsumerState<IndicatorsPage> {
       ],
     ),
     const SizedBox(height: 10),
+    IndicatorChartCard(
+      title: 'Viagens por semana',
+      period: IndicatorPeriod.weekly,
+      valueOf: (point) => point.totalRides.toDouble(),
+    ),
+    const SizedBox(height: 10),
     PlatformImpactCard(period: _period),
   ];
 
@@ -219,6 +227,13 @@ class _IndicatorsPageState extends ConsumerState<IndicatorsPage> {
           ),
         ),
       ],
+    ),
+    const SizedBox(height: 10),
+    IndicatorChartCard(
+      title: 'CO₂ evitado por mês (kg)',
+      period: IndicatorPeriod.monthly,
+      asLine: true,
+      valueOf: (point) => point.co2AvoidedKg,
     ),
     const SizedBox(height: 6),
     TextButton.icon(

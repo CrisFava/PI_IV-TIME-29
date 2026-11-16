@@ -38,6 +38,23 @@ class _FakeIndicatorRepository implements IndicatorRepository {
   );
 
   @override
+  Future<List<UserIndicatorModel>> mySeries(
+    IndicatorPeriod period, {
+    int limit = 6,
+  }) async => [
+    UserIndicatorModel(
+      reference: period == IndicatorPeriod.weekly ? '2026-W46' : '2026-10',
+      totalRides: 3,
+      ridesAsDriver: 2,
+      ridesAsPassenger: 1,
+      sharedKm: 30,
+      carsAvoided: 1,
+      co2AvoidedKg: 4,
+      equivalentTrees: 0.2,
+    ),
+  ];
+
+  @override
   Future<List<MethodologyItem>> methodology() async => const [];
 }
 
@@ -45,7 +62,11 @@ void main() {
   testWidgets(
     'mobilidade e ambiental mostram os números do período escolhido',
     (tester) async {
-      final repository = _FakeIndicatorRepository();
+      // Tela alta: os cartões e os gráficos cabem sem rolar
+    tester.view.physicalSize = const Size(800, 2400);
+    tester.view.devicePixelRatio = 1;
+    addTearDown(tester.view.reset);
+    final repository = _FakeIndicatorRepository();
       await tester.pumpWidget(
         ProviderScope(
           overrides: [
@@ -65,12 +86,14 @@ void main() {
       expect(find.text('1.240 km'), findsOneWidget);
       expect(find.text('34'), findsOneWidget);
       expect(find.text('5.400 caronas • 214 pessoas'), findsOneWidget);
+      expect(find.text('S46'), findsOneWidget);
 
       // Ambiental: CO₂ em destaque e as árvores
       await tester.tap(find.byKey(const ValueKey('indicators_tab_Ambiental')));
       await tester.pumpAndSettle();
       expect(find.text('186 kg'), findsOneWidget);
       expect(find.text('9 árvores em um ano'), findsOneWidget);
+      expect(find.text('out'), findsOneWidget);
 
       // Trocar o período busca de novo
       await tester.tap(find.byKey(const ValueKey('period_ALL_TIME')));

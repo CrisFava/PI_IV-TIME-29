@@ -2,6 +2,7 @@
 
 package com.converge.api.modules.indicator.presentation.controller;
 
+import com.converge.api.modules.indicator.application.GetUserIndicatorSeriesUseCase;
 import com.converge.api.modules.indicator.application.GetPlatformIndicatorsUseCase;
 import com.converge.api.modules.indicator.application.GetUserIndicatorsUseCase;
 import com.converge.api.modules.indicator.application.dto.PlatformIndicatorResponseDTO;
@@ -51,13 +52,16 @@ class IndicatorControllerTest {
     private GetUserIndicatorsUseCase getUserIndicators;
 
     @Mock
+    private GetUserIndicatorSeriesUseCase getUserIndicatorSeries;
+
+    @Mock
     private UserUtils userUtils;
 
     private MockMvc mockMvc;
 
     @BeforeEach
     void setUp() {
-        IndicatorController controller = new IndicatorController(getPlatformIndicators, getUserIndicators, userUtils);
+        IndicatorController controller = new IndicatorController(getPlatformIndicators, getUserIndicators, getUserIndicatorSeries, userUtils);
         // Simula o usuário logado, como o filtro do Firebase faria.
         HandlerMethodArgumentResolver authenticatedUser = new HandlerMethodArgumentResolver() {
             @Override

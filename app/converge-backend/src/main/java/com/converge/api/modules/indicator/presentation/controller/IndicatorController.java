@@ -2,6 +2,10 @@
 
 package com.converge.api.modules.indicator.presentation.controller;
 
+import java.util.List;
+import java.time.ZoneId;
+import java.time.LocalDate;
+import com.converge.api.modules.indicator.application.GetUserIndicatorSeriesUseCase;
 import com.converge.api.modules.indicator.application.GetPlatformIndicatorsUseCase;
 import com.converge.api.modules.indicator.application.GetUserIndicatorsUseCase;
 import com.converge.api.modules.indicator.application.dto.PlatformIndicatorResponseDTO;
@@ -27,8 +31,12 @@ import java.util.Map;
 @RequiredArgsConstructor
 public class IndicatorController {
 
+    // Fuso oficial da aplicação: é nele que "hoje" define a semana e o mês atuais
+    private static final ZoneId APP_ZONE = ZoneId.of("America/Sao_Paulo");
+
     private final GetPlatformIndicatorsUseCase getPlatformIndicators;
     private final GetUserIndicatorsUseCase getUserIndicators;
+    private final GetUserIndicatorSeriesUseCase getUserIndicatorSeries;
     private final UserUtils userUtils;
 
     // Ex.: GET /api/v1/indicators/platform?period=MONTHLY&reference=2025-05
@@ -54,6 +62,21 @@ public class IndicatorController {
         String userId = userUtils.getCurrentUser(principal).getId().toHexString();
         UserIndicatorResponseDTO data = getUserIndicators.execute(
                 new GetUserIndicatorsUseCase.Query(userId, period, reference)
+        );
+        return ResponseEntity.ok(ApplicationResponse.success(data));
+    }
+
+    // Série para os gráficos: os últimos N períodos, do mais antigo ao mais recente.
+    // Ex.: GET /api/v1/indicators/me/series?period=WEEKLY&limit=6
+    @GetMapping("/me/series")
+    public ResponseEntity<ApplicationResponse<List<UserIndicatorResponseDTO>>> getMySeries(
+            @AuthenticationPrincipal AuthenticatedUser principal,
+            @RequestParam(defaultValue = "MONTHLY") IndicatorPeriod period,
+            @RequestParam(defaultValue = "6") int limit
+    ) {
+        String userId = userUtils.getCurrentUser(principal).getId().toHexString();
+        List<UserIndicatorResponseDTO> data = getUserIndicatorSeries.execute(
+                new GetUserIndicatorSeriesUseCase.Query(userId, period, limit, LocalDate.now(APP_ZONE))
         );
         return ResponseEntity.ok(ApplicationResponse.success(data));
     }

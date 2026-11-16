@@ -9,6 +9,12 @@ import '../models/user_indicator_model.dart';
 abstract class IndicatorRepository {
   Future<UserIndicatorModel> myIndicators(IndicatorPeriod period);
 
+  /// Os últimos [limit] períodos, do mais antigo ao mais recente (para os gráficos).
+  Future<List<UserIndicatorModel>> mySeries(
+    IndicatorPeriod period, {
+    int limit = 6,
+  });
+
   Future<PlatformIndicatorModel> platformIndicators(IndicatorPeriod period);
 
   Future<List<MethodologyItem>> methodology();

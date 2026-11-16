@@ -816,6 +816,7 @@ A tela de Dados (ver wireframes `indicadores` e `indicadores ambientais`) exibe 
 - **Total histórico:** calculado **somando apenas os documentos `MONTHLY`** quando o usuário solicitar o acumulado. Nunca somar `WEEKLY` + `MONTHLY` + `SEMESTERLY` juntos — eles contêm os mesmos dados em granularidades diferentes e isso causaria contagem duplicada.
 - **Paginação:** quando houver muitos meses, o histórico é carregado em páginas (ex: 12 meses por página), com opção de filtrar por intervalo de datas.
 - **Sem cache em memória persistente:** o cálculo do acumulado é feito sob demanda na requisição. Como soma no máximo algumas dezenas de documentos mensais pequenos, é leve. Evita o risco de cache crescer indefinidamente e pesar com o tempo.
+- **Série para os gráficos:** `GET /api/v1/indicators/me/series?period=WEEKLY|MONTHLY|SEMESTERLY&limit=6` devolve os últimos N períodos (até 12), do mais antigo ao mais recente. Período sem documento vem zerado, para o gráfico não pular a semana ou o mês. O app usa as semanas para "viagens por semana" e os meses para "CO₂ evitado por mês".
 
 ---
 

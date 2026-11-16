@@ -15,6 +15,12 @@ final myIndicatorsProvider = FutureProvider.autoDispose
           ref.watch(indicatorRepositoryProvider).myIndicators(period),
     );
 
+/// Últimas semanas ou meses do usuário, para os gráficos (RF58).
+final myIndicatorSeriesProvider = FutureProvider.autoDispose
+    .family<List<UserIndicatorModel>, IndicatorPeriod>(
+      (ref, period) => ref.watch(indicatorRepositoryProvider).mySeries(period),
+    );
+
 /// Impacto de toda a plataforma no período (RF60).
 final platformIndicatorsProvider = FutureProvider.autoDispose
     .family<PlatformIndicatorModel, IndicatorPeriod>(
