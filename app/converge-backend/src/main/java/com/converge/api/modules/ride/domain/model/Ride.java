@@ -342,6 +342,22 @@ public class Ride {
      * Sem paradas, a distância e o desenho também ficam vazios.
      */
     public void updateItinerary(List<RideStop> stops, @Nullable Double distanceKm, @Nullable String polyline) {
+        updateItinerary(stops, distanceKm, polyline, null);
+    }
+
+    /**
+     * Com o tempo de carro passando pelas paradas, a chegada estimada da viagem passa
+     * a ser a saída mais esse tempo (buscar e deixar os passageiros leva mais tempo).
+     */
+    public void updateItinerary(
+            List<RideStop> stops,
+            @Nullable Double distanceKm,
+            @Nullable String polyline,
+            @Nullable Integer durationMinutes
+    ) {
+        if (durationMinutes != null && durationMinutes > 0 && this.departureDateTime != null) {
+            this.estimatedArrivalDateTime = this.departureDateTime.plusMinutes(durationMinutes);
+        }
         this.itinerary = stops == null ? new ArrayList<>() : new ArrayList<>(stops);
         boolean hasStops = !this.itinerary.isEmpty();
         this.itineraryDistanceKm = hasStops ? distanceKm : null;

@@ -25,6 +25,9 @@ import java.util.Optional;
 @RequiredArgsConstructor
 public class RouteGeometryService {
 
+    // Velocidade média de carro na cidade, para estimar a chegada sem o Google
+    static final double AVERAGE_CITY_SPEED_KMH = 30.0;
+
     private final MapsGateway mapsGateway;
 
     public RouteGeometry compute(Place origin, Place destination) {
@@ -56,6 +59,11 @@ public class RouteGeometryService {
         for (int i = 1; i < points.size(); i++) {
             distanceKm += HaversineCalculator.distanceKm(points.get(i - 1), points.get(i));
         }
-        return new RouteGeometry(distanceKm, null);
+        return new RouteGeometry(distanceKm, null, estimatedMinutes(distanceKm));
+    }
+
+    // Sem o Google: tempo de carro pela distância, numa média de cidade
+    static int estimatedMinutes(double distanceKm) {
+        return (int) Math.ceil(distanceKm / AVERAGE_CITY_SPEED_KMH * 60);
     }
 }

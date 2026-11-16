@@ -38,7 +38,8 @@ final class GoogleRoutesJson {
     record ComputeRoutesResponse(List<GoogleRoute> routes) {
     }
 
-    record GoogleRoute(Integer distanceMeters, Polyline polyline) {
+    // duration vem como texto em segundos, ex.: "1234s"
+    record GoogleRoute(Integer distanceMeters, String duration, Polyline polyline) {
     }
 
     record Polyline(String encodedPolyline) {

@@ -37,7 +37,7 @@ public class CreateRouteUseCase implements UseCase<CreateRouteCommand, Route> {
 
     private void applyGeometry(Route route) {
         RouteGeometry geometry = routeGeometryService.compute(route.getOrigin(), route.getDestination());
-        route.defineGeometry(geometry.distanceKm(), geometry.encodedPolyline());
+        route.defineGeometry(geometry.distanceKm(), geometry.encodedPolyline(), geometry.durationMinutes());
     }
 
     private void validateNotDuplicated(Route route) {

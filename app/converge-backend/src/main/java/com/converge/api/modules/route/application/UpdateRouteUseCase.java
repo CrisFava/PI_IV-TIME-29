@@ -42,7 +42,7 @@ public class UpdateRouteUseCase implements UseCase<UpdateRouteCommand, Route> {
         );
 
         RouteGeometry geometry = routeGeometryService.compute(route.getOrigin(), route.getDestination());
-        route.defineGeometry(geometry.distanceKm(), geometry.encodedPolyline());
+        route.defineGeometry(geometry.distanceKm(), geometry.encodedPolyline(), geometry.durationMinutes());
 
         Route saved = routeRepository.save(route);
         eventPublisher.publishEvent(new RouteChangedEvent(command.routeId()));

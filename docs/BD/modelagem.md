@@ -456,6 +456,20 @@ Quando `active = false` (conta suspensa ou excluída):
 }
 ```
 
+### Chegada estimada
+
+A chegada não usa mais um valor fixo enviado pelo app: ela sai do tempo de carro calculado pela Routes API (`routes.duration`).
+- **Trajeto:** `estimatedArrivalTime` = `departureTime` + o tempo da rota entre a origem e o destino. Sem o Google, o tempo é estimado pela distância, a 30 km/h de média na cidade.
+- **Viagem:** quando o itinerário é recalculado, `estimatedArrivalDateTime` = `departureDateTime` + o tempo da rota passando pelas paradas, porque buscar e deixar os passageiros leva mais tempo.
+
+### Histórico de viagens (RF59)
+
+`GET /api/v1/rides/history?role=&from=&to=` lista as viagens terminadas (`COMPLETED` ou `CANCELLED`) do usuário, da mais recente para a mais antiga. Não há coleção própria: as viagens já guardam o trajeto, o carro, os custos e os pagamentos.
+- **Passageiro:** vê o próprio embarque e desembarque, a própria parte estimada (`estimatedAmount`), o valor pago e a situação do pagamento. Pedidos recusados, expirados ou nunca aceitos não entram, porque ele não fez a viagem.
+- **Motorista:** vê o trajeto da carona, o custo total (`costs.totalCost`) e quanto recebeu (a soma dos pagamentos confirmados).
+- **Pessoas:** o motorista mais os passageiros que concluíram a viagem.
+- **Filtros:** `role` (`DRIVER` ou `PASSENGER`) e o intervalo de datas da saída (`from` e `to`, inclusive).
+
 ### Itinerário (rota com as paradas)
 
 O motorista vai até cada passageiro: `itinerary` guarda as paradas na ordem em que ele busca e deixa os passageiros confirmados.

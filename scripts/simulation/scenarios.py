@@ -92,6 +92,14 @@ def happy_path(world: SimulationWorld) -> None:
     paid = world.expect_ok(world.payment(driver, ride_id, ana, "confirm"), "confirmar pagamento da Ana")
     world.check(paid.get("status") == "PAID", f"o pagamento da Ana deveria estar PAID, está {paid.get('status')}")
 
+    world.step("O histórico da Ana mostra a viagem com o valor pago")
+    history = world.expect_ok(world.api.get("/rides/history", ana.token), "histórico da Ana") or []
+    item = next((h for h in history if h.get("rideId") == ride_id), None)
+    world.check(item is not None, "a viagem concluída não apareceu no histórico da Ana")
+    world.check(item.get("role") == "PASSENGER" and item.get("paymentStatus") == "PAID",
+                f"o histórico da Ana veio sem o pagamento: {item}")
+    print(f"      Ana: pagou R$ {item.get('paidAmount')}, {item.get('people')} pessoas na viagem")
+
     world.step("Ana avalia o motorista (e não consegue avaliar duas vezes)")
     review = {"rideId": ride_id, "reviewedId": driver.id, "rating": 5, "comment": "Simulação: tudo certo."}
     world.expect_ok(world.api.post("/reviews", ana.token, review), "Ana avaliar o motorista")

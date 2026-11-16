@@ -2,6 +2,12 @@
 
 package com.converge.api.modules.ride.presentation.controller;
 
+import java.time.LocalDate;
+import org.springframework.web.bind.annotation.RequestParam;
+import com.converge.api.modules.user.domain.enums.user.ParticipationRole;
+import com.converge.api.modules.ride.application.dto.RideHistoryQuery;
+import com.converge.api.modules.ride.application.dto.RideHistoryItemDTO;
+import com.converge.api.modules.ride.application.ListRideHistoryUseCase;
 import com.converge.api.modules.ride.application.AcceptPassengerUseCase;
 import com.converge.api.modules.ride.application.CancelRideUseCase;
 import com.converge.api.modules.ride.application.CompleteRideUseCase;
@@ -54,6 +60,7 @@ public class RideController {
     private final AcceptPassengerUseCase acceptPassenger;
     private final RejectPassengerUseCase rejectPassenger;
     private final ListMyRidesUseCase listMyRides;
+    private final ListRideHistoryUseCase listRideHistory;
     private final GetRideUseCase getRide;
     private final CancelRideUseCase cancelRide;
     private final RideViewService rideView;
@@ -79,6 +86,20 @@ public class RideController {
         List<RideResponseDTO> rides = rideView.viewAll(listMyRides.execute(uid), uid);
 
         return ResponseEntity.ok(ApplicationResponse.success(rides));
+    }
+
+    // Histórico (RF59): viagens terminadas, com filtro de papel e de datas da saída (yyyy-MM-dd)
+    @GetMapping("/history")
+    public ResponseEntity<ApplicationResponse<List<RideHistoryItemDTO>>> listHistory(
+            @AuthenticationPrincipal AuthenticatedUser principal,
+            @RequestParam(required = false) ParticipationRole role,
+            @RequestParam(required = false) LocalDate from,
+            @RequestParam(required = false) LocalDate to
+    ) {
+        List<RideHistoryItemDTO> history = listRideHistory.execute(
+                new RideHistoryQuery(uid(principal), role, from, to));
+
+        return ResponseEntity.ok(ApplicationResponse.success(history));
     }
 
     @GetMapping("/{rideId}")
