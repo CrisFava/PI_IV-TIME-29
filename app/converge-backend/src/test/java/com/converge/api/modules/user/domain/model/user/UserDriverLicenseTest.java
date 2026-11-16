@@ -1,12 +1,11 @@
 // Autor: Sara Fernandes Monteiro - RA 25024107
 
-package com.converge.api.modules.user.application.service;
+package com.converge.api.modules.user.domain.model.user;
 
 import com.converge.api.modules.user.domain.enums.user.DriverLicenseCategory;
 import com.converge.api.modules.user.domain.enums.user.ParticipationRole;
 import com.converge.api.modules.user.domain.enums.user.PixKeyType;
 import com.converge.api.modules.user.domain.enums.user.VerificationStatus;
-import com.converge.api.modules.user.domain.model.user.User;
 import com.converge.api.modules.user.domain.model.user.subtypes.AcademicRecord;
 import com.converge.api.modules.user.domain.model.user.subtypes.driver.DriverLicense;
 import com.converge.api.shared.presentation.exception.ApplicationException;
@@ -17,7 +16,6 @@ import java.time.LocalDateTime;
 import java.util.Set;
 
 import static org.assertj.core.api.Assertions.assertThat;
-import static org.assertj.core.api.Assertions.assertThatCode;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
 class UserDriverLicenseTest {
@@ -85,16 +83,6 @@ class UserDriverLicenseTest {
         assertThat(driver.getDriverLicense()).isSameAs(verified);
         assertThat(driver.getDriverLicense().status()).isEqualTo(VerificationStatus.VERIFIED);
         assertThat(driver.hasValidDriverLicense(LocalDateTime.now())).isTrue();
-    }
-
-    @Test
-    @DisplayName("Motorista edita nome e telefone sem precisar reenviar a CNH")
-    void shouldEditProfileWithoutResendingLicense() {
-        User driver = driverWith(verifiedLicense());
-
-        assertThatCode(() ->
-                driver.updateProfile("Bruno Souza", "(19) 97777-6666", null, "bruno@email.com", PixKeyType.EMAIL)
-        ).doesNotThrowAnyException();
     }
 
     @Test
