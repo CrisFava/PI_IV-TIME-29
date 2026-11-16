@@ -79,7 +79,7 @@ class IndicatorRepositoryImpl implements IndicatorRepository {
         queryParameters: {
           'period': period.apiValue,
           // O período atual (sem a referência, o backend pega o último com dados)
-          'reference': ?period.referenceFor(DateTime.now()),
+          'reference': ?period.referenceFor(IndicatorPeriod.nowInAppZone()),
         },
       );
       return unwrapApiResponse<T>(

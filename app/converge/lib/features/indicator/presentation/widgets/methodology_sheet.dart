@@ -31,7 +31,8 @@ class MethodologySheet extends ConsumerWidget {
   Widget build(BuildContext context, WidgetRef ref) {
     final methodology = ref.watch(methodologyProvider);
 
-    return Padding(
+    // Rola quando a metodologia passa da altura da folha
+    return SingleChildScrollView(
       padding: EdgeInsets.fromLTRB(
         22,
         14,

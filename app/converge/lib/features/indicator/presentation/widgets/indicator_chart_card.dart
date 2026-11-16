@@ -8,6 +8,7 @@ import '../../data/models/indicator_period.dart';
 import '../../data/models/user_indicator_model.dart';
 import '../../state/indicator_providers.dart';
 import 'indicator_chart_painter.dart';
+import 'indicator_format.dart';
 import 'indicator_series_label.dart';
 
 /// Cartão com o gráfico das últimas semanas ou meses: barras ou linha.
@@ -15,6 +16,7 @@ class IndicatorChartCard extends ConsumerWidget {
   final String title;
   final IndicatorPeriod period;
   final bool asLine;
+  final String unit;
   final double Function(UserIndicatorModel point) valueOf;
 
   const IndicatorChartCard({
@@ -22,6 +24,7 @@ class IndicatorChartCard extends ConsumerWidget {
     required this.title,
     required this.period,
     required this.valueOf,
+    required this.unit,
     this.asLine = false,
   });
 
@@ -76,13 +79,22 @@ class IndicatorChartCard extends ConsumerWidget {
     return Column(
       children: [
         Expanded(
-          child: CustomPaint(
-            size: Size.infinite,
-            painter: IndicatorChartPainter(
-              values: values,
-              asLine: asLine,
-              color: AppColors.primary,
-              mutedColor: AppColors.progressTrack,
+          // O desenho não é lido pelo leitor de tela: o valor de cada período vai no rótulo
+          child: Semantics(
+            label: [
+              title,
+              for (var i = 0; i < points.length; i++)
+                '${indicatorSeriesLabel(points[i].reference)}: '
+                    '${formatIndicatorDecimal(values[i])} $unit',
+            ].join('; '),
+            child: CustomPaint(
+              size: Size.infinite,
+              painter: IndicatorChartPainter(
+                values: values,
+                asLine: asLine,
+                color: AppColors.primary,
+                mutedColor: AppColors.progressTrack,
+              ),
             ),
           ),
         ),

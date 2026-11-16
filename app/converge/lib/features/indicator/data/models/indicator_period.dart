@@ -22,6 +22,11 @@ enum IndicatorPeriod {
     allTime => null,
   };
 
+  /// Agora no fuso do app (America/Sao_Paulo, UTC-3 fixo desde 2019, sem horário
+  /// de verão), igual ao backend: o período não muda com o fuso do aparelho.
+  static DateTime nowInAppZone() =>
+      DateTime.now().toUtc().subtract(const Duration(hours: 3));
+
   static String _twoDigits(int value) => value.toString().padLeft(2, '0');
 
   // Semana ISO 8601: começa na segunda; a semana 1 é a que tem a primeira quinta do ano

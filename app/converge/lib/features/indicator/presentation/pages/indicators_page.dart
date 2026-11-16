@@ -54,6 +54,8 @@ class _IndicatorsPageState extends ConsumerState<IndicatorsPage> {
           await ref.read(myIndicatorsProvider(_period).future);
         },
         child: ListView(
+          // Puxar para atualizar funciona mesmo com pouco conteúdo (ex.: erro)
+          physics: const AlwaysScrollableScrollPhysics(),
           padding: EdgeInsets.fromLTRB(
             16,
             16,
@@ -197,6 +199,7 @@ class _IndicatorsPageState extends ConsumerState<IndicatorsPage> {
     IndicatorChartCard(
       title: 'Viagens por semana',
       period: IndicatorPeriod.weekly,
+      unit: 'viagens',
       valueOf: (point) => point.totalRides.toDouble(),
     ),
     const SizedBox(height: 10),
@@ -233,6 +236,7 @@ class _IndicatorsPageState extends ConsumerState<IndicatorsPage> {
       title: 'CO₂ evitado por mês (kg)',
       period: IndicatorPeriod.monthly,
       asLine: true,
+      unit: 'kg',
       valueOf: (point) => point.co2AvoidedKg,
     ),
     const SizedBox(height: 6),
