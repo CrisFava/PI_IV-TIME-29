@@ -1,10 +1,9 @@
 // Autor: Sara Fernandes Monteiro - RA 25024107
 
-package com.converge.api.modules.user.application.service;
+package com.converge.api.modules.user.domain.model.user;
 
 import com.converge.api.modules.user.domain.enums.user.ParticipationRole;
 import com.converge.api.modules.user.domain.enums.user.PixKeyType;
-import com.converge.api.modules.user.domain.model.user.User;
 import com.converge.api.modules.user.domain.model.user.subtypes.AcademicRecord;
 import com.converge.api.shared.presentation.exception.ApplicationException;
 import org.junit.jupiter.api.DisplayName;
