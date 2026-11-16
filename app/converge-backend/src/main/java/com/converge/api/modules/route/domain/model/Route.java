@@ -26,6 +26,8 @@ import org.springframework.data.mongodb.core.mapping.Document;
 
 import java.time.DayOfWeek;
 import java.time.LocalDateTime;
+import java.time.LocalTime;
+import java.time.format.DateTimeFormatter;
 import java.util.ArrayList;
 import java.util.HashSet;
 import java.util.List;
@@ -177,7 +179,11 @@ public class Route {
         this.status = RouteStatus.INACTIVE;
     }
 
-    public void defineGeometry(double distanceKm, @Nullable String encodedPolyline) {
+    /**
+     * Guarda a distância e o desenho do caminho. Com o tempo de carro, a chegada
+     * estimada passa a ser a saída mais esse tempo (no lugar do valor informado).
+     */
+    public void defineGeometry(double distanceKm, @Nullable String encodedPolyline, @Nullable Integer durationMinutes) {
         if (distanceKm < 0) {
             throw new ApplicationException(
                     ErrorCode.BAD_REQUEST,
@@ -188,6 +194,12 @@ public class Route {
 
         this.routeDistanceKm = distanceKm;
         this.encodedPolyline = encodedPolyline;
+        if (durationMinutes != null && durationMinutes > 0) {
+            // LocalTime.plusMinutes já dá a volta na meia-noite
+            this.estimatedArrivalTime = LocalTime.parse(this.departureTime)
+                    .plusMinutes(durationMinutes)
+                    .format(DateTimeFormatter.ofPattern("HH:mm"));
+        }
     }
 
     // O type não entra aqui: um trajeto não muda de OFFER para SEARCH depois de

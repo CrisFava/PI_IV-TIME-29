@@ -98,6 +98,25 @@ class VehicleTest {
     }
 
     @Test
+    @DisplayName("Carro comum vai até 7 lugares; mais que isso só van ou outro")
+    void shouldLimitCarsToSevenSeats() {
+        List<FuelSource> gasoline = List.of(
+                new FuelSource(EnergySource.GASOLINE, 12.0, ConsumptionUnit.KM_PER_LITER, new BigDecimal("5.89"))
+        );
+
+        assertThatThrownBy(() -> new Vehicle(
+                "user-123", "Gol Azul", "Volkswagen Gol", "ABC1234", "14283256656", "Azul",
+                VehicleType.HATCH, 8, gasoline
+        )).isInstanceOf(ApplicationException.class);
+
+        Vehicle sevenSeats = new Vehicle(
+                "user-123", "SUV", "Chevrolet Spin", "ABC1234", "14283256656", "Prata",
+                VehicleType.SUV, 7, gasoline
+        );
+        assertThat(sevenSeats.getTotalCapacity()).isEqualTo(7);
+    }
+
+    @Test
     @DisplayName("Consumo fora da faixa do tipo de veículo deve ser recusado")
     void shouldFailWhenConsumptionIsOutOfRange() {
         List<FuelSource> tooEfficient = List.of(

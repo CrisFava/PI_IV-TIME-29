@@ -45,10 +45,10 @@ class RideItineraryServiceTest {
     }
 
     @Test
-    @DisplayName("Grava as paradas e a rota do Google passando por elas")
+    @DisplayName("Grava as paradas, a rota do Google passando por elas e a chegada pelo tempo da rota")
     void shouldStoreStopsAndRoute() {
         when(routeGeometry.compute(any(Place.class), anyList(), any(Place.class)))
-                .thenReturn(new RouteGeometry(14.2, "polyline-com-paradas"));
+                .thenReturn(new RouteGeometry(14.2, "polyline-com-paradas", 32));
 
         service.refresh(ride);
 
@@ -59,6 +59,7 @@ class RideItineraryServiceTest {
         assertThat(ride.getItinerary()).extracting(RideStop::passengerId).containsExactly("ana", "ana");
         assertThat(ride.getItineraryDistanceKm()).isEqualTo(14.2);
         assertThat(ride.getItineraryPolyline()).isEqualTo("polyline-com-paradas");
+        assertThat(ride.getEstimatedArrivalDateTime()).isEqualTo(ride.getDepartureDateTime().plusMinutes(32));
     }
 
     @Test

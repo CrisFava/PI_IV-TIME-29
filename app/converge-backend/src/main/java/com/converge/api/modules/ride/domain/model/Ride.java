@@ -107,6 +107,10 @@ public class Ride {
     @NotNull
     private LocalDateTime estimatedArrivalDateTime;
 
+    // Chegada pela rota direta, sem paradas: volta a valer quando o último passageiro sai
+    @Nullable
+    private LocalDateTime directArrivalDateTime;
+
     @Nullable
     private LocalDateTime completedAt;
 
@@ -190,6 +194,7 @@ public class Ride {
         this.destination = destination;
         this.departureDateTime = departureDateTime;
         this.estimatedArrivalDateTime = estimatedArrivalDateTime;
+        this.directArrivalDateTime = estimatedArrivalDateTime;
         this.weekDays.addAll(weekDays);
         this.totalSeats = totalSeats;
         this.availableSeats = totalSeats;
@@ -342,8 +347,28 @@ public class Ride {
      * Sem paradas, a distância e o desenho também ficam vazios.
      */
     public void updateItinerary(List<RideStop> stops, @Nullable Double distanceKm, @Nullable String polyline) {
+        updateItinerary(stops, distanceKm, polyline, null);
+    }
+
+    /**
+     * Com o tempo de carro passando pelas paradas, a chegada estimada da viagem passa
+     * a ser a saída mais esse tempo (buscar e deixar os passageiros leva mais tempo).
+     * Sem paradas, volta a chegada da rota direta.
+     */
+    public void updateItinerary(
+            List<RideStop> stops,
+            @Nullable Double distanceKm,
+            @Nullable String polyline,
+            @Nullable Integer durationMinutes
+    ) {
         this.itinerary = stops == null ? new ArrayList<>() : new ArrayList<>(stops);
         boolean hasStops = !this.itinerary.isEmpty();
+
+        if (!hasStops && this.directArrivalDateTime != null) {
+            this.estimatedArrivalDateTime = this.directArrivalDateTime;
+        } else if (hasStops && durationMinutes != null && durationMinutes > 0 && this.departureDateTime != null) {
+            this.estimatedArrivalDateTime = this.departureDateTime.plusMinutes(durationMinutes);
+        }
         this.itineraryDistanceKm = hasStops ? distanceKm : null;
         this.itineraryPolyline = hasStops ? polyline : null;
     }

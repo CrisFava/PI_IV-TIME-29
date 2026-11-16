@@ -17,8 +17,12 @@ enum VehicleType {
 
   bool get isMotorcycle => this == VehicleType.motorcycle;
 
-  /// Lugares no veículo, contando o motorista (regra do backend).
-  int get maxCapacity => isMotorcycle ? 2 : 15;
+  /// Van ou outro (micro-ônibus etc.): os únicos que passam de 7 lugares.
+  bool get isLarge => this == VehicleType.van || this == VehicleType.other;
+
+  /// Lugares no veículo, contando o motorista (regra do backend):
+  /// moto até 2, carro até 7, van ou outro até 15.
+  int get maxCapacity => isMotorcycle ? 2 : (isLarge ? 15 : 7);
 
   static VehicleType fromApi(String? value) => VehicleType.values.firstWhere(
     (type) => type.apiValue == value,

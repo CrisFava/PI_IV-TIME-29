@@ -167,6 +167,9 @@ public class Vehicle {
         return licensePlate.replace("-", "").trim().toUpperCase();
     }
 
+    // Lugares de um carro comum, contando o motorista
+    private static final int MAX_CAR_CAPACITY = 7;
+
     private void validateCapacity(VehicleType type, int totalCapacity) {
         if (totalCapacity < 1 || totalCapacity > 15) {
             throw new ApplicationException(
@@ -180,6 +183,16 @@ public class Vehicle {
             throw new ApplicationException(
                     ErrorCode.BAD_REQUEST,
                     "Uma moto comporta no máximo 2 lugares (piloto e 1 passageiro).",
+                    Set.of("totalCapacity")
+            );
+        }
+
+        // Carros comuns vão até 7 lugares; mais que isso, só van ou "outro" (micro-ônibus etc.)
+        boolean largeVehicle = type == VehicleType.VAN || type == VehicleType.OTHER;
+        if (!largeVehicle && type != VehicleType.MOTORCYCLE && totalCapacity > MAX_CAR_CAPACITY) {
+            throw new ApplicationException(
+                    ErrorCode.BAD_REQUEST,
+                    "Um carro comporta no máximo 7 lugares. Para mais, escolha van ou outro.",
                     Set.of("totalCapacity")
             );
         }

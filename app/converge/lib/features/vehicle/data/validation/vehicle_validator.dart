@@ -61,6 +61,9 @@ abstract final class VehicleValidator {
     if (type.isMotorcycle && capacity > 2) {
       return 'Uma moto comporta no máximo 2 lugares (piloto e 1 passageiro).';
     }
+    if (capacity > type.maxCapacity) {
+      return 'Um carro comporta no máximo 7 lugares. Para mais, escolha van ou outro.';
+    }
     if (capacity < 2) {
       return 'O veículo precisa de pelo menos 1 lugar para passageiro.';
     }

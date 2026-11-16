@@ -173,14 +173,19 @@ class RouteTest {
     }
 
     @Test
-    @DisplayName("Deve guardar a distância e o desenho do caminho")
+    @DisplayName("Deve guardar a distância e o desenho; com o tempo de carro, a chegada é a saída mais esse tempo")
     void shouldDefineGeometry() {
         Route route = offer(2.0, 3);
 
-        route.defineGeometry(12.63, "encoded-polyline");
+        route.defineGeometry(12.63, "encoded-polyline", 25);
 
         assertThat(route.getRouteDistanceKm()).isEqualTo(12.63);
         assertThat(route.getEncodedPolyline()).isEqualTo("encoded-polyline");
+        // Sai às 07:00: chega 25 min depois, e não mais no horário informado (07:40)
+        assertThat(route.getEstimatedArrivalTime()).isEqualTo("07:25");
+
+        route.defineGeometry(12.63, null, null);
+        assertThat(route.getEstimatedArrivalTime()).isEqualTo("07:25");
     }
 
     @Test
@@ -190,7 +195,7 @@ class RouteTest {
 
         ApplicationException ex = assertThrows(
                 ApplicationException.class,
-                () -> route.defineGeometry(-1, null)
+                () -> route.defineGeometry(-1, null, null)
         );
 
         assertThat(ex.getError().fields()).containsExactly("routeDistanceKm");
