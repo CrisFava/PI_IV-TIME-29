@@ -40,6 +40,8 @@ public class RouteMapper {
                 route.getDepartureTime(),
                 route.getEstimatedArrivalTime(),
                 route.getWeekDays(),
+                route.getRecurrence(),
+                route.getDate(),
                 route.getMaxDetourKm(),
                 route.getTotalSeats(),
                 route.getAvailableSeats(),

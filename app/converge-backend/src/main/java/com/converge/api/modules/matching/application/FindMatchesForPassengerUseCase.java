@@ -70,6 +70,8 @@ public class FindMatchesForPassengerUseCase implements UseCase<FindMatchesComman
         List<MatchingRoute> candidates = nearbyOffers.stream()
                 .filter(offer -> !offer.isOwnedBy(command.userId()))
                 .filter(offer -> !blockedUserIds.contains(offer.getUserId()))
+                // Caronas de um dia só precisam ser no mesmo dia do pedido
+                .filter(offer -> sameDayWhenFixed(offer, search))
                 .filter(offer -> !rejectedRouteIds.contains(offer.getId().toHexString()))
                 .filter(offer -> canOfferByDriver.computeIfAbsent(offer.getUserId(), matchCandidates::canOffer))
                 .map(offer -> {
@@ -84,7 +86,11 @@ public class FindMatchesForPassengerUseCase implements UseCase<FindMatchesComman
         List<CompatibleMatch> matches = matchingGateway.findDriversFor(matchingRouteFactory.fromSearch(search), candidates);
         matchingRecorder.replaceForPassengerRoute(command.routeId(), matches);
 
-        return matchViewAssembler.forPassenger(matches, offersById, vehiclesByRouteId);
+        return matchViewAssembler.forPassenger(matches, offersById, vehiclesByRouteId, search);
+    }
+
+    static boolean sameDayWhenFixed(Route offer, Route search) {
+        return offer.getDate() == null || search.getDate() == null || offer.getDate().equals(search.getDate());
     }
 
     private void validateSearch(Route route) {

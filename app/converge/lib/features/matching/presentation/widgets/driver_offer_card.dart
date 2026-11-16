@@ -4,133 +4,117 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 
 import '../../../../core/config/styles.dart';
+import '../../../../core/widgets/more_info_hint.dart';
+import '../../../ride/data/models/ride_status.dart';
 import '../../../ride/presentation/widgets/ride_place_line.dart';
 import '../../data/models/driver_offer.dart';
-import 'driver_ride_card.dart';
-import 'offer_schedule_label.dart';
+import 'driver_offer_title.dart';
+import 'driver_ride_action_button.dart';
 
-/// Uma carona que o motorista oferece: quando sai, de onde para onde e as viagens
-/// dela (com os passageiros e "Iniciar trajeto"). Dá para cancelar a oferta.
+/// Uma carona em "Minhas caronas", resumida: quando sai, de onde para onde e como
+/// estão os pedidos. Tocar abre os detalhes (passageiros, chat e cancelar).
+/// "Iniciar trajeto" e "Concluir viagem" ficam à mão aqui mesmo.
 class DriverOfferCard extends StatelessWidget {
   final DriverOffer offer;
   final Set<String> busyRideIds;
-  final bool isCancelling;
+  final VoidCallback onOpenDetails;
   final ValueChanged<String> onStartRide;
   final ValueChanged<String> onCompleteRide;
-  final void Function(String rideId, String passengerId) onOpenChat;
-  final VoidCallback onCancelOffer;
 
   const DriverOfferCard({
     super.key,
     required this.offer,
+    required this.onOpenDetails,
     required this.onStartRide,
     required this.onCompleteRide,
-    required this.onOpenChat,
-    required this.onCancelOffer,
     this.busyRideIds = const {},
-    this.isCancelling = false,
   });
+
+  String _summary() {
+    if (offer.rides.any((r) => r.status == RideStatus.inProgress)) {
+      return 'Viagem em andamento';
+    }
+    final confirmed = offer.confirmedPassengers;
+    final pending = offer.pendingRequests;
+    return [
+      if (confirmed > 0)
+        confirmed == 1
+            ? '1 passageiro confirmado'
+            : '$confirmed passageiros confirmados',
+      if (pending > 0)
+        pending == 1 ? '1 pedido esperando' : '$pending pedidos esperando',
+      if (confirmed == 0 && pending == 0) 'Ainda sem pedidos de vaga',
+    ].join(' · ');
+  }
 
   @override
   Widget build(BuildContext context) {
     final route = offer.route;
+    final firstRide = offer.rides.isEmpty ? null : offer.rides.first;
+    final origin = route?.origin.address ?? firstRide?.origin.address ?? '';
+    final destination =
+        route?.destination.address ?? firstRide?.destination.address ?? '';
+    final action = offer.actionableRide;
+    final inProgress = action?.status == RideStatus.inProgress;
 
-    return Container(
-      padding: const EdgeInsets.fromLTRB(14, 10, 6, 14),
-      decoration: BoxDecoration(
-        color: AppColors.cardSecondary,
+    return Material(
+      color: inProgress ? AppColors.successBackground : AppColors.cardSecondary,
+      borderRadius: BorderRadius.circular(20),
+      child: InkWell(
+        key: ValueKey('offer_card_${offer.key}'),
         borderRadius: BorderRadius.circular(20),
-        border: Border.all(color: AppColors.borderSubtle),
-      ),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.stretch,
-        children: [
-          if (route != null) ...[
-            Row(
-              children: [
-                const Icon(
-                  Icons.event_repeat_rounded,
-                  size: 18,
-                  color: AppColors.textPrimary,
-                ),
-                const SizedBox(width: 8),
-                Expanded(
-                  child: Text(
-                    offerScheduleLabel(route.weekDays, route.departureTime),
-                    style: const TextStyle(
-                      fontSize: 14,
-                      fontWeight: FontWeight.w800,
-                      color: AppColors.textPrimary,
+        onTap: () {
+          HapticFeedback.lightImpact();
+          onOpenDetails();
+        },
+        child: Container(
+          padding: const EdgeInsets.all(14),
+          decoration: BoxDecoration(
+            borderRadius: BorderRadius.circular(20),
+            border: Border.all(
+              color: inProgress
+                  ? AppColors.successBorder
+                  : AppColors.borderSubtle,
+            ),
+          ),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.stretch,
+            children: [
+              DriverOfferTitle(offer: offer),
+              const SizedBox(height: 8),
+              RidePlaceLine(icon: Icons.trip_origin_rounded, text: origin),
+              const SizedBox(height: 4),
+              RidePlaceLine(icon: Icons.flag_rounded, text: destination),
+              const SizedBox(height: 10),
+              Row(
+                children: [
+                  Expanded(
+                    child: Text(
+                      _summary(),
+                      style: TextStyle(
+                        fontSize: 12.5,
+                        fontWeight: FontWeight.w600,
+                        color: inProgress
+                            ? AppColors.success
+                            : AppColors.textSecondary,
+                      ),
                     ),
                   ),
-                ),
-                isCancelling
-                    ? const Padding(
-                        padding: EdgeInsets.all(12),
-                        child: SizedBox(
-                          width: 18,
-                          height: 18,
-                          child: CircularProgressIndicator(
-                            strokeWidth: 2,
-                            color: AppColors.error,
-                          ),
-                        ),
-                      )
-                    : IconButton(
-                        key: ValueKey('cancel_offer_${route.id}'),
-                        tooltip: 'Cancelar esta carona',
-                        visualDensity: VisualDensity.compact,
-                        onPressed: () {
-                          HapticFeedback.lightImpact();
-                          onCancelOffer();
-                        },
-                        icon: const Icon(
-                          Icons.delete_outline_rounded,
-                          size: 20,
-                          color: AppColors.error,
-                        ),
-                      ),
-              ],
-            ),
-            Padding(
-              padding: const EdgeInsets.only(right: 8),
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.stretch,
-                children: [
-                  RidePlaceLine(
-                    icon: Icons.trip_origin_rounded,
-                    text: route.origin.address,
-                  ),
-                  const SizedBox(height: 4),
-                  RidePlaceLine(
-                    icon: Icons.flag_rounded,
-                    text: route.destination.address,
-                  ),
+                  const MoreInfoHint(),
                 ],
               ),
-            ),
-          ],
-          if (offer.rides.isEmpty)
-            const Padding(
-              padding: EdgeInsets.only(top: 10, right: 8),
-              child: Text(
-                'Ainda sem pedidos de vaga.',
-                style: TextStyle(fontSize: 12, color: AppColors.textSecondary),
-              ),
-            )
-          else
-            for (final ride in offer.rides)
-              Padding(
-                padding: EdgeInsets.only(top: route == null ? 0 : 10, right: 8),
-                child: DriverRideCard(
-                  ride: ride,
-                  isBusy: busyRideIds.contains(ride.id),
-                  onStart: () => onStartRide(ride.id),
-                  onComplete: () => onCompleteRide(ride.id),
-                  onOpenChat: (passengerId) => onOpenChat(ride.id, passengerId),
+              if (action != null) ...[
+                const SizedBox(height: 10),
+                DriverRideActionButton(
+                  ride: action,
+                  isBusy: busyRideIds.contains(action.id),
+                  onStart: () => onStartRide(action.id),
+                  onComplete: () => onCompleteRide(action.id),
                 ),
-              ),
-        ],
+              ],
+            ],
+          ),
+        ),
       ),
     );
   }

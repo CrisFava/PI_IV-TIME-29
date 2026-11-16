@@ -27,6 +27,7 @@ import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.anyCollection;
 import static org.mockito.ArgumentMatchers.anyString;
 import static org.mockito.ArgumentMatchers.eq;
+import static org.mockito.ArgumentMatchers.isNull;
 import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
@@ -54,7 +55,7 @@ class CreateRouteUseCaseTest {
                 new PlaceRequestDTO("Rod. Dom Pedro I, km 136", null, "Campinas", -22.8337, -47.0524),
                 "07:00",
                 "07:40",
-                Set.of(DayOfWeek.MONDAY, DayOfWeek.FRIDAY),
+                Set.of(DayOfWeek.MONDAY, DayOfWeek.FRIDAY), null, null,
                 2.0,
                 3,
                 null,
@@ -65,7 +66,7 @@ class CreateRouteUseCaseTest {
 
     private void noDuplicate() {
         when(routeRepository.existsLiveDuplicate(
-                anyString(), any(), anyString(), anyString(), anyString(), anyCollection()
+                anyString(), any(), anyString(), anyString(), anyString(), any(), anyCollection()
         )).thenReturn(false);
     }
 
@@ -98,6 +99,7 @@ class CreateRouteUseCaseTest {
                 eq("Rua Barão de Jaguara, 1000"),
                 eq("Rod. Dom Pedro I, km 136"),
                 eq("07:00"),
+                isNull(),
                 anyCollection()
         );
     }
@@ -106,7 +108,7 @@ class CreateRouteUseCaseTest {
     @DisplayName("Deve lançar ROUTE_ALREADY_EXISTS e não salvar quando já houver trajeto igual ativo")
     void shouldRejectDuplicatedRoute() {
         when(routeRepository.existsLiveDuplicate(
-                anyString(), any(), anyString(), anyString(), anyString(), anyCollection()
+                anyString(), any(), anyString(), anyString(), anyString(), any(), anyCollection()
         )).thenReturn(true);
 
         ApplicationException ex = assertThrows(

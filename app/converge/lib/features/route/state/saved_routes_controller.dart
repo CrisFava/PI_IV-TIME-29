@@ -35,8 +35,8 @@ class SavedRoutesState {
 
 final savedRoutesProvider =
     NotifierProvider<SavedRoutesController, SavedRoutesState>(
-  SavedRoutesController.new,
-);
+      SavedRoutesController.new,
+    );
 
 class SavedRoutesController extends Notifier<SavedRoutesState> {
   RouteRepository get _repository => ref.read(routeRepositoryProvider);
@@ -90,6 +90,8 @@ class SavedRoutesController extends Notifier<SavedRoutesState> {
       departureTime: request.departureTime,
       estimatedArrivalTime: request.estimatedArrivalTime,
       weekDays: request.weekDays,
+      recurrence: request.recurrence,
+      date: request.date,
       maxDetourKm: request.maxDetourKm,
       totalSeats: request.totalSeats,
       availableSeats: request.totalSeats,

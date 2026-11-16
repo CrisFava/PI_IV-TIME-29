@@ -322,6 +322,8 @@ Quando `active = false` (conta suspensa ou excluída):
   "departureTime": "String (HH:mm)",
   "estimatedArrivalTime": "String (HH:mm)",
   "weekDays": ["MONDAY | TUESDAY | WEDNESDAY | THURSDAY | FRIDAY | SATURDAY | SUNDAY"],
+  "recurrence": "ONCE | WEEKLY",
+  "date": "String (yyyy-MM-dd) | null",
   "maxDetourKm": "Double",
   "toll": "Decimal128 | null",
   "parking": "Decimal128 | null",
@@ -345,6 +347,16 @@ Quando `active = false` (conta suspensa ou excluída):
 | `origin.location` | Geoespacial 2dsphere | Busca por proximidade de origem (GeoJSON Point) |
 | `destination.location` | Geoespacial 2dsphere | Busca por proximidade de destino (GeoJSON Point) |
 | `weekDays` | Simples | Filtro de dias compatíveis no matching |
+
+### Recorrência (carona de um dia só ou semanal)
+
+- **`ONCE`** (padrão no app): o trajeto vale só em `date`. A data não pode ter passado, e `weekDays` vira o dia da semana dela.
+  - A carona de um dia só termina junto com a viagem dela: quando a viagem é concluída ou cancelada, o trajeto fica `INACTIVE`. Ele também some da lista do usuário e da busca depois que a data passa.
+- **`WEEKLY`** ("Repetir toda semana"): o trajeto vale toda semana nos `weekDays`, e `date` fica nulo.
+  - A carona semanal continua ativa até o motorista cancelar. Cada semana em que alguém pede vaga gera uma viagem nova (uma por data), e as viagens concluídas vão para o histórico.
+- Documentos antigos, sem o campo, valem como `WEEKLY`. Se o app não envia `recurrence`, o backend também usa `WEEKLY`.
+- **Matching:** um trajeto `ONCE` com a data já passada sai da busca. Se o passageiro procura num dia específico, só aparecem motoristas que saem nesse dia.
+- **Duplicidade:** dois trajetos iguais em datas diferentes não são duplicados.
 
 ---
 

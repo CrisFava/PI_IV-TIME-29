@@ -1,8 +1,10 @@
 // Autor: Allan Giovanni Matias Paes - RA 25008211
 
 import 'package:flutter/foundation.dart';
+
 import 'create_route_request.dart';
 import 'route_place_model.dart';
+import 'route_recurrence.dart';
 
 @immutable
 class RouteResponseModel {
@@ -15,6 +17,10 @@ class RouteResponseModel {
   final String departureTime;
   final String estimatedArrivalTime;
   final Set<String> weekDays;
+  final RouteRecurrence recurrence;
+
+  /// Data da carona de um dia só (`yyyy-MM-dd`); nula na semanal.
+  final String? date;
   final double? maxDetourKm;
   final int? totalSeats;
   final int? availableSeats;
@@ -33,6 +39,8 @@ class RouteResponseModel {
     required this.departureTime,
     required this.estimatedArrivalTime,
     required this.weekDays,
+    this.recurrence = RouteRecurrence.weekly,
+    this.date,
     this.maxDetourKm,
     this.totalSeats,
     this.availableSeats,
@@ -58,6 +66,8 @@ class RouteResponseModel {
       departureTime: json['departureTime'] as String? ?? '',
       estimatedArrivalTime: json['estimatedArrivalTime'] as String? ?? '',
       weekDays: rawWeekDays.map((e) => e.toString()).toSet(),
+      recurrence: RouteRecurrence.fromApi(json['recurrence'] as String?),
+      date: json['date'] as String?,
       maxDetourKm: (json['maxDetourKm'] as num?)?.toDouble(),
       totalSeats: (json['totalSeats'] as num?)?.toInt(),
       availableSeats: (json['availableSeats'] as num?)?.toInt(),

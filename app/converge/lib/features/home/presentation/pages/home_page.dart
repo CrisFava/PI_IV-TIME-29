@@ -84,6 +84,9 @@ class _HomePageState extends ConsumerState<HomePage> {
   // Saída escolhida para a carona que o motorista vai publicar; null é "agora"
   DateTime? _offerDeparture;
 
+  /// Carona oferecida se repete toda semana (por padrão, é de um dia só).
+  bool _offerRepeatWeekly = false;
+
   // De onde sai a carona que o motorista vai publicar (escolhido no campo "Saindo de")
   String _offerOriginAddress = '';
   LatLng? _offerOriginLocation;
@@ -471,6 +474,7 @@ class _HomePageState extends ConsumerState<HomePage> {
       _currentMode = AppRideMode.driver;
       _showRideRequests = true;
       _offerDeparture = null;
+      _offerRepeatWeekly = false;
       _offerOriginAddress = '';
       _offerOriginLocation = null;
       _destinationLocation = null;
@@ -664,7 +668,10 @@ class _HomePageState extends ConsumerState<HomePage> {
       isDriver: true,
       vehicleId: vehicle.id,
       totalSeats: vehicle.seats,
-      schedule: RouteSchedule.startingAt(_offerDeparture ?? DateTime.now()),
+      schedule: RouteSchedule.startingAt(
+        _offerDeparture ?? DateTime.now().add(RouteSchedule.immediateOfferLead),
+        repeatWeekly: _offerRepeatWeekly,
+      ),
       maxDetourKm: maxDetourKm,
       originAddress: _offerOriginAddress,
       originLocation: _offerOriginLocation,
@@ -680,6 +687,7 @@ class _HomePageState extends ConsumerState<HomePage> {
     ref.invalidate(myOfferRoutesProvider);
     setState(() {
       _offerDeparture = null;
+      _offerRepeatWeekly = false;
       _offerOriginAddress = '';
       _offerOriginLocation = null;
       _destinationLocation = null;
@@ -841,6 +849,8 @@ class _HomePageState extends ConsumerState<HomePage> {
       departureTime: schedule.departureTime,
       estimatedArrivalTime: schedule.estimatedArrivalTime,
       weekDays: schedule.weekDays,
+      recurrence: schedule.recurrence,
+      date: schedule.date,
       maxDetourKm: maxDetourKm,
       totalSeats: isDriver ? (totalSeats ?? 3) : 1,
     );
@@ -1259,6 +1269,9 @@ class _HomePageState extends ConsumerState<HomePage> {
                   current: _offerDeparture,
                   onPicked: (departure) => _offerDeparture = departure,
                 ),
+                repeatWeekly: _offerRepeatWeekly,
+                onRepeatWeeklyChanged: (value) =>
+                    setState(() => _offerRepeatWeekly = value),
                 onSaveRoute: _handleSaveRoute,
                 onClose: _handleCloseDriverFormSheet,
                 onDestinationSelected: _handleDriverDestinationSelected,

@@ -2,6 +2,7 @@
 
 package com.converge.api.modules.route.domain.model;
 
+import com.converge.api.modules.route.domain.enums.RecurrenceType;
 import com.converge.api.modules.route.domain.enums.RouteStatus;
 import com.converge.api.modules.route.domain.enums.RouteType;
 import com.converge.api.modules.route.domain.model.subtypes.Place;
@@ -25,6 +26,7 @@ import org.springframework.data.mongodb.core.index.Indexed;
 import org.springframework.data.mongodb.core.mapping.Document;
 
 import java.time.DayOfWeek;
+import java.time.LocalDate;
 import java.time.LocalDateTime;
 import java.time.LocalTime;
 import java.time.format.DateTimeFormatter;
@@ -78,6 +80,16 @@ public class Route {
     @NotEmpty
     @Indexed
     private Set<DayOfWeek> weekDays = new HashSet<>();
+
+    // ONCE: vale só na data; WEEKLY: toda semana nos weekDays.
+    // Trajetos gravados antes deste campo existir ficam com o padrão WEEKLY.
+    @NotNull
+    private RecurrenceType recurrence = RecurrenceType.WEEKLY;
+
+    // Data do trajeto ONCE (weekDays fica só com o dia dela). Null no WEEKLY.
+    @Nullable
+    @Indexed
+    private LocalDate date;
 
     @Nullable
     private Double maxDetourKm;
@@ -173,10 +185,74 @@ public class Route {
 
         this.applyTripData(
                 vehicleId, origin, destination, departureTime, estimatedArrivalTime, weekDays, maxDetourKm, totalSeats, toll, parking);
+
+        // A carona de um dia só continua no dia da sua data, mesmo que outros dias venham na edição
+        if (getRecurrence() == RecurrenceType.ONCE && this.date != null) {
+            this.weekDays = new HashSet<>(Set.of(this.date.getDayOfWeek()));
+        }
     }
 
     public void deactivate() {
         this.status = RouteStatus.INACTIVE;
+    }
+
+    /**
+     * Define com que frequência o trajeto acontece. ONCE exige a data, que não pode
+     * ter passado, e o trajeto vale só nela. WEEKLY não tem data: usa os weekDays.
+     * Sem recorrência informada, vale WEEKLY.
+     */
+    public void schedule(@Nullable RecurrenceType recurrence, @Nullable LocalDate date, LocalDate today) {
+        RecurrenceType type = recurrence == null ? RecurrenceType.WEEKLY : recurrence;
+
+        if (type == RecurrenceType.WEEKLY) {
+            if (date != null) {
+                throw new ApplicationException(
+                        ErrorCode.BAD_REQUEST,
+                        "Uma carona semanal não tem data: ela vale nos dias da semana escolhidos.",
+                        Set.of("date")
+                );
+            }
+            this.recurrence = RecurrenceType.WEEKLY;
+            this.date = null;
+            return;
+        }
+
+        if (date == null) {
+            throw new ApplicationException(
+                    ErrorCode.BAD_REQUEST,
+                    "Informe a data da carona.",
+                    Set.of("date")
+            );
+        }
+
+        if (date.isBefore(today)) {
+            throw new ApplicationException(
+                    ErrorCode.BAD_REQUEST,
+                    "A data da carona não pode ter passado.",
+                    Set.of("date")
+            );
+        }
+
+        this.recurrence = RecurrenceType.ONCE;
+        this.date = date;
+        this.weekDays = new HashSet<>(Set.of(date.getDayOfWeek()));
+    }
+
+    // Documentos antigos podem vir sem o campo: valem como WEEKLY
+    public RecurrenceType getRecurrence() {
+        return this.recurrence == null ? RecurrenceType.WEEKLY : this.recurrence;
+    }
+
+    // Carona de um dia só cuja data já passou: não acontece mais
+    public boolean isPast(LocalDate today) {
+        return getRecurrence() == RecurrenceType.ONCE && this.date != null && this.date.isBefore(today);
+    }
+
+    // O trajeto acontece nesta data: no dia marcado, ou num dos dias da semana se ele se repete
+    public boolean runsOn(LocalDate day) {
+        return getRecurrence() == RecurrenceType.ONCE
+                ? day.equals(this.date)
+                : this.weekDays.contains(day.getDayOfWeek());
     }
 
     /**

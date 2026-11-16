@@ -1,5 +1,7 @@
 // Autor: Gustavo Alves de Siqueira Costa - RA 25001650
 
+import 'match_date_label.dart';
+
 const _order = [
   'MONDAY',
   'TUESDAY',
@@ -21,9 +23,17 @@ const _full = [
 ];
 const _weekdays = {'MONDAY', 'TUESDAY', 'WEDNESDAY', 'THURSDAY', 'FRIDAY'};
 
-/// Quando a carona oferecida sai, toda semana: `Toda segunda às 07:30`,
+/// Quando a carona oferecida sai. De um dia só ([date] `yyyy-MM-dd`):
+/// `Sáb, 21/11 às 07:30`. Toda semana: `Toda segunda às 07:30`,
 /// `Dias úteis às 08:00`, `Todos os dias às 07:00` ou `Seg, Qua e Sex às 07:30`.
-String offerScheduleLabel(Set<String> weekDays, String departureTime) {
+String offerScheduleLabel(
+  Set<String> weekDays,
+  String departureTime, {
+  String? date,
+}) {
+  final day = date == null ? null : DateTime.tryParse(date);
+  if (day != null) return '${matchDateLabel(day)} às $departureTime';
+
   final days = [
     for (var i = 0; i < _order.length; i++)
       if (weekDays.contains(_order[i])) i,

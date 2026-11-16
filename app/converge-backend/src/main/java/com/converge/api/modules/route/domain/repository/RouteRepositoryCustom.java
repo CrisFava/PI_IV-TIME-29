@@ -7,17 +7,20 @@ import com.converge.api.modules.route.domain.model.Route;
 import com.converge.api.modules.route.domain.model.subtypes.Coordinates;
 
 import java.time.DayOfWeek;
+import java.time.LocalDate;
 import java.util.Collection;
 import java.util.List;
 
 public interface RouteRepositoryCustom {
 
-    // Trajetos ACTIVE do tipo, com um dia em comum e com origem e destino dentro do raio (índices 2dsphere)
+    // Trajetos ACTIVE do tipo, com um dia em comum, sem data já passada (caronas de um dia)
+    // e com origem e destino dentro do raio (índices 2dsphere)
     List<Route> findActiveNear(
             RouteType type,
             Collection<DayOfWeek> weekDays,
             Coordinates origin,
             Coordinates destination,
-            double radiusKm
+            double radiusKm,
+            LocalDate today
     );
 }

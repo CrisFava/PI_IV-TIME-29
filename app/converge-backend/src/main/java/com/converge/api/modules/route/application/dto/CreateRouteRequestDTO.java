@@ -2,6 +2,7 @@
 
 package com.converge.api.modules.route.application.dto;
 
+import com.converge.api.modules.route.domain.enums.RecurrenceType;
 import com.converge.api.modules.route.domain.enums.RouteType;
 import jakarta.annotation.Nullable;
 import jakarta.validation.Valid;
@@ -14,6 +15,7 @@ import jakarta.validation.constraints.Pattern;
 
 import java.math.BigDecimal;
 import java.time.DayOfWeek;
+import java.time.LocalDate;
 import java.util.Set;
 
 public record CreateRouteRequestDTO(
@@ -42,6 +44,13 @@ public record CreateRouteRequestDTO(
 
         @NotEmpty(message = "Selecione ao menos um dia da semana.")
         Set<DayOfWeek> weekDays,
+
+        // ONCE (um dia só, exige date) ou WEEKLY (toda semana, sem date). Sem valor, vale WEEKLY.
+        @Nullable
+        RecurrenceType recurrence,
+
+        @Nullable
+        LocalDate date,
 
         @Nullable
         Double maxDetourKm,

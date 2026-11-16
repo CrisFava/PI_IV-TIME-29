@@ -7,11 +7,12 @@ import '../../../../core/config/styles.dart';
 import '../../../ride/data/models/participant_status.dart';
 import '../../../ride/data/models/ride_model.dart';
 import '../../../ride/data/models/ride_status.dart';
-import '../../../ride/presentation/widgets/ride_place_line.dart';
+import 'driver_ride_action_button.dart';
 import 'match_date_label.dart';
 
-/// Uma carona do motorista em "Minhas caronas": quando sai, de onde para onde e
-/// quem vai (com o atalho para o chat). "Iniciar trajeto" só com passageiro confirmado.
+/// Uma viagem nos detalhes da carona: quando sai e quem vai (com o atalho para
+/// o chat). O trajeto já aparece em cima, nos detalhes.
+/// "Iniciar trajeto" só com passageiro confirmado.
 class DriverRideCard extends StatelessWidget {
   final RideModel ride;
   final bool isBusy;
@@ -82,16 +83,7 @@ class DriverRideCard extends StatelessWidget {
               ),
             ],
           ),
-          const SizedBox(height: 8),
-          RidePlaceLine(
-            icon: Icons.trip_origin_rounded,
-            text: ride.origin.address,
-          ),
           const SizedBox(height: 4),
-          RidePlaceLine(
-            icon: Icons.flag_rounded,
-            text: ride.destination.address,
-          ),
           for (final passenger in confirmed)
             Padding(
               padding: const EdgeInsets.only(top: 6),
@@ -130,73 +122,14 @@ class DriverRideCard extends StatelessWidget {
               ),
             ),
           const SizedBox(height: 10),
-          _buildAction(confirmed.length),
+          DriverRideActionButton(
+            ride: ride,
+            isBusy: isBusy,
+            onStart: onStart,
+            onComplete: onComplete,
+          ),
         ],
       ),
-    );
-  }
-
-  Widget _buildAction(int confirmed) {
-    if (ride.status == RideStatus.inProgress) {
-      return _button(
-        key: ValueKey('complete_ride_${ride.id}'),
-        label: 'Concluir viagem',
-        icon: Icons.flag_circle_rounded,
-        color: AppColors.success,
-        onPressed: onComplete,
-      );
-    }
-
-    if (confirmed == 0) {
-      return const Text(
-        'Aceite um passageiro para poder iniciar o trajeto.',
-        style: TextStyle(fontSize: 12, color: AppColors.textSecondary),
-      );
-    }
-
-    return _button(
-      key: ValueKey('start_ride_${ride.id}'),
-      label: 'Iniciar trajeto',
-      icon: Icons.play_arrow_rounded,
-      color: AppColors.primary,
-      onPressed: onStart,
-    );
-  }
-
-  Widget _button({
-    required Key key,
-    required String label,
-    required IconData icon,
-    required Color color,
-    required VoidCallback onPressed,
-  }) {
-    return FilledButton.icon(
-      key: key,
-      onPressed: isBusy
-          ? null
-          : () {
-              HapticFeedback.mediumImpact();
-              onPressed();
-            },
-      style: FilledButton.styleFrom(
-        backgroundColor: color,
-        foregroundColor: AppColors.textLight,
-        disabledBackgroundColor: color,
-        disabledForegroundColor: AppColors.textLight,
-        padding: const EdgeInsets.symmetric(vertical: 12),
-        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
-      ),
-      icon: isBusy
-          ? const SizedBox(
-              width: 18,
-              height: 18,
-              child: CircularProgressIndicator(
-                strokeWidth: 2,
-                color: AppColors.textLight,
-              ),
-            )
-          : Icon(icon, size: 20),
-      label: Text(label, style: const TextStyle(fontWeight: FontWeight.w700)),
     );
   }
 }

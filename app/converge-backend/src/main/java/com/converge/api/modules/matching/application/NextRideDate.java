@@ -2,6 +2,8 @@
 
 package com.converge.api.modules.matching.application;
 
+import jakarta.annotation.Nullable;
+
 import java.time.DayOfWeek;
 import java.time.LocalDate;
 import java.time.LocalDateTime;
@@ -27,6 +29,42 @@ public final class NextRideDate {
 
     public static Optional<LocalDate> of(Set<DayOfWeek> days, String departureTime) {
         return of(days, departureTime, LocalDateTime.now(APP_ZONE));
+    }
+
+    /**
+     * Próxima data da combinação considerando as caronas de um dia só: se um dos trajetos
+     * tem data, a viagem é nela (e precisa ser a mesma nos dois, se ambos tiverem).
+     */
+    public static Optional<LocalDate> of(
+            Set<DayOfWeek> days,
+            String departureTime,
+            @Nullable LocalDate offerDate,
+            @Nullable LocalDate searchDate
+    ) {
+        if (offerDate == null && searchDate == null) {
+            return of(days, departureTime);
+        }
+        if (offerDate != null && searchDate != null && !offerDate.equals(searchDate)) {
+            return Optional.empty();
+        }
+
+        LocalDate date = offerDate != null ? offerDate : searchDate;
+        return onDate(date, departureTime, LocalDateTime.now(APP_ZONE));
+    }
+
+    // Data fixa: vale se for depois de hoje ou, hoje, se o motorista ainda não saiu
+    static Optional<LocalDate> onDate(LocalDate date, String departureTime, LocalDateTime now) {
+        LocalTime departure;
+        try {
+            departure = LocalTime.parse(departureTime);
+        } catch (DateTimeParseException | NullPointerException e) {
+            return Optional.empty();
+        }
+
+        LocalDate today = now.toLocalDate();
+        boolean departed = date.isBefore(today)
+                || (date.equals(today) && !departure.isAfter(now.toLocalTime()));
+        return departed ? Optional.empty() : Optional.of(date);
     }
 
     static Optional<LocalDate> of(Set<DayOfWeek> days, String departureTime, LocalDateTime now) {

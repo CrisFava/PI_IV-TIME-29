@@ -10,6 +10,7 @@ import org.springframework.data.mongodb.repository.MongoRepository;
 import org.springframework.data.mongodb.repository.Query;
 import org.springframework.stereotype.Repository;
 
+import java.time.LocalDate;
 import java.util.Collection;
 import java.util.List;
 
@@ -20,7 +21,7 @@ public interface RouteRepository extends MongoRepository<Route, ObjectId>, Route
 
     @Query(
             value = "{ 'userId': ?0, 'type': ?1, 'origin.address': ?2, 'destination.address': ?3, " +
-                    "'departureTime': ?4, 'status': { $in: ?5 } }",
+                    "'departureTime': ?4, 'date': ?5, 'status': { $in: ?6 } }",
             exists = true
     )
     boolean existsLiveDuplicate(
@@ -29,6 +30,7 @@ public interface RouteRepository extends MongoRepository<Route, ObjectId>, Route
             String originAddress,
             String destinationAddress,
             String departureTime,
+            LocalDate date,
             Collection<RouteStatus> statuses
     );
 }

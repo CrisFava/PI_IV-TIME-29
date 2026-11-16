@@ -25,6 +25,17 @@ class NextRideDateTest {
     }
 
     @Test
+    @DisplayName("Data fixa vale em qualquer dia futuro e hoje só antes da saída")
+    void shouldAcceptFixedDateWhileNotDeparted() {
+        assertThat(NextRideDate.onDate(LocalDate.of(2026, 11, 25), "07:00", WEDNESDAY_MORNING))
+                .contains(LocalDate.of(2026, 11, 25));
+        assertThat(NextRideDate.onDate(LocalDate.of(2026, 11, 11), "07:00", WEDNESDAY_MORNING))
+                .contains(LocalDate.of(2026, 11, 11));
+        assertThat(NextRideDate.onDate(LocalDate.of(2026, 11, 11), "06:00", WEDNESDAY_MORNING)).isEmpty();
+        assertThat(NextRideDate.onDate(LocalDate.of(2026, 11, 10), "07:00", WEDNESDAY_MORNING)).isEmpty();
+    }
+
+    @Test
     @DisplayName("Deve pular hoje quando o horário de saída já passou")
     void shouldSkipTodayAfterDeparture() {
         assertThat(NextRideDate.of(Set.of(DayOfWeek.WEDNESDAY, DayOfWeek.FRIDAY), "06:00", WEDNESDAY_MORNING))

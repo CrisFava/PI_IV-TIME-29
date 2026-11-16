@@ -2,7 +2,9 @@
 
 import 'package:flutter/foundation.dart';
 
+import '../../../ride/data/models/participant_status.dart';
 import '../../../ride/data/models/ride_model.dart';
+import '../../../ride/data/models/ride_status.dart';
 import '../../../route/data/models/route_response_model.dart';
 
 /// Uma carona que o motorista oferece: o trajeto de oferta publicado e as viagens
@@ -17,4 +19,37 @@ class DriverOffer {
     : rides = List.unmodifiable(rides);
 
   String get key => route?.id ?? 'ride:${rides.first.id}';
+
+  /// A viagem em andamento ou, se não houver, a mais próxima com passageiro
+  /// confirmado: é a que o motorista inicia ou conclui direto do card.
+  RideModel? get actionableRide {
+    for (final ride in rides) {
+      if (ride.status == RideStatus.inProgress) return ride;
+    }
+    RideModel? next;
+    for (final ride in rides) {
+      final departure = ride.departureDateTime;
+      if (_count(ride, ParticipantStatus.confirmed) == 0 || departure == null) {
+        continue;
+      }
+      final nextDeparture = next?.departureDateTime;
+      if (nextDeparture == null || departure.isBefore(nextDeparture)) {
+        next = ride;
+      }
+    }
+    return next;
+  }
+
+  /// Passageiros confirmados em todas as viagens da carona.
+  int get confirmedPassengers =>
+      rides.fold(0, (sum, r) => sum + _count(r, ParticipantStatus.confirmed));
+
+  /// Pedidos de vaga ainda sem resposta.
+  int get pendingRequests =>
+      rides.fold(0, (sum, r) => sum + _count(r, ParticipantStatus.requested));
+
+  static int _count(RideModel ride, ParticipantStatus status) => ride
+      .participants
+      .where((p) => p.isPassenger && p.status == status)
+      .length;
 }

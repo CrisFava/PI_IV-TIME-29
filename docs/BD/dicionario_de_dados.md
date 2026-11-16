@@ -113,7 +113,9 @@ Route é o registro de um deslocamento recorrente cadastrado por um usuário. Po
 | `destination` | Localização | Sim | Composto (C) | ver tipo especial 3.5 | nulo, incompleto | Ponto de chegada com endereço e coordenadas geográficas. |
 | `departureTime` | Hora | Sim | Simples | `07:30`, `18:00` | `7:3`, `25:00` | Formato `HH:mm`. Hora recorrente do dia, sem data, interpretada no fuso **America/Sao_Paulo**. |
 | `estimatedArrivalTime` | Hora | Sim | Simples | `08:10`, `19:00` | hora anterior à partida | Formato `HH:mm`. Calculado ou informado pelo usuário. |
-| `weekDays` | Elemento de lista enumerada | Sim | Multivalorado (M) | `["MONDAY","TUESDAY"]` | lista vazia | Mínimo 1 dia. Valores: `MONDAY`, `TUESDAY`, `WEDNESDAY`, `THURSDAY`, `FRIDAY`, `SATURDAY`, `SUNDAY`. |
+| `weekDays` | Elemento de lista enumerada | Sim | Multivalorado (M) | `["MONDAY","TUESDAY"]` | lista vazia | Mínimo 1 dia. Valores: `MONDAY`, `TUESDAY`, `WEDNESDAY`, `THURSDAY`, `FRIDAY`, `SATURDAY`, `SUNDAY`. Em `ONCE`, é o dia da semana de `date`. |
+| `recurrence` | Enumerado | Não | Simples | `ONCE`, `WEEKLY` | outro valor | `ONCE`: só na data de `date`. `WEEKLY`: toda semana nos `weekDays`. Ausente vale `WEEKLY`. |
+| `date` | Data | Não | Simples | `2026-11-21`, `null` | data passada | Formato `yyyy-MM-dd`, no fuso **America/Sao_Paulo**. Obrigatória em `ONCE` e nula em `WEEKLY`. |
 | `maxDetourKm` | Número decimal | Sim | Simples | `2.0`, `0.5`, `5.0` | negativo, zero | Somente para `OFFER`. Distância máxima de desvio aceita pelo motorista. Usado no matching. |
 | `toll` | Número decimal monetário | Não | Simples | `12.50`, `null` | negativo | Somente para `OFFER`. Valor estimado de pedágio informado pelo motorista na oferta. `Decimal128`. |
 | `parking` | Número decimal monetário | Não | Simples | `20.00`, `null` | negativo | Somente para `OFFER`. Valor estimado de estacionamento informado pelo motorista na oferta. `Decimal128`. |
@@ -802,6 +804,8 @@ Estrutura composta que representa a CNH do motorista. Opcional — só preenchid
   "departureTime": "07:30",
   "estimatedArrivalTime": "08:10",
   "weekDays": ["MONDAY", "TUESDAY", "WEDNESDAY", "THURSDAY", "FRIDAY"],
+  "recurrence": "WEEKLY",
+  "date": null,
   "maxDetourKm": 2.0,
   "toll": { "$numberDecimal": "12.50" },
   "parking": { "$numberDecimal": "0.00" },

@@ -39,7 +39,8 @@ public class MatchViewAssembler {
     public List<MatchResponseDTO> forPassenger(
             List<CompatibleMatch> matches,
             Map<String, Route> offersById,
-            Map<String, Optional<Vehicle>> vehiclesByRouteId
+            Map<String, Optional<Vehicle>> vehiclesByRouteId,
+            Route search
     ) {
         Map<String, String> names = getUserNames.execute(matches.stream().map(CompatibleMatch::driverId).toList());
 
@@ -51,7 +52,7 @@ public class MatchViewAssembler {
                             .map(MatchViewAssembler::toVehicle)
                             .orElse(null);
 
-                    return view(match, match.driverId(), ReviewedRole.DRIVER, names, offer, offer,
+                    return view(match, match.driverId(), ReviewedRole.DRIVER, names, offer, offer, search,
                             offer.getAvailableSeats(), vehicle);
                 })
                 .toList();
@@ -67,7 +68,8 @@ public class MatchViewAssembler {
 
         return matches.stream()
                 .map(match -> view(match, match.passengerId(), ReviewedRole.PASSENGER, names,
-                        searchesById.get(match.passengerRouteId()), driverRoute, null, null))
+                        searchesById.get(match.passengerRouteId()), driverRoute,
+                        searchesById.get(match.passengerRouteId()), null, null))
                 .toList();
     }
 
@@ -78,6 +80,7 @@ public class MatchViewAssembler {
             Map<String, String> names,
             Route otherRoute,
             Route driverRoute,
+            Route searchRoute,
             Integer availableSeats,
             MatchVehicleDTO vehicle
     ) {
@@ -97,7 +100,8 @@ public class MatchViewAssembler {
                 match.estimatedCostPerPassenger(),
                 match.maxAmount(),
                 // A viagem sai no horário do motorista
-                NextRideDate.of(match.compatibleDays(), driverRoute.getDepartureTime()).orElse(null),
+                NextRideDate.of(match.compatibleDays(), driverRoute.getDepartureTime(),
+                        driverRoute.getDate(), searchRoute.getDate()).orElse(null),
                 otherRoute.getDepartureTime(),
                 otherRoute.getEstimatedArrivalTime(),
                 toPlace(otherRoute.getOrigin()),

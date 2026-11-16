@@ -6,6 +6,7 @@ import com.converge.api.modules.ride.application.dto.CancelRideCommand;
 import com.converge.api.modules.ride.application.event.RideNotificationEvent;
 import com.converge.api.modules.ride.domain.model.Ride;
 import com.converge.api.modules.ride.domain.repository.RideRepository;
+import com.converge.api.modules.route.application.RouteAccess;
 import com.converge.api.modules.user.application.RecordReputationPenaltyUseCase;
 import com.converge.api.shared.application.AuditLogService;
 import com.converge.api.shared.application.SafeActionHandler;
@@ -17,6 +18,7 @@ import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.context.ApplicationEventPublisher;
 import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Transactional;
 
 import java.util.List;
 import java.util.Map;
@@ -34,8 +36,11 @@ public class CancelRideUseCase implements UseCase<CancelRideCommand, Ride> {
     private final RecordReputationPenaltyUseCase recordReputationPenalty;
     private final AuditLogService auditLogService;
     private final ApplicationEventPublisher eventPublisher;
+    private final RouteAccess routeAccess;
 
+    // A viagem cancelada e o fim da carona de um dia só são gravados juntos
     @Override
+    @Transactional(transactionManager = "mongoTransactionManager")
     public Ride execute(CancelRideCommand command) {
         Ride ride = rideAccess.getOwnedRide(command.rideId(), command.firebaseUid());
         String driverId = rideAccess.currentUserId(command.firebaseUid());
@@ -45,6 +50,7 @@ public class CancelRideUseCase implements UseCase<CancelRideCommand, Ride> {
 
         ride.cancel(driverId, reason);
         Ride saved = rideRepository.save(ride);
+        routeAccess.endIfOnce(saved.getDriverRouteId());
 
         if (!confirmedPassengerIds.isEmpty()) {
             handleCancellationWithConfirmedPassengers(driverId, command.rideId(), confirmedPassengerIds, reason);

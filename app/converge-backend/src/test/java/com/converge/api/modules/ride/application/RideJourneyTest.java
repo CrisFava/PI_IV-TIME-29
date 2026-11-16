@@ -17,6 +17,7 @@ import com.converge.api.modules.ride.domain.model.subtypes.Participant;
 import com.converge.api.modules.ride.domain.model.subtypes.VehicleSnapshot;
 import com.converge.api.modules.ride.domain.repository.RideRepository;
 import com.converge.api.modules.ride.infrastructure.RideCostCalculator;
+import com.converge.api.modules.route.application.RouteAccess;
 import com.converge.api.modules.route.domain.model.subtypes.Coordinates;
 import com.converge.api.modules.route.domain.model.subtypes.Place;
 import com.converge.api.modules.user.application.GetUserPixInfoUseCase;
@@ -165,8 +166,9 @@ class RideJourneyTest {
         leaveRide = new LeaveRideUseCase(
                 rideAccess, rideCostCalculator, rideItineraryService, rideRepository, recordReputationPenalty, auditLogService);
         cancelRide = new CancelRideUseCase(
-                rideAccess, rideRepository, recordReputationPenalty, auditLogService, eventPublisher);
-        completeRide = new CompleteRideUseCase(rideAccess, rideCostCalculator, rideRepository, completionPublisher);
+                rideAccess, rideRepository, recordReputationPenalty, auditLogService, eventPublisher, mock(RouteAccess.class));
+        completeRide = new CompleteRideUseCase(
+                rideAccess, rideCostCalculator, rideRepository, completionPublisher, mock(RouteAccess.class));
         requestPayment = new RequestPaymentUseCase(rideAccess, rideRepository, paymentView);
         confirmPayment = new ConfirmPaymentUseCase(rideAccess, rideRepository, paymentView);
     }
