@@ -1,5 +1,6 @@
 // Autor: Cristian Eduardo Fava - RA 25000636
 
+import 'features/indicator/presentation/pages/indicators_page.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
@@ -81,6 +82,10 @@ final appRouterProvider = Provider<GoRouter>((ref) {
       GoRoute(
         path: AppRoutes.home,
         builder: (_, _) => const HomePage(),
+      ),
+      GoRoute(
+        path: AppRoutes.indicators,
+        builder: (_, _) => const IndicatorsPage(),
       ),
       GoRoute(
         path: AppRoutes.chat,
