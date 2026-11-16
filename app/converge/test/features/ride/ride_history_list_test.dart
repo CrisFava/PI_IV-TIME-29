@@ -66,7 +66,7 @@ void main() {
       );
       await tester.pumpAndSettle();
 
-      expect(find.text('12/11 · 07:30'), findsOneWidget);
+      expect(find.text('12/11/2026 · 07:30'), findsOneWidget);
       expect(find.text('Cambuí → Campus'), findsOneWidget);
       expect(find.text('Gol · 4 pess. · pagou R\$ 6,00'), findsOneWidget);
       expect(find.text('Passageiro'), findsWidgets);

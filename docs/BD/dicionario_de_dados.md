@@ -146,6 +146,7 @@ Ride é o evento central do sistema. Representa uma viagem concreta com data, ho
 | `destination` | Localização | Sim | Composto (C) | ver tipo especial 3.5 | nulo | Snapshot do destino. Imutável. |
 | `departureDateTime` | Data e hora | Sim | Simples | `2025-05-12T10:30:00Z` | data passada no cadastro | Armazenado em **UTC**. Combinação da data concreta com `route.departureTime`, convertida de America/Sao_Paulo para UTC (ex.: 07:30 BRT = 10:30 UTC). Nunca usar o fuso do servidor na conversão. |
 | `estimatedArrivalDateTime` | Data e hora | Sim | Simples | `2025-05-12T11:10:00Z` | anterior à partida | Armazenado em UTC. Calculada a partir da partida + duração estimada. |
+| `directArrivalDateTime` | Data e hora | Não | Simples | `2025-05-12T11:00:00Z` | anterior à partida | Armazenado em UTC. Chegada pela rota direta, sem paradas, guardada na criação. Volta a ser a `estimatedArrivalDateTime` quando a viagem fica sem passageiros. |
 | `completedAt` | Data e hora | Não | Simples | `2025-05-12T11:15:00Z` | anterior à partida | Armazenado em UTC. Nulo até o motorista concluir a viagem. |
 | `weekDays` | Elemento de lista enumerada | Sim | Multivalorado (M) | `["MONDAY","WEDNESDAY"]` | lista vazia | Cópia dos dias do trajeto no momento da criação. |
 | `totalSeats` | Número inteiro | Sim | Simples | `3`, `8` | `0`, negativo | Copiado do trajeto. Não se altera após a criação. |
@@ -841,6 +842,7 @@ Estrutura composta que representa a CNH do motorista. Opcional — só preenchid
   },
   "departureDateTime": "2025-05-12T10:30:00Z",
   "estimatedArrivalDateTime": "2025-05-12T11:10:00Z",
+  "directArrivalDateTime": "2025-05-12T11:00:00Z",
   "completedAt": "2025-05-12T11:15:00Z",
   "weekDays": ["MONDAY", "TUESDAY", "WEDNESDAY", "THURSDAY", "FRIDAY"],
   "totalSeats": 3,

@@ -4,7 +4,6 @@ package com.converge.api.modules.ride.application;
 
 import com.converge.api.modules.ride.application.dto.RideHistoryItemDTO;
 import com.converge.api.modules.ride.application.dto.RideHistoryQuery;
-import com.converge.api.modules.ride.domain.enums.ParticipantPaymentStatus;
 import com.converge.api.modules.ride.domain.model.Ride;
 import com.converge.api.modules.ride.domain.repository.RideRepository;
 import com.converge.api.modules.user.domain.enums.user.ParticipationRole;
@@ -50,8 +49,10 @@ class ListRideHistoryUseCaseTest {
         completed.complete();
         var ana = completed.getParticipants().stream().filter(p -> "ana".equals(p.getUserId())).findFirst().orElseThrow();
         ReflectionTestUtils.setField(ana, "estimatedAmount", new BigDecimal("6.00"));
-        ReflectionTestUtils.setField(ana, "finalAmount", new BigDecimal("6.00"));
-        ReflectionTestUtils.setField(ana, "paymentStatus", ParticipantPaymentStatus.PAID);
+        // O valor pago é o cobrado pelo motorista e confirmado, não o calculado no fim
+        ReflectionTestUtils.setField(ana, "finalAmount", new BigDecimal("5.10"));
+        completed.requestPayment("ana", new BigDecimal("6.00"));
+        completed.confirmPayment("ana");
 
         // Viagem que ainda vai acontecer: não é histórico
         upcoming = rideFromCenterToCampus();

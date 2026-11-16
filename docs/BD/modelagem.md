@@ -383,6 +383,7 @@ Quando `active = false` (conta suspensa ou excluída):
   },
   "departureDateTime": "ISODate",
   "estimatedArrivalDateTime": "ISODate",
+  "directArrivalDateTime": "ISODate | null",
   "completedAt": "ISODate | null",
   "weekDays": ["MONDAY | TUESDAY | ..."],
   "totalSeats": "Integer",
@@ -460,7 +461,7 @@ Quando `active = false` (conta suspensa ou excluída):
 
 A chegada não usa mais um valor fixo enviado pelo app: ela sai do tempo de carro calculado pela Routes API (`routes.duration`).
 - **Trajeto:** `estimatedArrivalTime` = `departureTime` + o tempo da rota entre a origem e o destino. Sem o Google, o tempo é estimado pela distância, a 30 km/h de média na cidade.
-- **Viagem:** quando o itinerário é recalculado, `estimatedArrivalDateTime` = `departureDateTime` + o tempo da rota passando pelas paradas, porque buscar e deixar os passageiros leva mais tempo.
+- **Viagem:** quando o itinerário é recalculado, `estimatedArrivalDateTime` = `departureDateTime` + o tempo da rota passando pelas paradas, porque buscar e deixar os passageiros leva mais tempo. Quando o último passageiro sai, volta a valer `directArrivalDateTime`, a chegada pela rota direta guardada na criação da viagem.
 
 ### Histórico de viagens (RF59)
 

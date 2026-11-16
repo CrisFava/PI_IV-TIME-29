@@ -78,8 +78,8 @@ public class ListRideHistoryUseCase implements UseCase<RideHistoryQuery, List<Ri
 
     private static RideHistoryItemDTO driverItem(Ride ride) {
         BigDecimal received = ride.getParticipants().stream()
-                .filter(p -> p.getPaymentStatus() == ParticipantPaymentStatus.PAID && p.getFinalAmount() != null)
-                .map(Participant::getFinalAmount)
+                .filter(p -> p.getPaymentStatus() == ParticipantPaymentStatus.PAID && p.getRequestedAmount() != null)
+                .map(Participant::getRequestedAmount)
                 .reduce(BigDecimal.ZERO, BigDecimal::add);
 
         return new RideHistoryItemDTO(
@@ -112,7 +112,7 @@ public class ListRideHistoryUseCase implements UseCase<RideHistoryQuery, List<Ri
                 ride.getVehicleSnapshot(),
                 peopleWhoWent(ride),
                 passenger.getEstimatedAmount(),
-                paid ? passenger.getFinalAmount() : null,
+                paid ? passenger.getRequestedAmount() : null,
                 passenger.getPaymentStatus()
         );
     }

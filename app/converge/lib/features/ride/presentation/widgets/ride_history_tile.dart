@@ -21,7 +21,7 @@ class RideHistoryTile extends StatelessWidget {
 
   static String _when(DateTime? date) {
     if (date == null) return 'Data a definir';
-    return '${_twoDigits(date.day)}/${_twoDigits(date.month)} · '
+    return '${_twoDigits(date.day)}/${_twoDigits(date.month)}/${date.year} · '
         '${_twoDigits(date.hour)}:${_twoDigits(date.minute)}';
   }
 
