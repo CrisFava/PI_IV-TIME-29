@@ -89,7 +89,7 @@ Veículo é o automóvel cadastrado por um motorista. Um usuário pode ter múlt
 | `renavam` | Texto numérico | Sim | Simples | `14283256656` | `1428325665` (10 dígitos), `14283256657` (dígito verificador errado), `11111111111` | Registro Nacional de Veículos Automotores. 11 dígitos, guardados sem pontuação; o último é o dígito verificador (soma dos 10 primeiros com os pesos 3, 2, 9, 8, 7, 6, 5, 4, 3, 2; dígito = soma × 10 mod 11, com 10 virando 0). Pode faltar em veículos cadastrados antes do campo existir. |
 | `color` | Texto | Sim | Simples | `Branco`, `Prata`, `Azul` | vazio | Texto livre. Auxilia o passageiro a identificar o veículo. |
 | `type` | Elemento de lista enumerada | Sim | Simples | `HATCH`, `VAN`, `MOTORCYCLE` | valor fora do enum | Valores: `HATCH`, `SEDAN`, `SUV`, `PICKUP`, `VAN`, `MOTORCYCLE`, `OTHER`. Moto tem capacidade máxima de 1. |
-| `totalCapacity` | Número inteiro | Sim | Simples | `5`, `15`, `1` (moto) | `0`, negativo, maior que 15 | Inclui o motorista. Mínimo 1. Máximo 15. |
+| `totalCapacity` | Número inteiro | Sim | Simples | `5`, `7`, `15` (van), `2` (moto) | `0`, negativo, carro com mais de 7, maior que 15 | Inclui o motorista. Carro (hatch, sedã, SUV, picape): até 7. Van ou outro: até 15. Moto: até 2. |
 | `fuelSources` | Dados de consumo por fonte de energia | Sim | Multivalorado e Composto (MC) | ver tipo especial 3.4 | lista vazia | Não pode haver dois itens da mesma fonte no mesmo veículo. Flex tem 2 itens. |
 | `active` | Booleano | Sim | Simples | `true`, `false` | nulo | Veículo inativo não aparece na seleção de trajeto. |
 | `createdAt` | Data e hora | Sim | Simples | `2025-04-10T09:00:00Z` | data futura | Gerado automaticamente. |

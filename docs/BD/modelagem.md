@@ -266,7 +266,7 @@ Quando `active = false` (conta suspensa ou excluída):
 
 ### Regras de Negócio
 
-- **Moto:** `totalCapacity = 1`, validado no service.
+- **Lugares (`totalCapacity`, contando o motorista):** carro (hatch, sedã, SUV, picape) até 7; van ou outro até 15; moto até 2. Validado no domínio (`Vehicle`).
 - **Placa:** sempre gravada em maiúsculas, sem hífen e sem espaços.
 - **Limite de consumo médio** (validado no service; fora da faixa retorna erro 400):
 
