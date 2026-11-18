@@ -19,7 +19,6 @@ import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 
-import java.util.List;
 import java.util.Optional;
 import java.util.Set;
 
@@ -32,7 +31,7 @@ import static org.mockito.Mockito.verifyNoInteractions;
 import static org.mockito.Mockito.when;
 
 @ExtendWith(MockitoExtension.class)
-class ReportUseCasesTest {
+class CreateReportUseCaseTest {
 
     private static final String RIDE_ID = "ride-1";
     private static final String DRIVER = "driver-1";
@@ -164,14 +163,5 @@ class ReportUseCasesTest {
 
         assertFails(ErrorCode.BAD_REQUEST, new CreateReportUseCase.Command(
                 PASSENGER, request(DRIVER, ReportReason.IMPROPER_CHARGE, null, null)));
-    }
-
-    @Test
-    @DisplayName("Deve listar as denúncias do usuário logado")
-    void shouldListMyReports() {
-        Report report = new Report(PASSENGER, DRIVER, null, ReportReason.IMPROPER_CHARGE, null);
-        when(reportRepository.findByReporterIdOrderByCreatedAtDesc(PASSENGER)).thenReturn(List.of(report));
-
-        assertThat(new ListMyReportsUseCase(reportRepository).execute(PASSENGER)).containsExactly(report);
     }
 }

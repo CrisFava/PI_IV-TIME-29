@@ -2,7 +2,6 @@
 
 package com.converge.api.modules.security.application;
 
-import com.converge.api.modules.security.application.dto.BlockResponseDTO;
 import com.converge.api.modules.security.application.gateway.UserLookupGateway;
 import com.converge.api.modules.security.domain.model.Block;
 import com.converge.api.modules.security.domain.repository.BlockRepository;
@@ -15,8 +14,6 @@ import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 import org.springframework.dao.DuplicateKeyException;
 
-import java.util.List;
-import java.util.Map;
 import java.util.Optional;
 
 import static org.assertj.core.api.Assertions.assertThat;
@@ -28,7 +25,7 @@ import static org.mockito.Mockito.verifyNoInteractions;
 import static org.mockito.Mockito.when;
 
 @ExtendWith(MockitoExtension.class)
-class BlockUseCasesTest {
+class CreateBlockUseCaseTest {
 
     private static final String ME = "user-me";
     private static final String OTHER = "user-other";
@@ -104,46 +101,5 @@ class BlockUseCasesTest {
 
         assertThat(ex.getError().code()).isEqualTo(ErrorCode.USER_NOT_FOUND);
         verifyNoInteractions(blockRepository);
-    }
-
-    @Test
-    @DisplayName("Desbloquear remove só o bloqueio feito por quem pede")
-    void shouldDeleteOnlyOwnBlock() {
-        new DeleteBlockUseCase(blockRepository).execute(new DeleteBlockUseCase.Command(ME, OTHER));
-
-        verify(blockRepository).deleteByUserIdAndBlockedUserId(ME, OTHER);
-    }
-
-    @Test
-    @DisplayName("Desbloquear sem bloqueio existente não dá erro")
-    void shouldNotFailWhenThereIsNothingToDelete() {
-        when(blockRepository.deleteByUserIdAndBlockedUserId(ME, OTHER)).thenReturn(0L);
-
-        new DeleteBlockUseCase(blockRepository).execute(new DeleteBlockUseCase.Command(ME, OTHER));
-
-        verify(blockRepository).deleteByUserIdAndBlockedUserId(ME, OTHER);
-    }
-
-    @Test
-    @DisplayName("Deve listar os bloqueados com o nome de cada um")
-    void shouldListBlocksWithNames() {
-        when(blockRepository.findByUserIdOrderByCreatedAtDesc(ME))
-                .thenReturn(List.of(new Block(ME, "u1"), new Block(ME, "u2")));
-        when(userLookup.namesOf(List.of("u1", "u2"))).thenReturn(Map.of("u1", "Ana"));
-
-        List<BlockResponseDTO> blocks = new ListBlocksUseCase(blockRepository, userLookup).execute(ME);
-
-        assertThat(blocks).extracting(BlockResponseDTO::blockedUserId).containsExactly("u1", "u2");
-        assertThat(blocks).extracting(BlockResponseDTO::blockedUserName).containsExactly("Ana", null);
-    }
-
-    @Test
-    @DisplayName("Sem bloqueios devolve lista vazia sem buscar nomes")
-    void shouldReturnEmptyListWhenThereAreNoBlocks() {
-        when(blockRepository.findByUserIdOrderByCreatedAtDesc(ME)).thenReturn(List.of());
-
-        assertThat(new ListBlocksUseCase(blockRepository, userLookup).execute(ME)).isEmpty();
-
-        verifyNoInteractions(userLookup);
     }
 }
