@@ -2,11 +2,11 @@
 
 package com.converge.api.modules.route.application;
 
+import com.converge.api.modules.route.application.gateway.DistanceGateway;
 import com.converge.api.modules.route.application.gateway.MapsGateway;
 import com.converge.api.modules.route.application.gateway.RouteGeometry;
 import com.converge.api.modules.route.domain.model.subtypes.Coordinates;
 import com.converge.api.modules.route.domain.model.subtypes.Place;
-import com.converge.api.modules.route.domain.service.HaversineCalculator;
 import com.converge.api.shared.presentation.exception.ApplicationException;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
@@ -29,6 +29,7 @@ public class RouteGeometryService {
     static final double AVERAGE_CITY_SPEED_KMH = 30.0;
 
     private final MapsGateway mapsGateway;
+    private final DistanceGateway distanceGateway;
 
     public RouteGeometry compute(Place origin, Place destination) {
         return compute(origin, List.of(), destination);
@@ -55,9 +56,14 @@ public class RouteGeometryService {
             log.warn("Routes API indisponível, usando Haversine: {}", e.getMessage());
         }
 
-        double distanceKm = 0;
+        // Todos os trechos vão numa chamada só, e a soma segue a ordem dos trechos.
+        List<DistanceGateway.CoordinatePair> segments = new ArrayList<>();
         for (int i = 1; i < points.size(); i++) {
-            distanceKm += HaversineCalculator.distanceKm(points.get(i - 1), points.get(i));
+            segments.add(new DistanceGateway.CoordinatePair(points.get(i - 1), points.get(i)));
+        }
+        double distanceKm = 0;
+        for (double segmentKm : distanceGateway.distancesKm(segments)) {
+            distanceKm += segmentKm;
         }
         return new RouteGeometry(distanceKm, null, estimatedMinutes(distanceKm));
     }

@@ -5,7 +5,6 @@ package com.converge.api.modules.route.application;
 import com.converge.api.modules.route.application.gateway.RouteGeometry;
 import com.converge.api.modules.route.domain.model.subtypes.Coordinates;
 import com.converge.api.modules.route.domain.model.subtypes.Place;
-import com.converge.api.modules.route.domain.service.HaversineCalculator;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
@@ -23,15 +22,16 @@ class RouteGeometryServiceTest {
     private static final Place HOME = Place.of("Rua Barão de Jaguara, 1000", "Centro", "Campinas", HOME_COORDINATES);
     private static final Place PUC = Place.of("Rod. Dom Pedro I, km 136", null, "Campinas", PUC_COORDINATES);
 
-    private static final double STRAIGHT_LINE_KM = HaversineCalculator.distanceKm(HOME_COORDINATES, PUC_COORDINATES);
 
+    private final FakeDistanceGateway distances = new FakeDistanceGateway();
+    private final double straightLineKm = distances.distanceKm(HOME_COORDINATES, PUC_COORDINATES);
     private FakeMapsGateway mapsGateway;
     private RouteGeometryService routeGeometryService;
 
     @BeforeEach
     void setUp() {
         mapsGateway = new FakeMapsGateway();
-        routeGeometryService = new RouteGeometryService(mapsGateway);
+        routeGeometryService = new RouteGeometryService(mapsGateway, distances);
     }
 
     @Test
@@ -47,7 +47,7 @@ class RouteGeometryServiceTest {
 
         RouteGeometry geometry = routeGeometryService.compute(HOME, PUC);
 
-        assertThat(geometry.distanceKm()).isEqualTo(STRAIGHT_LINE_KM);
+        assertThat(geometry.distanceKm()).isEqualTo(straightLineKm);
         assertThat(geometry.encodedPolyline()).isNull();
     }
 
@@ -58,7 +58,7 @@ class RouteGeometryServiceTest {
 
         RouteGeometry geometry = routeGeometryService.compute(HOME, PUC);
 
-        assertThat(geometry.distanceKm()).isEqualTo(STRAIGHT_LINE_KM);
+        assertThat(geometry.distanceKm()).isEqualTo(straightLineKm);
         assertThat(geometry.encodedPolyline()).isNull();
     }
     @Test
@@ -70,9 +70,23 @@ class RouteGeometryServiceTest {
 
         RouteGeometry geometry = routeGeometryService.compute(HOME, List.of(stop), PUC);
 
-        double expected = HaversineCalculator.distanceKm(HOME_COORDINATES, stopCoordinates)
-                + HaversineCalculator.distanceKm(stopCoordinates, PUC_COORDINATES);
+        double expected = distances.distanceKm(HOME_COORDINATES, stopCoordinates)
+                + distances.distanceKm(stopCoordinates, PUC_COORDINATES);
         assertThat(geometry.distanceKm()).isEqualTo(expected);
         assertThat(geometry.encodedPolyline()).isNull();
+    }
+
+    @Test
+    @DisplayName("Sem o Google, todos os trechos são calculados numa chamada só ao gateway de distância")
+    void shouldCalculateAllSegmentsInOneCall() {
+        mapsGateway.routesDown = true;
+        FakeDistanceGateway countingDistances = new FakeDistanceGateway();
+        Coordinates stopCoordinates = new Coordinates(-22.8955, -47.0525);
+        Place stop = Place.of("Rua Coronel Quirino, 900", "Cambuí", "Campinas", stopCoordinates);
+
+        new RouteGeometryService(mapsGateway, countingDistances).compute(HOME, List.of(stop, stop), PUC);
+
+        assertThat(countingDistances.calls).isEqualTo(1);
+        assertThat(countingDistances.pairsCalculated).isEqualTo(3);
     }
 }

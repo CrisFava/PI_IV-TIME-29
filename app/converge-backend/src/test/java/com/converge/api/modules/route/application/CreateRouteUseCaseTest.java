@@ -47,7 +47,7 @@ class CreateRouteUseCaseTest {
     @BeforeEach
     void setUp() {
         createRouteUseCase = new CreateRouteUseCase(
-                routeRepository, new RouteMapper(), new RouteGeometryService(new FakeMapsGateway()),
+                routeRepository, new RouteMapper(), new RouteGeometryService(new FakeMapsGateway(), new FakeDistanceGateway()),
                 new OfferOverlapValidator(routeRepository)
         );
     }

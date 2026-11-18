@@ -4,6 +4,7 @@ package com.converge.api.modules.ride.application;
 
 import com.converge.api.modules.ride.domain.model.Ride;
 import com.converge.api.modules.ride.domain.model.subtypes.RideStop;
+import com.converge.api.modules.route.application.FakeDistanceGateway;
 import com.converge.api.modules.route.application.RouteGeometryService;
 import com.converge.api.modules.route.application.gateway.RouteGeometry;
 import com.converge.api.modules.route.domain.model.subtypes.Place;
@@ -38,7 +39,7 @@ class RideItineraryServiceTest {
 
     @BeforeEach
     void setUp() {
-        service = new RideItineraryService(new RideItineraryPlanner(), routeGeometry);
+        service = new RideItineraryService(new RideItineraryPlanner(new FakeDistanceGateway()), routeGeometry);
         ride = rideFromCenterToCampus();
         ride.requestSeat("ana", "route-ana", place("Cambuí", -22.9000, -47.0600), place("Bloco A", -22.8400, -47.0530));
         ride.acceptPassenger("ana");
