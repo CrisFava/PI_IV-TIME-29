@@ -6,11 +6,13 @@ import com.converge.api.modules.indicator.application.dto.UserIndicatorResponseD
 import com.converge.api.modules.indicator.domain.enums.IndicatorPeriod;
 import com.converge.api.modules.indicator.domain.model.UserIndicator;
 import com.converge.api.modules.indicator.domain.repository.UserIndicatorRepository;
+import com.converge.api.modules.indicator.infrastructure.SocketIndicatorReferenceGateway;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.InjectMocks;
 import org.mockito.Mock;
+import org.mockito.Spy;
 import org.mockito.junit.jupiter.MockitoExtension;
 
 import java.time.LocalDate;
@@ -24,6 +26,11 @@ class GetUserIndicatorSeriesUseCaseTest {
 
     @Mock
     private UserIndicatorRepository repository;
+
+    // Porta fechada: sem servidor, o adaptador cai no handler local.
+    @Spy
+    private SocketIndicatorReferenceGateway indicatorReferenceGateway =
+            new SocketIndicatorReferenceGateway("localhost", 1);
 
     @InjectMocks
     private GetUserIndicatorSeriesUseCase useCase;

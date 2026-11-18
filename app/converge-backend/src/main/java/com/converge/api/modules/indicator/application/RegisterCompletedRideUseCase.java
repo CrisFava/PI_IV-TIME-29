@@ -3,12 +3,12 @@
 package com.converge.api.modules.indicator.application;
 
 import com.converge.api.modules.indicator.application.dto.CompletedRideCommand;
+import com.converge.api.modules.indicator.application.gateway.IndicatorReferenceGateway;
 import com.converge.api.modules.indicator.application.gateway.IndicatorStore;
+import com.converge.api.modules.indicator.application.gateway.SustainabilityGateway;
 import com.converge.api.modules.indicator.domain.enums.IndicatorPeriod;
 import com.converge.api.modules.indicator.domain.model.PlatformIndicator;
 import com.converge.api.modules.indicator.domain.repository.PlatformIndicatorRepository;
-import com.converge.api.modules.indicator.domain.service.IndicatorReference;
-import com.converge.api.modules.indicator.domain.service.SustainabilityCalculator;
 import com.converge.api.shared.application.UseCase;
 import com.converge.api.shared.presentation.exception.ApplicationException;
 import com.converge.api.shared.presentation.exception.ErrorCode;
@@ -16,6 +16,7 @@ import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
 
 import java.time.LocalDate;
+import java.util.Collections;
 import java.util.List;
 import java.util.Set;
 
@@ -42,6 +43,8 @@ public class RegisterCompletedRideUseCase implements UseCase<CompletedRideComman
 
     private final IndicatorStore indicatorStore;
     private final PlatformIndicatorRepository platformIndicatorRepository;
+    private final SustainabilityGateway sustainabilityGateway;
+    private final IndicatorReferenceGateway indicatorReferenceGateway;
 
     @Override
     public PlatformIndicator execute(CompletedRideCommand command) {
@@ -59,18 +62,20 @@ public class RegisterCompletedRideUseCase implements UseCase<CompletedRideComman
     private void register(CompletedRideCommand command) {
         String rideId = command.rideId();
         List<String> passengerIds = command.passengerIds().stream().distinct().toList();
-        int carsAvoided = SustainabilityCalculator.carsAvoided(passengerIds.size());
         double distanceKm = command.distanceKm();
-
-        double energySaved =
-                SustainabilityCalculator.energySaved(distanceKm, command.averageConsumption(), carsAvoided);
-        double co2AvoidedKg = SustainabilityCalculator.co2AvoidedKg(energySaved, command.energySource());
+        SustainabilityGateway.Result impact = sustainabilityGateway.calculate(
+                distanceKm, command.averageConsumption(), command.energySource(), passengerIds.size());
+        int carsAvoided = impact.carsAvoided();
+        double co2AvoidedKg = impact.co2AvoidedKg();
         double co2SharePerParticipant = co2AvoidedKg / (passengerIds.size() + 1);
 
         LocalDate date = command.completedAt().toLocalDate();
 
-        for (IndicatorPeriod period : USER_PERIODS) {
-            String reference = IndicatorReference.of(period, date);
+        List<String> references = indicatorReferenceGateway.references(
+                USER_PERIODS, Collections.nCopies(USER_PERIODS.size(), date));
+        for (int i = 0; i < USER_PERIODS.size(); i++) {
+            IndicatorPeriod period = USER_PERIODS.get(i);
+            String reference = references.get(i);
 
             indicatorStore.addToUser(rideId, command.driverId(), period, reference,
                     1, 0, distanceKm, carsAvoided, co2SharePerParticipant);

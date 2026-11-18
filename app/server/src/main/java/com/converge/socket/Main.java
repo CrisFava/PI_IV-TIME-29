@@ -5,6 +5,8 @@ package com.converge.socket;
 import com.converge.socket.core.SocketServer;
 import com.converge.socket.handler.cpf.ValidateCpfHandler;
 import com.converge.socket.handler.cpf.ValidateCpfRequest;
+import com.converge.socket.handler.indicator.IndicatorReferenceHandler;
+import com.converge.socket.handler.indicator.IndicatorReferenceRequest;
 import com.converge.socket.handler.matching.MatchRoutesHandler;
 import com.converge.socket.handler.matching.MatchRoutesRequest;
 import com.converge.socket.handler.math.MathOperationHandler;
@@ -26,6 +28,7 @@ public class Main {
         server.registerHandler(MathOperationRequest.class, new MathOperationHandler());
         server.registerHandler(ValidateCpfRequest.class, new ValidateCpfHandler());
         server.registerHandler(SustainabilityRequest.class, new SustainabilityHandler());
+        server.registerHandler(IndicatorReferenceRequest.class, new IndicatorReferenceHandler());
         server.registerHandler(PixPayloadRequest.class, new PixPayloadHandler());
         server.registerHandler(MatchRoutesRequest.class, new MatchRoutesHandler());
         server.registerHandler(RideCostRequest.class, new RideCostHandler());
