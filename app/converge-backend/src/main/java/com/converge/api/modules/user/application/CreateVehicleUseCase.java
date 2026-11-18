@@ -25,11 +25,13 @@ public class CreateVehicleUseCase implements UseCase<CreateVehicleCommand, Vehic
     private final UserUtils userUtils;
     private final VehicleRepository vehicleRepository;
     private final VehicleMapper vehicleMapper;
+    private final ValidateRenavamUseCase validateRenavam;
 
     @Override
     public Vehicle execute(CreateVehicleCommand command) {
         User user = userUtils.getCurrentUser(command.firebaseUid());
         validateIsDriver(user);
+        validateRenavam.execute(command.request().renavam());
 
         Vehicle vehicle = vehicleMapper.toEntity(user.getId().toHexString(), command.request());
 
