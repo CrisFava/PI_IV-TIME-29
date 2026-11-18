@@ -45,6 +45,20 @@ public record Reputation(
         return new Reputation(driver, currentPassenger.recordLateCancellation(now));
     }
 
+    public Reputation withDriverCompletedRide(LocalDateTime now) {
+        DriverReputation currentDriver = driver != null
+                ? driver
+                : defaultInitial().driver();
+        return new Reputation(currentDriver.recordCompletedRide(now), passenger);
+    }
+
+    public Reputation withPassengerCompletedRide(LocalDateTime now) {
+        PassengerReputation currentPassenger = passenger != null
+                ? passenger
+                : defaultInitial().passenger();
+        return new Reputation(driver, currentPassenger.recordCompletedRide(now));
+    }
+
     public Reputation withDriverRating(double averageRating, int totalReviews, LocalDateTime now) {
         DriverReputation currentDriver = driver != null
                 ? driver

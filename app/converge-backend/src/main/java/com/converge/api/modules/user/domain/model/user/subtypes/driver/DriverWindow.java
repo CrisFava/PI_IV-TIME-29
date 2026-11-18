@@ -21,6 +21,11 @@ public record DriverWindow(
         Integer substantiatedReports
 ) {
 
+    public DriverWindow withIncrementedCompletedRides() {
+        int current = completedRides != null ? completedRides : 0;
+        return new DriverWindow(current + 1, driverInitiatedCancellations, delays, substantiatedReports);
+    }
+
     public DriverWindow withIncrementedCancellations() {
         int current = driverInitiatedCancellations != null ? driverInitiatedCancellations : 0;
         return new DriverWindow(completedRides, current + 1, delays, substantiatedReports);

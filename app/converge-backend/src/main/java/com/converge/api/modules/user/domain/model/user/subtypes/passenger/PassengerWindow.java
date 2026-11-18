@@ -24,6 +24,11 @@ public record PassengerWindow(
         Integer overdueRides
 ) {
 
+    public PassengerWindow withIncrementedCompletedRides() {
+        int current = completedRides != null ? completedRides : 0;
+        return new PassengerWindow(current + 1, lateCancellations, noShows, substantiatedReports, overdueRides);
+    }
+
     public PassengerWindow withIncrementedLateCancellations() {
         int current = lateCancellations != null ? lateCancellations : 0;
         return new PassengerWindow(completedRides, current + 1, noShows, substantiatedReports, overdueRides);
