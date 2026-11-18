@@ -338,6 +338,14 @@ public class User {
         revokeTrustBadgeIfThresholdExceeded();
     }
 
+    public void recordDriverRating(double averageRating, int totalReviews, LocalDateTime now) {
+        this.reputation = currentReputation().withDriverRating(averageRating, totalReviews, now);
+    }
+
+    public void recordPassengerRating(double averageRating, int totalReviews, LocalDateTime now) {
+        this.reputation = currentReputation().withPassengerRating(averageRating, totalReviews, now);
+    }
+
     private Reputation currentReputation() {
         return this.reputation != null ? this.reputation : Reputation.defaultInitial();
     }
