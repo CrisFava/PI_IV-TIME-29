@@ -10,7 +10,6 @@ import org.springframework.stereotype.Repository;
 
 import java.util.Optional;
 
-// Autora: Daniela Mikie Kikuchi Gonçalves
 // Acesso ao banco dos indicadores. O Spring gera a implementação pelos nomes dos métodos.
 @Repository
 public interface PlatformIndicatorRepository extends MongoRepository<PlatformIndicator, ObjectId> {

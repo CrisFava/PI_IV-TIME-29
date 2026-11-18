@@ -19,7 +19,6 @@ import java.util.ArrayList;
 import java.util.List;
 import java.util.Set;
 
-// Autora: Daniela Mikie Kikuchi Gonçalves
 // Indicadores de impacto da plataforma inteira, um documento por período (RF51-RF55).
 @Document(collection = "platform_indicators")
 @CompoundIndex(name = "period_reference_unique", def = "{'period': 1, 'reference': 1}", unique = true)
@@ -83,16 +82,16 @@ public class PlatformIndicator {
 
     private static void validateIdentity(IndicatorPeriod period, String reference) {
         if (period == null) {
-            throw new ApplicationException(ErrorCode.BAD_REQUEST, "Period is required.", Set.of("period"));
+            throw new ApplicationException(ErrorCode.BAD_REQUEST, "O período é obrigatório.", Set.of("period"));
         }
         if (reference == null || reference.isBlank()) {
-            throw new ApplicationException(ErrorCode.BAD_REQUEST, "Reference is required.", Set.of("reference"));
+            throw new ApplicationException(ErrorCode.BAD_REQUEST, "A referência é obrigatória.", Set.of("reference"));
         }
         // ALL_TIME tem um documento só, com referência sempre igual.
         if (period == IndicatorPeriod.ALL_TIME && !ALL_TIME_REFERENCE.equals(reference)) {
             throw new ApplicationException(
                     ErrorCode.BAD_REQUEST,
-                    "Reference must be ALL_TIME when period is ALL_TIME.",
+                    "Para o período ALL_TIME, a referência deve ser ALL_TIME.",
                     Set.of("reference")
             );
         }
@@ -113,7 +112,7 @@ public class PlatformIndicator {
         if (!fields.isEmpty()) {
             throw new ApplicationException(
                     ErrorCode.BAD_REQUEST,
-                    "Indicator totals cannot be negative.",
+                    "Os totais do indicador não podem ser negativos.",
                     Set.copyOf(fields)
             );
         }

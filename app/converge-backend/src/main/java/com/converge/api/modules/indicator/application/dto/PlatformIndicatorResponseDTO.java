@@ -7,7 +7,6 @@ import com.converge.api.modules.indicator.domain.model.PlatformIndicator;
 
 import java.time.Instant;
 
-// Autora: Daniela Mikie Kikuchi Gonçalves
 // Formato da resposta que vai para o app (a entidade não sai direto).
 public record PlatformIndicatorResponseDTO(
         IndicatorPeriod period,

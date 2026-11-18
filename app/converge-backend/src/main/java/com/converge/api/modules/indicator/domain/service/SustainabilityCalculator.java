@@ -2,7 +2,6 @@
 
 package com.converge.api.modules.indicator.domain.service;
 
-// Autora: Daniela Mikie Kikuchi Gonçalves
 // Contas de impacto ambiental (RF53, RF55, RF57). Só recebe e devolve números.
 // Fatores de emissão:
 //  - Combustíveis: valores de referência em kg de CO2 por litro (GHG Protocol / médias usadas em inventários).

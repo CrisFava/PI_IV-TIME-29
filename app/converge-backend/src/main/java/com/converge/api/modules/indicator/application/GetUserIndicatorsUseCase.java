@@ -37,10 +37,10 @@ public class GetUserIndicatorsUseCase
         IndicatorPeriod period = query.period();
 
         if (userId == null || userId.isBlank()) {
-            throw new ApplicationException(ErrorCode.BAD_REQUEST, "User is required.", Set.of("userId"));
+            throw new ApplicationException(ErrorCode.BAD_REQUEST, "O usuário é obrigatório.", Set.of("userId"));
         }
         if (period == null) {
-            throw new ApplicationException(ErrorCode.BAD_REQUEST, "Period is required.", Set.of("period"));
+            throw new ApplicationException(ErrorCode.BAD_REQUEST, "O período é obrigatório.", Set.of("period"));
         }
 
         if (period == IndicatorPeriod.ALL_TIME) {

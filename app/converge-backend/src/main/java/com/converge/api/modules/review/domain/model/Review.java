@@ -86,24 +86,24 @@ public class Review {
             ReviewedRole reviewedRole,
             int rating) {
         if (rideId == null || rideId.isBlank()) {
-            throw new ApplicationException(ErrorCode.BAD_REQUEST, "Ride is required.", Set.of("rideId"));
+            throw new ApplicationException(ErrorCode.BAD_REQUEST, "A viagem é obrigatória.", Set.of("rideId"));
         }
         if (reviewerId == null || reviewerId.isBlank()) {
-            throw new ApplicationException(ErrorCode.BAD_REQUEST, "Reviewer is required.", Set.of("reviewerId"));
+            throw new ApplicationException(ErrorCode.BAD_REQUEST, "Quem avalia é obrigatório.", Set.of("reviewerId"));
         }
         if (reviewedId == null || reviewedId.isBlank()) {
-            throw new ApplicationException(ErrorCode.BAD_REQUEST, "Reviewed user is required.", Set.of("reviewedId"));
+            throw new ApplicationException(ErrorCode.BAD_REQUEST, "O usuário avaliado é obrigatório.", Set.of("reviewedId"));
         }
         if (reviewedRole == null) {
-            throw new ApplicationException(ErrorCode.BAD_REQUEST, "Reviewed role is required.", Set.of("reviewedRole"));
+            throw new ApplicationException(ErrorCode.BAD_REQUEST, "O papel do avaliado é obrigatório.", Set.of("reviewedRole"));
         }
         // Ninguém avalia a si mesmo.
         if (reviewerId.equals(reviewedId)) {
-            throw new ApplicationException(ErrorCode.REVIEW_NOT_ALLOWED, "You cannot review yourself.");
+            throw new ApplicationException(ErrorCode.REVIEW_NOT_ALLOWED, "Você não pode avaliar a si mesmo.");
         }
         // Nota de 1 a 5.
         if (rating < MIN_RATING || rating > MAX_RATING) {
-            throw new ApplicationException(ErrorCode.BAD_REQUEST, "Rating must be between 1 and 5.", Set.of("rating"));
+            throw new ApplicationException(ErrorCode.BAD_REQUEST, "A nota deve ser de 1 a 5.", Set.of("rating"));
         }
     }
 }
