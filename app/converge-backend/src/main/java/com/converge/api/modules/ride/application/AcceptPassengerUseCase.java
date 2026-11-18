@@ -9,6 +9,7 @@ import com.converge.api.modules.ride.domain.model.Ride;
 import com.converge.api.modules.ride.domain.model.subtypes.Participant;
 import com.converge.api.modules.ride.domain.repository.RideRepository;
 import com.converge.api.modules.ride.infrastructure.RideCostCalculator;
+import com.converge.api.modules.security.application.BlockAccess;
 import com.converge.api.shared.application.SafeActionHandler;
 import com.converge.api.shared.application.UseCase;
 import com.converge.api.shared.domain.enums.NotificationType;
@@ -40,6 +41,7 @@ public class AcceptPassengerUseCase implements UseCase<PassengerRequestCommand, 
     private final RideItineraryService rideItineraryService;
     private final RideRepository rideRepository;
     private final ApplicationEventPublisher eventPublisher;
+    private final BlockAccess blockAccess;
     private final Duration requestTimeout;
 
     public AcceptPassengerUseCase(
@@ -48,9 +50,11 @@ public class AcceptPassengerUseCase implements UseCase<PassengerRequestCommand, 
             RideCostCalculator rideCostCalculator,
             RideItineraryService rideItineraryService,
             RideRepository rideRepository,
-            ApplicationEventPublisher eventPublisher
+            ApplicationEventPublisher eventPublisher,
+            BlockAccess blockAccess
     ) {
-        this(rideAccess, rideEligibility, rideCostCalculator, rideItineraryService, rideRepository, eventPublisher, Duration.ofMinutes(3));
+        this(rideAccess, rideEligibility, rideCostCalculator, rideItineraryService, rideRepository, eventPublisher,
+                blockAccess, Duration.ofMinutes(3));
     }
 
     @Autowired
@@ -61,6 +65,7 @@ public class AcceptPassengerUseCase implements UseCase<PassengerRequestCommand, 
             RideItineraryService rideItineraryService,
             RideRepository rideRepository,
             ApplicationEventPublisher eventPublisher,
+            BlockAccess blockAccess,
             @Value("${converge.ride.request-timeout:3m}") Duration requestTimeout
     ) {
         this.rideAccess = rideAccess;
@@ -69,6 +74,7 @@ public class AcceptPassengerUseCase implements UseCase<PassengerRequestCommand, 
         this.rideItineraryService = rideItineraryService;
         this.rideRepository = rideRepository;
         this.eventPublisher = eventPublisher;
+        this.blockAccess = blockAccess;
         this.requestTimeout = requestTimeout != null ? requestTimeout : Duration.ofMinutes(3);
     }
 
@@ -109,6 +115,14 @@ public class AcceptPassengerUseCase implements UseCase<PassengerRequestCommand, 
     private void validateParticipantsEligibility(Ride ride, String passengerId) {
         rideEligibility.assertCanOffer(ride.getDriverId(), "Você");
         rideEligibility.assertCanJoin(passengerId, "O passageiro");
+        // Bloqueio entre motorista e passageiro vale nos dois sentidos (RF47). Como o chat da viagem
+        // só é aberto ao aceitar o passageiro, barrar aqui também impede a conversa.
+        if (blockAccess.isBlockedBetween(ride.getDriverId(), passengerId)) {
+            throw new ApplicationException(
+                    ErrorCode.NOT_ALLOWED,
+                    "Não é possível aceitar este passageiro."
+            );
+        }
     }
 
     private void validateRequestNotExpired(Ride ride, String passengerId, LocalDateTime now, LocalDateTime requestCutoff) {

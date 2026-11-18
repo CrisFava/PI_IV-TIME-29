@@ -16,6 +16,7 @@ import com.converge.api.modules.ride.domain.model.subtypes.VehicleSnapshot;
 import com.converge.api.modules.ride.domain.repository.RideRepository;
 import com.converge.api.modules.ride.infrastructure.RideCostCalculator;
 import com.converge.api.modules.route.application.RouteAccess;
+import com.converge.api.modules.security.application.BlockAccess;
 import com.converge.api.modules.route.domain.model.subtypes.Coordinates;
 import com.converge.api.modules.route.domain.model.subtypes.Place;
 import com.converge.api.modules.user.application.RecordReputationPenaltyUseCase;
@@ -70,6 +71,8 @@ class RideUseCasesTest {
     // A rota com paradas é testada à parte (RideItineraryServiceTest)
     @Mock
     private RideItineraryService rideItineraryService;
+    @Mock
+    private BlockAccess blockAccess;
 
     @Mock
     private UserUtils userUtils;
@@ -234,7 +237,7 @@ class RideUseCasesTest {
     @DisplayName("O motorista deve aceitar o pedido de vaga registrando desvio, valor máximo e recalculando rateio")
     void shouldAcceptPassengerWhenUserIsTheDriver() {
         AcceptPassengerUseCase acceptPassenger = new AcceptPassengerUseCase(
-                rideAccess, rideEligibility, rideCostCalculator, rideItineraryService, rideRepository, eventPublisher);
+                rideAccess, rideEligibility, rideCostCalculator, rideItineraryService, rideRepository, eventPublisher, blockAccess);
         Ride ride = rideOf(userObjectId.toHexString(), LocalDateTime.now().plusDays(1));
         ride.requestSeat("passenger-456", "route-456", place("Rua A"), place("Campus PUC"));
         Ride updatedRide = rideOf(userObjectId.toHexString(), LocalDateTime.now().plusDays(1));
@@ -268,7 +271,7 @@ class RideUseCasesTest {
     @DisplayName("Aceitar passageiro deve isolar falhas de notificação e retornar carona salva com sucesso")
     void shouldSucceedWhenNotificationFailsOnAcceptPassenger() {
         AcceptPassengerUseCase acceptPassenger = new AcceptPassengerUseCase(
-                rideAccess, rideEligibility, rideCostCalculator, rideItineraryService, rideRepository, eventPublisher);
+                rideAccess, rideEligibility, rideCostCalculator, rideItineraryService, rideRepository, eventPublisher, blockAccess);
         Ride ride = rideOf(userObjectId.toHexString(), LocalDateTime.now().plusDays(1));
         ride.requestSeat("passenger-456", "route-456", place("Rua A"), place("Campus PUC"));
         Ride updatedRide = rideOf(userObjectId.toHexString(), LocalDateTime.now().plusDays(1));
@@ -296,10 +299,28 @@ class RideUseCasesTest {
     }
 
     @Test
-    @DisplayName("Quem não é o motorista não pode aceitar passageiros")
+    @DisplayName("Bloqueio entre motorista e passageiro deve recusar o aceite sem escrever nada")
+    void shouldNotAcceptPassengerWhenThereIsABlock() {
+        AcceptPassengerUseCase acceptPassenger = new AcceptPassengerUseCase(
+                rideAccess, rideEligibility, rideCostCalculator, rideItineraryService, rideRepository, eventPublisher, blockAccess);
+        Ride ride = rideOf(userObjectId.toHexString(), LocalDateTime.now().plusDays(1));
+        ride.requestSeat("passenger-456", "route-456", place("Rua A"), place("Campus PUC"));
+        currentUserIs(userObjectId);
+        when(rideRepository.findById(rideObjectId)).thenReturn(Optional.of(ride));
+        when(blockAccess.isBlockedBetween(userObjectId.toHexString(), "passenger-456")).thenReturn(true);
+        ApplicationException exception = assertThrows(ApplicationException.class, () -> acceptPassenger.execute(
+                new PassengerRequestCommand(rideObjectId.toHexString(), "passenger-456", UID)));
+        assertThat(exception.getError().code()).isEqualTo(ErrorCode.NOT_ALLOWED);
+        assertThat(ride.getParticipants().get(1).getStatus()).isEqualTo(ParticipantStatus.REQUESTED);
+        verify(rideRepository, never()).acceptPassengerAtomic(any(), any(), any(), any(), any(), any());
+        verify(rideRepository, never()).save(any());
+        verify(eventPublisher, never()).publishEvent(any(RideNotificationEvent.class));
+    }
+
+    @Test    @DisplayName("Quem não é o motorista não pode aceitar passageiros")
     void shouldNotAcceptPassengerWhenUserIsNotTheDriver() {
         AcceptPassengerUseCase acceptPassenger = new AcceptPassengerUseCase(
-                rideAccess, rideEligibility, rideCostCalculator, rideItineraryService, rideRepository, eventPublisher);
+                rideAccess, rideEligibility, rideCostCalculator, rideItineraryService, rideRepository, eventPublisher, blockAccess);
         Ride ride = rideOf("outro-motorista", LocalDateTime.now().plusDays(1));
         ride.requestSeat("passenger-456", "route-456", place("Rua A"), place("Campus PUC"));
         currentUserIs(userObjectId);
@@ -316,7 +337,7 @@ class RideUseCasesTest {
     @DisplayName("Não deve aceitar passageiro bloqueado ou sem vínculo acadêmico verificado")
     void shouldNotAcceptIneligiblePassenger() {
         AcceptPassengerUseCase acceptPassenger = new AcceptPassengerUseCase(
-                rideAccess, rideEligibility, rideCostCalculator, rideItineraryService, rideRepository, eventPublisher);
+                rideAccess, rideEligibility, rideCostCalculator, rideItineraryService, rideRepository, eventPublisher, blockAccess);
         Ride ride = rideOf(userObjectId.toHexString(), LocalDateTime.now().plusDays(1));
         ride.requestSeat("passenger-456", "route-456", place("Rua A"), place("Campus PUC"));
         currentUserIs(userObjectId);
@@ -335,7 +356,7 @@ class RideUseCasesTest {
     @DisplayName("Motorista que perdeu a CNH ou o vínculo não pode aceitar passageiros")
     void shouldNotAcceptWhenDriverCannotOfferRidesAnymore() {
         AcceptPassengerUseCase acceptPassenger = new AcceptPassengerUseCase(
-                rideAccess, rideEligibility, rideCostCalculator, rideItineraryService, rideRepository, eventPublisher);
+                rideAccess, rideEligibility, rideCostCalculator, rideItineraryService, rideRepository, eventPublisher, blockAccess);
         Ride ride = rideOf(userObjectId.toHexString(), LocalDateTime.now().plusDays(1));
         ride.requestSeat("passenger-456", "route-456", place("Rua A"), place("Campus PUC"));
         currentUserIs(userObjectId);
@@ -357,7 +378,7 @@ class RideUseCasesTest {
         assertThat(method.isAnnotationPresent(org.springframework.transaction.annotation.Transactional.class)).isTrue();
 
         AcceptPassengerUseCase acceptPassenger = new AcceptPassengerUseCase(
-                rideAccess, rideEligibility, rideCostCalculator, rideItineraryService, rideRepository, eventPublisher);
+                rideAccess, rideEligibility, rideCostCalculator, rideItineraryService, rideRepository, eventPublisher, blockAccess);
         Ride ride = rideOf(userObjectId.toHexString(), LocalDateTime.now().plusDays(1));
         ride.requestSeat("passenger-456", "route-456", place("Rua A"), place("Campus PUC"));
         Ride updatedRide = rideOf(userObjectId.toHexString(), LocalDateTime.now().plusDays(1));

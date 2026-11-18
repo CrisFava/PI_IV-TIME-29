@@ -16,6 +16,7 @@ import com.converge.api.modules.route.domain.enums.RouteType;
 import com.converge.api.modules.route.domain.model.Route;
 import com.converge.api.modules.route.domain.model.subtypes.Coordinates;
 import com.converge.api.modules.route.domain.model.subtypes.Place;
+import com.converge.api.modules.security.application.BlockAccess;
 import com.converge.api.modules.user.domain.enums.vehicle.VehicleType;
 import com.converge.api.modules.user.domain.model.vehicle.Vehicle;
 import com.converge.api.modules.user.application.VehicleAccess;
@@ -43,6 +44,7 @@ import static org.mockito.Mockito.lenient;
 import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.times;
 import static org.mockito.Mockito.verify;
+import static org.mockito.Mockito.verifyNoInteractions;
 import static org.mockito.Mockito.when;
 
 @ExtendWith(MockitoExtension.class)
@@ -58,6 +60,7 @@ class RequestRideSeatUseCaseTest {
     @Mock private VehicleAccess vehicleAccess;
     @Mock private RideRepository rideRepository;
     @Mock private RideMapper rideMapper;
+    @Mock private BlockAccess blockAccess;
     @Mock private Route passengerRoute;
     @Mock private Route driverRoute;
     @Mock private Vehicle vehicle;
@@ -72,7 +75,7 @@ class RequestRideSeatUseCaseTest {
     @BeforeEach
     void setUp() {
         requestSeat = new RequestRideSeatUseCase(
-                rideAccess, rideEligibility, routeAccess, vehicleAccess, rideRepository, rideMapper);
+                rideAccess, rideEligibility, routeAccess, vehicleAccess, rideRepository, rideMapper, blockAccess);
     }
 
     private Place place(String address) {
@@ -224,7 +227,23 @@ class RequestRideSeatUseCaseTest {
     }
 
     @Test
-    @DisplayName("Passageiro não pode pedir vaga duas vezes na mesma viagem")
+    @DisplayName("Bloqueio entre passageiro e motorista deve recusar o pedido sem criar nem alterar viagem")
+    void shouldRejectRequestWhenThereIsABlock() {
+        passengerRouteIsValid();
+        when(routeAccess.getActiveRoute(driverRouteObjectId.toHexString())).thenReturn(driverRoute);
+        when(driverRoute.getType()).thenReturn(RouteType.OFFER);
+        when(driverRoute.runsOn(date)).thenReturn(true);
+        when(driverRoute.getTotalSeats()).thenReturn(3);
+        when(driverRoute.getUserId()).thenReturn(DRIVER_ID);
+        when(blockAccess.isBlockedBetween(PASSENGER_ID, DRIVER_ID)).thenReturn(true);
+
+        ApplicationException exception = assertThrows(ApplicationException.class, () -> requestSeat.execute(command()));
+
+        assertThat(exception.getError().code()).isEqualTo(ErrorCode.NOT_ALLOWED);
+        verifyNoInteractions(rideRepository);
+    }
+
+    @Test    @DisplayName("Passageiro não pode pedir vaga duas vezes na mesma viagem")
     void shouldRejectDuplicatedRequest() {
         passengerRouteIsValid();
         driverRouteIsValid();

@@ -18,6 +18,7 @@ import com.converge.api.modules.ride.domain.model.subtypes.VehicleSnapshot;
 import com.converge.api.modules.ride.domain.repository.RideRepository;
 import com.converge.api.modules.ride.infrastructure.RideCostCalculator;
 import com.converge.api.modules.route.application.RouteAccess;
+import com.converge.api.modules.security.application.BlockAccess;
 import com.converge.api.modules.route.domain.model.subtypes.Coordinates;
 import com.converge.api.modules.route.domain.model.subtypes.Place;
 import com.converge.api.modules.user.application.GetUserPixInfoUseCase;
@@ -79,6 +80,8 @@ class RideJourneyTest {
     // A rota com paradas é testada à parte (RideItineraryServiceTest)
     @Mock
     private RideItineraryService rideItineraryService;
+    @Mock
+    private BlockAccess blockAccess;
 
     @Mock
     private UserUtils userUtils;
@@ -159,7 +162,7 @@ class RideJourneyTest {
         RidePaymentViewService paymentView = new RidePaymentViewService(getUserPixInfo, charge -> FAKE_PIX);
 
         acceptPassenger = new AcceptPassengerUseCase(
-                rideAccess, rideEligibility, rideCostCalculator, rideItineraryService, rideRepository, eventPublisher);
+                rideAccess, rideEligibility, rideCostCalculator, rideItineraryService, rideRepository, eventPublisher, blockAccess);
         startRide = new StartRideUseCase(rideAccess, rideRepository);
         markNoShow = new MarkNoShowUseCase(
                 rideAccess, rideCostCalculator, rideRepository, recordReputationPenalty, auditLogService);
