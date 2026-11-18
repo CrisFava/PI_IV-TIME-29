@@ -95,19 +95,19 @@ public class UserIndicator {
 
     private static void validateIdentity(String userId, IndicatorPeriod period, String reference) {
         if (userId == null || userId.isBlank()) {
-            throw new ApplicationException(ErrorCode.BAD_REQUEST, "User is required.", Set.of("userId"));
+            throw new ApplicationException(ErrorCode.BAD_REQUEST, "O usuário é obrigatório.", Set.of("userId"));
         }
         if (period == null) {
-            throw new ApplicationException(ErrorCode.BAD_REQUEST, "Period is required.", Set.of("period"));
+            throw new ApplicationException(ErrorCode.BAD_REQUEST, "O período é obrigatório.", Set.of("period"));
         }
         if (reference == null || reference.isBlank()) {
-            throw new ApplicationException(ErrorCode.BAD_REQUEST, "Reference is required.", Set.of("reference"));
+            throw new ApplicationException(ErrorCode.BAD_REQUEST, "A referência é obrigatória.", Set.of("reference"));
         }
         // O indicador por usuário não usa ALL_TIME: o acumulado vem da soma dos meses.
         if (period == IndicatorPeriod.ALL_TIME) {
             throw new ApplicationException(
                     ErrorCode.BAD_REQUEST,
-                    "User indicator does not support ALL_TIME; sum the monthly documents instead.",
+                    "O indicador do usuário não usa o período ALL_TIME; o acumulado vem da soma dos meses.",
                     Set.of("period")
             );
         }
@@ -128,7 +128,7 @@ public class UserIndicator {
         if (!fields.isEmpty()) {
             throw new ApplicationException(
                     ErrorCode.BAD_REQUEST,
-                    "Indicator totals cannot be negative.",
+                    "Os totais do indicador não podem ser negativos.",
                     Set.copyOf(fields)
             );
         }

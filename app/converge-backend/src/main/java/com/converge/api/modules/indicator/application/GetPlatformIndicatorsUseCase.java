@@ -14,7 +14,6 @@ import org.springframework.stereotype.Service;
 
 import java.util.Set;
 
-// Autora: Daniela Mikie Kikuchi Gonçalves
 // Lê os indicadores da plataforma (RF51, RF58).
 // Se não houver dados do período ainda, devolve zerado em vez de erro.
 @Service
@@ -32,7 +31,7 @@ public class GetPlatformIndicatorsUseCase
     public PlatformIndicatorResponseDTO execute(Query query) {
         IndicatorPeriod period = query.period();
         if (period == null) {
-            throw new ApplicationException(ErrorCode.BAD_REQUEST, "Period is required.", Set.of("period"));
+            throw new ApplicationException(ErrorCode.BAD_REQUEST, "O período é obrigatório.", Set.of("period"));
         }
 
         String reference = query.reference();

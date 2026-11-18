@@ -24,7 +24,6 @@ import org.springframework.web.bind.annotation.RestController;
 
 import java.util.Map;
 
-// Autora: Daniela Mikie Kikuchi Gonçalves
 // Endpoints dos indicadores de sustentabilidade (RF51-RF61). Só leitura.
 @RestController
 @RequestMapping("/api/v1/indicators")
