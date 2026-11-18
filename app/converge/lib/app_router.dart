@@ -10,6 +10,7 @@ import 'features/auth/presentation/pages/complete_profile_page.dart';
 import 'features/auth/presentation/pages/forgot_password_page.dart';
 import 'features/chat/presentation/pages/chat_page.dart';
 import 'features/home/presentation/pages/home_page.dart';
+import 'features/security/presentation/pages/blocked_users_page.dart';
 import 'features/auth/presentation/pages/login_page.dart';
 import 'features/auth/presentation/pages/register_page.dart';
 import 'features/auth/presentation/pages/splash_page.dart';
@@ -86,6 +87,10 @@ final appRouterProvider = Provider<GoRouter>((ref) {
       GoRoute(
         path: AppRoutes.indicators,
         builder: (_, _) => const IndicatorsPage(),
+      ),
+      GoRoute(
+        path: AppRoutes.blockedUsers,
+        builder: (_, _) => const BlockedUsersPage(),
       ),
       GoRoute(
         path: AppRoutes.chat,

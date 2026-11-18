@@ -7,6 +7,7 @@ import '../../../../core/config/styles.dart';
 import '../../../ride/data/models/participant_status.dart';
 import '../../data/models/driver_ride_request.dart';
 import '../../../ride/presentation/widgets/ride_place_line.dart';
+import '../../../security/presentation/widgets/user_safety_menu.dart';
 import 'match_date_label.dart';
 import 'match_info_chip.dart';
 
@@ -81,6 +82,12 @@ class RideRequestCard extends StatelessWidget {
                   ],
                 ),
               ),
+              if (request.passenger.userId != null)
+                UserSafetyMenu(
+                  userId: request.passenger.userId!,
+                  userName: request.passenger.displayName,
+                  rideId: ride.id,
+                ),
             ],
           ),
           const SizedBox(height: 10),

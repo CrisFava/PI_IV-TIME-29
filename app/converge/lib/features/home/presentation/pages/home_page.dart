@@ -1442,6 +1442,34 @@ class _HomePageState extends ConsumerState<HomePage> {
                 ),
               ),
 
+              const SizedBox(height: 10),
+              SizedBox(
+                width: double.infinity,
+                child: OutlinedButton.icon(
+                  key: const ValueKey('blocked_users_button'),
+                  onPressed: () => context.push(AppRoutes.blockedUsers),
+                  icon: const Icon(
+                    Icons.block_rounded,
+                    size: 18,
+                    color: AppColors.textPrimary,
+                  ),
+                  label: const Text(
+                    'Usuários bloqueados',
+                    style: TextStyle(
+                      fontSize: 14,
+                      fontWeight: FontWeight.w700,
+                      color: AppColors.textPrimary,
+                    ),
+                  ),
+                  style: OutlinedButton.styleFrom(
+                    padding: const EdgeInsets.symmetric(vertical: 14),
+                    side: const BorderSide(color: AppColors.borderMedium),
+                    shape: RoundedRectangleBorder(
+                      borderRadius: BorderRadius.circular(16),
+                    ),
+                  ),
+                ),
+              ),
               const SizedBox(height: 24),
               const Divider(color: AppColors.neutralLight),
               const SizedBox(height: 16),

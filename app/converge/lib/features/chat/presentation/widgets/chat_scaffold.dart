@@ -10,11 +10,15 @@ class ChatScaffold extends StatelessWidget {
   final String? subtitle;
   final Widget body;
 
+  /// Botoes na direita da barra (ex.: menu de denuncia e bloqueio).
+  final List<Widget> actions;
+
   const ChatScaffold({
     super.key,
     required this.title,
     this.subtitle,
     required this.body,
+    this.actions = const [],
   });
 
   @override
@@ -26,6 +30,7 @@ class ChatScaffold extends StatelessWidget {
         surfaceTintColor: AppColors.cardBackground,
         elevation: 0,
         titleSpacing: 0,
+        actions: actions,
         leading: IconButton(
           tooltip: 'Voltar',
           onPressed: () => Navigator.of(context).maybePop(),

@@ -6,6 +6,9 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../../../../core/config/styles.dart';
 import '../../../../core/widgets/show_app_notice.dart';
 import '../../../ride/state/ride_providers.dart';
+import '../../../security/presentation/widgets/blocked_chat_bar.dart';
+import '../../../security/presentation/widgets/user_safety_menu.dart';
+import '../../../security/state/blocked_users_controller.dart';
 import '../../data/models/chat_conversation.dart';
 import '../../state/chat_actions_controller.dart';
 import '../../state/chat_providers.dart';
@@ -83,6 +86,12 @@ class _ChatPageState extends ConsumerState<ChatPage> {
     final thread = conversation.thread;
     final messages = ref.watch(chatMessagesProvider(thread));
     final busy = ref.watch(chatActionsProvider(thread)).isLoading;
+    final otherPartyId = conversation.viewerIsDriver
+        ? thread.passengerId
+        : conversation.ride.driverId;
+    final otherPartyBlocked = ref
+        .watch(blockedUserIdsProvider)
+        .contains(otherPartyId);
 
     // Um aviso do outro participante (cobrança, pagamento, início ou fim da
     // viagem) significa que o estado mudou na API: recarrega o que a tela mostra.
@@ -113,6 +122,13 @@ class _ChatPageState extends ConsumerState<ChatPage> {
     return ChatScaffold(
       title: conversation.otherPartyName,
       subtitle: conversation.viewerIsDriver ? 'Passageiro' : 'Motorista',
+      actions: [
+        UserSafetyMenu(
+          userId: otherPartyId,
+          userName: conversation.otherPartyName,
+          rideId: thread.rideId,
+        ),
+      ],
       body: Column(
         children: [
           ChatRidePanel(conversation: conversation),
@@ -136,10 +152,13 @@ class _ChatPageState extends ConsumerState<ChatPage> {
                   ChatMessageList(messages: messages, viewerUid: viewerUid),
             ),
           ),
-          ChatComposer(
-            enabled: !busy,
-            onSend: ref.read(chatActionsProvider(thread).notifier).sendText,
-          ),
+          if (otherPartyBlocked)
+            const BlockedChatBar()
+          else
+            ChatComposer(
+              enabled: !busy,
+              onSend: ref.read(chatActionsProvider(thread).notifier).sendText,
+            ),
         ],
       ),
     );

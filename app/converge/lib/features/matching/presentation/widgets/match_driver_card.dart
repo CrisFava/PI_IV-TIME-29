@@ -6,6 +6,7 @@ import 'package:flutter/services.dart';
 import '../../../../core/config/styles.dart';
 import '../../../../core/utils/currency_formatter.dart';
 import '../../data/models/match_model.dart';
+import '../../../security/presentation/widgets/user_safety_menu.dart';
 import 'match_date_label.dart';
 import 'match_info_chip.dart';
 
@@ -77,6 +78,10 @@ class MatchDriverCard extends StatelessWidget {
                     ),
                   ],
                 ),
+              ),
+              UserSafetyMenu(
+                userId: match.otherUserId,
+                userName: match.otherUserName,
               ),
             ],
           ),
