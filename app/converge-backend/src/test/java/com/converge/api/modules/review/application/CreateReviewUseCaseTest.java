@@ -3,6 +3,7 @@
 package com.converge.api.modules.review.application;
 
 import com.converge.api.modules.review.application.dto.CreateReviewRequestDTO;
+import com.converge.api.modules.review.application.gateway.ReputationGateway;
 import com.converge.api.modules.review.application.gateway.RideParticipationGateway;
 import com.converge.api.modules.review.application.gateway.RideParticipationGateway.CompletedRide;
 import com.converge.api.modules.review.application.gateway.RideParticipationGateway.Participant;
@@ -25,8 +26,13 @@ import java.util.Optional;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.ArgumentMatchers.anyDouble;
+import static org.mockito.ArgumentMatchers.anyInt;
+import static org.mockito.ArgumentMatchers.anyString;
+import static org.mockito.Mockito.doThrow;
 import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
+import static org.mockito.Mockito.verifyNoInteractions;
 import static org.mockito.Mockito.when;
 
 @ExtendWith(MockitoExtension.class)
@@ -42,11 +48,18 @@ class CreateReviewUseCaseTest {
     @Mock
     private RideParticipationGateway rideGateway;
 
+    @Mock
+    private ReputationGateway reputationGateway;
+
     private CreateReviewUseCase useCase;
 
     @BeforeEach
     void setUp() {
-        useCase = new CreateReviewUseCase(reviewRepository, rideGateway);
+        useCase = new CreateReviewUseCase(reviewRepository, rideGateway, reputationGateway);
+    }
+
+    private static Review review(ReviewedRole role, int rating) {
+        return new Review(RIDE_ID, "x", "y", role, rating, null);
     }
 
     private static CreateReviewRequestDTO request(String reviewedId) {
@@ -98,6 +111,88 @@ class CreateReviewUseCaseTest {
         Review review = useCase.execute(new CreateReviewUseCase.Command(DRIVER, request(PASSENGER)));
 
         assertThat(review.getReviewedRole()).isEqualTo(ReviewedRole.PASSENGER);
+    }
+
+    @Test
+    @DisplayName("Depois de salvar, grava a média e o total de todas as avaliações do papel no avaliado")
+    void shouldUpdateReputationWithAverageOfAllReviews() {
+        rideWith(driver(DRIVER), passenger(PASSENGER));
+        when(reviewRepository.existsByRideIdAndReviewerIdAndReviewedId(RIDE_ID, PASSENGER, DRIVER)).thenReturn(false);
+        when(reviewRepository.save(any(Review.class))).thenAnswer(inv -> inv.getArgument(0));
+        when(reviewRepository.findByReviewedIdAndReviewedRole(DRIVER, ReviewedRole.DRIVER))
+                .thenReturn(List.of(review(ReviewedRole.DRIVER, 5), review(ReviewedRole.DRIVER, 4), review(ReviewedRole.DRIVER, 3)));
+
+        useCase.execute(new CreateReviewUseCase.Command(PASSENGER, request(DRIVER)));
+
+        verify(reputationGateway).updateRating(DRIVER, ReviewedRole.DRIVER, 4.0, 3);
+    }
+
+    @Test
+    @DisplayName("Avaliação do passageiro atualiza a reputação no papel de passageiro")
+    void shouldUpdateReputationInPassengerRole() {
+        rideWith(driver(DRIVER), passenger(PASSENGER));
+        when(reviewRepository.existsByRideIdAndReviewerIdAndReviewedId(RIDE_ID, DRIVER, PASSENGER)).thenReturn(false);
+        when(reviewRepository.save(any(Review.class))).thenAnswer(inv -> inv.getArgument(0));
+        when(reviewRepository.findByReviewedIdAndReviewedRole(PASSENGER, ReviewedRole.PASSENGER))
+                .thenReturn(List.of(review(ReviewedRole.PASSENGER, 2)));
+
+        useCase.execute(new CreateReviewUseCase.Command(DRIVER, request(PASSENGER)));
+
+        verify(reputationGateway).updateRating(PASSENGER, ReviewedRole.PASSENGER, 2.0, 1);
+    }
+
+    @Test
+    @DisplayName("Falha ao atualizar a reputação não impede a avaliação")
+    void shouldReturnReviewEvenWhenReputationFails() {
+        rideWith(driver(DRIVER), passenger(PASSENGER));
+        when(reviewRepository.existsByRideIdAndReviewerIdAndReviewedId(RIDE_ID, PASSENGER, DRIVER)).thenReturn(false);
+        when(reviewRepository.save(any(Review.class))).thenAnswer(inv -> inv.getArgument(0));
+        when(reviewRepository.findByReviewedIdAndReviewedRole(DRIVER, ReviewedRole.DRIVER))
+                .thenReturn(List.of(review(ReviewedRole.DRIVER, 5)));
+        doThrow(new IllegalStateException("falha")).when(reputationGateway)
+                .updateRating(anyString(), any(ReviewedRole.class), anyDouble(), anyInt());
+
+        Review result = useCase.execute(new CreateReviewUseCase.Command(PASSENGER, request(DRIVER)));
+
+        assertThat(result.getReviewedId()).isEqualTo(DRIVER);
+    }
+
+    @Test
+    @DisplayName("Falha ao ler as avaliações para recalcular também não impede a avaliação")
+    void shouldReturnReviewEvenWhenRecalculationReadFails() {
+        rideWith(driver(DRIVER), passenger(PASSENGER));
+        when(reviewRepository.existsByRideIdAndReviewerIdAndReviewedId(RIDE_ID, PASSENGER, DRIVER)).thenReturn(false);
+        when(reviewRepository.save(any(Review.class))).thenAnswer(inv -> inv.getArgument(0));
+        when(reviewRepository.findByReviewedIdAndReviewedRole(DRIVER, ReviewedRole.DRIVER))
+                .thenThrow(new IllegalStateException("banco fora"));
+
+        Review result = useCase.execute(new CreateReviewUseCase.Command(PASSENGER, request(DRIVER)));
+
+        assertThat(result).isNotNull();
+        verifyNoInteractions(reputationGateway);
+    }
+
+    @Test
+    @DisplayName("Avaliação duplicada barrada pelo índice não atualiza a reputação")
+    void shouldNotUpdateReputationOnDuplicateKey() {
+        rideWith(driver(DRIVER), passenger(PASSENGER));
+        when(reviewRepository.existsByRideIdAndReviewerIdAndReviewedId(RIDE_ID, PASSENGER, DRIVER)).thenReturn(false);
+        when(reviewRepository.save(any(Review.class))).thenThrow(new DuplicateKeyException("duplicado"));
+
+        assertThrows(ApplicationException.class,
+                () -> useCase.execute(new CreateReviewUseCase.Command(PASSENGER, request(DRIVER))));
+
+        verifyNoInteractions(reputationGateway);
+    }
+
+    @Test
+    @DisplayName("Avaliação recusada pelas regras não atualiza a reputação")
+    void shouldNotUpdateReputationWhenRejected() {
+        when(rideGateway.findCompletedRide(RIDE_ID)).thenReturn(Optional.empty());
+
+        assertFailsWith(ErrorCode.RIDE_NOT_COMPLETED, new CreateReviewUseCase.Command(PASSENGER, request(DRIVER)));
+
+        verifyNoInteractions(reputationGateway);
     }
 
     @Test

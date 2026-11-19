@@ -3,30 +3,37 @@
 package com.converge.api.modules.review.application;
 
 import com.converge.api.modules.review.application.dto.CreateReviewRequestDTO;
+import com.converge.api.modules.review.application.gateway.ReputationGateway;
 import com.converge.api.modules.review.application.gateway.RideParticipationGateway;
 import com.converge.api.modules.review.application.gateway.RideParticipationGateway.CompletedRide;
 import com.converge.api.modules.review.application.gateway.RideParticipationGateway.Participant;
 import com.converge.api.modules.review.domain.enums.ReviewedRole;
 import com.converge.api.modules.review.domain.model.Review;
 import com.converge.api.modules.review.domain.repository.ReviewRepository;
+import com.converge.api.shared.application.SafeActionHandler;
 import com.converge.api.shared.application.UseCase;
 import com.converge.api.shared.presentation.exception.ApplicationException;
 import com.converge.api.shared.presentation.exception.ErrorCode;
 import lombok.RequiredArgsConstructor;
+import lombok.extern.slf4j.Slf4j;
 import org.springframework.dao.DuplicateKeyException;
 import org.springframework.stereotype.Service;
+
+import java.util.List;
 
 // Cria uma avaliação depois de validar as regras (RF43):
 //  - a viagem existe e está concluída;
 //  - avaliador e avaliado participaram dela;
 //  - um é motorista e o outro passageiro;
 //  - o par ainda não avaliou nessa viagem.
+@Slf4j
 @Service
 @RequiredArgsConstructor
 public class CreateReviewUseCase implements UseCase<CreateReviewUseCase.Command, Review> {
 
     private final ReviewRepository reviewRepository;
     private final RideParticipationGateway rideGateway;
+    private final ReputationGateway reputationGateway;
 
     // Entrada: quem está avaliando (do token) + os dados do pedido.
     public record Command(String reviewerId, CreateReviewRequestDTO request) {
@@ -73,8 +80,9 @@ public class CreateReviewUseCase implements UseCase<CreateReviewUseCase.Command,
                 request.rating(),
                 request.comment()
         );
+        Review saved;
         try {
-            return reviewRepository.save(review);
+            saved = reviewRepository.save(review);
         } catch (DuplicateKeyException e) {
             // Dois pedidos iguais ao mesmo tempo: o índice único barra o segundo.
             throw new ApplicationException(
@@ -82,6 +90,18 @@ public class CreateReviewUseCase implements UseCase<CreateReviewUseCase.Command,
                     "Você já avaliou esse participante nesta viagem."
             );
         }
+
+        // A avaliação já está salva: falha na reputação só gera log.
+        SafeActionHandler.run(log, "atualizar a reputação do avaliado " + reviewedId,
+                () -> updateReputation(reviewedId, reviewedRole));
+        return saved;
+    }
+
+    // Recalcula a partir de todas as avaliações do papel, não soma de forma incremental.
+    private void updateReputation(String reviewedId, ReviewedRole reviewedRole) {
+        List<Review> received = reviewRepository.findByReviewedIdAndReviewedRole(reviewedId, reviewedRole);
+        double average = received.stream().mapToInt(Review::getRating).average().orElse(0.0);
+        reputationGateway.updateRating(reviewedId, reviewedRole, average, received.size());
     }
 
     // Descobre o papel do usuário na viagem; se não participou, recusa.

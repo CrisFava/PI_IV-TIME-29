@@ -31,28 +31,39 @@ public record DriverReputation(
     public DriverReputation recordCancellation(LocalDateTime now) {
         DriverWindow updatedWindow = (window != null ? window : new DriverWindow(0, 0, 0, 0))
                 .withIncrementedCancellations();
-        ReputationLevel updatedLevel = computeLevel(updatedWindow);
+        ReputationLevel updatedLevel = computeLevel(updatedWindow, averageRating);
 
         return new DriverReputation(updatedLevel, averageRating, totalReviews, updatedWindow, now);
     }
 
-    public boolean meetsTrustCriteria() {
-        if (window == null || averageRating == null) {
-            return false;
-        }
-        return averageRating >= 4.2
-                && safeInt(window.completedRides()) >= 10
-                && safeInt(window.driverInitiatedCancellations()) <= 2
-                && safeInt(window.substantiatedReports()) <= 1;
+    // Grava a média e a quantidade de avaliações já calculadas e recalcula o level.
+    public DriverReputation withRating(double newAverage, int newTotal, LocalDateTime now) {
+        DriverWindow currentWindow = window != null ? window : new DriverWindow(0, 0, 0, 0);
+        return new DriverReputation(computeLevel(currentWindow, newAverage), newAverage, newTotal, currentWindow, now);
     }
 
-    private ReputationLevel computeLevel(DriverWindow targetWindow) {
+    public boolean meetsTrustCriteria() {
+        return meetsTrustCriteria(window, averageRating);
+    }
+
+    private boolean meetsTrustCriteria(@Nullable DriverWindow targetWindow, @Nullable Double targetAverage) {
+        if (targetWindow == null || targetAverage == null) {
+            return false;
+        }
+        return targetAverage >= 4.2
+                && safeInt(targetWindow.completedRides()) >= 10
+                && safeInt(targetWindow.driverInitiatedCancellations()) <= 2
+                && safeInt(targetWindow.substantiatedReports()) <= 1;
+    }
+
+    // LOW se estourou algum limite; HIGH se cumpre os critérios de confiança; senão MEDIUM.
+    private ReputationLevel computeLevel(DriverWindow targetWindow, @Nullable Double targetAverage) {
         if (safeInt(targetWindow.driverInitiatedCancellations()) > 2
                 || safeInt(targetWindow.substantiatedReports()) > 1) {
             return ReputationLevel.LOW;
         }
-        if (level != null) {
-            return level;
+        if (meetsTrustCriteria(targetWindow, targetAverage)) {
+            return ReputationLevel.HIGH;
         }
         return ReputationLevel.MEDIUM;
     }

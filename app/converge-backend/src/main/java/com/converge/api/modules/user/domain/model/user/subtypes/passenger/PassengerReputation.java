@@ -30,38 +30,49 @@ public record PassengerReputation(
 
     public PassengerReputation recordLateCancellation(LocalDateTime now) {
         PassengerWindow updatedWindow = baseWindow().withIncrementedLateCancellations();
-        return new PassengerReputation(computeLevel(updatedWindow), averageRating, totalReviews, updatedWindow, now);
+        return new PassengerReputation(computeLevel(updatedWindow, averageRating), averageRating, totalReviews, updatedWindow, now);
     }
 
     public PassengerReputation recordNoShow(LocalDateTime now) {
         PassengerWindow updatedWindow = baseWindow().withIncrementedNoShows();
-        return new PassengerReputation(computeLevel(updatedWindow), averageRating, totalReviews, updatedWindow, now);
+        return new PassengerReputation(computeLevel(updatedWindow, averageRating), averageRating, totalReviews, updatedWindow, now);
+    }
+
+    // Grava a média e a quantidade de avaliações já calculadas e recalcula o level.
+    public PassengerReputation withRating(double newAverage, int newTotal, LocalDateTime now) {
+        PassengerWindow currentWindow = baseWindow();
+        return new PassengerReputation(computeLevel(currentWindow, newAverage), newAverage, newTotal, currentWindow, now);
     }
 
     public boolean meetsTrustCriteria() {
-        if (window == null || averageRating == null) {
+        return meetsTrustCriteria(window, averageRating);
+    }
+
+    private boolean meetsTrustCriteria(@Nullable PassengerWindow targetWindow, @Nullable Double targetAverage) {
+        if (targetWindow == null || targetAverage == null) {
             return false;
         }
-        return averageRating >= 4.0
-                && safeInt(window.completedRides()) >= 5
-                && safeInt(window.lateCancellations()) <= 2
-                && safeInt(window.noShows()) <= 1
-                && safeInt(window.overdueRides()) == 0;
+        return targetAverage >= 4.0
+                && safeInt(targetWindow.completedRides()) >= 5
+                && safeInt(targetWindow.lateCancellations()) <= 2
+                && safeInt(targetWindow.noShows()) <= 1
+                && safeInt(targetWindow.overdueRides()) == 0;
     }
 
     private PassengerWindow baseWindow() {
         return window != null ? window : new PassengerWindow(0, 0, 0, 0, 0);
     }
 
-    private ReputationLevel computeLevel(PassengerWindow targetWindow) {
+    // LOW se estourou algum limite; HIGH se cumpre os critérios de confiança; senão MEDIUM.
+    private ReputationLevel computeLevel(PassengerWindow targetWindow, @Nullable Double targetAverage) {
         if (safeInt(targetWindow.lateCancellations()) > 2
                 || safeInt(targetWindow.noShows()) > 1
                 || safeInt(targetWindow.overdueRides()) > 0
                 || safeInt(targetWindow.substantiatedReports()) > 1) {
             return ReputationLevel.LOW;
         }
-        if (level != null) {
-            return level;
+        if (meetsTrustCriteria(targetWindow, targetAverage)) {
+            return ReputationLevel.HIGH;
         }
         return ReputationLevel.MEDIUM;
     }
