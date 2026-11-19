@@ -18,8 +18,6 @@ import java.util.Set;
  */
 public class RideCostHandler implements RequestHandler<RideCostRequest, RideCostResponse> {
 
-    private static final BigDecimal TWO = BigDecimal.valueOf(2);
-
     @Override
     public RideCostResponse execute(RideCostRequest request) throws ServerException {
         validateRequest(request);
@@ -31,17 +29,19 @@ public class RideCostHandler implements RequestHandler<RideCostRequest, RideCost
     }
 
     // calcula o desvio e o valor máximo ao confirmar o passageiro, considerando a distância original da rota do motorista, os trechos do passageiro, o consumo médio do veículo, o preço da energia, pedágio e estacionamento
+    // o valor máximo é o custo inteiro da rota com o desvio do passageiro: o rateio é só entre os passageiros, então um passageiro sozinho paga a viagem toda
     private RideCostResponse confirmationQuote(RideCostRequest request) {
 
         double detourKm = detourKm(request);
 
         BigDecimal routeCost = routeCost(request.getBaseDistanceKm() + detourKm, request);
-        BigDecimal maxAmount = routeCost.divide(TWO, 2, RoundingMode.HALF_UP);
+        BigDecimal maxAmount = routeCost.setScale(2, RoundingMode.HALF_UP);
 
         return RideCostResponse.forConfirmationQuote(detourKm, maxAmount);
     }
 
     // calcula o rateio da viagem, considerando a distância original da rota do motorista, os trechos do passageiro, o consumo médio do veículo, o preço da energia, pedágio e estacionamento
+    // o custo é dividido igualmente só entre os passageiros, cada um limitado ao próprio teto; o motorista fica com o que sobrar (centavos do arredondamento e o que os tetos cortaram)
     private RideCostResponse costSharing(RideCostRequest request) {
 
         double totalDetourKm = 0.0;
@@ -54,10 +54,11 @@ public class RideCostHandler implements RequestHandler<RideCostRequest, RideCost
         BigDecimal energyCost = energyCost(totalDistanceKm, request);
         BigDecimal totalCost = routeCost(totalDistanceKm, request).setScale(2, RoundingMode.HALF_UP);
 
-        BigDecimal participants = BigDecimal.valueOf(request.getPassengers().size() + 1); // +1 motorista
-        BigDecimal equalShare = totalCost.divide(participants, 2, RoundingMode.DOWN);
-        
         Map<String, BigDecimal> shares = new LinkedHashMap<>();
+
+        // sem passageiros não há divisão: o custo é todo do motorista
+        BigDecimal passengers = BigDecimal.valueOf(Math.max(1, request.getPassengers().size()));
+        BigDecimal equalShare = totalCost.divide(passengers, 2, RoundingMode.DOWN);
 
         for (RideCostRequest.PassengerCostInput passenger : request.getPassengers()) {
             BigDecimal share = equalShare.min(passenger.maxAmount() != null ? passenger.maxAmount() : equalShare);

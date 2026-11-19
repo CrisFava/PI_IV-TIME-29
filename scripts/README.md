@@ -161,10 +161,11 @@ Resultado: 6/6 cenário(s) passaram.
 
 Se algum cenário falhar, ele mostra o passo e o motivo e o comando termina com código `1`.
 
-Linhas com `AVISO` não reprovam o cenário, mas indicam algo incompleto. Hoje aparecem duas:
+Linhas com `AVISO` não reprovam o cenário, mas indicam algo incompleto:
 
-- **custo total R$ 0**: o `RideCostHandler` do servidor de sockets ainda devolve tudo zerado,
-  porque o rateio foi retirado em 12/11 e ainda não voltou. Enquanto isso, a cobrança usa R$ 10,00.
+- **custo total R$ 0**: a viagem saiu sem custo calculado, em geral porque o veículo não tem
+  consumo e preço da energia. Nesse caso a cobrança usa R$ 10,00. O rateio divide o custo só
+  entre os passageiros, cada um limitado ao próprio teto (o custo da rota com o desvio dele).
 - **indicadores sem a viagem**: o `CompletedRidesIndicatorReconciler` reprocessa em até 15 min.
 
 ### Se a simulação cair no meio

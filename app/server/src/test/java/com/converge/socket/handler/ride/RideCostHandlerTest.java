@@ -47,12 +47,13 @@ class RideCostHandlerTest {
     void shouldComputeDetourAndMaxAmount() throws ServerException {
         RideCostResponse response = handler.execute(confirmationQuote());
 
+        // 44 km ÷ 10 × 5,50 = 24,20 de energia; + 7,00 + 3,00 = 34,20, o custo inteiro com o desvio
         assertEquals(4.0, response.getDetourGeneratedKm(), 0.0001);
-        assertEquals(new BigDecimal("17.10"), response.getMaxAmount());
+        assertEquals(new BigDecimal("34.20"), response.getMaxAmount());
     }
 
     @Test
-    @DisplayName("Sem os trechos do passageiro, não há desvio e o máximo é a metade do custo da rota original")
+    @DisplayName("Sem os trechos do passageiro, não há desvio e o máximo é o custo inteiro da rota original")
     void shouldHaveNoDetourWhenLegsAreMissing() throws ServerException {
         RideCostRequest request = RideCostRequest.forConfirmationQuote(
                 BASE_DISTANCE_KM,
@@ -68,7 +69,7 @@ class RideCostHandlerTest {
         RideCostResponse response = handler.execute(request);
 
         assertEquals(0.0, response.getDetourGeneratedKm(), 0.0001);
-        assertEquals(new BigDecimal("16.00"), response.getMaxAmount());
+        assertEquals(new BigDecimal("32.00"), response.getMaxAmount());
     }
 
     private static RideCostRequest quoteWithLegs(Double toBoarding, Double boardingToDropOff, Double dropOffToDestination) {
@@ -104,7 +105,7 @@ class RideCostHandlerTest {
         RideCostResponse response = handler.execute(quoteWithLegs(8.0, 32.0, 0.0));
 
         assertEquals(0.0, response.getDetourGeneratedKm(), 0.0001);
-        assertEquals(new BigDecimal("16.00"), response.getMaxAmount());
+        assertEquals(new BigDecimal("32.00"), response.getMaxAmount());
     }
 
     @Test
@@ -114,7 +115,7 @@ class RideCostHandlerTest {
         RideCostResponse response = handler.execute(quoteWithLegs(8.0, 30.0, 0.0));
 
         assertEquals(0.0, response.getDetourGeneratedKm(), 0.0001);
-        assertEquals(new BigDecimal("16.00"), response.getMaxAmount());
+        assertEquals(new BigDecimal("32.00"), response.getMaxAmount());
     }
 
     @Test
@@ -133,15 +134,15 @@ class RideCostHandlerTest {
 
         RideCostResponse response = handler.execute(request);
 
-        // 44 km ÷ 10 × 5,50 = 24,20 de energia; metade = 12,10
+        // 44 km ÷ 10 × 5,50 = 24,20 de energia, que é o teto inteiro
         assertEquals(4.0, response.getDetourGeneratedKm(), 0.0001);
-        assertEquals(new BigDecimal("12.10"), response.getMaxAmount());
+        assertEquals(new BigDecimal("24.20"), response.getMaxAmount());
     }
 
     @Test
-    @DisplayName("Deve ratear o custo igualmente entre o motorista e os passageiros")
-    void shouldSplitCostEquallyBetweenDriverAndPassengers() throws ServerException {
-        // Passageiro 1 desvia 4 km (teto 17,10) e passageiro 2 desvia 6 km (teto 17,65)
+    @DisplayName("Deve ratear o custo igualmente só entre os passageiros, sem o motorista")
+    void shouldSplitCostEquallyBetweenPassengersOnly() throws ServerException {
+        // Passageiro 1 desvia 4 km (teto 34,20) e passageiro 2 desvia 6 km (teto 35,30)
         RideCostRequest request = RideCostRequest.forCostSharing(
                 BASE_DISTANCE_KM,
                 AVERAGE_CONSUMPTION,
@@ -149,26 +150,26 @@ class RideCostHandlerTest {
                 TOLL,
                 PARKING,
                 List.of(
-                        new RideCostRequest.PassengerCostInput("passenger-1", 4.0, new BigDecimal("17.10")),
-                        new RideCostRequest.PassengerCostInput("passenger-2", 6.0, new BigDecimal("17.65"))
+                        new RideCostRequest.PassengerCostInput("passenger-1", 4.0, new BigDecimal("34.20")),
+                        new RideCostRequest.PassengerCostInput("passenger-2", 6.0, new BigDecimal("35.30"))
                 )
         );
 
         RideCostResponse response = handler.execute(request);
 
-        // 40 + 4 + 6 = 50 km; 50 ÷ 10 × 5,50 = 27,50 de energia; + 7,00 + 3,00 = 37,50; ÷ 3 pessoas = 12,50
+        // 40 + 4 + 6 = 50 km; 50 ÷ 10 × 5,50 = 27,50 de energia; + 7,00 + 3,00 = 37,50; ÷ 2 passageiros = 18,75
         assertEquals(50.0, response.getTotalDistanceKm(), 0.0001);
         assertEquals(new BigDecimal("27.50"), response.getEnergyCost());
         assertEquals(new BigDecimal("37.50"), response.getTotalCost());
-        assertEquals(new BigDecimal("12.50"), response.getSharesByPassenger().get("passenger-1"));
-        assertEquals(new BigDecimal("12.50"), response.getSharesByPassenger().get("passenger-2"));
+        assertEquals(new BigDecimal("18.75"), response.getSharesByPassenger().get("passenger-1"));
+        assertEquals(new BigDecimal("18.75"), response.getSharesByPassenger().get("passenger-2"));
         assertEquals(new BigDecimal("37.50"), response.getTotalShared());
     }
 
     @Test
     @DisplayName("Passageiro nunca paga mais que o próprio teto, e o motorista absorve a diferença")
     void shouldCapPassengerShareAtMaxAmount() throws ServerException {
-        // A divisão igual daria 12,50, mas o passageiro 1 tem teto de 10,00
+        // A divisão igual daria 18,75, mas o passageiro 1 tem teto de 10,00
         RideCostRequest request = RideCostRequest.forCostSharing(
                 BASE_DISTANCE_KM,
                 AVERAGE_CONSUMPTION,
@@ -177,43 +178,43 @@ class RideCostHandlerTest {
                 PARKING,
                 List.of(
                         new RideCostRequest.PassengerCostInput("passenger-1", 4.0, new BigDecimal("10.00")),
-                        new RideCostRequest.PassengerCostInput("passenger-2", 6.0, new BigDecimal("17.65"))
+                        new RideCostRequest.PassengerCostInput("passenger-2", 6.0, new BigDecimal("35.30"))
                 )
         );
 
         RideCostResponse response = handler.execute(request);
 
-        // Passageiro 1 paga o teto (10,00) e o passageiro 2 a divisão igual (12,50).
-        // O motorista cobre o resto do custo de 37,50, ou seja, 15,00, e o custo inteiro continua rateado.
+        // Passageiro 1 paga o teto (10,00) e o passageiro 2 a divisão igual (18,75).
+        // O motorista cobre o resto do custo de 37,50, ou seja, 8,75, e o custo inteiro continua rateado.
         assertEquals(new BigDecimal("10.00"), response.getSharesByPassenger().get("passenger-1"));
-        assertEquals(new BigDecimal("12.50"), response.getSharesByPassenger().get("passenger-2"));
+        assertEquals(new BigDecimal("18.75"), response.getSharesByPassenger().get("passenger-2"));
         assertEquals(new BigDecimal("37.50"), response.getTotalShared());
     }
 
     @Test
     @DisplayName("Os centavos que não dividem exato ficam com o motorista, e o passageiro nunca paga a mais")
     void shouldLeaveTheRemainingCentsToTheDriver() throws ServerException {
-        // Pedágio de 7,02: o custo total dá 37,52, e 37,52 ÷ 3 = 12,5066...
+        // Pedágio de 7,01: o custo total dá 37,51, e 37,51 ÷ 2 = 18,755
         RideCostRequest request = RideCostRequest.forCostSharing(
                 BASE_DISTANCE_KM,
                 AVERAGE_CONSUMPTION,
                 ENERGY_PRICE,
-                new BigDecimal("7.02"),
+                new BigDecimal("7.01"),
                 PARKING,
                 List.of(
-                        new RideCostRequest.PassengerCostInput("passenger-1", 4.0, new BigDecimal("17.10")),
-                        new RideCostRequest.PassengerCostInput("passenger-2", 6.0, new BigDecimal("17.65"))
+                        new RideCostRequest.PassengerCostInput("passenger-1", 4.0, new BigDecimal("34.20")),
+                        new RideCostRequest.PassengerCostInput("passenger-2", 6.0, new BigDecimal("35.30"))
                 )
         );
 
         RideCostResponse response = handler.execute(request);
 
-        // Cada passageiro paga 12,50 (a conta é cortada, não arredondada para cima)
-        // e o motorista fica com 37,52 - 25,00 = 12,52
-        assertEquals(new BigDecimal("37.52"), response.getTotalCost());
-        assertEquals(new BigDecimal("12.50"), response.getSharesByPassenger().get("passenger-1"));
-        assertEquals(new BigDecimal("12.50"), response.getSharesByPassenger().get("passenger-2"));
-        assertEquals(new BigDecimal("37.52"), response.getTotalShared());
+        // Cada passageiro paga 18,75 (a conta é cortada, não arredondada para cima)
+        // e o motorista fica com o centavo que sobra: 37,51 - 37,50 = 0,01
+        assertEquals(new BigDecimal("37.51"), response.getTotalCost());
+        assertEquals(new BigDecimal("18.75"), response.getSharesByPassenger().get("passenger-1"));
+        assertEquals(new BigDecimal("18.75"), response.getSharesByPassenger().get("passenger-2"));
+        assertEquals(new BigDecimal("37.51"), response.getTotalShared());
     }
 
     @Test
@@ -251,7 +252,7 @@ class RideCostHandlerTest {
     @Test
     @DisplayName("O custo da rota é arredondado para 2 casas antes de calcular o valor máximo")
     void shouldRoundRouteCostBeforeComputingTheMaximum() throws ServerException {
-        // 40,01 km ÷ 10 × 5,50 = 22,0055, que vira 22,01; + 7,00 + 3,00 = 32,01; metade = 16,005, que vira 16,01
+        // 40,01 km ÷ 10 × 5,50 = 22,0055, que vira 22,01; + 7,00 + 3,00 = 32,01
         RideCostRequest request = RideCostRequest.forConfirmationQuote(
                 40.01,
                 null,
@@ -265,7 +266,7 @@ class RideCostHandlerTest {
 
         RideCostResponse response = handler.execute(request);
 
-        assertEquals(new BigDecimal("16.01"), response.getMaxAmount());
+        assertEquals(new BigDecimal("32.01"), response.getMaxAmount());
     }
 
     @Test
@@ -279,9 +280,9 @@ class RideCostHandlerTest {
     @DisplayName("Deve recusar desvio de passageiro infinito ou inválido (NaN)")
     void shouldRejectNonFinitePassengerDetour() {
         assertThrows(ServerException.class, () -> handler.execute(sharingWith(List.of(
-                new RideCostRequest.PassengerCostInput("passenger-1", Double.NaN, new BigDecimal("17.10"))))));
+                new RideCostRequest.PassengerCostInput("passenger-1", Double.NaN, new BigDecimal("34.20"))))));
         assertThrows(ServerException.class, () -> handler.execute(sharingWith(List.of(
-                new RideCostRequest.PassengerCostInput("passenger-1", Double.POSITIVE_INFINITY, new BigDecimal("17.10"))))));
+                new RideCostRequest.PassengerCostInput("passenger-1", Double.POSITIVE_INFINITY, new BigDecimal("34.20"))))));
     }
 
     @Test
@@ -295,8 +296,8 @@ class RideCostHandlerTest {
     @DisplayName("Deve recusar o mesmo passageiro repetido na lista")
     void shouldRejectDuplicatedPassengerIds() {
         assertThrows(ServerException.class, () -> handler.execute(sharingWith(List.of(
-                new RideCostRequest.PassengerCostInput("passenger-1", 4.0, new BigDecimal("17.10")),
-                new RideCostRequest.PassengerCostInput("passenger-1", 6.0, new BigDecimal("17.65"))))));
+                new RideCostRequest.PassengerCostInput("passenger-1", 4.0, new BigDecimal("34.20")),
+                new RideCostRequest.PassengerCostInput("passenger-1", 6.0, new BigDecimal("35.30"))))));
     }
 
     @Test
