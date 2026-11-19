@@ -49,13 +49,14 @@ bool rideStatusesChanged(List<RideModel> before, List<RideModel> after) {
   return signature(before) != signature(after);
 }
 
-/// Viagem que pode ser concluída em breve: em andamento, ou confirmada para hoje
-/// (ou para um dia que já passou). Viagens de dias futuros não precisam ser acompanhadas.
+/// Viagem que pode ser concluída em breve: em andamento, ou confirmada para sair nas
+/// próximas 24 horas (ou com a saída já passada). O motorista pode iniciar antes do
+/// horário, então uma carona de amanhã cedo também precisa ser acompanhada hoje.
 bool isRideOnItsWay(RideModel ride, DateTime now) {
   if (ride.status == RideStatus.inProgress) return true;
   if (ride.status != RideStatus.confirmed) return false;
 
   final departure = ride.departureDateTime;
-  final startOfTomorrow = DateTime(now.year, now.month, now.day + 1);
-  return departure != null && departure.isBefore(startOfTomorrow);
+  return departure != null &&
+      departure.isBefore(now.add(const Duration(hours: 24)));
 }

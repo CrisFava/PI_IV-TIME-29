@@ -14,6 +14,7 @@ import '../data/repository/chat_exception.dart';
 import '../data/repository/chat_repository.dart';
 import '../data/repository/firebase_chat_repository.dart';
 import 'chat_providers.dart';
+import 'ride_chat_announcer.dart';
 
 final chatActionsProvider = NotifierProvider.autoDispose
     .family<ChatActionsController, AsyncValue<void>, ChatThreadRef>(
@@ -81,7 +82,7 @@ class ChatActionsController extends Notifier<AsyncValue<void>> {
     final ride = await _rides.startRide(thread.rideId);
     _refreshRide();
 
-    await _announce(ride, 'Viagem iniciada.');
+    await _announce(ride, RideChatAnnouncer.rideStarted);
   });
 
   /// Conclui a viagem no desembarque. A partir daqui os dois podem se avaliar.
@@ -89,7 +90,7 @@ class ChatActionsController extends Notifier<AsyncValue<void>> {
     final ride = await _rides.completeRide(thread.rideId);
     _refreshRide();
 
-    await _announce(ride, 'Viagem concluída. Avalie como foi a carona.');
+    await _announce(ride, RideChatAnnouncer.rideCompleted);
   });
 
   void _refreshPayment() {
@@ -103,24 +104,14 @@ class ChatActionsController extends Notifier<AsyncValue<void>> {
   }
 
   /// Avisa todos os passageiros com vaga, cada um na sua conversa com o motorista.
-  Future<void> _announce(RideModel ride, String text) async {
-    final passengerIds = {
-      thread.passengerId,
-      for (final passenger in ride.passengersWithSeat) passenger.userId!,
-    };
-
-    for (final passengerId in passengerIds) {
-      await _notify(
-        ChatThreadRef(
-          chatRoomId: thread.chatRoomId,
-          rideId: thread.rideId,
-          passengerId: passengerId,
-        ),
-        ChatMessageType.system,
+  Future<void> _announce(RideModel ride, String text) => ref
+      .read(rideChatAnnouncerProvider)
+      .announce(
+        ride,
         text,
+        chatRoomId: thread.chatRoomId,
+        alsoTo: thread.passengerId,
       );
-    }
-  }
 
   /// Aviso de uma mudança que já foi gravada na API. Se o chat falhar aqui, a
   /// ação continua valendo: o outro participante vê o novo estado ao reabrir a conversa.

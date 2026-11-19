@@ -27,9 +27,17 @@ void main() {
       expect(isRideOnItsWay(ride, DateTime(2026, 11, 18)), isTrue);
     });
 
-    test('confirmada para um dia futuro não conta', () {
+    test('confirmada para as próximas 24 horas conta, mesmo sendo amanhã', () {
       final ride = fakeRide(status: 'CONFIRMED');
 
+      // Na véspera, às 9h: a saída de amanhã às 07:30 está a menos de 24 horas
+      expect(isRideOnItsWay(ride, DateTime(2026, 11, 15, 9)), isTrue);
+    });
+
+    test('confirmada para depois das próximas 24 horas não conta', () {
+      final ride = fakeRide(status: 'CONFIRMED');
+
+      expect(isRideOnItsWay(ride, DateTime(2026, 11, 15, 7)), isFalse);
       expect(isRideOnItsWay(ride, DateTime(2026, 11, 10)), isFalse);
     });
 
