@@ -47,7 +47,7 @@ bool rideStatusesChanged(List<RideModel> before, List<RideModel> after) {
   String signature(List<RideModel> rides) => ([
     for (final ride in rides)
       '${ride.id}:${ride.status.name}:'
-          '${[for (final participant in ride.participants) participant.status.name].join(',')}',
+          '${[for (final participant in ride.participants) '${participant.status.name}:${participant.paymentStatus?.name}'].join(',')}',
   ]..sort()).join('|');
 
   return signature(before) != signature(after);

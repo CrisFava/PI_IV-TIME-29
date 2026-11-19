@@ -82,6 +82,16 @@ void main() {
       },
     );
 
+    test('mudança apenas no pagamento também é mudança', () {
+      final json = fakeRideJson(status: 'IN_PROGRESS', passengerStatus: 'COMPLETED');
+      final before = RideModel.fromJson(json);
+      (json['participants'] as List)[1]['paymentStatus'] = 'PAID';
+      final after = RideModel.fromJson(json);
+
+      expect(rideStatusesChanged([before], [after]), isTrue);
+      expect(rideStatusesChanged([after], [after]), isFalse);
+    });
+
     test('viagem que aparece ou some é mudança', () {
       expect(rideStatusesChanged(const [], [inProgress]), isTrue);
       expect(rideStatusesChanged([inProgress], const []), isTrue);

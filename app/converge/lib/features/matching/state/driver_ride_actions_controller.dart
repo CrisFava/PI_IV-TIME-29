@@ -1,5 +1,7 @@
 // Autor: Gustavo Alves de Siqueira Costa - RA 25001650
 
+import 'dart:async';
+
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../auth/state/auth_action_controller.dart';
@@ -77,8 +79,8 @@ class DriverRideActionsController extends Notifier<Set<String>> {
     try {
       final ride = await action();
       ref.invalidate(myRidesProvider);
-      if (announcement != null) await _announce(ride, announcement);
-      if (afterSuccess != null) await afterSuccess(ride);
+      if (announcement != null) unawaited(_announce(ride, announcement));
+      if (afterSuccess != null) unawaited(afterSuccess(ride));
       return null;
     } catch (e) {
       return authErrorMessage(e);

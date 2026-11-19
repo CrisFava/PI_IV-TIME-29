@@ -96,6 +96,30 @@ void main() {
     expect(find.text('Pague a carona'), findsNothing);
   });
 
+  testWidgets('depois de pagar mostra a próxima cobrança', (tester) async {
+    rides.pendingPayments = [
+      ...rides.pendingPayments,
+      RidePaymentModel(
+        rideId: 'ride-2',
+        passengerId: fakePassengerId,
+        driverId: fakeDriverId,
+        receiverName: 'Outra motorista',
+        amount: 20,
+        status: PaymentStatus.pending,
+        pixCopyPaste: 'PIX-2',
+        requestedAt: DateTime(2026, 11, 16, 8),
+        paidAt: null,
+      ),
+    ];
+    await openHome(tester);
+    await tester.tap(find.text('Já paguei'));
+    await tester.pumpAndSettle();
+
+    expect(find.text('Pague a carona'), findsOneWidget);
+    expect(find.textContaining('Outra motorista'), findsOneWidget);
+    expect(rides.calls, contains('markPaymentAsPaid:$fakeRideId'));
+  });
+
   testWidgets('sem cobrança em aberto, nada abre', (tester) async {
     rides.pendingPayments = [];
 

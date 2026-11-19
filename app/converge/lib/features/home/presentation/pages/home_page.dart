@@ -775,7 +775,9 @@ class _HomePageState extends ConsumerState<HomePage> {
 
     final rideId = ref.read(passengerMatchProvider).rideId;
     final rides = ref.read(myRidesProvider).value;
-    final pending = ref.read(pendingPaymentsProvider).value;
+    final payments = ref.read(pendingPaymentsProvider);
+    final pending = payments.value;
+    if (payments.isLoading || payments.hasError) return;
     if (rideId == null || rides == null || pending == null) return;
 
     RideModel? ride;
@@ -787,12 +789,13 @@ class _HomePageState extends ConsumerState<HomePage> {
     if (ride == null || viewerId == null) return;
 
     final me = ride.passengerOf(viewerId);
-    final stillRiding =
-        me != null &&
-        me.status == ParticipantStatus.confirmed &&
-        (ride.status == RideStatus.confirmed ||
-            ride.status == RideStatus.inProgress);
-    if (stillRiding) return;
+    if (me == null) return;
+    final finished =
+        me.status == ParticipantStatus.completed ||
+        me.status == ParticipantStatus.cancelled ||
+        me.status == ParticipantStatus.rejected ||
+        me.status == ParticipantStatus.expired;
+    if (!finished || me.paymentStatus == PaymentStatus.pending) return;
     final hasOpenCharge = pending.any(
       (payment) => payment.rideId == rideId && payment.isOpen,
     );

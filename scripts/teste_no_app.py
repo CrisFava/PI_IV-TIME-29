@@ -23,6 +23,7 @@ import argparse
 import json
 import sys
 import time
+import uuid
 from datetime import date, datetime, timedelta
 from pathlib import Path
 
@@ -85,7 +86,18 @@ def route_body(kind: str, departure: datetime, extra: dict) -> dict:
 # ---------------------------------------------------------------------------------- preparar
 
 def prepare(api: ApiClient, key: str, connection: str, database: str) -> None:
-    run_id = time.strftime("%m%d%H%M%S")
+    run_id = uuid.uuid4().hex
+    emails = [
+        f"sim.{run_id}.1.conta-do-app@converge-sim.test",
+        f"sim.{run_id}.2.motorista-robo@converge-sim.test",
+        f"sim.{run_id}.3.passageira-robo@converge-sim.test",
+    ]
+    try:
+        with STATE_FILE.open("x", encoding="utf-8") as state_file:
+            json.dump({"runId": run_id, "emails": emails}, state_file)
+    except FileExistsError:
+        raise SimulationFailure("Já existe uma preparação. Rode limpar antes de preparar novamente.")
+
     with MongoClient(connection, serverSelectionTimeoutMS=10_000) as client:
         users = client[database][verificar_usuario.USERS_COLLECTION]
         world = SimulationWorld(api, key, users, run_id, date.today())
@@ -95,11 +107,14 @@ def prepare(api: ApiClient, key: str, connection: str, database: str) -> None:
 
     state = {
         "runId": run_id,
+        "emails": emails,
         "app": {"email": app_user.email, "id": app_user.id},
         "motorista": {"email": driver_bot.email, "id": driver_bot.id},
         "passageiro": {"email": passenger_bot.email, "id": passenger_bot.id},
     }
-    STATE_FILE.write_text(json.dumps(state, indent=2, ensure_ascii=False), encoding="utf-8")
+    prepared_file = STATE_FILE.with_suffix(".tmp")
+    prepared_file.write_text(json.dumps(state, indent=2, ensure_ascii=False), encoding="utf-8")
+    prepared_file.replace(STATE_FILE)
 
     print("\nContas criadas (documentos aprovados; a conta do app também tem carro e PIX):\n")
     print(f"  CONTA DO APP (use no simulador): {app_user.email}")
@@ -186,8 +201,15 @@ def run_passenger_bot(api: ApiClient, key: str, connection: str, database: str, 
         routes = client[database]["routes"]
         offer = None
         for _ in range(120):
-            offer = routes.find_one({"userId": state["app"]["id"], "type": "OFFER", "status": "ACTIVE"},
-                                    sort=[("createdAt", -1)])
+            today = date.today()
+            midnight = datetime.combine(today, datetime.min.time())
+            offer = routes.find_one({
+                "userId": state["app"]["id"], "type": "OFFER", "status": "ACTIVE",
+                "$or": [
+                    {"recurrence": "ONCE", "date": midnight},
+                    {"recurrence": {"$ne": "ONCE"}, "weekDays": WEEK_DAYS[today.weekday()]},
+                ],
+            }, sort=[("createdAt", -1)])
             if offer:
                 break
             time.sleep(POLL_SECONDS)
@@ -238,12 +260,13 @@ def clean(api: ApiClient, key: str, connection: str, database: str) -> None:
     with MongoClient(connection, serverSelectionTimeoutMS=10_000) as client:
         world = SimulationWorld(api, key, client[database][verificar_usuario.USERS_COLLECTION],
                                 state["runId"], date.today())
-        deleted, leftovers = world.delete_accounts_of_run(state["runId"])
+        deleted, leftovers = world.delete_accounts_of_run(state["runId"], state.get("emails", []))
     print(f"{len(deleted)} conta(s) apagada(s) do Firebase.")
     for email in leftovers:
         print(f"  não deu para apagar: {email}")
-    if not leftovers:
-        STATE_FILE.unlink(missing_ok=True)
+    if leftovers:
+        raise SimulationFailure("Limpeza incompleta; o estado foi mantido para tentar novamente.")
+    STATE_FILE.unlink(missing_ok=True)
 
 
 def main() -> int:

@@ -160,20 +160,24 @@ class SimulationWorld:
                 leftovers.append(user.email)
         return leftovers
 
-    def delete_accounts_of_run(self, run_id: str) -> tuple:
+    def delete_accounts_of_run(self, run_id: str, emails: Optional[list[str]] = None) -> tuple:
         """Apaga as contas de uma execução anterior (que caiu antes de limpar), achadas pelo Mongo."""
         prefix = re.compile(f"^sim\\.{re.escape(run_id)}\\.")
         deleted, leftovers = [], []
 
-        for document in self.users_collection.find({"email": prefix}, {"email": 1}):
-            email = document["email"]
+        accounts = set(emails or [])
+        accounts.update(document["email"] for document in
+                        self.users_collection.find({"email": prefix}, {"email": 1}))
+        for email in sorted(accounts):
             try:
                 login = self.api.call("POST", f"{FIREBASE_AUTH_URL}/accounts:signInWithPassword"
                                               f"?key={self.firebase_api_key}",
                                       body={"email": email, "password": PASSWORD, "returnSecureToken": True})
                 token = (login.body or {}).get("idToken")
-                if not token:
-                    # EMAIL_NOT_FOUND: a conta já tinha sido apagada no fim daquela execução.
+                if not login.ok or not token:
+                    if login.status == 400 and login.error_message == "EMAIL_NOT_FOUND":
+                        continue
+                    leftovers.append(email)
                     continue
                 response = self.api.call("POST", f"{FIREBASE_AUTH_URL}/accounts:delete?key={self.firebase_api_key}",
                                          body={"idToken": token})

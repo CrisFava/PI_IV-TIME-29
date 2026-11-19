@@ -37,7 +37,7 @@ class _PendingPaymentPromptState extends ConsumerState<PendingPaymentPrompt> {
     // Recarregando, o valor ainda é o antigo: depois do "Já paguei", ele ainda traz a
     // cobrança que acabou de ser paga, e o pagamento abriria de novo
     final pending = payments.value;
-    if (_open || payments.isLoading || pending == null) return;
+    if (_open || payments.isLoading || payments.hasError || pending == null) return;
 
     final payment = ref
         .read(paymentPromptProvider.notifier)
@@ -52,6 +52,8 @@ class _PendingPaymentPromptState extends ConsumerState<PendingPaymentPrompt> {
     // Só fecha sem pagar quando o código PIX não estava disponível: não reabre sozinho
     if (paid != true) {
       ref.read(paymentPromptProvider.notifier).dismiss(payment.rideId);
+    } else {
+      await _maybeShow(ref.read(pendingPaymentsProvider));
     }
   }
 }
