@@ -8,7 +8,7 @@ import com.converge.socket.core.handler.RequestHandler;
 
 /**
  * Distância em linha reta entre pontos (fórmula de Haversine), em km (RT20).
- * Mesma conta e mesmo raio do HaversineCalculator do backend, na mesma ordem de operações,
+ * Mesma conta e mesmo raio que o backend usava antes de delegar o cálculo ao servidor, na mesma ordem de operações,
  * para o resultado sair idêntico. Recebe um lote de pares para o backend não abrir
  * uma chamada de socket por par dentro de laços.
  */
