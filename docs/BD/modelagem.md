@@ -159,11 +159,11 @@ A reputação é separada por papel (`reputation.driver` e `reputation.passenger
 - `level` só vira `HIGH` se `completedRides` for alto o bastante. Como `completedRides` só passou a ser contado com o listener de viagem concluída, **o `HIGH` só é alcançável com a gravação da média e a contagem de viagens funcionando juntas**.
 
 **Contagem de viagens (`completedRides`):**
-- O registro da viagem concluída roda **depois** que a conclusão da viagem é gravada, fora da transação da conclusão. Uma falha nele só vai para o log e **nunca desfaz nem impede** a conclusão.
+- O listener do `RideCompletedEvent` usa `@EventListener` simples, então roda de forma síncrona, **dentro** da transação da conclusão da viagem. Uma falha dele é capturada e só vai para o log, então não desfaz nem impede a conclusão. Evolução: mover o registro para depois do commit (`@TransactionalEventListener` com `AFTER_COMMIT`).
 - Idempotência: não há lista de `rideId` aplicados. O listener ouve só o `RideCompletedEvent`, que o `RideCompletionPublisher` publica uma vez por viagem (só o `CompleteRideUseCase` o chama, e uma viagem só conclui uma vez). O reconciliador de indicadores **não** republica o evento, então não há recontagem.
 - Limitação: se o registro falhar, aquela viagem fica sem contagem (não há reprocessamento). Viagem sem passageiro efetivo não gera evento e não conta (RF49).
 
-**Atualização atômica por papel:** a reputação é gravada **por papel** (`reputation.driver` ou `reputation.passenger`), sem regravar o usuário inteiro. Assim uma avaliação, uma penalidade e o job dos selos não sobrescrevem as alterações uns dos outros.
+**Gravação da reputação (limitação):** os casos de uso de avaliação (`RecordReviewRatingUseCase`), de viagem concluída (`RecordCompletedRideUseCase`) e de penalidade carregam o usuário e gravam o documento inteiro (`findById` + `save`). A gravação **não é atômica por papel**: uma avaliação, uma penalidade e o job dos selos que rodem ao mesmo tempo no mesmo usuário podem sobrescrever as alterações uns dos outros. Evolução: update parcial de `reputation.driver` ou `reputation.passenger`.
 
 **Janela de 90 dias não é deslizante.** Os contadores de `window` **acumulam desde o início** e nunca são zerados nem descontados por data. Os limites "nos últimos 90 dias" das tabelas abaixo valem, na prática, sobre o total acumulado. A janela deslizante fica como evolução.
 

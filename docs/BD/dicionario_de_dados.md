@@ -461,10 +461,10 @@ Estrutura composta que representa os indicadores de comportamento do usuário se
 
 **Como cada campo é gravado hoje:**
 - `averageRating` e `totalReviews`: recalculados a partir de **todas** as avaliações recebidas no papel, logo depois de salvar uma avaliação (só o papel avaliado). A média é gravada com 2 casas decimais, e esse valor entra nas regras de `level` e de selo. Se a gravação falhar, a avaliação continua salva (só log).
-- `window.completedRides`: +1 para o motorista e +1 para cada passageiro efetivo quando a viagem é concluída. O registro roda **depois** que a conclusão da viagem é gravada, fora da transação dela; uma falha nele só vai para o log e nunca desfaz nem impede a conclusão. Cada conclusão conta uma vez (o evento é publicado uma vez por viagem). Viagem sem passageiro efetivo não gera evento e não conta.
+- `window.completedRides`: +1 para o motorista e +1 para cada passageiro efetivo quando a viagem é concluída. O listener roda de forma síncrona, dentro da transação da conclusão da viagem; uma falha nele é capturada e só vai para o log, então não desfaz nem impede a conclusão. Evolução: registrar só depois do commit. Cada conclusão conta uma vez (o evento é publicado uma vez por viagem). Viagem sem passageiro efetivo não gera evento e não conta.
 - `window.driverInitiatedCancellations`, `window.lateCancellations` e `window.noShows`: incrementados pelas penalidades.
 - `level` e `calculatedAt`: recalculados a cada gravação acima.
-- A reputação é gravada **por papel** (`reputation.driver` ou `reputation.passenger`), de forma atômica, sem regravar o usuário inteiro, para uma avaliação, uma penalidade e o job dos selos não sobrescreverem uns aos outros.
+- Limitação: cada gravação carrega o usuário e salva o documento inteiro (não há update parcial por papel). Uma avaliação, uma penalidade e o job dos selos simultâneos no mesmo usuário podem sobrescrever uns aos outros. Evolução: update parcial de `reputation.driver` ou `reputation.passenger`.
 
 **Regra de `level` (igual nos dois papéis):** `LOW` quando algum limite de penalidade é estourado; `HIGH` quando cumpre os critérios de confiança do papel (tabelas abaixo); `MEDIUM` no resto. A regra roda de novo a cada média, viagem concluída ou penalidade, então uma penalidade pode rebaixar `HIGH` para `MEDIUM`.
 
