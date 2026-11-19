@@ -12,6 +12,7 @@ import '../../../security/state/blocked_users_controller.dart';
 import '../../data/models/chat_conversation.dart';
 import '../../state/chat_actions_controller.dart';
 import '../../state/chat_providers.dart';
+import '../../state/chat_unread_provider.dart';
 import '../widgets/chat_composer.dart';
 import '../widgets/chat_message_list.dart';
 import '../widgets/chat_notice.dart';
@@ -34,6 +35,9 @@ class ChatPage extends ConsumerStatefulWidget {
 }
 
 class _ChatPageState extends ConsumerState<ChatPage> {
+  // A conversa já foi marcada como lida ao abrir (o número da navbar zera)
+  bool _markedReadOnOpen = false;
+
   @override
   Widget build(BuildContext context) {
     final viewer = ref.watch(chatViewerProvider);
@@ -85,6 +89,19 @@ class _ChatPageState extends ConsumerState<ChatPage> {
   Widget _buildConversation(ChatConversation conversation, String viewerUid) {
     final thread = conversation.thread;
     final messages = ref.watch(chatMessagesProvider(thread));
+    // Com a conversa aberta, o que chega já conta como visto (sai do número da
+    // navbar). Depois do desenho: o Riverpod não deixa mudar providers durante ele.
+    void markRead() => Future.microtask(
+      () => ref.read(chatReadProvider.notifier).markRead(thread.path),
+    );
+    ref.listen(chatMessagesProvider(thread), (_, next) {
+      if (next.hasValue) markRead();
+    });
+    // Ao abrir, com as mensagens já carregadas (sem mudança para o listen)
+    if (!_markedReadOnOpen && messages.hasValue) {
+      _markedReadOnOpen = true;
+      markRead();
+    }
     final busy = ref.watch(chatActionsProvider(thread)).isLoading;
     final otherPartyId = conversation.viewerIsDriver
         ? thread.passengerId
