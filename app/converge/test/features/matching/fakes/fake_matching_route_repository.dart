@@ -31,6 +31,8 @@ class FakeMatchingRouteRepository implements RouteRepository {
         'departureTime': request.departureTime,
         'estimatedArrivalTime': request.estimatedArrivalTime,
         'weekDays': request.weekDays.toList(),
+        'recurrence': request.recurrence.apiValue,
+        'date': request.date,
       });
 
   @override

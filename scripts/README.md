@@ -6,6 +6,7 @@ Ferramentas para testar o Converge sem precisar sair de casa nem fazer cadastros
 | :-- | :-- |
 | `run_servers.py` | Abre dois terminais: o servidor de sockets e, em seguida, o backend com o `.env` carregado |
 | `verificar_usuario.py` | Marca a CNH e o vínculo acadêmico de um usuário como `VERIFIED`, buscando pelo e-mail |
+| `verificar_todos_usuarios.py` | Faz o mesmo para todos os usuários do banco de uma vez |
 | `simular_corrida.py` | Percorre corridas inteiras contra o backend rodando e confere cada resposta |
 
 Os testes **mockados** (sem banco e sem API) ficam no backend, em
@@ -30,6 +31,9 @@ scripts\.venv\Scripts\Activate.ps1
 python -m pip install -r scripts/requirements.txt
 ```
 
+Depois disso, não precisa ativar o venv toda vez: se o `python3` do sistema não tiver o `pymongo`,
+os scripts se reabrem sozinhos com o Python de `scripts/.venv`.
+
 Os dois scripts leem a conexão do Mongo do `app/converge-backend/.env`, o mesmo arquivo do backend.
 Nada mais precisa ser configurado.
 
@@ -48,7 +52,12 @@ em banco com `prod` no nome**.
 
 Sobe o ambiente do backend em dois terminais novos, na ordem certa: primeiro o servidor de
 sockets (`app/server`), depois o Spring (`app/converge-backend`) com as variáveis do `.env`.
-Não precisa do venv.
+Não precisa do venv. Funciona no Windows (cmd), no macOS (Terminal) e no Linux (gnome-terminal,
+konsole ou xterm).
+
+- Só abre o backend quando a porta 3000 do servidor de sockets responde (espera até 3 min). Se a
+  porta já estiver ocupada, usa o servidor de sockets que já está rodando.
+- O `.env` é lido dentro do terminal novo, então as variáveis chegam ao Spring em qualquer sistema.
 
 ```bash
 python scripts/run_servers.py
@@ -75,6 +84,28 @@ python scripts/verificar_usuario.py aluno@puccampinas.edu.br --banco converge-te
   `VERIFIED` no banco, mas o backend continua tratando como `EXPIRED`.
 - Retorna `0` se alterou, `1` se não achou o usuário ou não havia o que alterar, `2` se faltou
   configuração.
+
+---
+
+## `verificar_todos_usuarios.py`
+
+Versão em lote do `verificar_usuario.py`: aprova a CNH e o vínculo acadêmico de **todos** os
+usuários do banco. Usa as mesmas funções e a mesma configuração do script individual.
+
+```bash
+python scripts/verificar_todos_usuarios.py                         # CNH e vínculo de todos
+python scripts/verificar_todos_usuarios.py --somente estudante
+python scripts/verificar_todos_usuarios.py --simular                # só mostra, não grava
+python scripts/verificar_todos_usuarios.py --sem-confirmar          # não pergunta antes de gravar
+python scripts/verificar_todos_usuarios.py --banco converge-testes
+```
+
+- Lista cada usuário que vai mudar, com o status de antes e os avisos (CNH vencida etc.).
+- Pede confirmação (`s`/`N`) antes de gravar, a não ser com `--sem-confirmar`.
+- Não mexe no que já está `VERIFIED`, então o `verifiedAt` original fica como estava.
+- Quem ainda não mandou a CNH só tem o vínculo acadêmico verificado.
+- Retorna `0` se alterou (ou simulou), `1` se não havia o que alterar ou foi cancelado, `2` se
+  faltou configuração.
 
 ---
 

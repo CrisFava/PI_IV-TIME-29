@@ -21,12 +21,20 @@ Future<void> promptRideReviews(
   final session = ref.read(authControllerProvider).value;
   if (session is! Authenticated) return;
 
+  // O provider é autoDispose e quem chama (a home) não o observa: sem um ouvinte, ele
+  // poderia ser descartado no meio da carga e o future nunca terminar.
+  final subscription = ref.listenManual(
+    rideReviewsProvider(ride.id),
+    (_, _) {},
+  );
   final List<ReviewModel> given;
   try {
     given = await ref.read(rideReviewsProvider(ride.id).future);
   } catch (_) {
     // Sem saber o que já foi avaliado, não abre sozinha: o botão "Avaliar" do chat continua lá.
     return;
+  } finally {
+    subscription.close();
   }
 
   final targets = pendingReviewTargets(
