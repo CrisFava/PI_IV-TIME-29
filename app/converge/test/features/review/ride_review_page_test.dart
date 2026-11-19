@@ -115,6 +115,30 @@ void main() {
     expect(find.byType(RideReviewPage), findsOneWidget);
   });
 
+  testWidgets('apagar o comentário sem estrelas e enviar de novo envia e fecha a tela', (
+    tester,
+  ) async {
+    await openPage(tester, const [_ana, _bia]);
+
+    await tester.tap(find.byTooltip('5 de 5').first);
+    await tester.enterText(find.byType(TextField).last, 'Chegou atrasada');
+    await tester.pump();
+    await tester.tap(find.text('Enviar avaliações'));
+    await tester.pumpAndSettle();
+    expect(
+      find.text('Escolha de 1 a 5 estrelas para enviar o comentário.'),
+      findsOneWidget,
+    );
+
+    await tester.enterText(find.byType(TextField).last, '');
+    await tester.pump();
+    await tester.tap(find.text('Enviar avaliações'));
+    await tester.pumpAndSettle();
+
+    expect(reviews.reviews.map((review) => review.reviewedId), ['passenger-1']);
+    expect(find.byType(RideReviewPage), findsNothing);
+  });
+
   testWidgets('"Agora não" fecha sem enviar nada', (tester) async {
     await openPage(tester, const [_ana, _bia]);
 

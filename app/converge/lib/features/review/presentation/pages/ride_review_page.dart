@@ -78,6 +78,12 @@ class _RideReviewPageState extends ConsumerState<RideReviewPage> {
   Future<void> _submit() async {
     if (!_canSubmit) return;
 
+    // Limpa os erros da tentativa anterior: um aviso já resolvido (ex.: o comentário sem
+    // estrelas foi apagado) não pode manter a tela aberta depois de um envio que deu certo.
+    for (final draft in _drafts.values) {
+      if (!draft.sent) draft.error = null;
+    }
+
     // Comentário sem estrelas: a nota é obrigatória, então avisa em vez de perder o texto.
     var missingRating = false;
     for (final draft in _drafts.values) {
