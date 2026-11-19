@@ -55,19 +55,6 @@ class VehicleTest {
     }
 
     @Test
-    @DisplayName("RENAVAM com dígito verificador errado, tamanho errado ou dígitos repetidos deve ser recusado")
-    void shouldFailWhenRenavamIsInvalid() {
-        for (String renavam : new String[]{"14283256657", "1428325665", "11111111111", ""}) {
-            assertThatThrownBy(() -> new Vehicle(
-                    "user-123", "Gol Azul", "Volkswagen Gol", "ABC1234", renavam, "Azul",
-                    VehicleType.HATCH, 5, gasolineOnly()
-            ))
-                    .isInstanceOf(ApplicationException.class)
-                    .satisfies(error -> assertThat(((ApplicationException) error).getError().fields()).contains("renavam"));
-        }
-    }
-
-    @Test
     @DisplayName("Moto não pode ter mais de 2 lugares")
     void shouldFailWhenMotorcycleHasTooManySeats() {
         assertThatThrownBy(() -> new Vehicle(

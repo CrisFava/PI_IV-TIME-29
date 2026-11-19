@@ -22,19 +22,21 @@ public class UpdateVehicleUseCase implements UseCase<UpdateVehicleCommand, Vehic
     private final VehicleAccess vehicleAccess;
     private final VehicleRepository vehicleRepository;
     private final VehicleMapper vehicleMapper;
+    private final ValidateRenavamUseCase validateRenavam;
 
     @Override
     public Vehicle execute(UpdateVehicleCommand command) {
         Vehicle vehicle = vehicleAccess.getOwnedVehicle(command.vehicleId(), command.firebaseUid());
         UpdateVehicleRequestDTO request = command.request();
 
+        String renavam = validateRenavam.execute(request.renavam());
         String previousPlate = vehicle.getLicensePlate();
 
         vehicle.update(
                 request.nickname(),
                 request.model(),
                 request.licensePlate(),
-                request.renavam(),
+                renavam,
                 request.color(),
                 request.type(),
                 request.totalCapacity(),
