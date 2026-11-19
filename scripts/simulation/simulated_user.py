@@ -1,3 +1,5 @@
+# Autor: Cristian Eduardo Fava - RA 25000636
+
 from dataclasses import dataclass
 
 

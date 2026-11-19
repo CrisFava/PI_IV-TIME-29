@@ -1,3 +1,5 @@
+# Autor: Cristian Eduardo Fava - RA 25000636
+
 """
 Cenários da simulação. Cada um cria as próprias pessoas e trajetos, então eles não dependem
 uns dos outros e podem rodar sozinhos (--cenario).

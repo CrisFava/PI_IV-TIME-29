@@ -1,4 +1,6 @@
 #!/usr/bin/env python3
+# Autor: Cristian Eduardo Fava - RA 25000636
+
 """
 Marca a CNH e o vínculo acadêmico (documento de estudante) de um usuário como VERIFIED.
 

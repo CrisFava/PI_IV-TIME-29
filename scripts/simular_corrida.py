@@ -1,4 +1,6 @@
 #!/usr/bin/env python3
+# Autor: Cristian Eduardo Fava - RA 25000636
+
 """
 Simula corridas inteiras contra o backend rodando, sem ninguém sair de casa.
 
