@@ -1,5 +1,7 @@
 // Autor: Cristian Eduardo Fava - RA 25000636
 
+import 'package:converge/features/ride/data/models/payment_status.dart';
+import 'package:converge/features/ride/data/models/ride_payment_model.dart';
 import 'package:converge/features/ride/data/repository/ride_repository_impl.dart';
 import 'package:converge/features/ride/presentation/widgets/pending_payment_prompt.dart';
 import 'package:converge/features/ride/presentation/widgets/pix_qr_code.dart';
@@ -50,16 +52,46 @@ void main() {
 
     expect(rides.calls, contains('markPaymentAsPaid:$fakeRideId'));
     expect(find.text('Pague a carona'), findsNothing);
+    expect(
+      find.text('Pagamento informado. Você já pode pedir e oferecer caronas.'),
+      findsOneWidget,
+    );
   });
 
-  testWidgets('"Depois" fecha o pagamento e ele não volta sozinho', (tester) async {
+  testWidgets('sem "Depois": o pagamento não fecha tocando fora, só com o "Já paguei"', (
+    tester,
+  ) async {
     await openHome(tester);
 
-    await tester.tap(find.text('Depois'));
+    expect(find.text('Depois'), findsNothing);
+    expect(find.text('Fechar'), findsNothing);
+    await tester.tapAt(const Offset(400, 40));
+    await tester.pumpAndSettle();
+
+    expect(find.text('Pague a carona'), findsOneWidget);
+  });
+
+  testWidgets('sem o código PIX, o pagamento pode ser fechado', (tester) async {
+    // Cobrança em aberto, mas o código PIX não veio (ex.: falha ao gerar)
+    rides.pendingPayments = [
+      RidePaymentModel(
+        rideId: fakeRideId,
+        passengerId: fakePassengerId,
+        driverId: fakeDriverId,
+        receiverName: 'Lucas Silveira',
+        amount: 12.5,
+        status: PaymentStatus.pending,
+        pixCopyPaste: null,
+        requestedAt: DateTime(2026, 11, 16, 7),
+        paidAt: null,
+      ),
+    ];
+    await openHome(tester);
+
+    await tester.tap(find.text('Fechar'));
     await tester.pumpAndSettle();
 
     expect(find.text('Pague a carona'), findsNothing);
-    expect(rides.calls, isNot(contains('markPaymentAsPaid:$fakeRideId')));
   });
 
   testWidgets('sem cobrança em aberto, nada abre', (tester) async {

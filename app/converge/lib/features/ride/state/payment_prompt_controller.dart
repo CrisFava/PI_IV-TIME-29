@@ -20,14 +20,14 @@ final paymentPromptProvider =
 ///
 /// Enquanto houver cobrança em aberto, o passageiro não pede nem oferece carona (a API
 /// recusa com PAYMENT_PENDING). Por isso o pagamento volta a aparecer sempre que uma
-/// dessas ações é recusada, mesmo que ele tenha fechado com "Depois".
+/// dessas ações é recusada, mesmo que ele o tenha fechado antes.
 class PaymentPromptController extends Notifier<PaymentPromptState> {
   RideRepository get _rides => ref.read(rideRepositoryProvider);
 
   @override
   PaymentPromptState build() => const PaymentPromptState();
 
-  /// A primeira cobrança em aberto que ainda não foi deixada para depois.
+  /// A primeira cobrança em aberto que não foi fechada sem pagar nesta sessão.
   RidePaymentModel? nextToShow(List<RidePaymentModel> pending) {
     for (final payment in pending) {
       if (payment.isOpen && !state.dismissedRideIds.contains(payment.rideId)) {
@@ -37,7 +37,7 @@ class PaymentPromptController extends Notifier<PaymentPromptState> {
     return null;
   }
 
-  /// "Depois": a cobrança não abre sozinha de novo nesta sessão.
+  /// Fechou sem pagar (sem código PIX disponível): a cobrança não abre sozinha de novo nesta sessão.
   void dismiss(String rideId) {
     state = PaymentPromptState(
       dismissedRideIds: {...state.dismissedRideIds, rideId},

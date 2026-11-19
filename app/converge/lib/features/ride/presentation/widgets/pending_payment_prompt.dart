@@ -3,7 +3,6 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
-import '../../../../core/widgets/show_app_notice.dart';
 import '../../data/models/ride_payment_model.dart';
 import '../../state/payment_prompt_controller.dart';
 import '../../state/pending_payments_provider.dart';
@@ -26,7 +25,7 @@ class _PendingPaymentPromptState extends ConsumerState<PendingPaymentPrompt> {
   @override
   Widget build(BuildContext context) {
     ref.listen(pendingPaymentsProvider, (_, next) => _maybeShow(next));
-    // "Depois" ou uma ação recusada por pagamento em aberto mudam o que deve aparecer
+    // Fechar sem pagar ou uma ação recusada por pagamento em aberto mudam o que deve aparecer
     ref.listen(
       paymentPromptProvider,
       (_, _) => _maybeShow(ref.read(pendingPaymentsProvider)),
@@ -48,14 +47,9 @@ class _PendingPaymentPromptState extends ConsumerState<PendingPaymentPrompt> {
     _open = false;
     if (!mounted) return;
 
-    if (paid == true) {
-      showAppNotice(
-        context,
-        'Pagamento informado. Você já pode pedir e oferecer caronas.',
-        type: AppNoticeType.success,
-      );
-      return;
+    // Só fecha sem pagar quando o código PIX não estava disponível: não reabre sozinho
+    if (paid != true) {
+      ref.read(paymentPromptProvider.notifier).dismiss(payment.rideId);
     }
-    ref.read(paymentPromptProvider.notifier).dismiss(payment.rideId);
   }
 }

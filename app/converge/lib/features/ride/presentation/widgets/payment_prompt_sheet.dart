@@ -13,19 +13,38 @@ import '../../state/payment_prompt_controller.dart';
 import 'pix_qr_code.dart';
 
 /// Abre o pagamento de uma cobrança em aberto: o valor, o PIX e o "Já paguei".
-/// Devolve `true` se o passageiro informou o pagamento.
+/// O passageiro é levado a pagar na hora: não há "Depois" e o painel não fecha arrastando
+/// nem tocando fora. Só fecha sem pagar quando o código PIX não está disponível.
+/// Devolve `true` se o passageiro informou o pagamento (e mostra a confirmação).
 Future<bool?> showPaymentPromptSheet(
   BuildContext context,
   RidePaymentModel payment,
-) => showModalBottomSheet<bool>(
-  context: context,
-  isScrollControlled: true,
-  backgroundColor: AppColors.cardBackground,
-  shape: const RoundedRectangleBorder(
-    borderRadius: BorderRadius.vertical(top: Radius.circular(26)),
-  ),
-  builder: (_) => PaymentPromptSheet(payment: payment),
-);
+) async {
+  final canClose = payment.pixCopyPaste == null;
+  final paid = await showModalBottomSheet<bool>(
+    context: context,
+    isScrollControlled: true,
+    isDismissible: canClose,
+    enableDrag: canClose,
+    backgroundColor: AppColors.cardBackground,
+    shape: const RoundedRectangleBorder(
+      borderRadius: BorderRadius.vertical(top: Radius.circular(26)),
+    ),
+    builder: (_) => PopScope(
+      canPop: canClose,
+      child: PaymentPromptSheet(payment: payment),
+    ),
+  );
+
+  if (paid == true && context.mounted) {
+    showAppNotice(
+      context,
+      'Pagamento informado. Você já pode pedir e oferecer caronas.',
+      type: AppNoticeType.success,
+    );
+  }
+  return paid;
+}
 
 /// Pagamento da carona: o passageiro copia o PIX, paga no banco e volta para o "Já paguei".
 class PaymentPromptSheet extends ConsumerWidget {
@@ -149,17 +168,20 @@ class PaymentPromptSheet extends ConsumerWidget {
               style: TextStyle(fontSize: 14.5, fontWeight: FontWeight.w700),
             ),
           ),
-          const SizedBox(height: 4),
-          TextButton(
-            onPressed: marking ? null : () => Navigator.of(context).pop(false),
-            child: const Text(
-              'Depois',
-              style: TextStyle(
-                fontWeight: FontWeight.w600,
-                color: AppColors.textSecondary,
+          // Sem o código PIX não dá para pagar agora: só aí o painel pode ser fechado
+          if (pixCode == null) ...[
+            const SizedBox(height: 4),
+            TextButton(
+              onPressed: marking ? null : () => Navigator.of(context).pop(false),
+              child: const Text(
+                'Fechar',
+                style: TextStyle(
+                  fontWeight: FontWeight.w600,
+                  color: AppColors.textSecondary,
+                ),
               ),
             ),
-          ),
+          ],
         ],
       ),
     );
