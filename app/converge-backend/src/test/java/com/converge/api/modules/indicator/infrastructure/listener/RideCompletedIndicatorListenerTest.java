@@ -12,10 +12,16 @@ import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.ArgumentCaptor;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
+import org.springframework.transaction.annotation.Propagation;
+import org.springframework.transaction.annotation.Transactional;
+import org.springframework.transaction.event.TransactionPhase;
+import org.springframework.transaction.event.TransactionalEventListener;
 
+import java.lang.reflect.Method;
 import java.time.LocalDateTime;
 import java.util.List;
 
+import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.junit.jupiter.api.Assertions.assertDoesNotThrow;
 import static org.mockito.ArgumentMatchers.any;
@@ -66,5 +72,21 @@ class RideCompletedIndicatorListenerTest {
                 .thenThrow(new IllegalStateException("banco fora do ar"));
 
         assertDoesNotThrow(() -> listener.onRideCompleted(event()));
+    }
+
+    @Test
+    @DisplayName("Deve rodar só depois do commit, com fallback sem transação e fora da sessão da transação")
+    void shouldRunAfterCommitOutsideTransactionSession() throws NoSuchMethodException {
+        Method method = RideCompletedIndicatorListener.class.getMethod("onRideCompleted", RideCompletedEvent.class);
+
+        TransactionalEventListener listenerAnnotation = method.getAnnotation(TransactionalEventListener.class);
+        Transactional transactional = method.getAnnotation(Transactional.class);
+
+        assertThat(listenerAnnotation).isNotNull();
+        assertThat(listenerAnnotation.phase()).isEqualTo(TransactionPhase.AFTER_COMMIT);
+        assertThat(listenerAnnotation.fallbackExecution()).isTrue();
+        assertThat(transactional).isNotNull();
+        assertThat(transactional.propagation()).isEqualTo(Propagation.NOT_SUPPORTED);
+        assertThat(transactional.transactionManager()).isEqualTo("mongoTransactionManager");
     }
 }
