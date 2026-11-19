@@ -266,7 +266,8 @@ class _RideDockNavigationState extends State<RideDockNavigation>
                             children: [
                               Expanded(
                                 child: _SymmetricTabItem(
-                                  icon: Icons.home_rounded,
+                                  // Única exceção ao Icons.*_rounded: essa família não tem casa em contorno.
+                                  icon: Icons.home_outlined,
                                   label: 'Início',
                                   isSelected: widget.currentIndex == 0,
                                   onTap: () => _handleTabTap(0),
@@ -274,7 +275,7 @@ class _RideDockNavigationState extends State<RideDockNavigation>
                               ),
                               Expanded(
                                 child: _SymmetricTabItem(
-                                  icon: Icons.chat_bubble_rounded,
+                                  icon: Icons.chat_bubble_outline_rounded,
                                   label: 'Chat',
                                   isSelected: widget.currentIndex == 2,
                                   onTap: () => _handleTabTap(2),
@@ -301,7 +302,7 @@ class _RideDockNavigationState extends State<RideDockNavigation>
                               ),
                               Expanded(
                                 child: _SymmetricTabItem(
-                                  icon: Icons.person_rounded,
+                                  icon: Icons.person_outline_rounded,
                                   label: 'Perfil',
                                   isSelected: widget.currentIndex == 3,
                                   onTap: () => _handleTabTap(3),
