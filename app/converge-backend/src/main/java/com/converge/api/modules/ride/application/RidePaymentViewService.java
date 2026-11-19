@@ -53,7 +53,6 @@ public class RidePaymentViewService {
                 driver.name(),
                 passenger.getRequestedAmount(),
                 passenger.getPaymentStatus(),
-                passenger.isPaymentConfirmedByDriver(),
                 pixCopyPaste(ride, passenger, driver),
                 passenger.getPaymentRequestedAt(),
                 passenger.getPaidAt()

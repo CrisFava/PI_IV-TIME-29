@@ -2,8 +2,8 @@
 
 package com.converge.api.modules.ride.presentation.controller;
 
-import com.converge.api.modules.ride.application.ConfirmPaymentUseCase;
 import com.converge.api.modules.ride.application.GetPaymentUseCase;
+import com.converge.api.modules.ride.application.MarkPaymentAsPaidUseCase;
 import com.converge.api.modules.ride.application.RequestPaymentUseCase;
 import com.converge.api.modules.ride.application.dto.PassengerRequestCommand;
 import com.converge.api.modules.ride.application.dto.PaymentResponseDTO;
@@ -25,7 +25,7 @@ import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RestController;
 
 /**
- * Pagamento de um passageiro em uma viagem (RF39, RF41): cobrança via Pix Copia e Cola e confirmação manual.
+ * Pagamento de um passageiro em uma viagem (RF39, RF41): cobrança via Pix Copia e Cola e o "Já paguei" do passageiro.
  */
 @RestController
 @RequestMapping("/api/v1/rides/{rideId}/passengers/{passengerId}/payment")
@@ -33,8 +33,8 @@ import org.springframework.web.bind.annotation.RestController;
 public class RidePaymentController {
 
     private final RequestPaymentUseCase requestPayment;
-    private final ConfirmPaymentUseCase confirmPayment;
     private final GetPaymentUseCase getPayment;
+    private final MarkPaymentAsPaidUseCase markPaymentAsPaid;
 
     @GetMapping
     public ResponseEntity<ApplicationResponse<PaymentResponseDTO>> getPayment(
@@ -62,14 +62,14 @@ public class RidePaymentController {
         return ResponseEntity.ok(ApplicationResponse.success(payment));
     }
 
-    // "Passageiro já pagou" (só o motorista)
-    @PostMapping("/confirm")
-    public ResponseEntity<ApplicationResponse<PaymentResponseDTO>> confirmPayment(
+    // "Já paguei" (só o próprio passageiro): libera o passageiro para outras caronas
+    @PostMapping("/mark-paid")
+    public ResponseEntity<ApplicationResponse<PaymentResponseDTO>> markAsPaid(
             @AuthenticationPrincipal AuthenticatedUser principal,
             @PathVariable String rideId,
             @PathVariable String passengerId
     ) {
-        PaymentResponseDTO payment = confirmPayment.execute(
+        PaymentResponseDTO payment = markPaymentAsPaid.execute(
                 new PassengerRequestCommand(rideId, passengerId, uid(principal)));
 
         return ResponseEntity.ok(ApplicationResponse.success(payment));

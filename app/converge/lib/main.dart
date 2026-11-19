@@ -29,9 +29,5 @@ Future<void> main() async {
     }
   }
 
-  runApp(
-      const ProviderScope(
-          child: AppWidget()
-      )
-  );
+  runApp(const ProviderScope(child: AppWidget()));
 }

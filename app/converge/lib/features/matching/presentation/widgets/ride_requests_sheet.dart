@@ -10,6 +10,7 @@ import 'package:go_router/go_router.dart';
 import '../../../../app_routes.dart';
 import '../../../../core/config/styles.dart';
 import '../../../../core/widgets/confirm_dialog.dart';
+import '../../../../core/utils/currency_formatter.dart';
 import '../../../../core/widgets/details_sheet.dart';
 import '../../../../core/widgets/show_app_notice.dart';
 import '../../../auth/state/auth_action_controller.dart';
@@ -139,6 +140,7 @@ class _RideRequestsSheetState extends ConsumerState<RideRequestsSheet> {
         onAcceptRequest: _accept,
         onRejectRequest: _reject,
         onOpenRequestChat: _openChat,
+        onArrive: _arrivePassenger,
       ),
     );
   }
@@ -172,6 +174,32 @@ class _RideRequestsSheetState extends ConsumerState<RideRequestsSheet> {
     final error = await ref
         .read(driverRideActionsProvider.notifier)
         .markNoShow(rideId, passengerId);
+    if (mounted && error != null) _showMessage(error);
+  }
+
+  /// "Chegou": o passageiro desceu, a viagem dele termina e ele recebe a cobrança do rateio.
+  Future<void> _arrivePassenger(String rideId, String passengerId) async {
+    final rides = ref.read(myRidesProvider).value ?? const <RideModel>[];
+    RideParticipantModel? passenger;
+    for (final ride in rides) {
+      if (ride.id == rideId) passenger = ride.passengerOf(passengerId);
+    }
+    final estimate = passenger?.estimatedAmount;
+    final amountHint = estimate != null && estimate > 0
+        ? ' (cerca de ${CurrencyFormatter.format(estimate)})'
+        : '';
+
+    final confirmed = await _confirm(
+      title:
+          'Confirmar a chegada de ${passenger?.displayName ?? 'o passageiro'}?',
+      message:
+          'A viagem dele termina aqui e ele recebe a cobrança do rateio pelo PIX$amountHint.',
+      confirmLabel: 'Confirmar chegada',
+    );
+    if (!confirmed) return;
+    final error = await ref
+        .read(driverRideActionsProvider.notifier)
+        .arrive(rideId, passengerId);
     if (mounted && error != null) _showMessage(error);
   }
 

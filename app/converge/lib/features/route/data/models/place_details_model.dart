@@ -50,5 +50,6 @@ class PlaceDetailsModel {
           longitude == other.longitude;
 
   @override
-  int get hashCode => Object.hash(address, neighborhood, city, latitude, longitude);
+  int get hashCode =>
+      Object.hash(address, neighborhood, city, latitude, longitude);
 }

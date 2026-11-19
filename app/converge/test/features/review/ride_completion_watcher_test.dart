@@ -27,9 +27,17 @@ void main() {
       expect(isRideOnItsWay(ride, DateTime(2026, 11, 18)), isTrue);
     });
 
-    test('confirmada para um dia futuro não conta', () {
+    test('confirmada para as próximas 24 horas conta, mesmo sendo amanhã', () {
       final ride = fakeRide(status: 'CONFIRMED');
 
+      // Na véspera, às 9h: a saída de amanhã às 07:30 está a menos de 24 horas
+      expect(isRideOnItsWay(ride, DateTime(2026, 11, 15, 9)), isTrue);
+    });
+
+    test('confirmada para depois das próximas 24 horas não conta', () {
+      final ride = fakeRide(status: 'CONFIRMED');
+
+      expect(isRideOnItsWay(ride, DateTime(2026, 11, 15, 7)), isFalse);
       expect(isRideOnItsWay(ride, DateTime(2026, 11, 10)), isFalse);
     });
 
@@ -54,9 +62,34 @@ void main() {
     });
 
     test('viagem que muda de status é mudança', () {
-      final completed = fakeRide(status: 'COMPLETED', passengerStatus: 'COMPLETED');
+      final completed = fakeRide(
+        status: 'COMPLETED',
+        passengerStatus: 'COMPLETED',
+      );
 
       expect(rideStatusesChanged([inProgress], [completed]), isTrue);
+    });
+
+    test(
+      'chegada de um passageiro é mudança, mesmo com a viagem em andamento',
+      () {
+        final arrived = fakeRide(
+          status: 'IN_PROGRESS',
+          passengerStatus: 'COMPLETED',
+        );
+
+        expect(rideStatusesChanged([inProgress], [arrived]), isTrue);
+      },
+    );
+
+    test('mudança apenas no pagamento também é mudança', () {
+      final json = fakeRideJson(status: 'IN_PROGRESS', passengerStatus: 'COMPLETED');
+      final before = RideModel.fromJson(json);
+      (json['participants'] as List)[1]['paymentStatus'] = 'PAID';
+      final after = RideModel.fromJson(json);
+
+      expect(rideStatusesChanged([before], [after]), isTrue);
+      expect(rideStatusesChanged([after], [after]), isFalse);
     });
 
     test('viagem que aparece ou some é mudança', () {
@@ -79,24 +112,30 @@ void main() {
           ],
         );
 
-    test('com viagem em andamento, atualiza a lista sozinho e percebe a conclusão', () async {
-      rides = FakeRideRepository(ride: fakeRide(status: 'IN_PROGRESS'));
-      container = containerFor(rides);
-      container.listen(rideCompletionWatcherProvider, (_, _) {});
-      container.listen(myRidesProvider, (_, _) {});
+    test(
+      'com viagem em andamento, atualiza a lista sozinho e percebe a conclusão',
+      () async {
+        rides = FakeRideRepository(ride: fakeRide(status: 'IN_PROGRESS'));
+        container = containerFor(rides);
+        container.listen(rideCompletionWatcherProvider, (_, _) {});
+        container.listen(myRidesProvider, (_, _) {});
 
-      final first = await container.read(myRidesProvider.future);
-      expect(first.single.status, RideStatus.inProgress);
+        final first = await container.read(myRidesProvider.future);
+        expect(first.single.status, RideStatus.inProgress);
 
-      // O motorista conclui em outro aparelho: o app só fica sabendo se consultar de novo
-      rides.ride = fakeRide(status: 'COMPLETED', passengerStatus: 'COMPLETED');
-      await Future<void>.delayed(const Duration(milliseconds: 400));
+        // O motorista conclui em outro aparelho: o app só fica sabendo se consultar de novo
+        rides.ride = fakeRide(
+          status: 'COMPLETED',
+          passengerStatus: 'COMPLETED',
+        );
+        await Future<void>.delayed(const Duration(milliseconds: 400));
 
-      expect(
-        container.read(myRidesProvider).value!.single.status,
-        RideStatus.completed,
-      );
-    });
+        expect(
+          container.read(myRidesProvider).value!.single.status,
+          RideStatus.completed,
+        );
+      },
+    );
 
     test('sem mudança nas viagens, consulta mas não recarrega a lista (a tela não pisca)', () async {
       rides = FakeRideRepository(ride: fakeRide(status: 'IN_PROGRESS'));

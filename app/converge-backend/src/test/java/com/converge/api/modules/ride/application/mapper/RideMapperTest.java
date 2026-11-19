@@ -109,7 +109,6 @@ class RideMapperTest {
         assertThat(participant.maxAmount()).isNull();
         assertThat(participant.finalAmount()).isNull();
         assertThat(participant.paymentStatus()).isNull();
-        assertThat(participant.paymentConfirmedByDriver()).isFalse();
     }
 
     @Test

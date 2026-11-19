@@ -1,4 +1,4 @@
-// Autor: Allan Giovanni Matias Paes - RA 25008211
+// Autor: Sara Fernandes Monteiro - RA: 25024107
 
 package com.converge.socket.handler.ride;
 

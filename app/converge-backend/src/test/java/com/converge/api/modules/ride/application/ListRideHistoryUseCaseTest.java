@@ -49,10 +49,10 @@ class ListRideHistoryUseCaseTest {
         completed.complete();
         var ana = completed.getParticipants().stream().filter(p -> "ana".equals(p.getUserId())).findFirst().orElseThrow();
         ReflectionTestUtils.setField(ana, "estimatedAmount", new BigDecimal("6.00"));
-        // O valor pago é o cobrado pelo motorista e confirmado, não o calculado no fim
+        // O valor pago é o cobrado e pago, não o calculado no fim
         ReflectionTestUtils.setField(ana, "finalAmount", new BigDecimal("5.10"));
         completed.requestPayment("ana", new BigDecimal("6.00"));
-        completed.confirmPayment("ana");
+        completed.markPaymentAsPaid("ana");
 
         // Viagem que ainda vai acontecer: não é histórico
         upcoming = rideFromCenterToCampus();

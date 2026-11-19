@@ -77,7 +77,6 @@ class RidePaymentTest {
         assertThat(passenger.getRequestedAmount()).isEqualTo(new BigDecimal("12.50"));
         assertThat(passenger.getPaymentStatus()).isEqualTo(ParticipantPaymentStatus.PENDING);
         assertThat(passenger.getPaymentRequestedAt()).isNotNull();
-        assertThat(passenger.isPaymentConfirmedByDriver()).isFalse();
         assertThat(passenger.getPaidAt()).isNull();
     }
 
@@ -137,37 +136,12 @@ class RidePaymentTest {
     }
 
     @Test
-    @DisplayName("Confirmar o pagamento deve marcar como pago e confirmado pelo motorista")
-    void shouldMarkAsPaidWhenDriverConfirms() {
+    @DisplayName("Pagamento já feito não pode ser cobrado de novo")
+    void shouldNotChargeAgainAfterPaid() {
         Ride ride = rideWithConfirmedPassenger();
         ride.requestPayment(PASSENGER, new BigDecimal("12.50"));
+        ride.markPaymentAsPaid(PASSENGER);
 
-        ride.confirmPayment(PASSENGER);
-
-        Participant passenger = passengerOf(ride);
-        assertThat(passenger.getPaymentStatus()).isEqualTo(ParticipantPaymentStatus.PAID);
-        assertThat(passenger.isPaymentConfirmedByDriver()).isTrue();
-        assertThat(passenger.getPaidAt()).isNotNull();
-    }
-
-    @Test
-    @DisplayName("Não deve confirmar pagamento que nunca foi solicitado")
-    void shouldNotConfirmPaymentNeverRequested() {
-        Ride ride = rideWithConfirmedPassenger();
-
-        assertThatThrownBy(() -> ride.confirmPayment(PASSENGER))
-                .isInstanceOf(ApplicationException.class);
-    }
-
-    @Test
-    @DisplayName("Pagamento já confirmado não pode ser confirmado nem cobrado de novo")
-    void shouldNotChargeOrConfirmAgainAfterPaid() {
-        Ride ride = rideWithConfirmedPassenger();
-        ride.requestPayment(PASSENGER, new BigDecimal("12.50"));
-        ride.confirmPayment(PASSENGER);
-
-        assertThatThrownBy(() -> ride.confirmPayment(PASSENGER))
-                .isInstanceOf(ApplicationException.class);
         assertThatThrownBy(() -> ride.requestPayment(PASSENGER, new BigDecimal("5.00")))
                 .isInstanceOf(ApplicationException.class);
     }
@@ -180,7 +154,7 @@ class RidePaymentTest {
         ride.requestPayment(PASSENGER, new BigDecimal("8.00"));
         ride.complete();
 
-        ride.confirmPayment(PASSENGER);
+        ride.markPaymentAsPaid(PASSENGER);
 
         assertThat(passengerOf(ride).getPaymentStatus()).isEqualTo(ParticipantPaymentStatus.PAID);
     }

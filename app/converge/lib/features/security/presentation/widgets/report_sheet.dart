@@ -238,7 +238,10 @@ class _ReportSheetState extends ConsumerState<ReportSheet> {
                   )
                 : const Text(
                     'Enviar denúncia',
-                    style: TextStyle(fontSize: 14.5, fontWeight: FontWeight.w700),
+                    style: TextStyle(
+                      fontSize: 14.5,
+                      fontWeight: FontWeight.w700,
+                    ),
                   ),
           ),
         ],

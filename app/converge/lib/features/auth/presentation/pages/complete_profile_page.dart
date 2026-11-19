@@ -90,7 +90,9 @@ class _CompleteProfilePageState extends ConsumerState<CompleteProfilePage> {
                     if (email != null) ...[
                       Text(
                         'Conclua seu perfil para a conta $email',
-                        style: const TextStyle(color: AppColors.textBodySecondary),
+                        style: const TextStyle(
+                          color: AppColors.textBodySecondary,
+                        ),
                       ),
                       const SizedBox(height: 16),
                     ],

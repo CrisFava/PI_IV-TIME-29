@@ -55,6 +55,7 @@ class RequestRideSeatUseCaseTest {
     private static final String DRIVER_ID = "driver-sara";
 
     @Mock private RideAccess rideAccess;
+    @Mock private PendingPaymentGuard pendingPaymentGuard;
     @Mock private RideEligibility rideEligibility;
     @Mock private RouteAccess routeAccess;
     @Mock private VehicleAccess vehicleAccess;
@@ -75,7 +76,8 @@ class RequestRideSeatUseCaseTest {
     @BeforeEach
     void setUp() {
         requestSeat = new RequestRideSeatUseCase(
-                rideAccess, rideEligibility, routeAccess, vehicleAccess, rideRepository, rideMapper, blockAccess);
+                rideAccess, rideEligibility, routeAccess, vehicleAccess, rideRepository, rideMapper, blockAccess,
+                pendingPaymentGuard);
     }
 
     private Place place(String address) {
@@ -224,6 +226,19 @@ class RequestRideSeatUseCaseTest {
         assertThat(ride).isSameAs(existing);
         assertThat(ride.getParticipants()).hasSize(2);
         verify(vehicleAccess, never()).getActiveVehicleOf(any(), any());
+    }
+
+    @Test
+    @DisplayName("Com o pagamento de outra carona em aberto, o pedido de vaga é recusado sem criar nem alterar viagem")
+    void shouldRejectRequestWithPendingPayment() {
+        when(rideAccess.currentUserId(UID)).thenReturn(PASSENGER_ID);
+        doThrow(new ApplicationException(ErrorCode.PAYMENT_PENDING, "Pagamento em aberto."))
+                .when(pendingPaymentGuard).ensureNoPendingPayment(PASSENGER_ID);
+
+        ApplicationException exception = assertThrows(ApplicationException.class, () -> requestSeat.execute(command()));
+
+        assertThat(exception.getError().code()).isEqualTo(ErrorCode.PAYMENT_PENDING);
+        verifyNoInteractions(rideRepository);
     }
 
     @Test

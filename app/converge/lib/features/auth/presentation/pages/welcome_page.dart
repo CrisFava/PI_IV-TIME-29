@@ -83,7 +83,9 @@ class WelcomePage extends StatelessWidget {
                         child: const Text.rich(
                           TextSpan(
                             text: 'Não tem conta? ',
-                            style: TextStyle(color: AppColors.textBodySecondary),
+                            style: TextStyle(
+                              color: AppColors.textBodySecondary,
+                            ),
                             children: [
                               TextSpan(
                                 text: 'Criar conta',

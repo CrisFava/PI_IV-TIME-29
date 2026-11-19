@@ -9,7 +9,7 @@ import 'onboarding_design_tokens.dart';
 class RegisterStepEmail extends StatelessWidget {
   static const List<String> suggestedDomains = [
     '@puccampinas.edu.br',
-    '@unicamp.br'
+    '@unicamp.br',
   ];
 
   final TextEditingController emailController;
@@ -44,10 +44,7 @@ class RegisterStepEmail extends StatelessWidget {
           style: OnboardingDesignTokens.stepSubtitleStyle,
         ),
         const SizedBox(height: 28),
-        const Text(
-          'E-mail',
-          style: OnboardingDesignTokens.fieldLabelStyle,
-        ),
+        const Text('E-mail', style: OnboardingDesignTokens.fieldLabelStyle),
         const SizedBox(height: 8),
         TextFormField(
           controller: emailController,
@@ -70,8 +67,9 @@ class RegisterStepEmail extends StatelessWidget {
           spacing: 8,
           runSpacing: 8,
           children: suggestedDomains.map((domain) {
-            final isSelected =
-                currentText.toLowerCase().endsWith(domain.toLowerCase());
+            final isSelected = currentText.toLowerCase().endsWith(
+              domain.toLowerCase(),
+            );
             return _DomainQuickChip(
               domain: domain,
               isSelected: isSelected,

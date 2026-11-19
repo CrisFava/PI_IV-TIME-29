@@ -3,7 +3,6 @@
 /// Espelho do enum `ParticipantPaymentStatus` do backend.
 enum PaymentStatus {
   pending('PENDING'),
-  awaitingDriverConfirmation('AWAITING_DRIVER_CONFIRMATION'),
   paid('PAID'),
   notApplicable('NOT_APPLICABLE'),
 

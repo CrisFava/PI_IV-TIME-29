@@ -10,3 +10,6 @@ app/__pycache__
 # Ambiente Python dos scripts de desenvolvimento
 scripts/.venv/
 __pycache__/
+
+# Contas do teste manual no app (scripts/teste_no_app.py)
+scripts/.teste_no_app.json

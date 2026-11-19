@@ -7,6 +7,11 @@ sockets (app/server), depois o Spring (app/converge-backend) com as variáveis d
 Uso:
     python scripts/run_servers.py
 
+Antes de abrir os terminais, instala o módulo do servidor de sockets no Maven local: o backend
+compila contra as classes dele (handlers e DTOs), e um jar antigo em ~/.m2 quebra a compilação
+ou, pior, faz o backend rodar um cálculo desatualizado. Servidor que já está no ar não é aberto
+de novo.
+
 Cada terminal novo roda este mesmo arquivo em modo interno (--executar socket|backend). É ele
 que carrega o .env e chama o Maven dentro do terminal, então as variáveis chegam ao Spring em
 qualquer sistema. Passar o ambiente pelo processo que abre o terminal não funciona no macOS
@@ -28,6 +33,7 @@ APP_DIR = REPO_ROOT / "app"
 SERVER_DIR = APP_DIR / "server"
 BACKEND_DIR = APP_DIR / "converge-backend"
 SOCKET_PORT = 3000
+BACKEND_PORT = 8080
 SOCKET_WAIT_SECONDS = 180
 IS_WINDOWS = sys.platform == "win32"
 
@@ -170,6 +176,18 @@ def parse_args():
     return parser.parse_args()
 
 
+def install_server_module() -> bool:
+    """Instala o app/server no Maven local, para o backend compilar contra a versão atual."""
+    command = maven_command(SERVER_DIR, ["-q", "install", "-DskipTests"])
+    print("\n[0/2] Instalando o módulo do Socket Server no Maven local (o backend usa as classes dele)...")
+    print(f"      Comando: {' '.join(command)}")
+    if subprocess.call(command, cwd=str(SERVER_DIR), shell=IS_WINDOWS) != 0:
+        print("      Falhou. Corrija o erro acima: sem isso o backend não compila ou usa um cálculo antigo.")
+        return False
+    print("      Instalado.")
+    return True
+
+
 def main() -> int:
     args = parse_args()
     if args.executar:
@@ -178,6 +196,9 @@ def main() -> int:
     print("=" * 60)
     print("Iniciando ecossistema Backend do Converge...")
     print("=" * 60)
+
+    if not install_server_module():
+        return 1
 
     # 1. Socket Server
     if port_open(SOCKET_PORT):
@@ -195,14 +216,18 @@ def main() -> int:
                   "o backend será aberto mesmo assim.")
 
     # 2. Spring Backend (o .env é carregado dentro do terminal novo)
-    env_file = backend_env_file()
-    print("\n[2/2] Abrindo terminal do Spring Backend...")
-    print(f"      Diretório: {BACKEND_DIR}")
-    print(f"      Arquivo .env: {env_file}" + ("" if env_file.is_file() else " (não encontrado!)"))
-    open_terminal("backend")
+    if port_open(BACKEND_PORT):
+        print(f"\n[2/2] Já tem algo ouvindo na porta {BACKEND_PORT}; o Spring Backend já está rodando.")
+        print("      Para subir com o código atual, pare esse backend e rode este script de novo.")
+    else:
+        env_file = backend_env_file()
+        print("\n[2/2] Abrindo terminal do Spring Backend...")
+        print(f"      Diretório: {BACKEND_DIR}")
+        print(f"      Arquivo .env: {env_file}" + ("" if env_file.is_file() else " (não encontrado!)"))
+        open_terminal("backend")
 
     print("\n" + "=" * 60)
-    print("Os 2 terminais foram abertos na ordem correta!")
+    print("Pronto: os servidores que faltavam foram abertos, na ordem certa.")
     print("=" * 60)
     return 0
 

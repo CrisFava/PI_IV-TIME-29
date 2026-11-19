@@ -38,6 +38,9 @@ class DriverOfferDetails extends ConsumerStatefulWidget {
   final ValueChanged<DriverRideRequest> onRejectRequest;
   final ValueChanged<DriverRideRequest> onOpenRequestChat;
 
+  /// Confirma a chegada de um passageiro na viagem em andamento (ele recebe a cobrança).
+  final void Function(String rideId, String passengerId) onArrive;
+
   const DriverOfferDetails({
     super.key,
     required this.offerKey,
@@ -49,6 +52,7 @@ class DriverOfferDetails extends ConsumerStatefulWidget {
     required this.onAcceptRequest,
     required this.onRejectRequest,
     required this.onOpenRequestChat,
+    required this.onArrive,
   });
 
   @override
@@ -198,6 +202,8 @@ class _DriverOfferDetailsState extends ConsumerState<DriverOfferDetails> {
                               widget.onOpenChat(ride.id, passengerId),
                           onMarkNoShow: (passengerId) =>
                               widget.onMarkNoShow(ride.id, passengerId),
+                          onArrive: (passengerId) =>
+                              widget.onArrive(ride.id, passengerId),
                         ),
                       ),
                   ],

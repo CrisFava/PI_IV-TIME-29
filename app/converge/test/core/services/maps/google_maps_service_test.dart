@@ -48,22 +48,25 @@ void main() {
       expect(requested, isFalse);
     });
 
-    test('decodePolyline decodifica corretamente e rejeita strings truncadas', () {
-      // Polyline canônica do Google: (38.5, -120.2) -> (40.7, -120.95)
-      const testPolyline = '_p~iF~ps|U_ulLnnqC';
-      final points = GoogleMapsService.decodePolyline(testPolyline);
+    test(
+      'decodePolyline decodifica corretamente e rejeita strings truncadas',
+      () {
+        // Polyline canônica do Google: (38.5, -120.2) -> (40.7, -120.95)
+        const testPolyline = '_p~iF~ps|U_ulLnnqC';
+        final points = GoogleMapsService.decodePolyline(testPolyline);
 
-      expect(points.length, 2);
-      expect(points[0].latitude, closeTo(38.5, 0.001));
-      expect(points[0].longitude, closeTo(-120.2, 0.001));
-      expect(points[1].latitude, closeTo(40.7, 0.001));
-      expect(points[1].longitude, closeTo(-120.95, 0.001));
+        expect(points.length, 2);
+        expect(points[0].latitude, closeTo(38.5, 0.001));
+        expect(points[0].longitude, closeTo(-120.2, 0.001));
+        expect(points[1].latitude, closeTo(40.7, 0.001));
+        expect(points[1].longitude, closeTo(-120.95, 0.001));
 
-      expect(
-        () => GoogleMapsService.decodePolyline('_p~iF~ps|'),
-        throwsA(isA<FormatException>()),
-      );
-    });
+        expect(
+          () => GoogleMapsService.decodePolyline('_p~iF~ps|'),
+          throwsA(isA<FormatException>()),
+        );
+      },
+    );
 
     test('computeRoutes prioriza encodedPolyline quando fornecido', () async {
       const testPolyline = '_p~iF~ps|U_ulLnnqC';
@@ -84,7 +87,10 @@ void main() {
         InterceptorsWrapper(
           onRequest: (options, handler) {
             expect(options.headers['X-Goog-Api-Key'], 'test_mock_key');
-            expect(options.headers['X-Goog-FieldMask'], contains('routes.polyline.encodedPolyline'));
+            expect(
+              options.headers['X-Goog-FieldMask'],
+              contains('routes.polyline.encodedPolyline'),
+            );
             expect(options.method, 'POST');
             expect(options.path, contains('computeRoutes'));
 
@@ -95,9 +101,7 @@ void main() {
                 data: {
                   'routes': [
                     {
-                      'polyline': {
-                        'encodedPolyline': testPolyline,
-                      },
+                      'polyline': {'encodedPolyline': testPolyline},
                     },
                   ],
                 },
@@ -125,8 +129,11 @@ void main() {
           destination: const LatLng(1, 1),
         ),
         throwsA(
-          isA<RoutesException>()
-              .having((e) => e.apiStatus, 'apiStatus', 'MISSING_API_KEY'),
+          isA<RoutesException>().having(
+            (e) => e.apiStatus,
+            'apiStatus',
+            'MISSING_API_KEY',
+          ),
         ),
       );
     });
@@ -145,7 +152,8 @@ void main() {
                   'status': 'OK',
                   'results': [
                     {
-                      'formatted_address': 'Av. Rebouças, 100 - Centro, Campinas - SP',
+                      'formatted_address':
+                          'Av. Rebouças, 100 - Centro, Campinas - SP',
                     },
                   ],
                 },

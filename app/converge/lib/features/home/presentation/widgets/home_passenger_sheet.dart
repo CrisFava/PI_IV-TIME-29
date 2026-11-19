@@ -100,7 +100,12 @@ class _HomePassengerSheetState extends ConsumerState<HomePassengerSheet> {
                 ),
               ),
               SliverPadding(
-                padding: EdgeInsets.fromLTRB(16, 4, 16, 120 + widget.bottomSafeArea),
+                padding: EdgeInsets.fromLTRB(
+                  16,
+                  4,
+                  16,
+                  120 + widget.bottomSafeArea,
+                ),
                 sliver: SliverList(
                   delegate: SliverChildListDelegate([
                     Row(
@@ -131,7 +136,8 @@ class _HomePassengerSheetState extends ConsumerState<HomePassengerSheet> {
                         ),
                         IconButton(
                           icon: const Icon(Icons.refresh_rounded),
-                          onPressed: matchState.phase == PassengerMatchPhase.loading ||
+                          onPressed:
+                              matchState.phase == PassengerMatchPhase.loading ||
                                   matchState.isBusy
                               ? null
                               : widget.onRetryMatches,
@@ -160,7 +166,8 @@ class _HomePassengerSheetState extends ConsumerState<HomePassengerSheet> {
     final phase = matchState.phase;
     final drivers = matchState.matches;
 
-    if (phase == PassengerMatchPhase.loading || phase == PassengerMatchPhase.idle) {
+    if (phase == PassengerMatchPhase.loading ||
+        phase == PassengerMatchPhase.idle) {
       return const [
         Padding(
           padding: EdgeInsets.all(28),
@@ -195,7 +202,8 @@ class _HomePassengerSheetState extends ConsumerState<HomePassengerSheet> {
           padding: const EdgeInsets.only(bottom: 10),
           child: MatchDriverCard(
             match: driver,
-            isRequesting: phase == PassengerMatchPhase.requesting &&
+            isRequesting:
+                phase == PassengerMatchPhase.requesting &&
                 selected?.driverRouteId == driver.driverRouteId,
             isDisabled: matchState.isBusy,
             onRequest: () => widget.onSelectDriver(driver),

@@ -7,6 +7,7 @@ import '../../../../core/config/styles.dart';
 import '../../../ride/data/models/participant_status.dart';
 import '../../../ride/data/models/ride_model.dart';
 import '../../../ride/data/models/ride_status.dart';
+import 'driver_arrived_passenger_row.dart';
 import 'driver_ride_action_button.dart';
 import 'match_date_label.dart';
 
@@ -28,6 +29,9 @@ class DriverRideCard extends StatelessWidget {
   /// Marca um passageiro como ausente (com a viagem em andamento).
   final ValueChanged<String>? onMarkNoShow;
 
+  /// "Chegou": confirma a chegada de um passageiro, que já recebe a cobrança.
+  final ValueChanged<String>? onArrive;
+
   const DriverRideCard({
     super.key,
     required this.ride,
@@ -36,6 +40,7 @@ class DriverRideCard extends StatelessWidget {
     required this.onOpenChat,
     this.onCancel,
     this.onMarkNoShow,
+    this.onArrive,
     this.isBusy = false,
   });
 
@@ -45,6 +50,14 @@ class DriverRideCard extends StatelessWidget {
       for (final p in ride.participants)
         if (p.isPassenger &&
             p.status == ParticipantStatus.confirmed &&
+            p.userId != null)
+          p,
+    ];
+    // Quem já desceu, com a chegada confirmada: aparece com a situação da cobrança
+    final arrived = [
+      for (final p in ride.participants)
+        if (p.isPassenger &&
+            p.status == ParticipantStatus.completed &&
             p.userId != null)
           p,
     ];
@@ -113,6 +126,25 @@ class DriverRideCard extends StatelessWidget {
                       ),
                     ),
                   ),
+                  // Durante a viagem, o motorista confirma quem desceu
+                  if (inProgress && onArrive != null)
+                    TextButton(
+                      key: ValueKey('arrive_${passenger.userId}'),
+                      onPressed: isBusy
+                          ? null
+                          : () {
+                              HapticFeedback.mediumImpact();
+                              onArrive!(passenger.userId!);
+                            },
+                      style: TextButton.styleFrom(
+                        foregroundColor: AppColors.success,
+                        visualDensity: VisualDensity.compact,
+                      ),
+                      child: const Text(
+                        'Chegou',
+                        style: TextStyle(fontWeight: FontWeight.w700),
+                      ),
+                    ),
                   // Durante a viagem, o motorista marca quem não apareceu
                   if (inProgress && onMarkNoShow != null)
                     TextButton(
@@ -147,6 +179,11 @@ class DriverRideCard extends StatelessWidget {
                   ),
                 ],
               ),
+            ),
+          for (final passenger in arrived)
+            Padding(
+              padding: const EdgeInsets.only(top: 6),
+              child: DriverArrivedPassengerRow(passenger: passenger),
             ),
           const SizedBox(height: 10),
           DriverRideActionButton(

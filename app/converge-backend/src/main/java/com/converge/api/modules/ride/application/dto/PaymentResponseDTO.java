@@ -20,7 +20,6 @@ public record PaymentResponseDTO(
         String receiverName,
         @Nullable BigDecimal amount,
         ParticipantPaymentStatus status,
-        boolean confirmedByDriver,
         @Nullable String pixCopyPaste,
         @Nullable LocalDateTime requestedAt,
         @Nullable LocalDateTime paidAt

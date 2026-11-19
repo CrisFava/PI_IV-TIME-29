@@ -1,6 +1,7 @@
 // Autor: Allan Giovanni Matias Paes - RA 25008211
 
 import 'dart:ui';
+
 import 'package:flutter/material.dart';
 
 import '../../../../core/config/styles.dart';

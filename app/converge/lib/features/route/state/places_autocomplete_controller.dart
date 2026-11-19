@@ -1,6 +1,7 @@
 // Autor: Allan Giovanni Matias Paes - RA 25008211
 
 import 'dart:async';
+
 import 'package:flutter/foundation.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
@@ -38,10 +39,11 @@ class PlacesAutocompleteState {
   }
 }
 
-final placesAutocompleteProvider = NotifierProvider.autoDispose<
-    PlacesAutocompleteController, PlacesAutocompleteState>(
-  PlacesAutocompleteController.new,
-);
+final placesAutocompleteProvider =
+    NotifierProvider.autoDispose<
+      PlacesAutocompleteController,
+      PlacesAutocompleteState
+    >(PlacesAutocompleteController.new);
 
 class PlacesAutocompleteController extends Notifier<PlacesAutocompleteState> {
   RouteRepository get _repository => ref.read(routeRepositoryProvider);
@@ -75,11 +77,7 @@ class PlacesAutocompleteController extends Notifier<PlacesAutocompleteState> {
     }
 
     if (!ref.mounted) return;
-    state = state.copyWith(
-      query: input,
-      isLoading: true,
-      errorMessage: null,
-    );
+    state = state.copyWith(query: input, isLoading: true, errorMessage: null);
 
     _debounceTimer = Timer(const Duration(seconds: 1), () async {
       await _fetchSuggestions(trimmed);

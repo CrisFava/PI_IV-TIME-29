@@ -40,7 +40,9 @@ void main() {
       tester.widget<FilledButton>(find.byType(FilledButton));
 
   group('ReportSheet', () {
-    testWidgets('botão fica desabilitado até escolher um motivo', (tester) async {
+    testWidgets('botão fica desabilitado até escolher um motivo', (
+      tester,
+    ) async {
       await pumpSheet(tester);
 
       expect(find.text('Denunciar Ana'), findsOneWidget);
@@ -64,7 +66,9 @@ void main() {
       expect(submitButton(tester).onPressed, isNotNull);
     });
 
-    testWidgets('atraso ou ausência só aparece quando há viagem', (tester) async {
+    testWidgets('atraso ou ausência só aparece quando há viagem', (
+      tester,
+    ) async {
       await pumpSheet(tester);
       expect(find.text('Atraso ou ausência'), findsNothing);
 
@@ -84,28 +88,29 @@ void main() {
       expect(repository.reports.single.rideId, 'ride-1');
     });
 
-    testWidgets('erro do backend aparece na tela e o botão volta a ficar ativo', (
-      tester,
-    ) async {
-      repository.failNext = const ApiException(
-        code: ApiErrorCode.badRequest,
-        message: 'Você já fez essa denúncia e ela ainda está em análise.',
-        status: 400,
-      );
-      await pumpSheet(tester);
+    testWidgets(
+      'erro do backend aparece na tela e o botão volta a ficar ativo',
+      (tester) async {
+        repository.failNext = const ApiException(
+          code: ApiErrorCode.badRequest,
+          message: 'Você já fez essa denúncia e ela ainda está em análise.',
+          status: 400,
+        );
+        await pumpSheet(tester);
 
-      await tester.tap(find.text('Cobrança indevida'));
-      await tester.pump();
-      await tester.tap(find.byType(FilledButton));
-      await tester.pumpAndSettle();
+        await tester.tap(find.text('Cobrança indevida'));
+        await tester.pump();
+        await tester.tap(find.byType(FilledButton));
+        await tester.pumpAndSettle();
 
-      expect(
-        find.text('Você já fez essa denúncia e ela ainda está em análise.'),
-        findsOneWidget,
-      );
-      expect(submitButton(tester).onPressed, isNotNull);
-      expect(repository.reports, isEmpty);
-    });
+        expect(
+          find.text('Você já fez essa denúncia e ela ainda está em análise.'),
+          findsOneWidget,
+        );
+        expect(submitButton(tester).onPressed, isNotNull);
+        expect(repository.reports, isEmpty);
+      },
+    );
   });
 
   group('BlockConfirmDialog', () {
@@ -133,7 +138,9 @@ void main() {
       await tester.pumpAndSettle();
 
       expect(
-        find.text('Não foi possível conectar ao servidor. Verifique sua internet.'),
+        find.text(
+          'Não foi possível conectar ao servidor. Verifique sua internet.',
+        ),
         findsOneWidget,
       );
       expect(repository.blocks, isEmpty);

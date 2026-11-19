@@ -36,7 +36,6 @@ class FakeRideRepository implements RideRepository {
     receiverName: 'Lucas Silveira',
     amount: amount,
     status: status,
-    confirmedByDriver: status == PaymentStatus.paid,
     pixCopyPaste: amount != null && status == PaymentStatus.pending
         ? '000201-PIX-FALSO'
         : null,
@@ -74,28 +73,37 @@ class FakeRideRepository implements RideRepository {
     return payment;
   }
 
+  /// Cobranças em aberto devolvidas por [listPendingPayments].
+  List<RidePaymentModel> pendingPayments = [];
+
   @override
-  Future<RidePaymentModel> requestPayment(
-    String rideId,
-    String passengerId, {
-    required double amount,
-  }) async {
-    calls.add('requestPayment:$amount');
-    _failIfRequested();
-    return payment = fakePayment(amount: amount);
+  Future<List<RidePaymentModel>> listPendingPayments() async {
+    calls.add('listPendingPayments');
+    return pendingPayments;
   }
 
   @override
-  Future<RidePaymentModel> confirmPayment(
+  Future<RidePaymentModel> markPaymentAsPaid(
     String rideId,
     String passengerId,
   ) async {
-    calls.add('confirmPayment');
+    calls.add('markPaymentAsPaid:$rideId');
     _failIfRequested();
+    pendingPayments = [
+      for (final pending in pendingPayments)
+        if (pending.rideId != rideId) pending,
+    ];
     return payment = fakePayment(
       amount: payment.amount,
       status: PaymentStatus.paid,
     );
+  }
+
+  @override
+  Future<RideModel> arrivePassenger(String rideId, String passengerId) async {
+    calls.add('arrivePassenger:$passengerId');
+    _failIfRequested();
+    return ride = fakeRide(status: 'IN_PROGRESS', passengerStatus: 'COMPLETED');
   }
 
   @override

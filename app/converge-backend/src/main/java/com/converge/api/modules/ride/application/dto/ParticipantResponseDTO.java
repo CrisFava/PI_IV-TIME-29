@@ -21,7 +21,6 @@ public record ParticipantResponseDTO(
         BigDecimal maxAmount,
         BigDecimal finalAmount,
         ParticipantPaymentStatus paymentStatus,
-        boolean paymentConfirmedByDriver,
         LocalDateTime confirmedAt,
         LocalDateTime requestedAt
 ) {

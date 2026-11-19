@@ -34,8 +34,12 @@ import '../../../matching/presentation/widgets/ride_requests_sheet.dart';
 import '../../../matching/state/driver_offers_provider.dart';
 import '../../../matching/state/driver_ride_actions_controller.dart';
 import '../../../matching/state/driver_rides_provider.dart';
+import '../../../ride/data/models/participant_status.dart';
+import '../../../ride/data/models/payment_status.dart';
 import '../../../ride/data/models/ride_model.dart';
 import '../../../ride/data/models/ride_status.dart';
+import '../../../ride/presentation/widgets/pending_payment_prompt.dart';
+import '../../../ride/state/pending_payments_provider.dart';
 import '../../../ride/state/ride_providers.dart';
 import '../../../review/presentation/widgets/ride_review_prompt.dart';
 import '../../../review/state/pending_reviews.dart';
@@ -90,6 +94,9 @@ class _HomePageState extends ConsumerState<HomePage> {
 
   /// Viagens para as quais a tela de avaliação já abriu, para não abrir duas vezes.
   final Set<String> _reviewPrompted = {};
+
+  // Viagens concluídas com a cobrança do passageiro ainda em aberto: a avaliação espera o pagamento
+  final Set<String> _reviewAfterPayment = {};
 
   /// Última lista de viagens recebida, para notar quando uma delas é concluída.
   List<RideModel>? _lastRides;
@@ -736,10 +743,81 @@ class _HomePageState extends ConsumerState<HomePage> {
     final toReview = before == null
         ? recentlyCompletedRides(rides: rides, now: DateTime.now())
         : newlyCompletedRides(previous: before, next: rides);
-    _promptReviews([
+
+    // Primeiro o pagamento, depois a avaliação: com a cobrança em aberto, ela fica para depois
+    for (final ride in toReview) {
+      if (_awaitsPayment(ride)) _reviewAfterPayment.add(ride.id);
+    }
+    final ready = [
       for (final ride in toReview)
+        if (!_reviewAfterPayment.contains(ride.id)) ride,
+      for (final ride in rides)
+        if (_reviewAfterPayment.contains(ride.id) && !_awaitsPayment(ride))
+          ride,
+    ];
+    _reviewAfterPayment.removeAll(ready.map((ride) => ride.id));
+    _promptReviews([
+      for (final ride in ready)
         if (_reviewPrompted.add(ride.id)) ride,
     ]);
+
+    _finishAcceptedRideIfDone();
+  }
+
+  /// O usuário é passageiro desta viagem, ela terminou para ele e a cobrança ainda está em aberto.
+  bool _awaitsPayment(RideModel ride) {
+    final viewerId = ref.read(matchingViewerIdProvider);
+    final me = viewerId == null ? null : ride.passengerOf(viewerId);
+    return me != null &&
+        me.status == ParticipantStatus.completed &&
+        me.paymentStatus == PaymentStatus.pending &&
+        (me.finalAmount ?? 0) > 0;
+  }
+
+  /// O pedido aceito acabou: a viagem do passageiro terminou (ou foi cancelada) e não há
+  /// cobrança em aberto. O pedido sai da tela e ele volta a poder pedir e oferecer carona.
+  /// Com a cobrança em aberto, o card da carona fica, agora com o "Pagar".
+  void _finishAcceptedRideIfDone() {
+    if (_passengerStep != PassengerRideStep.driverAccepted) return;
+
+    final rideId = ref.read(passengerMatchProvider).rideId;
+    final rides = ref.read(myRidesProvider).value;
+    final payments = ref.read(pendingPaymentsProvider);
+    final pending = payments.value;
+    if (payments.isLoading || payments.hasError) return;
+    if (rideId == null || rides == null || pending == null) return;
+    if (payments.isLoading) return;
+
+    RideModel? ride;
+    for (final candidate in rides) {
+      if (candidate.id == rideId) ride = candidate;
+    }
+    final viewerId = ref.read(matchingViewerIdProvider);
+    // Lista ainda sem a viagem (recém-aceita): não dá para concluir nada
+    if (ride == null || viewerId == null) return;
+
+    final me = ride.passengerOf(viewerId);
+    if (me == null) return;
+    final finished =
+        me.status == ParticipantStatus.completed ||
+        me.status == ParticipantStatus.cancelled ||
+        me.status == ParticipantStatus.rejected ||
+        me.status == ParticipantStatus.expired;
+    if (!finished || me.paymentStatus == PaymentStatus.pending) return;
+    final hasOpenCharge = pending.any(
+      (payment) => payment.rideId == rideId && payment.isOpen,
+    );
+    if (hasOpenCharge) return;
+
+    setState(() {
+      _draftGeneration++;
+      _passengerSheetHidden = false;
+      _passengerStep = PassengerRideStep.idle;
+      _rideDeparture = null;
+      _resetDraftPlaces();
+      _driverApproachRoutePoints = null;
+    });
+    ref.read(passengerMatchProvider.notifier).reset();
   }
 
   /// Avisa o passageiro quando o motorista inicia uma viagem em que ele está.
@@ -959,6 +1037,8 @@ class _HomePageState extends ConsumerState<HomePage> {
     ref.listen(passengerMatchProvider, _onPassengerMatchChanged);
     ref.listen(driverAccessProvider, _onDriverAccessChanged);
     ref.listen(myRidesProvider, _onRidesChanged);
+    // Pagou: o pedido aceito termina e a avaliação que esperava o pagamento pode abrir
+    ref.listen(pendingPaymentsProvider, (_, _) => _finishAcceptedRideIfDone());
     // Enquanto há uma viagem a caminho, mantém a lista em dia para a avaliação abrir em qualquer tela
     ref.watch(rideCompletionWatcherProvider);
     final driverAccess = ref.watch(driverAccessProvider);
@@ -976,6 +1056,15 @@ class _HomePageState extends ConsumerState<HomePage> {
             )
           : Stack(
               children: [
+                // Abre o pagamento sozinho quando há cobrança de carona em aberto.
+                // Posicionado: um filho sem posição definiria o tamanho do Stack (0x0,
+                // porque o ouvinte não desenha nada) e a Home inteira sumiria.
+                const Positioned(
+                  left: 0,
+                  top: 0,
+                  child: PendingPaymentPrompt(),
+                ),
+
                 // ============================================================
                 // CAMADA 1: CONTEÚDO PRINCIPAL (MAPA OU ABAS SECUNDÁRIAS)
                 // ============================================================

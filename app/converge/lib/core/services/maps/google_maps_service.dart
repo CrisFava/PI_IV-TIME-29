@@ -123,8 +123,7 @@ class GoogleMapsService {
               'Limite de requisições da Routes API excedido temporariamente.',
             'INVALID_ARGUMENT' =>
               'Parâmetros inválidos enviados para a Routes API.',
-            'NOT_FOUND' =>
-              'Origem ou destino não puderam ser localizados em vias trafegáveis.',
+            'NOT_FOUND' => 'Origem ou destino não puderam ser localizados em vias trafegáveis.',
             _ =>
               'Erro retornado pela Routes API: ${status ?? detailsMsg ?? "desconhecido"}.',
           };
@@ -207,12 +206,11 @@ class GoogleMapsService {
     required LatLng origin,
     required LatLng destination,
     String? encodedPolyline,
-  }) =>
-      computeRoutes(
-        origin: origin,
-        destination: destination,
-        encodedPolyline: encodedPolyline,
-      );
+  }) => computeRoutes(
+    origin: origin,
+    destination: destination,
+    encodedPolyline: encodedPolyline,
+  );
 
   static Future<String> getAddressFromCoordinates(LatLng position) async {
     if (apiKey.isEmpty) {

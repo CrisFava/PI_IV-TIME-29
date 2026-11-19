@@ -19,6 +19,7 @@ import '../../route/data/repository/route_repository_impl.dart';
 import '../data/models/match_model.dart';
 import '../data/repository/matching_repository.dart';
 import '../data/repository/matching_repository_impl.dart';
+import '../../ride/state/payment_prompt_controller.dart';
 import 'matching_viewer_provider.dart';
 import 'passenger_match_phase.dart';
 import 'passenger_match_state.dart';
@@ -73,6 +74,8 @@ class PassengerMatchController extends Notifier<PassengerMatchState> {
         final saved = _findSame(await _routes.listMyRoutes(), request);
         if (saved != null) return reused(saved);
       }
+      // Pagamento de outra carona em aberto: o pagamento volta a aparecer
+      ref.read(paymentPromptProvider.notifier).handleBlockedAction(e);
       state = state.copyWith(notice: e.message);
       return null;
     } catch (e) {
@@ -162,6 +165,8 @@ class PassengerMatchController extends Notifier<PassengerMatchState> {
       if (state.phase == PassengerMatchPhase.waiting) _startPolling();
       return true;
     } catch (e) {
+      // Pagamento de outra carona em aberto: o pagamento volta a aparecer
+      ref.read(paymentPromptProvider.notifier).handleBlockedAction(e);
       state = state.copyWith(
         phase: PassengerMatchPhase.ready,
         selected: null,

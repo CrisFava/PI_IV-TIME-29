@@ -24,6 +24,7 @@ class ApiException implements Exception {
   bool get isNetworkError => code == ApiErrorCode.network;
   bool get isNotFound => status == 404;
   bool get isConflict => status == 409;
+  bool get isPaymentPending => code == ApiErrorCode.paymentPending;
   bool get isUnauthorized => status == 401;
 
   factory ApiException.network() => const ApiException(

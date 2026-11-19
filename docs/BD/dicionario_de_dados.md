@@ -623,11 +623,10 @@ Estrutura composta e multivalorada que representa cada participante de uma viage
 | `estimatedAmount` | Número decimal monetário | Sim | `Decimal128`. Valor estimado atual (RF34/RF36). Recalculado a cada entrada, cancelamento ou ausência de participantes. Nunca ultrapassa o `maxAmount`. |
 | `maxAmount` | Número decimal monetário | Sim | `Decimal128`. Teto de proteção do passageiro (RF35/RF37): custo inteiro da rota com o desvio do passageiro, gravado na confirmação. Nunca pode ser superado pelo `finalAmount`. |
 | `finalAmount` | Número decimal monetário | Não | `Decimal128`. Calculado somente ao concluir a viagem. Nulo até a conclusão. |
-| `paymentStatus` | Elemento de lista enumerada | Sim | Valores: `PENDING`, `AWAITING_DRIVER_CONFIRMATION`, `PAID`, `NOT_APPLICABLE`. Em `AWAITING_DRIVER_CONFIRMATION` o relógio da dívida fica **pausado** (a viagem não vira vencida enquanto espera o motorista confirmar). |
-| `paymentConfirmedByDriver` | Booleano | Sim | `false` por padrão. Atualizado pelo motorista ao confirmar recebimento. |
-| `requestedAmount` | Número decimal monetário | Não | `Decimal128`. Valor combinado no chat e cobrado pelo motorista em "Solicitar pagamento". Nunca ultrapassa o `maxAmount` quando este estiver definido. Nulo até a primeira cobrança; pode ser alterado enquanto o pagamento não for confirmado. |
+| `paymentStatus` | Elemento de lista enumerada | Sim | Valores: `PENDING`, `PAID`, `NOT_APPLICABLE`. Todo passageiro nasce `PENDING`; só com `paymentRequestedAt` é uma cobrança em aberto, que bloqueia pedir vaga e cadastrar trajeto (RF74). |
+| `requestedAmount` | Número decimal monetário | Não | `Decimal128`. Valor cobrado: o `finalAmount` do rateio, gravado automaticamente no fim da viagem do passageiro (RF39). Nunca ultrapassa o `maxAmount` quando este estiver definido. Nulo até a cobrança. |
 | `paymentRequestedAt` | Data e hora | Não | Momento da última cobrança. Nulo até a primeira cobrança. |
-| `paidAt` | Data e hora | Não | Momento em que o motorista confirmou o recebimento ("Passageiro já pagou"). |
+| `paidAt` | Data e hora | Não | Momento em que o passageiro informou o pagamento ("Já paguei"). |
 | `confirmedAt` | Data e hora | Sim | Timestamp de entrada do participante na viagem. |
 | `cancelledAt` | Data e hora | Não | Nulo enquanto não cancelar. |
 | `updatedAt` | Data e hora | Sim | Atualizado a cada mudança no subdocumento. |
@@ -982,7 +981,6 @@ Estrutura composta e multivalorada usada no array `itinerary` da Ride. Cada item
       "maxAmount": { "$numberDecimal": "2.51" },
       "finalAmount": { "$numberDecimal": "2.51" },
       "paymentStatus": "NOT_APPLICABLE",
-      "paymentConfirmedByDriver": true,
       "confirmedAt": "2025-05-10T20:00:00Z",
       "cancelledAt": null,
       "updatedAt": "2025-05-12T08:15:00Z"
@@ -1010,7 +1008,6 @@ Estrutura composta e multivalorada usada no array `itinerary` da Ride. Cada item
       "maxAmount": { "$numberDecimal": "6.00" },
       "finalAmount": { "$numberDecimal": "2.51" },
       "paymentStatus": "PAID",
-      "paymentConfirmedByDriver": true,
       "confirmedAt": "2025-05-11T07:00:00Z",
       "cancelledAt": null,
       "updatedAt": "2025-05-12T08:20:00Z"
@@ -1261,7 +1258,7 @@ Estrutura composta e multivalorada usada no array `itinerary` da Ride. Cada item
 | Validar unicidade de e-mail institucional | `academicRecord.institutionalEmail` | `{ "academicRecord.institutionalEmail": 1 }` único parcial (`$type: 'string'`) | Garante que cada e-mail universitário pertença a no máximo uma conta. |
 | Buscar usuário por UID Firebase | `firebaseUid` | `{ firebaseUid: 1 }` único | Executada a cada requisição autenticada. |
 | Verificar inadimplência no matching | `isDefaulter` | `{ isDefaulter: 1 }` | Checagem rápida antes de exibir combinações. |
-| Tela de pendências do passageiro | `participants.userId`, `participants.paymentStatus` | `{ "participants.userId": 1, "participants.paymentStatus": 1 }` | Lista viagens com pagamento `PENDING` ou `AWAITING_DRIVER_CONFIRMATION`. |
+| Tela de pendências do passageiro | `participants.userId`, `participants.paymentStatus` | `{ "participants.userId": 1, "participants.paymentStatus": 1 }` | Lista as cobranças emitidas ainda `PENDING` (`GET /rides/payments/pending`). |
 | Fila de verificação acadêmica (método documento) | `academicRecord.status` | `{ "academicRecord.status": 1 }` | Moderação dos cadastros `UNDER_REVIEW`. |
 | Fila de verificação de CNH | `driverLicense.status` | `{ "driverLicense.status": 1 }` | Moderação das CNHs `UNDER_REVIEW`. |
 | Detectar CNHs vencidas (job) | `driverLicense.expiresAt`, `driverLicense.status` | `{ "driverLicense.expiresAt": 1, "driverLicense.status": 1 }` | Job agendado que marca `EXPIRED` e tira o motorista do matching. |
@@ -1314,10 +1311,10 @@ Já existiam e seguem o mesmo padrão: `RideCostHandler` (rateio da viagem), `Pi
 
 ### Pagamento PIX — geração do "Copia e Cola"
 
-No MVP o pagamento usa **QR Code PIX estático** ("Pix Copia e Cola") gerado pelo próprio backend, **sem gateway e sem API externa**. O dinheiro vai direto da conta do passageiro para a do motorista — o Converge nunca toca no dinheiro. Como o banco não devolve confirmação ao servidor, a confirmação de recebimento é **manual** (o motorista marca `paymentConfirmedByDriver`).
+No MVP o pagamento usa **QR Code PIX estático** ("Pix Copia e Cola") gerado pelo próprio backend, **sem gateway e sem API externa**. O dinheiro vai direto da conta do passageiro para a do motorista — o Converge nunca toca no dinheiro. Como o banco não devolve confirmação ao servidor, o pagamento é **informado pelo próprio passageiro** ("Já paguei", que grava `paymentStatus = PAID`); o motorista não confirma o recebimento.
 
-- O payload (padrão BR Code do Banco Central, com CRC16) é **montado sob demanda e não armazenado** — é derivado de dados que já existem (`users.pixKey`, `users.name`, `participants[].finalAmount`).
-- **Endpoint:** `GET /rides/{rideId}/payment-qr` devolve a string; o app desenha o QR.
-- **Quando gera:** viagem `COMPLETED` e passageiro com `finalAmount > 0`. Não há QR para `NO_SHOW` nem `NOT_APPLICABLE`.
-- **Autorização:** só participantes da viagem acessam o QR, pois a chave PIX do motorista é dado pessoal.
-- **Vínculo cobrança ↔ viagem:** como o PIX estático não tem txid, o vínculo é feito no banco (`rideId` + participante); o status `PAID` só muda quando o motorista confirma.
+- O payload (padrão BR Code do Banco Central, com CRC16) é **montado sob demanda e não armazenado** — é derivado de dados que já existem (`users.pixKey`, `users.name`, `participants[].requestedAmount`, que é o `finalAmount` cobrado).
+- **Endpoints:** `GET /rides/{rideId}/passengers/{passengerId}/payment` e `GET /rides/payments/pending` devolvem a string em `pixCopyPaste`; o app desenha o QR.
+- **Quando gera:** cobrança emitida e em aberto (`requestedAmount` preenchido e `paymentStatus = PENDING`). Não há código depois do "Já paguei" (`PAID`), nem para `NO_SHOW` e `NOT_APPLICABLE`.
+- **Autorização:** só o motorista e o próprio passageiro acessam, pois a chave PIX do motorista é dado pessoal.
+- **Vínculo cobrança ↔ viagem:** como o PIX estático não tem txid, o vínculo é feito no banco (`rideId` + participante); o status `PAID` muda quando o passageiro informa o pagamento (`POST .../payment/mark-paid`).

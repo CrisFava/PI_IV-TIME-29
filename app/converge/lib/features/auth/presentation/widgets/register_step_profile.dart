@@ -62,10 +62,7 @@ class RegisterStepProfile extends StatelessWidget {
           ),
         ),
         const SizedBox(height: 20),
-        const Text(
-          'Telefone',
-          style: OnboardingDesignTokens.fieldLabelStyle,
-        ),
+        const Text('Telefone', style: OnboardingDesignTokens.fieldLabelStyle),
         const SizedBox(height: 8),
         TextFormField(
           controller: phoneController,

@@ -38,11 +38,13 @@ public class RequestRideSeatUseCase implements UseCase<RequestRideSeatCommand, R
     private final RideRepository rideRepository;
     private final RideMapper rideMapper;
     private final BlockAccess blockAccess;
+    private final PendingPaymentGuard pendingPaymentGuard;
 
     @Override
     public Ride execute(RequestRideSeatCommand command) {
         String passengerId = rideAccess.currentUserId(command.firebaseUid());
         rideEligibility.assertCanJoin(passengerId, "Você");
+        pendingPaymentGuard.ensureNoPendingPayment(passengerId);
 
         LocalDate date = command.request().date();
 

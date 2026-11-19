@@ -8,6 +8,7 @@ Ferramentas para testar o Converge sem precisar sair de casa nem fazer cadastros
 | `verificar_usuario.py` | Marca a CNH e o vínculo acadêmico de um usuário como `VERIFIED`, buscando pelo e-mail |
 | `verificar_todos_usuarios.py` | Faz o mesmo para todos os usuários do banco de uma vez |
 | `simular_corrida.py` | Percorre corridas inteiras contra o backend rodando e confere cada resposta |
+| `teste_no_app.py` | Prepara um teste manual no app: cria uma conta para o simulador e um robô que faz a outra ponta da corrida |
 
 Os testes **mockados** (sem banco e sem API) ficam no backend, em
 `app/converge-backend/src/test/java/com/converge/api/modules/ride/application/RideJourneyTest.java`.
@@ -55,8 +56,12 @@ sockets (`app/server`), depois o Spring (`app/converge-backend`) com as variáve
 Não precisa do venv. Funciona no Windows (cmd), no macOS (Terminal) e no Linux (gnome-terminal,
 konsole ou xterm).
 
-- Só abre o backend quando a porta 3000 do servidor de sockets responde (espera até 3 min). Se a
-  porta já estiver ocupada, usa o servidor de sockets que já está rodando.
+- Antes de tudo, instala o `app/server` no Maven local (`mvnw install -DskipTests`). O backend
+  compila contra as classes dele; com um jar antigo em `~/.m2`, ele não compila ou usa um cálculo
+  desatualizado (por exemplo, o rateio antigo).
+- Só abre o backend quando a porta 3000 do servidor de sockets responde (espera até 3 min).
+- Servidor que já está no ar não é aberto de novo: com a porta 3000 ou 8080 ocupada, usa o que
+  está rodando. Para subir com o código atual, pare o servidor antes.
 - O `.env` é lido dentro do terminal novo, então as variáveis chegam ao Spring em qualquer sistema.
 
 ```bash
@@ -109,6 +114,28 @@ python scripts/verificar_todos_usuarios.py --banco converge-testes
 
 ---
 
+## `teste_no_app.py`
+
+Para testar a corrida **no app**, no simulador, com uma conta só. A outra ponta da corrida é um
+robô que age pela API no tempo certo das regras de horário: o pedido de vaga vale até 5 min antes
+da saída, o início de 5 min antes a 5 min depois, e um pedido expira em 3 min sem resposta.
+
+```bash
+python scripts/teste_no_app.py preparar     # cria a conta do app e os dois robôs (mostra e-mail e senha)
+python scripts/teste_no_app.py motorista    # o app é a PASSAGEIRA: o robô oferece, aceita, inicia, cobra e encerra
+python scripts/teste_no_app.py passageiro   # o app é o MOTORISTA: a robô pede vaga na carona publicada e paga
+python scripts/teste_no_app.py limpar       # apaga as contas do Firebase
+```
+
+- A carona usa os trajetos padrão do app: PUC-Campinas - Portaria Principal → Campus II (Saúde).
+- `motorista`: a carona do robô sai em 15 min (`--minutos`); depois de iniciada, ele confirma a
+  chegada em 3 min (`--duracao`), o que emite a cobrança, e encerra a viagem.
+- `passageiro`: espera a conta do app publicar uma carona (até 10 min), pede vaga e, depois da
+  cobrança, informa o pagamento em 30 s (`--pagar-depois`).
+- As contas ficam em `scripts/.teste_no_app.json` (fora do Git). A senha é a mesma da simulação.
+
+---
+
 ## `simular_corrida.py`
 
 ### O que ele faz
@@ -118,7 +145,9 @@ que o app faria:
 
 1. cria as contas no Firebase (`sim.<execução>.<n>.<nome>@converge-sim.test`);
 2. cadastra cada pessoa em `POST /users` e aprova os documentos no Mongo (usa o `verificar_usuario.py`);
-3. cadastra o carro do motorista e os trajetos de oferta e de procura para **amanhã**;
+3. cadastra o carro do motorista e os trajetos de oferta e de procura para **hoje**, saindo uns 7 min
+   depois de cada oferta. O pedido de vaga só vale até 5 min antes da saída e o "Iniciar trajeto" só de
+   5 min antes a 5 min depois, então cada cenário espera cerca de 2 min antes de iniciar a viagem;
 4. executa os passos do cenário e confere status, vagas, valores, PIX, avaliações e indicadores;
 5. no fim, apaga as contas do Firebase (a não ser que você use `--manter-contas`).
 
@@ -126,7 +155,7 @@ Cada cenário cria as próprias pessoas, então eles não dependem uns dos outro
 
 | Cenário | O que confere |
 | :-- | :-- |
-| `caminho-feliz` | matching acha o motorista, 2 pedidos na mesma viagem, aceite, início, conclusão (`COMPLETED`, `completedAt`, valor final ≤ teto), cobrança com PIX, confirmação (`PAID`), avaliação (e a segunda é recusada) e indicadores |
+| `caminho-feliz` | matching acha o motorista, 2 pedidos na mesma viagem, aceite, início, conclusão (`COMPLETED`, `completedAt`, valor final ≤ teto), cobrança automática com PIX, "Já paguei" da passageira (`PAID`), avaliação (e a segunda é recusada) e indicadores |
 | `ausencia-parcial` | quem falta fica `NO_SHOW` e `NOT_APPLICABLE`, a vaga volta, os presentes concluem e cobrar o ausente é recusado |
 | `todos-ausentes` | sem ninguém presente, concluir vira `CANCELLED` |
 | `transicoes-invalidas` | concluir antes de iniciar, avaliar antes de concluir, passageira iniciar ou concluir, cancelar ou sair com a viagem andando, concluir duas vezes, iniciar ou marcar ausência depois de concluída |
@@ -164,8 +193,9 @@ Se algum cenário falhar, ele mostra o passo e o motivo e o comando termina com 
 Linhas com `AVISO` não reprovam o cenário, mas indicam algo incompleto:
 
 - **custo total R$ 0**: a viagem saiu sem custo calculado, em geral porque o veículo não tem
-  consumo e preço da energia. Nesse caso a cobrança usa R$ 10,00. O rateio divide o custo só
-  entre os passageiros, cada um limitado ao próprio teto (o custo da rota com o desvio dele).
+  consumo e preço da energia. Sem valor não há cobrança, e os passos de pagamento do cenário
+  falham. O rateio divide o custo só entre os passageiros, cada um limitado ao próprio teto
+  (o custo da rota com o desvio dele).
 - **indicadores sem a viagem**: o `CompletedRidesIndicatorReconciler` reprocessa em até 15 min.
 
 ### Se a simulação cair no meio
