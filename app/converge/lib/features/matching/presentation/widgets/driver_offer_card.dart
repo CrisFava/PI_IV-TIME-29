@@ -7,6 +7,7 @@ import '../../../../core/config/styles.dart';
 import '../../../../core/widgets/more_info_hint.dart';
 import '../../../ride/data/models/ride_status.dart';
 import '../../../ride/presentation/widgets/ride_place_line.dart';
+import '../../../ride/presentation/widgets/ride_role_tag.dart';
 import '../../data/models/driver_offer.dart';
 import 'driver_offer_title.dart';
 import 'driver_ride_action_button.dart';
@@ -80,7 +81,13 @@ class DriverOfferCard extends StatelessWidget {
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.stretch,
             children: [
-              DriverOfferTitle(offer: offer),
+              Row(
+                children: [
+                  Expanded(child: DriverOfferTitle(offer: offer)),
+                  const SizedBox(width: 8),
+                  const RideRoleTag(isDriver: true),
+                ],
+              ),
               const SizedBox(height: 8),
               RidePlaceLine(icon: Icons.trip_origin_rounded, text: origin),
               const SizedBox(height: 4),

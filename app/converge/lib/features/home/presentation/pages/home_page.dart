@@ -31,7 +31,7 @@ import '../../../matching/state/driver_offers_provider.dart';
 import '../../../matching/state/driver_ride_actions_controller.dart';
 import '../../../matching/state/driver_rides_provider.dart';
 import '../../../ride/data/models/ride_model.dart';
-import '../../../ride/data/models/ride_stop_type.dart';
+import '../../../ride/data/models/ride_status.dart';
 import '../../../ride/state/ride_providers.dart';
 import '../../../review/presentation/widgets/ride_review_prompt.dart';
 import '../../../review/state/pending_reviews.dart';
@@ -42,6 +42,7 @@ import '../../../matching/state/matching_viewer_provider.dart';
 import '../../../matching/state/passenger_match_controller.dart';
 import '../../../matching/state/passenger_match_phase.dart';
 import '../../../matching/state/passenger_match_state.dart';
+import '../../../matching/state/passenger_rides_provider.dart';
 import '../../../ride/presentation/widgets/ride_history_list.dart';
 import '../../../vehicle/data/repository/vehicle_repository_impl.dart';
 import '../../../vehicle/presentation/widgets/add_vehicle_sheet.dart';
@@ -63,6 +64,7 @@ import '../../../auth/state/auth_action_controller.dart';
 import '../../../auth/state/auth_controller.dart';
 import '../../../auth/state/session/auth_session.dart';
 import '../../../chat/presentation/widgets/conversations_tab.dart';
+import '../../../chat/state/chat_unread_provider.dart';
 
 class HomePage extends ConsumerStatefulWidget {
   const HomePage({super.key});
@@ -433,7 +435,6 @@ class _HomePageState extends ConsumerState<HomePage> {
 
   void _onStartDriverShiftFromDock(bool canDrive) {
     setState(() => _isCarMenuOpen = false);
-    if (_isDriverActionBlocked()) return;
     final latestSession = ref.read(authControllerProvider).value;
     final isDriverNow =
         canDrive ||
@@ -443,7 +444,8 @@ class _HomePageState extends ConsumerState<HomePage> {
       // "Minhas caronas": o painel com as caronas oferecidas e os pedidos
       _openRideRequests();
     } else {
-      _showLockedDriverWarning();
+      // Quem só pede carona também abre o painel, com as viagens em que vai
+      _openRideRequests(asPassenger: true);
     }
   }
 
@@ -492,8 +494,8 @@ class _HomePageState extends ConsumerState<HomePage> {
   }
 
   /// Escolhe outro dia e horário de saída (até 7 dias à frente), para o pedido de
-  /// carona ou para a carona do motorista. O matching junta saídas com até 30 min
-  /// de diferença. [onPicked] recebe null quando a saída volta a ser "agora".
+  /// carona ou para a carona do motorista. O matching junta o motorista que sai de 30 min
+  /// antes a 5 min depois do passageiro. [onPicked] recebe null quando a saída volta a ser "agora".
   Future<void> _pickDeparture({
     required DateTime? current,
     required void Function(DateTime? departure) onPicked,
@@ -744,14 +746,6 @@ class _HomePageState extends ConsumerState<HomePage> {
   static LatLng _latLngOf(RoutePlaceModel place) =>
       LatLng(place.latitude, place.longitude);
 
-  // Nome do passageiro de uma parada (o motorista vê todos os participantes)
-  static String _stopName(RideModel ride, String passengerId) {
-    for (final participant in ride.participants) {
-      if (participant.userId == passengerId) return participant.displayName;
-    }
-    return 'Passageiro';
-  }
-
   /// Rota da viagem em andamento, decodificada uma vez por polyline.
   List<LatLng>? _itineraryPoints(RideModel ride) {
     final polyline = ride.itineraryPolyline;
@@ -783,9 +777,10 @@ class _HomePageState extends ConsumerState<HomePage> {
     return false;
   }
 
-  /// Mostra os pedidos de vaga no painel sobre o mapa, no modo motorista.
-  void _openRideRequests() {
-    if (_isDriverActionBlocked()) return;
+  /// Mostra "Minhas caronas" sobre o mapa. O motorista precisa de um carro
+  /// liberado; quem só pede carona ([asPassenger]) vê as viagens em que vai.
+  void _openRideRequests({bool asPassenger = false}) {
+    if (!asPassenger && _isDriverActionBlocked()) return;
     setState(() {
       _isCarMenuOpen = false;
       _currentMode = AppRideMode.driver;
@@ -1005,6 +1000,17 @@ class _HomePageState extends ConsumerState<HomePage> {
                     // Pedido aceito também aparece: o menu reabre os detalhes da
                     // carona em vez de começar um pedido novo
                     isSearchingRide: _hasActiveRideRequest,
+                    chatUnreadCount: ref.watch(chatUnreadCountProvider),
+                    // Anel verde na viagem em andamento, como motorista ou passageiro
+                    isOnTrip:
+                        shiftRide != null ||
+                        (ref
+                                .watch(myPassengerRidesProvider)
+                                .value
+                                ?.any(
+                                  (ride) => ride.status == RideStatus.inProgress,
+                                ) ??
+                            false),
                     rideSearchTitle: switch (_passengerStep) {
                       PassengerRideStep.waitingDriver =>
                         'Aguardando o motorista',
@@ -1045,7 +1051,9 @@ class _HomePageState extends ConsumerState<HomePage> {
       mainAxisSize: MainAxisSize.min,
       crossAxisAlignment: CrossAxisAlignment.stretch,
       children: [
-        if (canDrive) const IncomingRideRequestAlert(),
+        // O pedido de vaga só vira aviso com "Minhas caronas" fechada: aberta,
+        // ele já aparece na lista para aceitar ou recusar
+        if (canDrive && !_showRideRequests) const IncomingRideRequestAlert(),
         if (suggestion != null)
           DriverSuggestionAlert(
             match: suggestion,
@@ -1107,16 +1115,6 @@ class _HomePageState extends ConsumerState<HomePage> {
             destinationAddress: showShiftRoute
                 ? shiftRide.destination.address
                 : _destinationAddress,
-            itineraryStops: showShiftRoute
-                ? [
-                    for (final stop in shiftRide.itinerary)
-                      (
-                        _latLngOf(stop.place),
-                        stop.type == RideStopType.pickup,
-                        _stopName(shiftRide, stop.passengerId),
-                      ),
-                  ]
-                : const [],
             bottomPadding: mapBottomPadding,
             showTrajectory:
                 showShiftRoute ||
@@ -1156,7 +1154,8 @@ class _HomePageState extends ConsumerState<HomePage> {
                 bottomSafeArea: bottomPadding,
                 onClose: _handleCloseRideRequests,
                 onRideStarted: _handleRideStarted,
-                onNewOffer: _openOfferForm,
+                // Quem ainda não é motorista vê como liberar o perfil
+                onNewOffer: canDrive ? _openOfferForm : _showLockedDriverWarning,
               ),
             ),
           )

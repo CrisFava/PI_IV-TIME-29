@@ -164,9 +164,6 @@ class HomeRealMapBackground extends StatefulWidget {
   /// Altura coberta por um painel na parte de baixo: o enquadramento usa só a área visível.
   final double bottomPadding;
 
-  /// Paradas da viagem em andamento: (posição, é embarque?, título do marcador).
-  final List<(LatLng, bool, String)> itineraryStops;
-
   const HomeRealMapBackground({
     super.key,
     required this.isDriverMode,
@@ -187,7 +184,6 @@ class HomeRealMapBackground extends StatefulWidget {
     this.onMapTap,
     this.universityName = 'PUC-Campinas',
     this.bottomPadding = 0,
-    this.itineraryStops = const [],
   });
 
   @override
@@ -383,23 +379,7 @@ class _HomeRealMapBackgroundState extends State<HomeRealMapBackground> {
       );
     }
 
-    // Paradas da viagem em andamento: embarques em verde, desembarques em laranja
-    for (var i = 0; i < widget.itineraryStops.length; i++) {
-      final (position, isPickup, title) = widget.itineraryStops[i];
-      markers.add(
-        Marker(
-          markerId: MarkerId('itinerary_stop_$i'),
-          position: position,
-          icon: BitmapDescriptor.defaultMarkerWithHue(
-            isPickup ? BitmapDescriptor.hueGreen : BitmapDescriptor.hueOrange,
-          ),
-          infoWindow: InfoWindow(
-            title: '${i + 1}. $title',
-            snippet: isPickup ? 'Buscar o passageiro' : 'Deixar o passageiro',
-          ),
-        ),
-      );
-    }
+    // Na viagem em andamento só o trajeto aparece: sem pinos nas paradas
 
     // 3. Marcador do Motorista Aceito (Carrinho preto filled)
     if (widget.acceptedDriver != null) {

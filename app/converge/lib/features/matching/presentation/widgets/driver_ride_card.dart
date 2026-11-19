@@ -22,12 +22,20 @@ class DriverRideCard extends StatelessWidget {
   /// Abre o chat com um passageiro confirmado.
   final ValueChanged<String> onOpenChat;
 
+  /// "Cancelar esta viagem" (antes de começar); nulo esconde o botão.
+  final VoidCallback? onCancel;
+
+  /// Marca um passageiro como ausente (com a viagem em andamento).
+  final ValueChanged<String>? onMarkNoShow;
+
   const DriverRideCard({
     super.key,
     required this.ride,
     required this.onStart,
     required this.onComplete,
     required this.onOpenChat,
+    this.onCancel,
+    this.onMarkNoShow,
     this.isBusy = false,
   });
 
@@ -105,6 +113,25 @@ class DriverRideCard extends StatelessWidget {
                       ),
                     ),
                   ),
+                  // Durante a viagem, o motorista marca quem não apareceu
+                  if (inProgress && onMarkNoShow != null)
+                    TextButton(
+                      key: ValueKey('no_show_${passenger.userId}'),
+                      onPressed: isBusy
+                          ? null
+                          : () {
+                              HapticFeedback.lightImpact();
+                              onMarkNoShow!(passenger.userId!);
+                            },
+                      style: TextButton.styleFrom(
+                        foregroundColor: AppColors.error,
+                        visualDensity: VisualDensity.compact,
+                      ),
+                      child: const Text(
+                        'Ausente',
+                        style: TextStyle(fontWeight: FontWeight.w700),
+                      ),
+                    ),
                   IconButton(
                     tooltip: 'Abrir chat com ${passenger.displayName}',
                     visualDensity: VisualDensity.compact,
@@ -128,6 +155,22 @@ class DriverRideCard extends StatelessWidget {
             onStart: onStart,
             onComplete: onComplete,
           ),
+          // Antes de começar, o motorista pode cancelar só esta viagem
+          if (!inProgress && onCancel != null)
+            TextButton(
+              key: ValueKey('cancel_ride_${ride.id}'),
+              onPressed: isBusy
+                  ? null
+                  : () {
+                      HapticFeedback.mediumImpact();
+                      onCancel!();
+                    },
+              style: TextButton.styleFrom(foregroundColor: AppColors.error),
+              child: const Text(
+                'Cancelar esta viagem',
+                style: TextStyle(fontWeight: FontWeight.w700),
+              ),
+            ),
         ],
       ),
     );

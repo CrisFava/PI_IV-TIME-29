@@ -28,6 +28,12 @@ class DriverOfferDetails extends ConsumerStatefulWidget {
   /// Pede a confirmação e cancela; devolve se cancelou.
   final Future<bool> Function(String routeId) onCancelOffer;
 
+  /// Cancela só uma viagem (pede a confirmação antes).
+  final ValueChanged<String> onCancelRide;
+
+  /// Marca um passageiro como ausente na viagem em andamento.
+  final void Function(String rideId, String passengerId) onMarkNoShow;
+
   const DriverOfferDetails({
     super.key,
     required this.offerKey,
@@ -35,6 +41,8 @@ class DriverOfferDetails extends ConsumerStatefulWidget {
     required this.onCompleteRide,
     required this.onOpenChat,
     required this.onCancelOffer,
+    required this.onCancelRide,
+    required this.onMarkNoShow,
   });
 
   @override
@@ -175,6 +183,9 @@ class _DriverOfferDetailsState extends ConsumerState<DriverOfferDetails> {
                           onComplete: () => widget.onCompleteRide(ride.id),
                           onOpenChat: (passengerId) =>
                               widget.onOpenChat(ride.id, passengerId),
+                          onCancel: () => widget.onCancelRide(ride.id),
+                          onMarkNoShow: (passengerId) =>
+                              widget.onMarkNoShow(ride.id, passengerId),
                         ),
                       ),
                   ],

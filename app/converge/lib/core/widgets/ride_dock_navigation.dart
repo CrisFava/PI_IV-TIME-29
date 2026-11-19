@@ -44,9 +44,16 @@ class RideDockNavigation extends StatefulWidget {
   /// Callback do botão "Adicionar carro".
   final VoidCallback? onAddVehicle;
 
-  /// O passageiro tem um pedido de carona em andamento: o botão do carro ganha o
-  /// anel azul pulsante e o menu mostra a busca com o destino e o botão "Cancelar".
+  /// O passageiro tem um pedido de carona em andamento: o menu mostra a busca com
+  /// o destino e o botão "Cancelar" (sem animação no botão do carro).
   final bool isSearchingRide;
+
+  /// O usuário está numa viagem em andamento (motorista ou passageiro): o botão do
+  /// carro ganha o anel verde pulsante.
+  final bool isOnTrip;
+
+  /// Mensagens do chat ainda não vistas: o número aparece na aba "Chat".
+  final int chatUnreadCount;
 
   /// Título da busca no menu (ex.: "Procurando motorista").
   final String rideSearchTitle;
@@ -75,6 +82,8 @@ class RideDockNavigation extends StatefulWidget {
     this.needsVehicle = false,
     this.onAddVehicle,
     this.isSearchingRide = false,
+    this.isOnTrip = false,
+    this.chatUnreadCount = 0,
     this.rideSearchTitle = 'Procurando motorista',
     this.rideSearchDestination,
     this.onOpenRideSearch,
@@ -195,15 +204,10 @@ class _RideDockNavigationState extends State<RideDockNavigation>
                             widget.onStartDriverShift();
                           }
                         },
+                        // "Minhas caronas" abre para todos: o passageiro vê as viagens em que vai
                         onStartDriverShift: () {
                           _handleToggle();
-                          if (widget.canDrive) {
-                            widget.onStartDriverShift();
-                          } else if (widget.onLockedDriverTap != null) {
-                            widget.onLockedDriverTap!();
-                          } else {
-                            widget.onStartDriverShift();
-                          }
+                          widget.onStartDriverShift();
                         },
                         onClose: _handleToggle,
                         isOnShift: widget.isOnShift,
@@ -277,6 +281,7 @@ class _RideDockNavigationState extends State<RideDockNavigation>
                                 child: _SymmetricTabItem(
                                   icon: Icons.chat_bubble_outline_rounded,
                                   label: 'Chat',
+                                  badgeCount: widget.chatUnreadCount,
                                   isSelected: widget.currentIndex == 2,
                                   onTap: () => _handleTabTap(2),
                                 ),
@@ -320,11 +325,9 @@ class _RideDockNavigationState extends State<RideDockNavigation>
                     child: _CenterRideButton(
                       progress: progress,
                       onPressed: _handleToggle,
-                      // Verde na viagem em andamento; azul enquanto procura motorista
-                      pulseColor: widget.isOnShift
+                      // Só o anel verde, na viagem em andamento (motorista ou passageiro)
+                      pulseColor: widget.isOnShift || widget.isOnTrip
                           ? AppColors.success
-                          : widget.isSearchingRide
-                          ? AppColors.info
                           : null,
                     ),
                   ),
@@ -344,17 +347,21 @@ class _SymmetricTabItem extends StatelessWidget {
   final bool isSelected;
   final VoidCallback onTap;
 
+  /// Número em cima do ícone (ex.: mensagens não vistas); 0 esconde.
+  final int badgeCount;
+
   const _SymmetricTabItem({
     required this.icon,
     required this.label,
     required this.isSelected,
     required this.onTap,
+    this.badgeCount = 0,
   });
 
   @override
   Widget build(BuildContext context) {
     return Semantics(
-      label: label,
+      label: badgeCount > 0 ? '$label, $badgeCount não lidas' : label,
       selected: isSelected,
       button: true,
       child: InkWell(
@@ -372,12 +379,47 @@ class _SymmetricTabItem extends StatelessWidget {
                 scale: 1.0,
                 duration: const Duration(milliseconds: 280),
                 curve: Curves.easeOutBack,
-                child: Icon(
-                  icon,
-                  size: 24,
-                  color: isSelected
-                      ? AppColors.dockItemActive
-                      : AppColors.dockItemInactive,
+                child: Stack(
+                  clipBehavior: Clip.none,
+                  children: [
+                    Icon(
+                      icon,
+                      size: 24,
+                      color: isSelected
+                          ? AppColors.dockItemActive
+                          : AppColors.dockItemInactive,
+                    ),
+                    if (badgeCount > 0)
+                      Positioned(
+                        top: -6,
+                        right: -10,
+                        child: Container(
+                          key: const ValueKey('dock_tab_badge'),
+                          constraints: const BoxConstraints(minWidth: 18),
+                          padding: const EdgeInsets.symmetric(
+                            horizontal: 5,
+                            vertical: 1,
+                          ),
+                          decoration: BoxDecoration(
+                            color: AppColors.dockItemActive,
+                            borderRadius: BorderRadius.circular(10),
+                            border: Border.all(
+                              color: AppColors.dockBackground,
+                              width: 1.5,
+                            ),
+                          ),
+                          child: Text(
+                            badgeCount > 99 ? '99+' : '$badgeCount',
+                            textAlign: TextAlign.center,
+                            style: const TextStyle(
+                              fontSize: 10.5,
+                              fontWeight: FontWeight.w800,
+                              color: AppColors.dockBackground,
+                            ),
+                          ),
+                        ),
+                      ),
+                  ],
                 ),
               ),
               const SizedBox(height: 4),
@@ -404,7 +446,7 @@ class _SymmetricTabItem extends StatelessWidget {
 class _CenterRideButton extends StatefulWidget {
   final double progress;
   final VoidCallback onPressed;
-  /// Cor do anel pulsante e do ponto de status; null deixa o botão sem destaque.
+  /// Cor do anel pulsante; null deixa o botão sem destaque.
   final Color? pulseColor;
 
   const _CenterRideButton({
@@ -551,24 +593,6 @@ class _CenterRideButtonState extends State<_CenterRideButton>
                 ),
               ),
             ),
-            // Ponto verde de "viagem em andamento"
-            if (widget.pulseColor != null && !isExpanded)
-              Positioned(
-                top: 2,
-                right: 2,
-                child: Container(
-                  width: 14,
-                  height: 14,
-                  decoration: BoxDecoration(
-                    color: widget.pulseColor,
-                    shape: BoxShape.circle,
-                    border: Border.all(
-                      color: AppColors.dockBackground,
-                      width: 2,
-                    ),
-                  ),
-                ),
-              ),
           ],
         ),
       ),
@@ -686,12 +710,9 @@ class _RidesPopoverCard extends StatelessWidget {
               title: 'Minhas caronas',
               subtitle: canDrive
                   ? 'Ofereça uma carona ou veja as suas.'
-                  : 'Requer perfil de motorista cadastrado.',
-              icon: canDrive ? Icons.drive_eta_rounded : Icons.lock_rounded,
-              badgeLabel: canDrive ? null : 'Bloqueado',
-              onTap: canDrive
-                  ? onStartDriverShift
-                  : (onLockedDriverTap ?? onStartDriverShift),
+                  : 'Veja as caronas em que você vai.',
+              icon: Icons.drive_eta_rounded,
+              onTap: onStartDriverShift,
             ),
         ],
       ),
@@ -994,14 +1015,12 @@ class _CompactActionRow extends StatefulWidget {
   final String title;
   final String subtitle;
   final IconData icon;
-  final String? badgeLabel;
   final VoidCallback onTap;
 
   const _CompactActionRow({
     required this.title,
     required this.subtitle,
     required this.icon,
-    this.badgeLabel,
     required this.onTap,
   });
 
@@ -1075,36 +1094,6 @@ class _CompactActionRowState extends State<_CompactActionRow> {
                             ),
                           ),
                         ),
-                        if (widget.badgeLabel != null) ...[
-                          const SizedBox(width: 6),
-                          Container(
-                            padding: const EdgeInsets.symmetric(
-                                horizontal: 6, vertical: 2),
-                            decoration: BoxDecoration(
-                              color: AppColors.primary,
-                              borderRadius: BorderRadius.circular(6),
-                            ),
-                            child: Row(
-                              mainAxisSize: MainAxisSize.min,
-                              children: [
-                                const Icon(
-                                  Icons.fiber_manual_record_rounded,
-                                  size: 6,
-                                  color: Colors.white,
-                                ),
-                                const SizedBox(width: 3),
-                                Text(
-                                  widget.badgeLabel!,
-                                  style: const TextStyle(
-                                    fontSize: 9.5,
-                                    fontWeight: FontWeight.w700,
-                                    color: Colors.white,
-                                  ),
-                                ),
-                              ],
-                            ),
-                          ),
-                        ],
                       ],
                     ),
                     const SizedBox(height: 2),

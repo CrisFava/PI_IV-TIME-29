@@ -6,7 +6,8 @@ import 'route_recurrence.dart';
 
 /// Horário e dias de um trajeto, no formato da API (`HH:mm` e `MONDAY`...).
 /// A carona de um dia só leva a data (`yyyy-MM-dd`); a semanal, só os dias.
-/// O matching só junta saídas com até 30 min de diferença e com um dia em comum.
+/// O matching junta o motorista que sai de 30 min antes a 5 min depois do
+/// passageiro, com um dia em comum.
 @immutable
 class RouteSchedule {
   /// Tempo de viagem usado na chegada prevista enquanto a rota real não é calculada.

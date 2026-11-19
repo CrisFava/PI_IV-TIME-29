@@ -12,7 +12,7 @@ final driverRideActionsProvider =
       DriverRideActionsController.new,
     );
 
-/// Iniciar e concluir as viagens do motorista. O estado são as viagens com uma
+/// Iniciar, concluir e cancelar as viagens do motorista, e marcar ausentes. O estado são as viagens com uma
 /// ação em andamento (para desabilitar os botões).
 class DriverRideActionsController extends Notifier<Set<String>> {
   RideRepository get _rides => ref.read(rideRepositoryProvider);
@@ -28,6 +28,18 @@ class DriverRideActionsController extends Notifier<Set<String>> {
   /// Encerra o expediente concluindo a viagem. Devolve a mensagem de erro, ou `null`.
   Future<String?> complete(String rideId) =>
       _run(rideId, () => _rides.completeRide(rideId));
+
+  /// "Cancelar esta viagem" (antes de ela começar): os confirmados são avisados.
+  /// Devolve a mensagem de erro, ou `null`.
+  Future<String?> cancel(String rideId) => _run(
+    rideId,
+    () => _rides.cancelRide(rideId, reason: 'O motorista cancelou a viagem.'),
+  );
+
+  /// Marca um passageiro confirmado como ausente na viagem em andamento.
+  /// Devolve a mensagem de erro, ou `null`.
+  Future<String?> markNoShow(String rideId, String passengerId) =>
+      _run(rideId, () => _rides.markNoShow(rideId, passengerId));
 
   Future<String?> _run(String rideId, Future<Object?> Function() action) async {
     if (state.contains(rideId)) return null;
