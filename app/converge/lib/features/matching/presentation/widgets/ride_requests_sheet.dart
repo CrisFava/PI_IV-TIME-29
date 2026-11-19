@@ -195,6 +195,7 @@ class _RideRequestsSheetState extends ConsumerState<RideRequestsSheet> {
       message:
           'A viagem dele termina aqui e ele recebe a cobrança do rateio pelo PIX$amountHint.',
       confirmLabel: 'Confirmar chegada',
+      destructive: false,
     );
     if (!confirmed) return;
     final error = await ref
