@@ -15,7 +15,8 @@ final blockedUsersProvider =
 /// Ids dos bloqueados. Vazio enquanto a lista carrega ou se ela falhar.
 final blockedUserIdsProvider = Provider.autoDispose<Set<String>>(
   (ref) => {
-    for (final block in ref.watch(blockedUsersProvider).value ?? const <BlockModel>[])
+    for (final block
+        in ref.watch(blockedUsersProvider).value ?? const <BlockModel>[])
       block.blockedUserId,
   },
 );

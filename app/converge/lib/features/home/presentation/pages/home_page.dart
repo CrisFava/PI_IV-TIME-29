@@ -745,7 +745,8 @@ class _HomePageState extends ConsumerState<HomePage> {
       for (final ride in toReview)
         if (!_reviewAfterPayment.contains(ride.id)) ride,
       for (final ride in rides)
-        if (_reviewAfterPayment.contains(ride.id) && !_awaitsPayment(ride)) ride,
+        if (_reviewAfterPayment.contains(ride.id) && !_awaitsPayment(ride))
+          ride,
     ];
     _reviewAfterPayment.removeAll(ready.map((ride) => ride.id));
     _promptReviews([
@@ -789,9 +790,13 @@ class _HomePageState extends ConsumerState<HomePage> {
     final stillRiding =
         me != null &&
         me.status == ParticipantStatus.confirmed &&
-        (ride.status == RideStatus.confirmed || ride.status == RideStatus.inProgress);
+        (ride.status == RideStatus.confirmed ||
+            ride.status == RideStatus.inProgress);
     if (stillRiding) return;
-    if (pending.any((payment) => payment.rideId == rideId && payment.isOpen)) return;
+    final hasOpenCharge = pending.any(
+      (payment) => payment.rideId == rideId && payment.isOpen,
+    );
+    if (hasOpenCharge) return;
 
     setState(() {
       _draftGeneration++;
@@ -1017,7 +1022,11 @@ class _HomePageState extends ConsumerState<HomePage> {
                 // Abre o pagamento sozinho quando há cobrança de carona em aberto.
                 // Posicionado: um filho sem posição definiria o tamanho do Stack (0x0,
                 // porque o ouvinte não desenha nada) e a Home inteira sumiria.
-                const Positioned(left: 0, top: 0, child: PendingPaymentPrompt()),
+                const Positioned(
+                  left: 0,
+                  top: 0,
+                  child: PendingPaymentPrompt(),
+                ),
 
                 // ============================================================
                 // CAMADA 1: CONTEÚDO PRINCIPAL (MAPA OU ABAS SECUNDÁRIAS)
@@ -1084,7 +1093,8 @@ class _HomePageState extends ConsumerState<HomePage> {
                                 .watch(myPassengerRidesProvider)
                                 .value
                                 ?.any(
-                                  (ride) => ride.status == RideStatus.inProgress,
+                                  (ride) =>
+                                      ride.status == RideStatus.inProgress,
                                 ) ??
                             false),
                     rideSearchTitle: switch (_passengerStep) {
@@ -1147,7 +1157,9 @@ class _HomePageState extends ConsumerState<HomePage> {
   Widget _buildUberHomeView(dynamic user, bool canDrive, double bottomPadding) {
     // O desenho do caminho do rascunho vem do controlador da estimativa
     ref.listen(tripEstimateProvider, (_, next) {
-      setState(() => _tripRoutePoints = next.points.isEmpty ? null : next.points);
+      setState(
+        () => _tripRoutePoints = next.points.isEmpty ? null : next.points,
+      );
     });
     // Com a viagem em andamento (e sem um pedido de carona aberto), o mapa
     // mostra a rota da viagem com as paradas: buscar e deixar cada passageiro
@@ -1231,7 +1243,9 @@ class _HomePageState extends ConsumerState<HomePage> {
                 onClose: _handleCloseRideRequests,
                 onRideStarted: _handleRideStarted,
                 // Quem ainda não é motorista vê como liberar o perfil
-                onNewOffer: canDrive ? _openOfferForm : _showLockedDriverWarning,
+                onNewOffer: canDrive
+                    ? _openOfferForm
+                    : _showLockedDriverWarning,
               ),
             ),
           )

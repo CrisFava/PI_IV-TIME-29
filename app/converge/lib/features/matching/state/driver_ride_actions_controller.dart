@@ -92,15 +92,17 @@ class DriverRideActionsController extends Notifier<Set<String>> {
   Future<void> _notifyCharged(RideModel ride, String passengerId) async {
     final amount = ride.passengerOf(passengerId)?.finalAmount;
     try {
-      await ref.read(rideChatAnnouncerProvider).notifyPassenger(
-        ride,
-        passengerId,
-        ChatMessageType.paymentRequest,
-        amount == null
-            ? 'Você chegou. A cobrança da carona foi enviada.'
-            : 'Você chegou. A cobrança de ${CurrencyFormatter.format(amount)} foi enviada.',
-        amount: amount,
-      );
+      await ref
+          .read(rideChatAnnouncerProvider)
+          .notifyPassenger(
+            ride,
+            passengerId,
+            ChatMessageType.paymentRequest,
+            amount == null
+                ? 'Você chegou. A cobrança da carona foi enviada.'
+                : 'Você chegou. A cobrança de ${CurrencyFormatter.format(amount)} foi enviada.',
+            amount: amount,
+          );
     } catch (_) {
       // Sem o aviso; o passageiro vê a cobrança ao abrir o app.
     }

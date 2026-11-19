@@ -50,7 +50,14 @@ class RideChatAnnouncer {
     };
 
     for (final passengerId in passengerIds) {
-      await _send(room, ride.id, passengerId, viewer, ChatMessageType.system, text);
+      await _send(
+        room,
+        ride.id,
+        passengerId,
+        viewer,
+        ChatMessageType.system,
+        text,
+      );
     }
   }
 
@@ -80,7 +87,11 @@ class RideChatAnnouncer {
   }) async {
     try {
       await _chat.sendMessage(
-        ChatThreadRef(chatRoomId: room, rideId: rideId, passengerId: passengerId),
+        ChatThreadRef(
+          chatRoomId: room,
+          rideId: rideId,
+          passengerId: passengerId,
+        ),
         ChatMessageModel(
           senderId: viewer.id,
           senderName: viewer.name,

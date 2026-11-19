@@ -83,5 +83,4 @@ void main() {
       expect(container.read(incomingRideRequestProvider), isNull);
     },
   );
-
 }

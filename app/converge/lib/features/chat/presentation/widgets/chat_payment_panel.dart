@@ -85,8 +85,7 @@ class ChatPaymentPanel extends ConsumerWidget {
       return const ChatPanelCard(
         icon: Icons.pix_rounded,
         title: 'Pagamento',
-        subtitle:
-            'O passageiro recebe a cobrança do rateio pelo PIX quando você confirma a chegada dele ou encerra a viagem.',
+        subtitle: 'O passageiro recebe a cobrança do rateio pelo PIX quando você confirma a chegada dele ou encerra a viagem.',
       );
     }
 
@@ -104,8 +103,7 @@ class ChatPaymentPanel extends ConsumerWidget {
       return const ChatPanelCard(
         icon: Icons.pix_rounded,
         title: 'Pagamento',
-        subtitle:
-            'O valor do rateio é cobrado pelo PIX quando a sua viagem terminar.',
+        subtitle: 'O valor do rateio é cobrado pelo PIX quando a sua viagem terminar.',
       );
     }
 

@@ -2,6 +2,7 @@
 
 import 'dart:math' as math;
 import 'dart:ui' as ui;
+
 import 'package:converge/features/home/presentation/widgets/home_map_background.dart';
 import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
@@ -14,10 +15,7 @@ import '../../../matching/data/models/match_model.dart';
 import 'campus_spots.dart';
 
 /// Tipo de pino central para o modo de arrasto estilo Uber
-enum CentralPinType {
-  destination,
-  pickup,
-}
+enum CentralPinType { destination, pickup }
 
 /// Estilo JSON Monocromático de Alto Contraste (Prédios e áreas não-viárias mais escuras)
 const String _monochromeMapStyle = '''[
@@ -141,6 +139,7 @@ const String _monochromeMapStyle = '''[
 class HomeRealMapBackground extends StatefulWidget {
   final bool isDriverMode;
   final bool showDrivers;
+
   /// Motoristas compatíveis (matching), marcados no ponto de partida de cada um.
   final List<MatchModel> availableDrivers;
   final MatchModel? acceptedDriver;
@@ -209,7 +208,8 @@ class _HomeRealMapBackgroundState extends State<HomeRealMapBackground> {
   Future<void> _initCustomMonochromeIcons() async {
     try {
       final origin = _originDotIcon ?? await _generateOriginDotDescriptor();
-      final dest = _destinationDotIcon ?? await _generateDestinationDotDescriptor();
+      final dest =
+          _destinationDotIcon ?? await _generateDestinationDotDescriptor();
       final car = _blackCarIcon ?? await _generateBlackCarDescriptor();
       _originDotIcon = origin;
       _destinationDotIcon = dest;
@@ -247,7 +247,8 @@ class _HomeRealMapBackgroundState extends State<HomeRealMapBackground> {
         widget.destinationLocation != oldWidget.destinationLocation ||
         widget.acceptedDriver != oldWidget.acceptedDriver ||
         widget.tripRoutePoints != oldWidget.tripRoutePoints ||
-        widget.driverApproachRoutePoints != oldWidget.driverApproachRoutePoints ||
+        widget.driverApproachRoutePoints !=
+            oldWidget.driverApproachRoutePoints ||
         widget.showTrajectory != oldWidget.showTrajectory ||
         widget.bottomPadding != oldWidget.bottomPadding) {
       _adjustCameraForCurrentState();
@@ -321,10 +322,7 @@ class _HomeRealMapBackgroundState extends State<HomeRealMapBackground> {
     final target = widget.pickupLocation ?? campusCoordinates;
     _mapController?.animateCamera(
       CameraUpdate.newCameraPosition(
-        CameraPosition(
-          target: target,
-          zoom: 15.0,
-        ),
+        CameraPosition(target: target, zoom: 15.0),
       ),
     );
   }
@@ -333,8 +331,8 @@ class _HomeRealMapBackgroundState extends State<HomeRealMapBackground> {
     final markers = <Marker>{};
 
     // 1. Marcador de Origem (Bolinha preta opaca remetendo a "origem")
-    final isDraggingPickup = widget.isDraggingPin &&
-        widget.centralPinType == CentralPinType.pickup;
+    final isDraggingPickup =
+        widget.isDraggingPin && widget.centralPinType == CentralPinType.pickup;
     if (!isDraggingPickup) {
       final pickupPos = widget.pickupLocation ?? campusCoordinates;
       final pickupTitle = widget.pickupAddress.isNotEmpty
@@ -345,7 +343,8 @@ class _HomeRealMapBackgroundState extends State<HomeRealMapBackground> {
         Marker(
           markerId: const MarkerId('pickup_marker'),
           position: pickupPos,
-          icon: _originDotIcon ??
+          icon:
+              _originDotIcon ??
               BitmapDescriptor.defaultMarkerWithHue(BitmapDescriptor.hueViolet),
           anchor: const Offset(0.5, 0.5),
           infoWindow: InfoWindow(
@@ -357,7 +356,8 @@ class _HomeRealMapBackgroundState extends State<HomeRealMapBackground> {
     }
 
     // 2. Marcador de Destino (Bolinha quadriculada remetendo à chegada)
-    final isDraggingDest = widget.isDraggingPin &&
+    final isDraggingDest =
+        widget.isDraggingPin &&
         widget.centralPinType == CentralPinType.destination;
     if (widget.destinationLocation != null && !isDraggingDest) {
       final destTitle = widget.destinationAddress.isNotEmpty
@@ -368,7 +368,8 @@ class _HomeRealMapBackgroundState extends State<HomeRealMapBackground> {
         Marker(
           markerId: const MarkerId('destination_marker'),
           position: widget.destinationLocation!,
-          icon: _destinationDotIcon ??
+          icon:
+              _destinationDotIcon ??
               BitmapDescriptor.defaultMarkerWithHue(BitmapDescriptor.hueRed),
           anchor: const Offset(0.5, 0.5),
           infoWindow: InfoWindow(
@@ -388,7 +389,8 @@ class _HomeRealMapBackgroundState extends State<HomeRealMapBackground> {
         Marker(
           markerId: MarkerId('accepted_driver_${driver.driverRouteId}'),
           position: _driverPosition(driver),
-          icon: _blackCarIcon ??
+          icon:
+              _blackCarIcon ??
               BitmapDescriptor.defaultMarkerWithHue(BitmapDescriptor.hueAzure),
           anchor: const Offset(0.5, 0.5),
           infoWindow: InfoWindow(
@@ -405,8 +407,11 @@ class _HomeRealMapBackgroundState extends State<HomeRealMapBackground> {
           Marker(
             markerId: MarkerId(driver.driverRouteId),
             position: _driverPosition(driver),
-            icon: _blackCarIcon ??
-                BitmapDescriptor.defaultMarkerWithHue(BitmapDescriptor.hueAzure),
+            icon:
+                _blackCarIcon ??
+                BitmapDescriptor.defaultMarkerWithHue(
+                  BitmapDescriptor.hueAzure,
+                ),
             anchor: const Offset(0.5, 0.5),
             infoWindow: InfoWindow(
               title: '${driver.otherUserName} • ${driver.compatibilityLabel}',
@@ -470,7 +475,8 @@ class _HomeRealMapBackgroundState extends State<HomeRealMapBackground> {
 
   @override
   Widget build(BuildContext context) {
-    final isUnsupportedPlatform = kIsWeb ||
+    final isUnsupportedPlatform =
+        kIsWeb ||
         (defaultTargetPlatform != TargetPlatform.android &&
             defaultTargetPlatform != TargetPlatform.iOS);
 
@@ -533,8 +539,8 @@ class _HomeRealMapBackgroundState extends State<HomeRealMapBackground> {
                     translation: const Offset(0, -0.5),
                     child: _UberStyleCentralPin(
                       type: widget.centralPinType,
-                      address: widget.centralPinType ==
-                              CentralPinType.destination
+                      address:
+                          widget.centralPinType == CentralPinType.destination
                           ? widget.destinationAddress
                           : widget.pickupAddress,
                     ),
@@ -879,4 +885,3 @@ class _HollowPinPainter extends CustomPainter {
   @override
   bool shouldRepaint(covariant CustomPainter oldDelegate) => false;
 }
-

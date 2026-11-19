@@ -67,7 +67,10 @@ class PaymentPromptController extends Notifier<PaymentPromptState> {
       await _rides.markPaymentAsPaid(payment.rideId, payment.passengerId);
       ref.invalidate(pendingPaymentsProvider);
       ref.invalidate(
-        ridePaymentProvider((rideId: payment.rideId, passengerId: payment.passengerId)),
+        ridePaymentProvider((
+          rideId: payment.rideId,
+          passengerId: payment.passengerId,
+        )),
       );
       ref.invalidate(myRidesProvider);
       return null;

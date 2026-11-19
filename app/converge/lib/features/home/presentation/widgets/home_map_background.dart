@@ -1,6 +1,7 @@
 // Autor: Allan Giovanni Matias Paes - RA 25008211
 
 import 'dart:math' as math;
+
 import 'package:flutter/material.dart';
 
 import '../../../../core/config/styles.dart';
@@ -295,7 +296,11 @@ class _UberStyleMapPainter extends CustomPainter {
     _drawCarGlyph(canvas, const Offset(320, 560), headingAngle: 0.0);
   }
 
-  void _drawCarGlyph(Canvas canvas, Offset pos, {required double headingAngle}) {
+  void _drawCarGlyph(
+    Canvas canvas,
+    Offset pos, {
+    required double headingAngle,
+  }) {
     canvas.save();
     canvas.translate(pos.dx, pos.dy);
     canvas.rotate(headingAngle);
@@ -348,11 +353,7 @@ class _UberStyleMapPainter extends CustomPainter {
     );
 
     // Pin Destino 2: Campus II
-    _drawPinMarker(
-      canvas,
-      const Offset(220, 720),
-      label: 'Campus II',
-    );
+    _drawPinMarker(canvas, const Offset(220, 720), label: 'Campus II');
   }
 
   void _drawPinMarker(Canvas canvas, Offset pos, {required String label}) {
@@ -387,10 +388,7 @@ class _UberStyleMapPainter extends CustomPainter {
       const Radius.circular(8),
     );
 
-    canvas.drawRRect(
-      bgRect,
-      Paint()..color = Colors.white,
-    );
+    canvas.drawRRect(bgRect, Paint()..color = Colors.white);
     canvas.drawRRect(
       bgRect,
       Paint()
@@ -401,7 +399,10 @@ class _UberStyleMapPainter extends CustomPainter {
 
     textPainter.paint(
       canvas,
-      Offset(pos.dx - textPainter.width / 2, pos.dy - 22 - textPainter.height / 2),
+      Offset(
+        pos.dx - textPainter.width / 2,
+        pos.dy - 22 - textPainter.height / 2,
+      ),
     );
   }
 

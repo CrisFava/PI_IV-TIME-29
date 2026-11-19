@@ -128,7 +128,12 @@ class _HomePassengerSheetState extends ConsumerState<HomePassengerSheet> {
                 ),
               ),
               SliverPadding(
-                padding: EdgeInsets.fromLTRB(16, 4, 16, 120 + widget.bottomSafeArea),
+                padding: EdgeInsets.fromLTRB(
+                  16,
+                  4,
+                  16,
+                  120 + widget.bottomSafeArea,
+                ),
                 sliver: SliverList(
                   delegate: SliverChildListDelegate([
                     Row(
@@ -159,7 +164,8 @@ class _HomePassengerSheetState extends ConsumerState<HomePassengerSheet> {
                         ),
                         IconButton(
                           icon: const Icon(Icons.refresh_rounded),
-                          onPressed: matchState.phase == PassengerMatchPhase.loading ||
+                          onPressed:
+                              matchState.phase == PassengerMatchPhase.loading ||
                                   matchState.isBusy
                               ? null
                               : widget.onRetryMatches,
@@ -188,7 +194,8 @@ class _HomePassengerSheetState extends ConsumerState<HomePassengerSheet> {
     final phase = matchState.phase;
     final drivers = matchState.matches;
 
-    if (phase == PassengerMatchPhase.loading || phase == PassengerMatchPhase.idle) {
+    if (phase == PassengerMatchPhase.loading ||
+        phase == PassengerMatchPhase.idle) {
       return const [
         Padding(
           padding: EdgeInsets.all(28),
@@ -223,7 +230,8 @@ class _HomePassengerSheetState extends ConsumerState<HomePassengerSheet> {
           padding: const EdgeInsets.only(bottom: 10),
           child: MatchDriverCard(
             match: driver,
-            isRequesting: phase == PassengerMatchPhase.requesting &&
+            isRequesting:
+                phase == PassengerMatchPhase.requesting &&
                 selected?.driverRouteId == driver.driverRouteId,
             isDisabled: matchState.isBusy,
             onRequest: () => widget.onSelectDriver(driver),
@@ -292,7 +300,8 @@ class _DriverAcceptedPipSheet extends StatefulWidget {
   });
 
   @override
-  State<_DriverAcceptedPipSheet> createState() => _DriverAcceptedPipSheetState();
+  State<_DriverAcceptedPipSheet> createState() =>
+      _DriverAcceptedPipSheetState();
 }
 
 class _DriverAcceptedPipSheetState extends State<_DriverAcceptedPipSheet>
@@ -329,9 +338,10 @@ class _DriverAcceptedPipSheetState extends State<_DriverAcceptedPipSheet>
     _slideAnimation = Tween<double>(begin: 60.0, end: 0.0).animate(
       CurvedAnimation(parent: _animController, curve: Curves.easeOutCubic),
     );
-    _fadeAnimation = Tween<double>(begin: 0.0, end: 1.0).animate(
-      CurvedAnimation(parent: _animController, curve: Curves.easeOut),
-    );
+    _fadeAnimation = Tween<double>(
+      begin: 0.0,
+      end: 1.0,
+    ).animate(CurvedAnimation(parent: _animController, curve: Curves.easeOut));
     _scaleAnimation = Tween<double>(begin: 0.92, end: 1.0).animate(
       CurvedAnimation(parent: _animController, curve: Curves.easeOutBack),
     );
@@ -378,7 +388,9 @@ class _DriverAcceptedPipSheetState extends State<_DriverAcceptedPipSheet>
   @override
   Widget build(BuildContext context) {
     final screenSize = MediaQuery.sizeOf(context);
-    final pos = _bubblePosition ?? Offset(screenSize.width - 76, screenSize.height * 0.40);
+    final pos =
+        _bubblePosition ??
+        Offset(screenSize.width - 76, screenSize.height * 0.40);
 
     return Stack(
       children: [
@@ -445,7 +457,10 @@ class _DriverAcceptedPipSheetState extends State<_DriverAcceptedPipSheet>
                                 decoration: BoxDecoration(
                                   color: AppColors.success,
                                   shape: BoxShape.circle,
-                                  border: Border.all(color: Colors.white, width: 2),
+                                  border: Border.all(
+                                    color: Colors.white,
+                                    width: 2,
+                                  ),
                                 ),
                               ),
                             ),
@@ -483,13 +498,21 @@ class _DriverAcceptedPipSheetState extends State<_DriverAcceptedPipSheet>
                   );
                 },
                 child: Padding(
-                  padding: EdgeInsets.fromLTRB(16, 0, 16, 96 + widget.bottomSafeArea),
+                  padding: EdgeInsets.fromLTRB(
+                    16,
+                    0,
+                    16,
+                    96 + widget.bottomSafeArea,
+                  ),
                   child: Container(
                     padding: const EdgeInsets.all(20),
                     decoration: BoxDecoration(
                       color: AppColors.cardBackground,
                       borderRadius: BorderRadius.circular(26),
-                      border: Border.all(color: AppColors.borderSubtle, width: 1),
+                      border: Border.all(
+                        color: AppColors.borderSubtle,
+                        width: 1,
+                      ),
                       boxShadow: [
                         BoxShadow(
                           color: Colors.black.withValues(alpha: 0.18),
@@ -509,7 +532,9 @@ class _DriverAcceptedPipSheetState extends State<_DriverAcceptedPipSheet>
                               decoration: BoxDecoration(
                                 color: AppColors.successBackground,
                                 shape: BoxShape.circle,
-                                border: Border.all(color: AppColors.successBorder),
+                                border: Border.all(
+                                  color: AppColors.successBorder,
+                                ),
                               ),
                               child: const Icon(
                                 Icons.check_rounded,
@@ -590,7 +615,8 @@ class _DriverAcceptedPipSheetState extends State<_DriverAcceptedPipSheet>
                                     ),
                                   ),
                                 ),
-                                if (widget.driver!.estimatedCostPerPassenger != null)
+                                if (widget.driver!.estimatedCostPerPassenger !=
+                                    null)
                                   Text(
                                     CurrencyFormatter.format(
                                       widget.driver!.estimatedCostPerPassenger!,
@@ -631,38 +657,47 @@ class _DriverAcceptedPipSheetState extends State<_DriverAcceptedPipSheet>
                             ),
                           )
                         else
-                        ElevatedButton.icon(
-                          onPressed: widget.onSendMessage,
-                          style: ElevatedButton.styleFrom(
-                            backgroundColor: AppColors.primary,
-                            foregroundColor: AppColors.textLight,
-                            padding: const EdgeInsets.symmetric(vertical: 14),
-                            shape: RoundedRectangleBorder(
-                              borderRadius: BorderRadius.circular(16),
+                          ElevatedButton.icon(
+                            onPressed: widget.onSendMessage,
+                            style: ElevatedButton.styleFrom(
+                              backgroundColor: AppColors.primary,
+                              foregroundColor: AppColors.textLight,
+                              padding: const EdgeInsets.symmetric(vertical: 14),
+                              shape: RoundedRectangleBorder(
+                                borderRadius: BorderRadius.circular(16),
+                              ),
+                              elevation: 0,
                             ),
-                            elevation: 0,
+                            icon: const Icon(
+                              Icons.chat_bubble_rounded,
+                              size: 19,
+                            ),
+                            label: const Text(
+                              'Enviar mensagem ao motorista',
+                              style: TextStyle(
+                                fontSize: 14.5,
+                                fontWeight: FontWeight.w700,
+                              ),
+                            ),
                           ),
-                          icon: const Icon(Icons.chat_bubble_rounded, size: 19),
-                          label: const Text(
-                            'Enviar mensagem ao motorista',
-                            style: TextStyle(fontSize: 14.5, fontWeight: FontWeight.w700),
-                          ),
-                        ),
                         const SizedBox(height: 8),
 
                         // Com a cobrança em aberto, o pedido só termina depois do pagamento
                         if (widget.pendingPayment == null)
-                        TextButton(
-                          onPressed: widget.onCancel,
-                          style: TextButton.styleFrom(
-                            foregroundColor: AppColors.textSecondary,
-                            padding: const EdgeInsets.symmetric(vertical: 8),
+                          TextButton(
+                            onPressed: widget.onCancel,
+                            style: TextButton.styleFrom(
+                              foregroundColor: AppColors.textSecondary,
+                              padding: const EdgeInsets.symmetric(vertical: 8),
+                            ),
+                            child: const Text(
+                              'Fechar',
+                              style: TextStyle(
+                                fontSize: 13,
+                                fontWeight: FontWeight.w600,
+                              ),
+                            ),
                           ),
-                          child: const Text(
-                            'Fechar',
-                            style: TextStyle(fontSize: 13, fontWeight: FontWeight.w600),
-                          ),
-                        ),
                       ],
                     ),
                   ),

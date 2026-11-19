@@ -39,7 +39,9 @@ class _PendingPaymentPromptState extends ConsumerState<PendingPaymentPrompt> {
     final pending = payments.value;
     if (_open || payments.isLoading || pending == null) return;
 
-    final payment = ref.read(paymentPromptProvider.notifier).nextToShow(pending);
+    final payment = ref
+        .read(paymentPromptProvider.notifier)
+        .nextToShow(pending);
     if (payment == null) return;
 
     _open = true;

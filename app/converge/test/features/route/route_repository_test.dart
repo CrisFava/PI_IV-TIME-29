@@ -17,39 +17,44 @@ void main() {
       repository = RouteRepositoryImpl(dio);
     });
 
-    test('autocomplete retorna lista de PlaceSuggestionModel extraída do envelope', () async {
-      dio.interceptors.add(
-        InterceptorsWrapper(
-          onRequest: (options, handler) {
-            expect(options.path, RouteEndpoints.placesAutocomplete);
-            expect(options.queryParameters['input'], 'PUC Campinas');
-            handler.resolve(
-              Response(
-                requestOptions: options,
-                statusCode: 200,
-                data: {
-                  'success': true,
-                  'data': [
-                    {
-                      'placeId': 'place_123',
-                      'mainText': 'PUC-Campinas - Campus I',
-                      'secondaryText': 'R. Prof. Dr. Edivaldo Pereira Falcão',
-                    },
-                  ],
-                  'error': null,
-                  'timestamp': '2026-10-22T18:00:00Z',
-                },
-              ),
-            );
-          },
-        ),
-      );
+    test(
+      'autocomplete retorna lista de PlaceSuggestionModel extraída do envelope',
+      () async {
+        dio.interceptors.add(
+          InterceptorsWrapper(
+            onRequest: (options, handler) {
+              expect(options.path, RouteEndpoints.placesAutocomplete);
+              expect(options.queryParameters['input'], 'PUC Campinas');
+              handler.resolve(
+                Response(
+                  requestOptions: options,
+                  statusCode: 200,
+                  data: {
+                    'success': true,
+                    'data': [
+                      {
+                        'placeId': 'place_123',
+                        'mainText': 'PUC-Campinas - Campus I',
+                        'secondaryText': 'R. Prof. Dr. Edivaldo Pereira Falcão',
+                      },
+                    ],
+                    'error': null,
+                    'timestamp': '2026-10-22T18:00:00Z',
+                  },
+                ),
+              );
+            },
+          ),
+        );
 
-      final suggestions = await repository.autocomplete(input: 'PUC Campinas');
-      expect(suggestions.length, 1);
-      expect(suggestions.first.placeId, 'place_123');
-      expect(suggestions.first.mainText, 'PUC-Campinas - Campus I');
-    });
+        final suggestions = await repository.autocomplete(
+          input: 'PUC Campinas',
+        );
+        expect(suggestions.length, 1);
+        expect(suggestions.first.placeId, 'place_123');
+        expect(suggestions.first.mainText, 'PUC-Campinas - Campus I');
+      },
+    );
 
     test('getPlaceDetails retorna PlaceDetailsModel com coordenadas', () async {
       dio.interceptors.add(

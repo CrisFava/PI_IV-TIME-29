@@ -67,8 +67,10 @@ void main() {
     });
 
     test('status desconhecido não quebra a leitura', () {
-      final ride =
-          fakeRide(status: 'NOVO_STATUS', passengerStatus: 'STATUS_INEXISTENTE');
+      final ride = fakeRide(
+        status: 'NOVO_STATUS',
+        passengerStatus: 'STATUS_INEXISTENTE',
+      );
 
       expect(ride.status, RideStatus.unknown);
       expect(

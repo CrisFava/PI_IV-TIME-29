@@ -144,8 +144,7 @@ class _RideRequestsSheetState extends ConsumerState<RideRequestsSheet> {
   Future<void> _cancelRide(String rideId) async {
     final confirmed = await _confirm(
       title: 'Cancelar esta viagem?',
-      message:
-          'Os passageiros confirmados serão avisados. Cancelar com passageiro confirmado conta na sua reputação.',
+      message: 'Os passageiros confirmados serão avisados. Cancelar com passageiro confirmado conta na sua reputação.',
       confirmLabel: 'Cancelar viagem',
     );
     if (!confirmed) return;
@@ -159,8 +158,7 @@ class _RideRequestsSheetState extends ConsumerState<RideRequestsSheet> {
   Future<void> _markNoShow(String rideId, String passengerId) async {
     final confirmed = await _confirm(
       title: 'Marcar como ausente?',
-      message:
-          'A vaga é liberada e o passageiro não é cobrado nem entra nos indicadores.',
+      message: 'A vaga é liberada e o passageiro não é cobrado nem entra nos indicadores.',
       confirmLabel: 'Marcar ausente',
     );
     if (!confirmed) return;
@@ -183,7 +181,8 @@ class _RideRequestsSheetState extends ConsumerState<RideRequestsSheet> {
         : '';
 
     final confirmed = await _confirm(
-      title: 'Confirmar a chegada de ${passenger?.displayName ?? 'o passageiro'}?',
+      title:
+          'Confirmar a chegada de ${passenger?.displayName ?? 'o passageiro'}?',
       message:
           'A viagem dele termina aqui e ele recebe a cobrança do rateio pelo PIX$amountHint.',
       confirmLabel: 'Confirmar chegada',
@@ -414,7 +413,12 @@ class _RideRequestsSheetState extends ConsumerState<RideRequestsSheet> {
                       ],
                     ),
                     // Uma lista só: as viagens como passageiro e as caronas oferecidas
-                    ..._ridesList(offers, passengerRides, viewerId, rideActions),
+                    ..._ridesList(
+                      offers,
+                      passengerRides,
+                      viewerId,
+                      rideActions,
+                    ),
                   ]),
                 ),
               ),
@@ -450,9 +454,7 @@ class _RideRequestsSheetState extends ConsumerState<RideRequestsSheet> {
     final asPassenger = passengerList ?? const <RideModel>[];
     final asDriver = offerList ?? const <DriverOffer>[];
     if (asPassenger.isEmpty && asDriver.isEmpty) {
-      return const [
-        MatchingMessage(text: 'Você ainda não tem caronas.'),
-      ];
+      return const [MatchingMessage(text: 'Você ainda não tem caronas.')];
     }
 
     // A viagem em andamento como passageiro vem primeiro; as caronas oferecidas

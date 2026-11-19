@@ -98,30 +98,27 @@ void main() {
     },
   );
 
-  test(
-    '"Chegou" confirma a chegada e avisa só aquele passageiro da cobrança no chat',
-    () async {
-      final rides = FakeSeatRideRepository(
-        myRides: [fakeRide(status: 'IN_PROGRESS')],
-      );
-      final container = containerWith(rides);
-      const thread = ChatThreadRef(
-        chatRoomId: 'ride_ride-1',
-        rideId: fakeRideId,
-        passengerId: fakePassengerId,
-      );
+  test('"Chegou" confirma a chegada e avisa só aquele passageiro da cobrança no chat', () async {
+    final rides = FakeSeatRideRepository(
+      myRides: [fakeRide(status: 'IN_PROGRESS')],
+    );
+    final container = containerWith(rides);
+    const thread = ChatThreadRef(
+      chatRoomId: 'ride_ride-1',
+      rideId: fakeRideId,
+      passengerId: fakePassengerId,
+    );
 
-      final error = await container
-          .read(driverRideActionsProvider.notifier)
-          .arrive(fakeRideId, fakePassengerId);
+    final error = await container
+        .read(driverRideActionsProvider.notifier)
+        .arrive(fakeRideId, fakePassengerId);
 
-      expect(error, isNull);
-      expect(rides.calls, contains('arrive:$fakeRideId:$fakePassengerId'));
-      final notice = chat.messagesOf(thread).single;
-      expect(notice.type, ChatMessageType.paymentRequest);
-      expect(notice.text, startsWith('Você chegou.'));
-    },
-  );
+    expect(error, isNull);
+    expect(rides.calls, contains('arrive:$fakeRideId:$fakePassengerId'));
+    final notice = chat.messagesOf(thread).single;
+    expect(notice.type, ChatMessageType.paymentRequest);
+    expect(notice.text, startsWith('Você chegou.'));
+  });
 
   test(
     'iniciar e concluir fora do chat também avisam o passageiro no chat',

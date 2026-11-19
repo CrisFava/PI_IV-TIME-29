@@ -1,6 +1,7 @@
 // Autor: Allan Giovanni Matias Paes - RA 25008211
 
 import 'dart:ui';
+
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 
@@ -90,7 +91,9 @@ class HomeModeSelectorHeader extends StatelessWidget {
                     Expanded(
                       child: _buildModeTab(
                         title: 'Motorista',
-                        icon: canDrive ? Icons.directions_car_rounded : Icons.lock_rounded,
+                        icon: canDrive
+                            ? Icons.directions_car_rounded
+                            : Icons.lock_rounded,
                         isSelected: currentMode.isDriver,
                         isLocked: !canDrive,
                         onTap: () {
@@ -154,7 +157,9 @@ class HomeModeSelectorHeader extends StatelessWidget {
                 size: 17,
                 color: isSelected
                     ? AppColors.textLight
-                    : (isLocked ? AppColors.textMuted : AppColors.textSecondary),
+                    : (isLocked
+                          ? AppColors.textMuted
+                          : AppColors.textSecondary),
               ),
               const SizedBox(width: 7),
               Text(
@@ -164,7 +169,9 @@ class HomeModeSelectorHeader extends StatelessWidget {
                   fontWeight: isSelected ? FontWeight.w800 : FontWeight.w600,
                   color: isSelected
                       ? AppColors.textLight
-                      : (isLocked ? AppColors.textMuted : AppColors.textSecondary),
+                      : (isLocked
+                            ? AppColors.textMuted
+                            : AppColors.textSecondary),
                   letterSpacing: -0.2,
                 ),
               ),

@@ -126,16 +126,16 @@ void main() {
     respondWith(
       success([
         {
-        'rideId': 'ride-1',
-        'passengerId': 'passenger-1',
-        'driverId': 'driver-1',
-        'receiverName': 'Lucas Silveira',
-        'amount': 12.5,
-        'status': 'PENDING',
-        'pixCopyPaste': '00020126...6304ABCD',
-        'requestedAt': '2026-11-16T07:00:00',
-        'paidAt': null,
-      },
+          'rideId': 'ride-1',
+          'passengerId': 'passenger-1',
+          'driverId': 'driver-1',
+          'receiverName': 'Lucas Silveira',
+          'amount': 12.5,
+          'status': 'PENDING',
+          'pixCopyPaste': '00020126...6304ABCD',
+          'requestedAt': '2026-11-16T07:00:00',
+          'paidAt': null,
+        },
       ]),
     );
 
@@ -148,31 +148,34 @@ void main() {
     expect(pending.single.pixCopyPaste, '00020126...6304ABCD');
   });
 
-  test('markPaymentAsPaid e getPayment usam os endpoints de pagamento', () async {
-    respondWith(
-      success({
-        'rideId': 'ride-1',
-        'passengerId': 'passenger-1',
-        'driverId': 'driver-1',
-        'receiverName': 'Lucas Silveira',
-        'amount': 12.5,
-        'status': 'PAID',
-        'pixCopyPaste': null,
-      }),
-    );
+  test(
+    'markPaymentAsPaid e getPayment usam os endpoints de pagamento',
+    () async {
+      respondWith(
+        success({
+          'rideId': 'ride-1',
+          'passengerId': 'passenger-1',
+          'driverId': 'driver-1',
+          'receiverName': 'Lucas Silveira',
+          'amount': 12.5,
+          'status': 'PAID',
+          'pixCopyPaste': null,
+        }),
+      );
 
-    final paid = await repository.markPaymentAsPaid('ride-1', 'passenger-1');
-    await repository.getPayment('ride-1', 'passenger-1');
+      final paid = await repository.markPaymentAsPaid('ride-1', 'passenger-1');
+      await repository.getPayment('ride-1', 'passenger-1');
 
-    expect(paid.status, PaymentStatus.paid);
-    expect(requests[0].method, 'POST');
-    expect(
-      requests[0].path,
-      '/rides/ride-1/passengers/passenger-1/payment/mark-paid',
-    );
-    expect(requests[1].method, 'GET');
-    expect(requests[1].path, '/rides/ride-1/passengers/passenger-1/payment');
-  });
+      expect(paid.status, PaymentStatus.paid);
+      expect(requests[0].method, 'POST');
+      expect(
+        requests[0].path,
+        '/rides/ride-1/passengers/passenger-1/payment/mark-paid',
+      );
+      expect(requests[1].method, 'GET');
+      expect(requests[1].path, '/rides/ride-1/passengers/passenger-1/payment');
+    },
+  );
 
   test('arrivePassenger confirma a chegada do passageiro', () async {
     respondWith(success(fakeRideJson(status: 'IN_PROGRESS')));

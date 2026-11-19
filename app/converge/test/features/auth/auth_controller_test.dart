@@ -282,8 +282,9 @@ void main() {
           container.read(authControllerProvider).value as Authenticated;
       expect(initialSession.user.isDriver, isFalse);
 
-      final updated =
-          await container.read(authControllerProvider.notifier).becomeDriver();
+      final updated = await container
+          .read(authControllerProvider.notifier)
+          .becomeDriver();
       expect(updated.isDriver, isTrue);
 
       final currentSession =
@@ -322,8 +323,9 @@ void main() {
       final container = createContainer();
       await container.read(authControllerProvider.future);
 
-      final ok =
-          await container.read(becomeDriverProvider.notifier).becomeDriver();
+      final ok = await container
+          .read(becomeDriverProvider.notifier)
+          .becomeDriver();
       expect(ok, isTrue);
 
       final session =
@@ -345,10 +347,7 @@ void main() {
 
       final updated = await container
           .read(authControllerProvider.notifier)
-          .updatePixKey(
-            pixKey: '123.456.789-00',
-            pixKeyType: PixKeyType.cpf,
-          );
+          .updatePixKey(pixKey: '123.456.789-00', pixKeyType: PixKeyType.cpf);
 
       expect(updated.pixKey, '123.456.789-00');
       expect(updated.pixKeyType, PixKeyType.cpf);
@@ -359,41 +358,44 @@ void main() {
       expect(session.user.pixKeyType, PixKeyType.cpf);
     });
 
-    test('activateDriverAtomic cadastra PIX e ativa motorista atomicamente', () async {
-      auth = FakeAuthService(
-        initialUser: const AuthUser(
-          uid: 'uid-1',
-          email: 'ana@puc.edu.br',
-          emailVerified: true,
-        ),
-      );
-      repository = FakeAuthRepository(stored: fakeUser());
-      final container = createContainer();
-      await container.read(authControllerProvider.future);
+    test(
+      'activateDriverAtomic cadastra PIX e ativa motorista atomicamente',
+      () async {
+        auth = FakeAuthService(
+          initialUser: const AuthUser(
+            uid: 'uid-1',
+            email: 'ana@puc.edu.br',
+            emailVerified: true,
+          ),
+        );
+        repository = FakeAuthRepository(stored: fakeUser());
+        final container = createContainer();
+        await container.read(authControllerProvider.future);
 
-      final ok = await container
-          .read(becomeDriverProvider.notifier)
-          .activateDriverAtomic(
-            pixKey: 'ana@puc.edu.br',
-            pixKeyType: PixKeyType.email,
-            license: DriverLicenseInput(
-              number: '12345678901',
-              category: DriverLicenseCategory.b,
-              expiresAt: DateTime(2028, 12, 31),
-            ),
-            verificationDelay: Duration.zero,
-          );
+        final ok = await container
+            .read(becomeDriverProvider.notifier)
+            .activateDriverAtomic(
+              pixKey: 'ana@puc.edu.br',
+              pixKeyType: PixKeyType.email,
+              license: DriverLicenseInput(
+                number: '12345678901',
+                category: DriverLicenseCategory.b,
+                expiresAt: DateTime(2028, 12, 31),
+              ),
+              verificationDelay: Duration.zero,
+            );
 
-      expect(ok, isTrue);
-      expect(repository.lastSubmittedLicense, isNotNull);
-      expect(repository.lastSubmittedLicense!.number, '12345678901');
+        expect(ok, isTrue);
+        expect(repository.lastSubmittedLicense, isNotNull);
+        expect(repository.lastSubmittedLicense!.number, '12345678901');
 
-      final session =
-          container.read(authControllerProvider).value as Authenticated;
-      expect(session.user.isDriver, isTrue);
-      expect(session.user.pixKey, 'ana@puc.edu.br');
-      expect(session.user.pixKeyType, PixKeyType.email);
-    });
+        final session =
+            container.read(authControllerProvider).value as Authenticated;
+        expect(session.user.isDriver, isTrue);
+        expect(session.user.pixKey, 'ana@puc.edu.br');
+        expect(session.user.pixKeyType, PixKeyType.email);
+      },
+    );
     test('submitDriverLicense envia carteira de motorista', () async {
       auth = FakeAuthService(
         initialUser: const AuthUser(

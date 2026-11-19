@@ -62,16 +62,25 @@ void main() {
     });
 
     test('viagem que muda de status é mudança', () {
-      final completed = fakeRide(status: 'COMPLETED', passengerStatus: 'COMPLETED');
+      final completed = fakeRide(
+        status: 'COMPLETED',
+        passengerStatus: 'COMPLETED',
+      );
 
       expect(rideStatusesChanged([inProgress], [completed]), isTrue);
     });
 
-    test('chegada de um passageiro é mudança, mesmo com a viagem em andamento', () {
-      final arrived = fakeRide(status: 'IN_PROGRESS', passengerStatus: 'COMPLETED');
+    test(
+      'chegada de um passageiro é mudança, mesmo com a viagem em andamento',
+      () {
+        final arrived = fakeRide(
+          status: 'IN_PROGRESS',
+          passengerStatus: 'COMPLETED',
+        );
 
-      expect(rideStatusesChanged([inProgress], [arrived]), isTrue);
-    });
+        expect(rideStatusesChanged([inProgress], [arrived]), isTrue);
+      },
+    );
 
     test('viagem que aparece ou some é mudança', () {
       expect(rideStatusesChanged(const [], [inProgress]), isTrue);
@@ -93,24 +102,30 @@ void main() {
           ],
         );
 
-    test('com viagem em andamento, atualiza a lista sozinho e percebe a conclusão', () async {
-      rides = FakeRideRepository(ride: fakeRide(status: 'IN_PROGRESS'));
-      container = containerFor(rides);
-      container.listen(rideCompletionWatcherProvider, (_, _) {});
-      container.listen(myRidesProvider, (_, _) {});
+    test(
+      'com viagem em andamento, atualiza a lista sozinho e percebe a conclusão',
+      () async {
+        rides = FakeRideRepository(ride: fakeRide(status: 'IN_PROGRESS'));
+        container = containerFor(rides);
+        container.listen(rideCompletionWatcherProvider, (_, _) {});
+        container.listen(myRidesProvider, (_, _) {});
 
-      final first = await container.read(myRidesProvider.future);
-      expect(first.single.status, RideStatus.inProgress);
+        final first = await container.read(myRidesProvider.future);
+        expect(first.single.status, RideStatus.inProgress);
 
-      // O motorista conclui em outro aparelho: o app só fica sabendo se consultar de novo
-      rides.ride = fakeRide(status: 'COMPLETED', passengerStatus: 'COMPLETED');
-      await Future<void>.delayed(const Duration(milliseconds: 400));
+        // O motorista conclui em outro aparelho: o app só fica sabendo se consultar de novo
+        rides.ride = fakeRide(
+          status: 'COMPLETED',
+          passengerStatus: 'COMPLETED',
+        );
+        await Future<void>.delayed(const Duration(milliseconds: 400));
 
-      expect(
-        container.read(myRidesProvider).value!.single.status,
-        RideStatus.completed,
-      );
-    });
+        expect(
+          container.read(myRidesProvider).value!.single.status,
+          RideStatus.completed,
+        );
+      },
+    );
 
     test('sem mudança nas viagens, consulta mas não recarrega a lista (a tela não pisca)', () async {
       rides = FakeRideRepository(ride: fakeRide(status: 'IN_PROGRESS'));

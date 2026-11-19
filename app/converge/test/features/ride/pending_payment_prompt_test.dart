@@ -23,9 +23,7 @@ void main() {
     await tester.pumpWidget(
       ProviderScope(
         overrides: [rideRepositoryProvider.overrideWithValue(rides)],
-        child: const MaterialApp(
-          home: Scaffold(body: PendingPaymentPrompt()),
-        ),
+        child: const MaterialApp(home: Scaffold(body: PendingPaymentPrompt())),
       ),
     );
     await tester.pumpAndSettle();
@@ -36,40 +34,44 @@ void main() {
       ..pendingPayments = [FakeRideRepository.fakePayment(amount: 12.5)];
   });
 
-  testWidgets('com cobrança em aberto, o pagamento abre sozinho e o "Já paguei" fecha', (
-    tester,
-  ) async {
-    await openHome(tester);
+  testWidgets(
+    'com cobrança em aberto, o pagamento abre sozinho e o "Já paguei" fecha',
+    (tester) async {
+      await openHome(tester);
 
-    expect(find.text('Pague a carona'), findsOneWidget);
-    expect(find.textContaining('Lucas Silveira'), findsOneWidget);
-    // QR Code do mesmo Pix Copia e Cola, para pagar com outro celular
-    expect(find.byType(PixQrCode), findsOneWidget);
-    expect(find.bySemanticsLabel('QR Code do PIX'), findsOneWidget);
+      expect(find.text('Pague a carona'), findsOneWidget);
+      expect(find.textContaining('Lucas Silveira'), findsOneWidget);
+      // QR Code do mesmo Pix Copia e Cola, para pagar com outro celular
+      expect(find.byType(PixQrCode), findsOneWidget);
+      expect(find.bySemanticsLabel('QR Code do PIX'), findsOneWidget);
 
-    await tester.tap(find.text('Já paguei'));
-    await tester.pumpAndSettle();
+      await tester.tap(find.text('Já paguei'));
+      await tester.pumpAndSettle();
 
-    expect(rides.calls, contains('markPaymentAsPaid:$fakeRideId'));
-    expect(find.text('Pague a carona'), findsNothing);
-    expect(
-      find.text('Pagamento informado. Você já pode pedir e oferecer caronas.'),
-      findsOneWidget,
-    );
-  });
+      expect(rides.calls, contains('markPaymentAsPaid:$fakeRideId'));
+      expect(find.text('Pague a carona'), findsNothing);
+      expect(
+        find.text(
+          'Pagamento informado. Você já pode pedir e oferecer caronas.',
+        ),
+        findsOneWidget,
+      );
+    },
+  );
 
-  testWidgets('sem "Depois": o pagamento não fecha tocando fora, só com o "Já paguei"', (
-    tester,
-  ) async {
-    await openHome(tester);
+  testWidgets(
+    'sem "Depois": o pagamento não fecha tocando fora, só com o "Já paguei"',
+    (tester) async {
+      await openHome(tester);
 
-    expect(find.text('Depois'), findsNothing);
-    expect(find.text('Fechar'), findsNothing);
-    await tester.tapAt(const Offset(400, 40));
-    await tester.pumpAndSettle();
+      expect(find.text('Depois'), findsNothing);
+      expect(find.text('Fechar'), findsNothing);
+      await tester.tapAt(const Offset(400, 40));
+      await tester.pumpAndSettle();
 
-    expect(find.text('Pague a carona'), findsOneWidget);
-  });
+      expect(find.text('Pague a carona'), findsOneWidget);
+    },
+  );
 
   testWidgets('sem o código PIX, o pagamento pode ser fechado', (tester) async {
     // Cobrança em aberto, mas o código PIX não veio (ex.: falha ao gerar)

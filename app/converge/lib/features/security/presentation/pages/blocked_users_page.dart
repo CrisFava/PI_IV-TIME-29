@@ -38,7 +38,11 @@ class _BlockedUsersPageState extends ConsumerState<BlockedUsersPage> {
       );
     } catch (error) {
       if (!mounted) return;
-      showAppNotice(context, authErrorMessage(error), type: AppNoticeType.error);
+      showAppNotice(
+        context,
+        authErrorMessage(error),
+        type: AppNoticeType.error,
+      );
     } finally {
       if (mounted) setState(() => _busy.remove(block.blockedUserId));
     }
@@ -77,8 +81,7 @@ class _BlockedUsersPageState extends ConsumerState<BlockedUsersPage> {
             return const _Message(
               icon: Icons.block_rounded,
               title: 'Nenhum usuário bloqueado',
-              message:
-                  'Quando você bloquear alguém, a pessoa aparece aqui para você desbloquear.',
+              message: 'Quando você bloquear alguém, a pessoa aparece aqui para você desbloquear.',
             );
           }
           return RefreshIndicator(
@@ -226,10 +229,7 @@ class _Message extends StatelessWidget {
             ),
             if (actionLabel != null) ...[
               const SizedBox(height: 14),
-              OutlinedButton(
-                onPressed: onAction,
-                child: Text(actionLabel!),
-              ),
+              OutlinedButton(onPressed: onAction, child: Text(actionLabel!)),
             ],
           ],
         ),

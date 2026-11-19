@@ -84,9 +84,7 @@ void main() {
     setUp(() {
       fakeRepository = FakeRouteRepository();
       container = ProviderContainer(
-        overrides: [
-          routeRepositoryProvider.overrideWithValue(fakeRepository),
-        ],
+        overrides: [routeRepositoryProvider.overrideWithValue(fakeRepository)],
       );
       // Mantém o provider ativo no teste
       subscription = container.listen(placesAutocompleteProvider, (_, _) {});
@@ -98,8 +96,7 @@ void main() {
     });
 
     test('Texto com menos de 3 caracteres não dispara autocomplete', () async {
-      final controller =
-          container.read(placesAutocompleteProvider.notifier);
+      final controller = container.read(placesAutocompleteProvider.notifier);
 
       controller.onQueryChanged('ab');
       await Future<void>.delayed(const Duration(milliseconds: 1100));
@@ -109,8 +106,7 @@ void main() {
     });
 
     test('Digitação rápida aguarda 1 segundo sem digitar antes de chamar backend', () async {
-      final controller =
-          container.read(placesAutocompleteProvider.notifier);
+      final controller = container.read(placesAutocompleteProvider.notifier);
 
       // Usuário começa a digitar: "puc" -> "puc c" -> "puc campinas"
       controller.onQueryChanged('puc');
@@ -139,8 +135,7 @@ void main() {
     });
 
     test('getPlaceDetails retorna detalhes com coordenadas', () async {
-      final controller =
-          container.read(placesAutocompleteProvider.notifier);
+      final controller = container.read(placesAutocompleteProvider.notifier);
 
       final details = await controller.getPlaceDetails('fake_id');
       expect(details, isNotNull);

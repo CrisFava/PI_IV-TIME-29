@@ -9,10 +9,14 @@ abstract final class AppColors {
   static const Color dockBackground = Color(0xFF111111);
   static const Color carButtonResting = Color(0xFF14171A);
   static const Color carButtonDepressed = Color(0xFF1E232A);
-  static const Color carButtonBorder = Color(0x3DFFFFFF); // Borda do botão do carro fechado
-  static const Color carButtonBorderOpen = Colors.white; // Borda do botão do carro aberto
+  static const Color carButtonBorder = Color(
+    0x3DFFFFFF,
+  ); // Borda do botão do carro fechado
+  static const Color carButtonBorderOpen =
+      Colors.white; // Borda do botão do carro aberto
   static const Color carButtonIcon = Colors.white;
-  static const Color carButtonShadow = Colors.black; // A opacidade é aplicada na sombra
+  static const Color carButtonShadow =
+      Colors.black; // A opacidade é aplicada na sombra
 
   // Fundos e Superfícies Claras
   static const Color scaffoldBackground = Color(0xFFF8FAFC);
@@ -60,16 +64,28 @@ abstract final class AppColors {
   static const Color infoBorder = Color(0xFFBFDBFE);
 
   // Elementos do Mapa Estilo Uber (Cartografia Monocromática com Alto Contraste)
-  static const Color mapBackground = Color(0xFFD6DADF); // Fundo cinza arquitetural contrastante
+  static const Color mapBackground = Color(
+    0xFFD6DADF,
+  ); // Fundo cinza arquitetural contrastante
   static const Color mapRoadPrimary = Color(0xFFFFFFFF); // Ruas em branco puro
   static const Color mapRoadSecondary = Color(0xFFE5E8EC);
   static const Color mapRoute = Color(0xFF111111);
-  static const Color mapBuilding = Color(0xFFBCC2C9); // Prédios e estruturas mais escuras
+  static const Color mapBuilding = Color(
+    0xFFBCC2C9,
+  ); // Prédios e estruturas mais escuras
   static const Color mapPinMarker = Color(0xFF111111);
-  static const Color mapPinOrigin = Color(0xFF111111); // Bolinha preta opaca de Origem
-  static const Color mapPinDestination = Color(0xFF111111); // Chegada quadriculada monocromática
-  static const Color mapWater = Color(0xFFB0B6BF); // Água em cinza grafite médio
-  static const Color driverApproachRoute = Color(0xFF94A3B8); // Cinza suave para trajeto do motorista
+  static const Color mapPinOrigin = Color(
+    0xFF111111,
+  ); // Bolinha preta opaca de Origem
+  static const Color mapPinDestination = Color(
+    0xFF111111,
+  ); // Chegada quadriculada monocromática
+  static const Color mapWater = Color(
+    0xFFB0B6BF,
+  ); // Água em cinza grafite médio
+  static const Color driverApproachRoute = Color(
+    0xFF94A3B8,
+  ); // Cinza suave para trajeto do motorista
 
   // Chat e Avaliações
   static const Color chatBubbleMine = Color(0xFF111111);
@@ -79,7 +95,9 @@ abstract final class AppColors {
 
   // Itens de Navegação (Dock)
   static const Color dockItemActive = Colors.white;
-  static const Color dockItemInactive = Color(0xFFA1A1AA); // Mais claro e legível quando não selecionado
+  static const Color dockItemInactive = Color(
+    0xFFA1A1AA,
+  ); // Mais claro e legível quando não selecionado
   static const Color dockIndicatorDot = Colors.white;
 
   // Barreira Translúcida de Dismiss

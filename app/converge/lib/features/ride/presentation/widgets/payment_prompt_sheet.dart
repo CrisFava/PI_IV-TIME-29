@@ -98,7 +98,9 @@ class PaymentPromptSheet extends ConsumerWidget {
           ),
           const SizedBox(height: 14),
           Text(
-            amount == null ? 'Valor a confirmar' : CurrencyFormatter.format(amount),
+            amount == null
+                ? 'Valor a confirmar'
+                : CurrencyFormatter.format(amount),
             style: const TextStyle(
               fontSize: 30,
               fontWeight: FontWeight.w800,
@@ -108,7 +110,10 @@ class PaymentPromptSheet extends ConsumerWidget {
           const SizedBox(height: 2),
           Text(
             'para ${payment.receiverName}, o valor do rateio da viagem',
-            style: const TextStyle(fontSize: 13, color: AppColors.textSecondary),
+            style: const TextStyle(
+              fontSize: 13,
+              color: AppColors.textSecondary,
+            ),
           ),
           const SizedBox(height: 16),
           if (pixCode != null) ...[
@@ -119,7 +124,10 @@ class PaymentPromptSheet extends ConsumerWidget {
             pixCode == null
                 ? 'O código PIX não está disponível agora. Tente de novo em instantes.'
                 : 'Escaneie o QR Code ou copie o código, pague no app do seu banco e volte aqui para informar o pagamento.',
-            style: const TextStyle(fontSize: 13.5, color: AppColors.textSecondary),
+            style: const TextStyle(
+              fontSize: 13.5,
+              color: AppColors.textSecondary,
+            ),
           ),
           if (pixCode != null) ...[
             const SizedBox(height: 12),
@@ -172,7 +180,9 @@ class PaymentPromptSheet extends ConsumerWidget {
           if (pixCode == null) ...[
             const SizedBox(height: 4),
             TextButton(
-              onPressed: marking ? null : () => Navigator.of(context).pop(false),
+              onPressed: marking
+                  ? null
+                  : () => Navigator.of(context).pop(false),
               child: const Text(
                 'Fechar',
                 style: TextStyle(

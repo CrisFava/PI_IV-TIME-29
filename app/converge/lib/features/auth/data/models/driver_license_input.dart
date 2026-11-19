@@ -1,7 +1,12 @@
 // Autor: Allan Giovanni Matias Paes - RA 25008211
 
 enum DriverLicenseCategory {
-  a, b, ab, c, d, e;
+  a,
+  b,
+  ab,
+  c,
+  d,
+  e;
 
   String toJson() => name.toUpperCase();
 

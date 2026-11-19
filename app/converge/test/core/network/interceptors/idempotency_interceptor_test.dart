@@ -60,10 +60,7 @@ void main() {
 
   for (final method in ['GET', 'DELETE']) {
     test('nao injeta Idempotency-Key em requisicoes $method', () {
-      final options = RequestOptions(
-        path: '/api/v1/rides',
-        method: method,
-      );
+      final options = RequestOptions(path: '/api/v1/rides', method: method);
       final handler = _TestRequestHandler();
 
       interceptor.onRequest(options, handler);

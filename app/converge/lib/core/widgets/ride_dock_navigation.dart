@@ -446,6 +446,7 @@ class _SymmetricTabItem extends StatelessWidget {
 class _CenterRideButton extends StatefulWidget {
   final double progress;
   final VoidCallback onPressed;
+
   /// Cor do anel pulsante; null deixa o botão sem destaque.
   final Color? pulseColor;
 

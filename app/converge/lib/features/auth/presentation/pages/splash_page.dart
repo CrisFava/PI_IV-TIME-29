@@ -43,11 +43,7 @@ class SplashPage extends ConsumerWidget {
             error: (err, _) => Column(
               mainAxisSize: MainAxisSize.min,
               children: [
-                Image.asset(
-                  'assets/icon.png',
-                  width: 120,
-                  fit: BoxFit.contain,
-                ),
+                Image.asset('assets/icon.png', width: 120, fit: BoxFit.contain),
                 const SizedBox(height: 24),
                 const Icon(Icons.error_outline, size: 48, color: Colors.red),
                 const SizedBox(height: 16),

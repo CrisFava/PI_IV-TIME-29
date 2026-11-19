@@ -94,7 +94,6 @@ void main() {
       expect(state().suggestion, isNull);
       expect(state().matches, hasLength(2));
     });
-
   });
 
   group('requestSeat', () {
@@ -252,25 +251,30 @@ void main() {
       expect(routes.calls, contains('deleteRoute:created-1'));
     });
 
-    test('fechar o pedido desativa também um trajeto avulso reaproveitado', () async {
-      final once = CreateRouteRequest(
-        type: request.type,
-        origin: request.origin,
-        destination: request.destination,
-        departureTime: request.departureTime,
-        estimatedArrivalTime: request.estimatedArrivalTime,
-        weekDays: request.weekDays,
-        recurrence: RouteRecurrence.once,
-        date: '2026-11-19',
-      );
-      routes.routes.add(FakeMatchingRouteRepository.routeFrom('saved-1', once));
+    test(
+      'fechar o pedido desativa também um trajeto avulso reaproveitado',
+      () async {
+        final once = CreateRouteRequest(
+          type: request.type,
+          origin: request.origin,
+          destination: request.destination,
+          departureTime: request.departureTime,
+          estimatedArrivalTime: request.estimatedArrivalTime,
+          weekDays: request.weekDays,
+          recurrence: RouteRecurrence.once,
+          date: '2026-11-19',
+        );
+        routes.routes.add(
+          FakeMatchingRouteRepository.routeFrom('saved-1', once),
+        );
 
-      await controller().prepareSearchRoute(once);
-      controller().reset();
-      await pumpEventQueue();
+        await controller().prepareSearchRoute(once);
+        controller().reset();
+        await pumpEventQueue();
 
-      expect(routes.calls, contains('deleteRoute:saved-1'));
-    });
+        expect(routes.calls, contains('deleteRoute:saved-1'));
+      },
+    );
 
     test('fechar o pedido mantém um trajeto semanal reaproveitado', () async {
       routes.routes.add(

@@ -202,8 +202,9 @@ class _LoginPageState extends ConsumerState<LoginPage> {
                                 behavior: HitTestBehavior.opaque,
                                 onTap: isLoading
                                     ? null
-                                    : () =>
-                                        context.push(AppRoutes.forgotPassword),
+                                    : () => context.push(
+                                        AppRoutes.forgotPassword,
+                                      ),
                                 child: const Padding(
                                   padding: EdgeInsets.symmetric(
                                     vertical: 2,
@@ -295,9 +296,7 @@ class _LoginPageState extends ConsumerState<LoginPage> {
                                 ),
                               ),
                               Padding(
-                                padding: EdgeInsets.symmetric(
-                                  horizontal: 14,
-                                ),
+                                padding: EdgeInsets.symmetric(horizontal: 14),
                                 child: Text(
                                   'Ainda não faz parte?',
                                   style: TextStyle(
