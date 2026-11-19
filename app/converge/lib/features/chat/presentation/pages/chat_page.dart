@@ -113,6 +113,9 @@ class _ChatPageState extends ConsumerState<ChatPage> {
 
       ref.invalidate(ridePaymentProvider(thread.passenger));
       ref.invalidate(rideProvider(thread.rideId));
+      // A lista de viagens também muda: é por ela que a Home abre a avaliação
+      // quando o motorista conclui a viagem.
+      ref.invalidate(myRidesProvider);
     });
 
     ref.listen(chatActionsProvider(thread), (previous, next) {
