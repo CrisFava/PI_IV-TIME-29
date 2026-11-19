@@ -13,7 +13,7 @@ import java.util.Locale;
 /**
  * Converte datas na referência do período dos indicadores (RT22), em lote:
  * "2025-W20" (semana ISO, com o ano ISO na virada), "2025-05" (mês), "2025-S1" (semestre)
- * ou "ALL_TIME". Mesma regra da IndicatorReference que existia no backend.
+ * ou "ALL_TIME". Mesma regra de referência de período que o backend aplicava antes de delegar ao servidor.
  */
 public class IndicatorReferenceHandler implements RequestHandler<IndicatorReferenceRequest, IndicatorReferenceResponse> {
 

@@ -13,7 +13,7 @@ enum IndicatorPeriod {
   const IndicatorPeriod(this.apiValue, this.label);
 
   /// Referência do período que contém [date], no formato do backend
-  /// (`IndicatorReference`): `2026-W47`, `2026-11`, `2026-S2`. O total não tem.
+  /// (calculado pelo servidor de sockets): `2026-W47`, `2026-11`, `2026-S2`. O total não tem.
   /// Sem ela, o backend devolve o último período com dados, e não o atual.
   String? referenceFor(DateTime date) => switch (this) {
     weekly => _isoWeek(date),
