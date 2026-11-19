@@ -17,6 +17,8 @@ import com.converge.socket.handler.pix.PixPayloadHandler;
 import com.converge.socket.handler.pix.PixPayloadRequest;
 import com.converge.socket.handler.renavam.ValidateRenavamHandler;
 import com.converge.socket.handler.renavam.ValidateRenavamRequest;
+import com.converge.socket.handler.distance.DistanceHandler;
+import com.converge.socket.handler.distance.DistanceRequest;
 
 import java.util.Scanner;
 
@@ -30,6 +32,7 @@ public class Main {
         server.registerHandler(MatchRoutesRequest.class, new MatchRoutesHandler());
         server.registerHandler(RideCostRequest.class, new RideCostHandler());
         server.registerHandler(ValidateRenavamRequest.class, new ValidateRenavamHandler());
+        server.registerHandler(DistanceRequest.class, new DistanceHandler());
     }
     
     public static void main(String[] args) {
