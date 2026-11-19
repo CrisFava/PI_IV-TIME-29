@@ -34,6 +34,9 @@ class DriverOfferDetails extends ConsumerStatefulWidget {
   /// Marca um passageiro como ausente na viagem em andamento.
   final void Function(String rideId, String passengerId) onMarkNoShow;
 
+  /// Confirma a chegada de um passageiro na viagem em andamento (ele recebe a cobrança).
+  final void Function(String rideId, String passengerId) onArrive;
+
   const DriverOfferDetails({
     super.key,
     required this.offerKey,
@@ -43,6 +46,7 @@ class DriverOfferDetails extends ConsumerStatefulWidget {
     required this.onCancelOffer,
     required this.onCancelRide,
     required this.onMarkNoShow,
+    required this.onArrive,
   });
 
   @override
@@ -186,6 +190,8 @@ class _DriverOfferDetailsState extends ConsumerState<DriverOfferDetails> {
                           onCancel: () => widget.onCancelRide(ride.id),
                           onMarkNoShow: (passengerId) =>
                               widget.onMarkNoShow(ride.id, passengerId),
+                          onArrive: (passengerId) =>
+                              widget.onArrive(ride.id, passengerId),
                         ),
                       ),
                   ],

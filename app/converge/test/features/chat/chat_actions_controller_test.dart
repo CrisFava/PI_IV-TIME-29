@@ -6,7 +6,6 @@ import 'package:converge/features/chat/data/repository/chat_exception.dart';
 import 'package:converge/features/chat/data/repository/firebase_chat_repository.dart';
 import 'package:converge/features/chat/state/chat_actions_controller.dart';
 import 'package:converge/features/chat/state/chat_providers.dart';
-import 'package:converge/features/ride/data/models/payment_status.dart';
 import 'package:converge/features/ride/data/models/ride_status.dart';
 import 'package:converge/features/ride/data/repository/ride_repository_impl.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
@@ -79,69 +78,6 @@ void main() {
         chatErrorMessage(state.error!),
         'Não foi possível enviar a mensagem.',
       );
-    });
-  });
-
-  group('requestPayment', () {
-    test('registra a cobrança na API e avisa o passageiro no chat', () async {
-      final requested = await controller().requestPayment(12.5);
-
-      expect(requested, isTrue);
-      expect(rides.calls, contains('requestPayment:12.5'));
-
-      final notice = chat.messagesOf(thread).single;
-      expect(notice.type, ChatMessageType.paymentRequest);
-      expect(notice.amount, 12.5);
-      expect(notice.senderId, fakeDriverId);
-    });
-
-    test('se a API recusar, nada é enviado ao chat', () async {
-      rides.failNextActionWith =
-          'O valor cobrado não pode passar do valor máximo.';
-
-      final requested = await controller().requestPayment(999);
-
-      expect(requested, isFalse);
-      expect(chat.messagesOf(thread), isEmpty);
-      expect(
-        chatErrorMessage(container.read(chatActionsProvider(thread)).error!),
-        'O valor cobrado não pode passar do valor máximo.',
-      );
-    });
-
-    test('a cobrança vale mesmo se o aviso no chat falhar', () async {
-      chat.failOnSend = true;
-
-      final requested = await controller().requestPayment(12.5);
-
-      expect(requested, isTrue);
-      expect(rides.payment.amount, 12.5);
-      expect(container.read(chatActionsProvider(thread)).hasError, isFalse);
-    });
-  });
-
-  group('confirmPayment', () {
-    test('marca como pago na API e avisa o passageiro no chat', () async {
-      await controller().requestPayment(12.5);
-
-      final confirmed = await controller().confirmPayment();
-
-      expect(confirmed, isTrue);
-      expect(rides.payment.status, PaymentStatus.paid);
-      final notice = chat.messagesOf(thread).last;
-      expect(notice.type, ChatMessageType.paymentConfirmed);
-      expect(notice.amount, 12.5);
-    });
-
-    test('se a API recusar, o chat não recebe confirmação', () async {
-      rides.failNextActionWith =
-          'Solicite o pagamento antes de confirmar o recebimento.';
-
-      final confirmed = await controller().confirmPayment();
-
-      expect(confirmed, isFalse);
-      expect(chat.messagesOf(thread), isEmpty);
-      expect(rides.payment.status, PaymentStatus.pending);
     });
   });
 

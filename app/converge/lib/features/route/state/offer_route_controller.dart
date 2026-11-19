@@ -2,6 +2,7 @@
 
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
+import '../../ride/state/payment_prompt_controller.dart';
 import '../data/models/create_route_request.dart';
 import '../data/models/route_response_model.dart';
 import '../data/repository/route_repository.dart';
@@ -28,6 +29,10 @@ class OfferRouteController extends Notifier<bool> {
     state = true;
     try {
       return await _routes.createRoute(request);
+    } catch (e) {
+      // Pagamento de uma carona em aberto: o pagamento volta a aparecer
+      ref.read(paymentPromptProvider.notifier).handleBlockedAction(e);
+      rethrow;
     } finally {
       if (ref.mounted) state = false;
     }

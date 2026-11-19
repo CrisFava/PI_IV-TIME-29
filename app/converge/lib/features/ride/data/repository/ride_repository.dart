@@ -32,16 +32,15 @@ abstract class RideRepository {
   Future<RideModel> leaveRide(String rideId, {String? reason});
   Future<RideModel> markNoShow(String rideId, String passengerId);
 
+  /// "Confirmar chegada": o passageiro desceu e já recebe a cobrança.
+  Future<RideModel> arrivePassenger(String rideId, String passengerId);
+
   // --- Pagamento ---
   Future<RidePaymentModel> getPayment(String rideId, String passengerId);
 
-  /// "Solicitar pagamento": o motorista cobra o valor combinado no chat.
-  Future<RidePaymentModel> requestPayment(
-    String rideId,
-    String passengerId, {
-    required double amount,
-  });
+  /// Cobranças em aberto do usuário logado, com o PIX de cada uma.
+  Future<List<RidePaymentModel>> listPendingPayments();
 
-  /// "Passageiro já pagou": o motorista confirma o recebimento.
-  Future<RidePaymentModel> confirmPayment(String rideId, String passengerId);
+  /// "Já paguei": o passageiro informa o pagamento da própria cobrança.
+  Future<RidePaymentModel> markPaymentAsPaid(String rideId, String passengerId);
 }

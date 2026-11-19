@@ -21,8 +21,8 @@ final chatActionsProvider = NotifierProvider.autoDispose
       ChatActionsController.new,
     );
 
-/// Ações de uma conversa: enviar mensagem, cobrar e confirmar o pagamento,
-/// iniciar e concluir a viagem.
+/// Ações de uma conversa: enviar mensagem, iniciar e concluir a viagem.
+/// A cobrança é emitida pela API no fim da viagem de cada passageiro, sem ação no chat.
 ///
 /// A fonte de verdade do pagamento e da viagem é a API. O chat recebe só um
 /// aviso de cada mudança, e é esse aviso que faz a tela do outro participante
@@ -45,39 +45,6 @@ class ChatActionsController extends Notifier<AsyncValue<void>> {
     return _run(() => _send(thread, ChatMessageType.text, trimmed));
   }
 
-  /// "Solicitar pagamento": registra a cobrança do valor combinado e avisa o passageiro.
-  Future<bool> requestPayment(double amount) => _run(() async {
-    final payment = await _rides.requestPayment(
-      thread.rideId,
-      thread.passengerId,
-      amount: amount,
-    );
-    _refreshPayment();
-
-    await _notify(
-      thread,
-      ChatMessageType.paymentRequest,
-      'Pagamento solicitado.',
-      amount: payment.amount ?? amount,
-    );
-  });
-
-  /// "Passageiro já pagou": confirma o recebimento e avisa o passageiro.
-  Future<bool> confirmPayment() => _run(() async {
-    final payment = await _rides.confirmPayment(
-      thread.rideId,
-      thread.passengerId,
-    );
-    _refreshPayment();
-
-    await _notify(
-      thread,
-      ChatMessageType.paymentConfirmed,
-      'Pagamento confirmado.',
-      amount: payment.amount,
-    );
-  });
-
   Future<bool> startRide() => _run(() async {
     final ride = await _rides.startRide(thread.rideId);
     _refreshRide();
@@ -89,6 +56,8 @@ class ChatActionsController extends Notifier<AsyncValue<void>> {
   Future<bool> completeRide() => _run(() async {
     final ride = await _rides.completeRide(thread.rideId);
     _refreshRide();
+    // Concluir já emite a cobrança do passageiro
+    _refreshPayment();
 
     await _announce(ride, RideChatAnnouncer.rideCompleted);
   });
@@ -112,21 +81,6 @@ class ChatActionsController extends Notifier<AsyncValue<void>> {
         chatRoomId: thread.chatRoomId,
         alsoTo: thread.passengerId,
       );
-
-  /// Aviso de uma mudança que já foi gravada na API. Se o chat falhar aqui, a
-  /// ação continua valendo: o outro participante vê o novo estado ao reabrir a conversa.
-  Future<void> _notify(
-    ChatThreadRef target,
-    ChatMessageType type,
-    String text, {
-    double? amount,
-  }) async {
-    try {
-      await _send(target, type, text, amount: amount);
-    } on Exception {
-      // Sem o aviso em tempo real; o estado na API já está correto.
-    }
-  }
 
   Future<void> _send(
     ChatThreadRef target,

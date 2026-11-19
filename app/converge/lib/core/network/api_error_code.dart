@@ -9,6 +9,9 @@ enum ApiErrorCode {
   invalidCredentials('INVALID_CREDENTIALS'),
   notAllowed('NOT_ALLOWED'),
 
+  /// Cobrança de uma carona em aberto: não dá para pedir vaga nem cadastrar trajeto.
+  paymentPending('PAYMENT_PENDING'),
+
   /// Sem resposta do servidor (timeout, sem rede, servidor fora do ar).
   network('NETWORK'),
 

@@ -12,10 +12,10 @@ class RidePaymentModel {
   final String driverId;
   final String receiverName;
 
-  /// Valor combinado no chat. `null` enquanto o motorista não solicitou o pagamento.
+  /// Valor cobrado: o do rateio, definido no fim da viagem do passageiro.
+  /// `null` enquanto a cobrança não foi emitida.
   final double? amount;
   final PaymentStatus status;
-  final bool confirmedByDriver;
 
   /// Pix Copia e Cola da cobrança. Só vem enquanto ela está em aberto.
   final String? pixCopyPaste;
@@ -29,7 +29,6 @@ class RidePaymentModel {
     required this.receiverName,
     required this.amount,
     required this.status,
-    required this.confirmedByDriver,
     required this.pixCopyPaste,
     required this.requestedAt,
     required this.paidAt,
@@ -38,7 +37,7 @@ class RidePaymentModel {
   bool get isRequested => amount != null;
   bool get isPaid => status == PaymentStatus.paid;
 
-  /// Cobrança enviada e ainda não confirmada pelo motorista.
+  /// Cobrança emitida e ainda não paga: o passageiro não pode pedir nem oferecer carona.
   bool get isOpen => isRequested && status == PaymentStatus.pending;
 
   factory RidePaymentModel.fromJson(Map<String, dynamic> json) =>
@@ -49,7 +48,6 @@ class RidePaymentModel {
         receiverName: json['receiverName'] as String? ?? '',
         amount: (json['amount'] as num?)?.toDouble(),
         status: PaymentStatus.fromJson(json['status']),
-        confirmedByDriver: json['confirmedByDriver'] as bool? ?? false,
         pixCopyPaste: json['pixCopyPaste'] as String?,
         requestedAt: DateTime.tryParse(json['requestedAt'] as String? ?? ''),
         paidAt: DateTime.tryParse(json['paidAt'] as String? ?? ''),

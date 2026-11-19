@@ -18,7 +18,12 @@ class RideParticipantModel {
   final ParticipationRole? role;
   final ParticipantStatus status;
   final PaymentStatus? paymentStatus;
-  final bool paymentConfirmedByDriver;
+
+  /// Valor estimado do rateio enquanto o passageiro está na viagem.
+  final double? estimatedAmount;
+
+  /// Valor final, definido quando a viagem do passageiro termina (é o valor cobrado).
+  final double? finalAmount;
 
   /// Onde o passageiro embarca e desembarca (o motorista não tem).
   final RoutePlaceModel? boardingLocation;
@@ -30,7 +35,8 @@ class RideParticipantModel {
     required this.role,
     required this.status,
     this.paymentStatus,
-    this.paymentConfirmedByDriver = false,
+    this.estimatedAmount,
+    this.finalAmount,
     this.boardingLocation,
     this.dropOffLocation,
   });
@@ -53,8 +59,8 @@ class RideParticipantModel {
       paymentStatus: paymentStatus == null
           ? null
           : PaymentStatus.fromJson(paymentStatus),
-      paymentConfirmedByDriver:
-          json['paymentConfirmedByDriver'] as bool? ?? false,
+      estimatedAmount: (json['estimatedAmount'] as num?)?.toDouble(),
+      finalAmount: (json['finalAmount'] as num?)?.toDouble(),
       boardingLocation: _placeOrNull(json['boardingLocation']),
       dropOffLocation: _placeOrNull(json['dropOffLocation']),
     );

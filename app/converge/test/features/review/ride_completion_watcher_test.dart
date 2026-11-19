@@ -67,6 +67,12 @@ void main() {
       expect(rideStatusesChanged([inProgress], [completed]), isTrue);
     });
 
+    test('chegada de um passageiro é mudança, mesmo com a viagem em andamento', () {
+      final arrived = fakeRide(status: 'IN_PROGRESS', passengerStatus: 'COMPLETED');
+
+      expect(rideStatusesChanged([inProgress], [arrived]), isTrue);
+    });
+
     test('viagem que aparece ou some é mudança', () {
       expect(rideStatusesChanged(const [], [inProgress]), isTrue);
       expect(rideStatusesChanged([inProgress], const []), isTrue);

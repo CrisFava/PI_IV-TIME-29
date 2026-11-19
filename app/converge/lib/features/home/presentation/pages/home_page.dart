@@ -32,6 +32,7 @@ import '../../../matching/state/driver_ride_actions_controller.dart';
 import '../../../matching/state/driver_rides_provider.dart';
 import '../../../ride/data/models/ride_model.dart';
 import '../../../ride/data/models/ride_status.dart';
+import '../../../ride/presentation/widgets/pending_payment_prompt.dart';
 import '../../../ride/state/ride_providers.dart';
 import '../../../review/presentation/widgets/ride_review_prompt.dart';
 import '../../../review/state/pending_reviews.dart';
@@ -943,6 +944,9 @@ class _HomePageState extends ConsumerState<HomePage> {
             )
           : Stack(
               children: [
+                // Abre o pagamento sozinho quando há cobrança de carona em aberto
+                const PendingPaymentPrompt(),
+
                 // ============================================================
                 // CAMADA 1: CONTEÚDO PRINCIPAL (MAPA OU ABAS SECUNDÁRIAS)
                 // ============================================================
