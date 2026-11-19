@@ -10,6 +10,7 @@ import com.converge.socket.core.protocol.Message;
 
 import lombok.Getter;
 
+import java.io.IOException;
 import java.io.ObjectInputStream;
 import java.io.ObjectOutputStream;
 import java.net.InetSocketAddress;
@@ -39,8 +40,8 @@ public class SocketClient implements AutoCloseable {
         this.host = host != null ? host : DEFAULT_HOST;
         this.port = port > 0 ? port : DEFAULT_PORT;
 
+        this.socket = new Socket();
         try {
-            this.socket = new Socket();
             this.socket.connect(new InetSocketAddress(this.host, this.port), Math.max(timeoutMillis, 0));
             // Antes de criar os streams: o ObjectInputStream já lê o cabeçalho do servidor.
             this.socket.setSoTimeout(Math.max(timeoutMillis, 0));
@@ -52,6 +53,12 @@ public class SocketClient implements AutoCloseable {
 
             this.connection = new ClientConnection(this.socket, receiver, transmitter);
         } catch (Exception e) {
+            // se falhou no meio, fecha o socket pra ele não ficar aberto
+            try {
+                this.socket.close();
+            } catch (IOException closeError) {
+                e.addSuppressed(closeError);
+            }
             throw new ServerException(
                     ServerErrorCode.CONNECTION_ERROR,
                     "Failed to connect to socket server at " + this.host + ":" + this.port + " - " + e.getMessage(),

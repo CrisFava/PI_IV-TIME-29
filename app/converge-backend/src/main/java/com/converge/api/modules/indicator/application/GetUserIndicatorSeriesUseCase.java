@@ -3,10 +3,10 @@
 package com.converge.api.modules.indicator.application;
 
 import com.converge.api.modules.indicator.application.dto.UserIndicatorResponseDTO;
+import com.converge.api.modules.indicator.application.gateway.IndicatorReferenceGateway;
 import com.converge.api.modules.indicator.domain.enums.IndicatorPeriod;
 import com.converge.api.modules.indicator.domain.model.UserIndicator;
 import com.converge.api.modules.indicator.domain.repository.UserIndicatorRepository;
-import com.converge.api.modules.indicator.domain.service.IndicatorReference;
 import com.converge.api.shared.application.UseCase;
 import com.converge.api.shared.presentation.exception.ApplicationException;
 import com.converge.api.shared.presentation.exception.ErrorCode;
@@ -15,6 +15,7 @@ import org.springframework.stereotype.Service;
 
 import java.time.LocalDate;
 import java.util.ArrayList;
+import java.util.Collections;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
@@ -34,6 +35,7 @@ public class GetUserIndicatorSeriesUseCase
     static final int MAX_POINTS = 12;
 
     private final UserIndicatorRepository repository;
+    private final IndicatorReferenceGateway indicatorReferenceGateway;
 
     public record Query(String userId, IndicatorPeriod period, int limit, LocalDate today) {
     }
@@ -53,9 +55,13 @@ public class GetUserIndicatorSeriesUseCase
         Map<String, UserIndicator> saved = repository.findByUserIdAndPeriod(query.userId(), period).stream()
                 .collect(Collectors.toMap(UserIndicator::getReference, Function.identity(), (a, b) -> a));
 
-        List<UserIndicatorResponseDTO> series = new ArrayList<>();
+        List<LocalDate> dates = new ArrayList<>();
         for (int i = limit - 1; i >= 0; i--) {
-            String reference = IndicatorReference.of(period, periodsAgo(query.today(), period, i));
+            dates.add(periodsAgo(query.today(), period, i));
+        }
+        List<String> references = indicatorReferenceGateway.references(Collections.nCopies(limit, period), dates);
+        List<UserIndicatorResponseDTO> series = new ArrayList<>();
+        for (String reference : references) {
             UserIndicator indicator = saved.getOrDefault(
                     reference, new UserIndicator(query.userId(), period, reference));
             series.add(UserIndicatorResponseDTO.from(indicator));

@@ -8,7 +8,7 @@ import com.converge.socket.core.handler.RequestHandler;
 
 /**
  * Calcula o impacto ambiental de uma viagem compartilhada (RF53, RF54, RF55, RF57; RT22).
- * Mesmas fórmulas e fatores da SustainabilityCalculator do backend:
+ * Mesmas fórmulas e fatores que o backend usava antes de delegar o cálculo ao servidor:
  *  - carros evitados = passageiros efetivos (nunca negativo);
  *  - energia poupada = carros evitados x distância / consumo médio;
  *  - CO2 evitado = energia poupada x fator de emissão da fonte;

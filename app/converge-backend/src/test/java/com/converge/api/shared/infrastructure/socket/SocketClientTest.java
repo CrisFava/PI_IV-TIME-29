@@ -3,6 +3,7 @@
 package com.converge.api.shared.infrastructure.socket;
 
 import com.converge.socket.core.SocketServer;
+import com.converge.socket.core.exception.ServerException;
 import com.converge.socket.core.protocol.ErrorResponse;
 import com.converge.socket.core.protocol.Message;
 import com.converge.socket.handler.math.MathOperationHandler;
@@ -14,7 +15,11 @@ import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 
+import java.io.InputStream;
 import java.net.ServerSocket;
+import java.net.Socket;
+import java.util.concurrent.CompletableFuture;
+import java.util.concurrent.TimeUnit;
 
 import static org.junit.jupiter.api.Assertions.*;
 
@@ -56,6 +61,28 @@ public class SocketClientTest {
             assertInstanceOf(MathOperationResponse.class, response);
             MathOperationResponse mathResp = (MathOperationResponse) response;
             assertEquals(50.0, mathResp.getResult(), 0.001);
+        }
+    }
+
+    @Test
+    @DisplayName("Should close the socket when the server accepts but never sends the stream header")
+    void testClosesSocketWhenHandshakeFails() throws Exception {
+        // servidor que aceita a conexão mas não manda o cabeçalho do ObjectOutputStream
+        try (ServerSocket silentServer = new ServerSocket(0)) {
+            int silentPort = silentServer.getLocalPort();
+
+            CompletableFuture<Throwable> clientError = CompletableFuture.supplyAsync(() ->
+                    assertThrows(ServerException.class, () -> new SocketClient("localhost", silentPort, 300)));
+
+            try (Socket accepted = silentServer.accept()) {
+                assertInstanceOf(ServerException.class, clientError.get(5, TimeUnit.SECONDS));
+                accepted.setSoTimeout(2000);
+                InputStream in = accepted.getInputStream();
+
+                // o cliente manda o cabeçalho dele; depois disso tem que vir o fim do stream
+                in.readNBytes(4);
+                assertEquals(-1, in.read());
+            }
         }
     }
 }

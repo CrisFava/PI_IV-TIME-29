@@ -8,6 +8,8 @@ import com.converge.api.modules.indicator.domain.enums.IndicatorPeriod;
 import com.converge.api.modules.indicator.domain.model.PlatformIndicator;
 import com.converge.api.modules.indicator.domain.model.UserIndicator;
 import com.converge.api.modules.indicator.domain.repository.PlatformIndicatorRepository;
+import com.converge.api.modules.indicator.infrastructure.SocketIndicatorReferenceGateway;
+import com.converge.api.modules.indicator.infrastructure.SocketSustainabilityGateway;
 import com.converge.api.shared.presentation.exception.ApplicationException;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
@@ -44,7 +46,9 @@ class RegisterCompletedRideUseCaseTest {
     @BeforeEach
     void setUp() {
         store = new FakeIndicatorStore();
-        registerCompletedRide = new RegisterCompletedRideUseCase(store, platformIndicatorRepository);
+        registerCompletedRide = new RegisterCompletedRideUseCase(store, platformIndicatorRepository,
+                new SocketSustainabilityGateway("localhost", 1),
+                new SocketIndicatorReferenceGateway("localhost", 1));
         when(platformIndicatorRepository.findByPeriodAndReference(any(), anyString()))
                 .thenAnswer(call -> store.findPlatform(call.getArgument(0), call.getArgument(1)));
     }
