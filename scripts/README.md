@@ -8,6 +8,7 @@ Ferramentas para testar o Converge sem precisar sair de casa nem fazer cadastros
 | `verificar_usuario.py` | Marca a CNH e o vínculo acadêmico de um usuário como `VERIFIED`, buscando pelo e-mail |
 | `verificar_todos_usuarios.py` | Faz o mesmo para todos os usuários do banco de uma vez |
 | `simular_corrida.py` | Percorre corridas inteiras contra o backend rodando e confere cada resposta |
+| `teste_no_app.py` | Prepara um teste manual no app: cria uma conta para o simulador e um robô que faz a outra ponta da corrida |
 
 Os testes **mockados** (sem banco e sem API) ficam no backend, em
 `app/converge-backend/src/test/java/com/converge/api/modules/ride/application/RideJourneyTest.java`.
@@ -55,8 +56,12 @@ sockets (`app/server`), depois o Spring (`app/converge-backend`) com as variáve
 Não precisa do venv. Funciona no Windows (cmd), no macOS (Terminal) e no Linux (gnome-terminal,
 konsole ou xterm).
 
-- Só abre o backend quando a porta 3000 do servidor de sockets responde (espera até 3 min). Se a
-  porta já estiver ocupada, usa o servidor de sockets que já está rodando.
+- Antes de tudo, instala o `app/server` no Maven local (`mvnw install -DskipTests`). O backend
+  compila contra as classes dele; com um jar antigo em `~/.m2`, ele não compila ou usa um cálculo
+  desatualizado (por exemplo, o rateio antigo).
+- Só abre o backend quando a porta 3000 do servidor de sockets responde (espera até 3 min).
+- Servidor que já está no ar não é aberto de novo: com a porta 3000 ou 8080 ocupada, usa o que
+  está rodando. Para subir com o código atual, pare o servidor antes.
 - O `.env` é lido dentro do terminal novo, então as variáveis chegam ao Spring em qualquer sistema.
 
 ```bash
@@ -106,6 +111,28 @@ python scripts/verificar_todos_usuarios.py --banco converge-testes
 - Quem ainda não mandou a CNH só tem o vínculo acadêmico verificado.
 - Retorna `0` se alterou (ou simulou), `1` se não havia o que alterar ou foi cancelado, `2` se
   faltou configuração.
+
+---
+
+## `teste_no_app.py`
+
+Para testar a corrida **no app**, no simulador, com uma conta só. A outra ponta da corrida é um
+robô que age pela API no tempo certo das regras de horário: o pedido de vaga vale até 5 min antes
+da saída, o início de 5 min antes a 5 min depois, e um pedido expira em 3 min sem resposta.
+
+```bash
+python scripts/teste_no_app.py preparar     # cria a conta do app e os dois robôs (mostra e-mail e senha)
+python scripts/teste_no_app.py motorista    # o app é a PASSAGEIRA: o robô oferece, aceita, inicia, cobra e encerra
+python scripts/teste_no_app.py passageiro   # o app é o MOTORISTA: a robô pede vaga na carona publicada e paga
+python scripts/teste_no_app.py limpar       # apaga as contas do Firebase
+```
+
+- A carona usa os trajetos padrão do app: PUC-Campinas - Portaria Principal → Campus II (Saúde).
+- `motorista`: a carona do robô sai em 15 min (`--minutos`); depois de iniciada, ele confirma a
+  chegada em 3 min (`--duracao`), o que emite a cobrança, e encerra a viagem.
+- `passageiro`: espera a conta do app publicar uma carona (até 10 min), pede vaga e, depois da
+  cobrança, informa o pagamento em 30 s (`--pagar-depois`).
+- As contas ficam em `scripts/.teste_no_app.json` (fora do Git). A senha é a mesma da simulação.
 
 ---
 
