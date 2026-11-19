@@ -25,7 +25,7 @@
 | 12/11/2026 | Cristian Eduardo Fava | 1.5.0 | Cobrança combinada no chat na Participação (`requestedAmount`, `paymentRequestedAt`, `paidAt`); estrutura do chat no Firebase Realtime Database; indicadores atualizados ao concluir a viagem |
 | 13/11/2026 | Daniela Mikie Kikuchi Gonçalves | 1.5.1 | Avaliação: quem pode avaliar (participante que concluiu a viagem), avaliação imutável e sem prazo no MVP, média calculada a partir das avaliações; índice de duplicidade corrigido para `rideId + reviewerId + reviewedId` |
 | 15/11/2026 | Allan Giovanni Matias Paes | 1.6.0 | Alinhamento com as entidades Java: `toll` e `parking` no Trajeto; `EXPIRED` e `version` na Viagem; `appliedRideIds` nos Indicadores e Plataforma; `IdempotencyKey` completo com replay e fingerprint; `REQUEST_EXPIRED` em Notificação; complementação dos schemas JSON 4.11 a 4.15 e índices de integridade |
-| 18/11/2026 | Daniela Mikie Kikuchi Gonçalves | 1.7.0 | Itinerário da Viagem (`itinerary`, `itineraryDistanceKm`, `itineraryPolyline`, `RideStop`, `RideStopType`); `IndicatorRideRegistration` documentada; reputação gravada a partir das avaliações e regra de `level`; selos automáticos (job semanal) e `completedRides` contado ao concluir a viagem; denúncias e bloqueios implementados (endpoints, onde valem, moderação fora); campo do selo `badge`; `appliedRideIds` ausente em `ALL_TIME`; indicadores na versão enxuta; atualização por viagem com reconciliação a cada 15 min; TTL de idempotência de 24 h; avisos de "sem código" para `reserved_seats` e `universities`; cálculos migrados para o servidor de sockets (sustentabilidade, referência de período, distância, RENAVAM) |
+| 18/11/2026 | Daniela Mikie Kikuchi Gonçalves | 1.7.0 | Itinerário da Viagem (`itinerary`, `itineraryDistanceKm`, `itineraryPolyline`, `RideStop`, `RideStopType`); `IndicatorRideRegistration` documentada; reputação gravada a partir das avaliações e regra de `level`; selos automáticos (job semanal) e `completedRides` contado ao concluir a viagem; denúncias e bloqueios implementados (endpoints, onde valem, moderação fora); campo do selo `badge`; `appliedRideIds` ausente em `ALL_TIME`; indicadores na versão enxuta; atualização por viagem com reconciliação a cada 15 min; TTL de idempotência de 24 h; avisos de "sem código" para `reserved_seats` e `universities`; cálculos migrados para o servidor de sockets (sustentabilidade, referência de período, distância, RENAVAM); registro de `completedRides` e dos indicadores depois do commit da conclusão da viagem; reputação e selos gravados por update parcial atômico |
 
 ---
 
@@ -432,8 +432,6 @@ Marca as viagens que já terminaram de ser contabilizadas nos indicadores (`indi
 
 ---
 
----
-
 ## 3. Tipos especiais, compostos ou específicos
 
 ### 3.1. AcademicRecord (Vínculo Acadêmico)
@@ -461,10 +459,11 @@ Estrutura composta que representa os indicadores de comportamento do usuário se
 
 **Como cada campo é gravado hoje:**
 - `averageRating` e `totalReviews`: recalculados a partir de **todas** as avaliações recebidas no papel, logo depois de salvar uma avaliação (só o papel avaliado). A média é gravada com 2 casas decimais, e esse valor entra nas regras de `level` e de selo. Se a gravação falhar, a avaliação continua salva (só log).
-- `window.completedRides`: +1 para o motorista e +1 para cada passageiro efetivo quando a viagem é concluída. O listener roda de forma síncrona, dentro da transação da conclusão da viagem; uma falha nele é capturada e só vai para o log, então não desfaz nem impede a conclusão. Evolução: registrar só depois do commit. Cada conclusão conta uma vez (o evento é publicado uma vez por viagem). Viagem sem passageiro efetivo não gera evento e não conta.
+- `window.completedRides`: +1 para o motorista e +1 para cada passageiro efetivo quando a viagem é concluída. O registro roda **depois do commit** da conclusão da viagem (`@TransactionalEventListener` com `AFTER_COMMIT`, fora da transação); uma falha nele é capturada e só vai para o log, então não desfaz nem impede a conclusão. Cada conclusão conta uma vez (o evento é publicado uma vez por viagem). Viagem sem passageiro efetivo não gera evento e não conta.
 - `window.driverInitiatedCancellations`, `window.lateCancellations` e `window.noShows`: incrementados pelas penalidades.
 - `level` e `calculatedAt`: recalculados a cada gravação acima.
-- Limitação: cada gravação carrega o usuário e salva o documento inteiro (não há update parcial por papel). Uma avaliação, uma penalidade e o job dos selos simultâneos no mesmo usuário podem sobrescrever uns aos outros. Evolução: update parcial de `reputation.driver` ou `reputation.passenger`.
+- Gravação: a reputação é gravada por **update parcial atômico** (`$set`), só em `reputation.driver` ou `reputation.passenger` (mais `updatedAt`), com filtro por `_id`. O documento inteiro do usuário não é regravado. Os selos são gravados por `$push`/`$pull` em `badges`. Assim, avaliação, penalidade, viagem concluída e job dos selos não sobrescrevem os outros campos do usuário nem o outro papel.
+- Limite da gravação: dentro do mesmo papel, duas gravações simultâneas ainda partem de uma leitura anterior e a última vence.
 
 **Regra de `level` (igual nos dois papéis):** `LOW` quando algum limite de penalidade é estourado; `HIGH` quando cumpre os critérios de confiança do papel (tabelas abaixo); `MEDIUM` no resto. A regra roda de novo a cada média, viagem concluída ou penalidade, então uma penalidade pode rebaixar `HIGH` para `MEDIUM`.
 
