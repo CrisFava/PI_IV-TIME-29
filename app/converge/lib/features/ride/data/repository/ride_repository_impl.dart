@@ -97,6 +97,10 @@ class RideRepositoryImpl implements RideRepository {
       _postRide(RideEndpoints.noShow(rideId, passengerId));
 
   @override
+  Future<RideModel> arrivePassenger(String rideId, String passengerId) =>
+      _postRide(RideEndpoints.arrive(rideId, passengerId));
+
+  @override
   Future<RidePaymentModel> getPayment(String rideId, String passengerId) async {
     try {
       final response = await _dio.get<dynamic>(
@@ -109,31 +113,27 @@ class RideRepositoryImpl implements RideRepository {
   }
 
   @override
-  Future<RidePaymentModel> requestPayment(
-    String rideId,
-    String passengerId, {
-    required double amount,
-  }) async {
+  Future<List<RidePaymentModel>> listPendingPayments() async {
     try {
-      final response = await _dio.post<dynamic>(
-        RideEndpoints.requestPayment(rideId, passengerId),
-        // Como texto, para o backend receber exatamente 2 casas decimais.
-        data: {'amount': amount.toStringAsFixed(2)},
+      final response = await _dio.get<dynamic>(RideEndpoints.pendingPayments);
+      return unwrapApiListResponse<RidePaymentModel>(
+        response.data,
+        RidePaymentModel.fromJson,
+        status: response.statusCode ?? 200,
       );
-      return _unwrapPayment(response);
     } on DioException catch (e) {
       throw e.toApiException();
     }
   }
 
   @override
-  Future<RidePaymentModel> confirmPayment(
+  Future<RidePaymentModel> markPaymentAsPaid(
     String rideId,
     String passengerId,
   ) async {
     try {
       final response = await _dio.post<dynamic>(
-        RideEndpoints.confirmPayment(rideId, passengerId),
+        RideEndpoints.markPaid(rideId, passengerId),
       );
       return _unwrapPayment(response);
     } on DioException catch (e) {

@@ -106,7 +106,9 @@ class _BlockConfirmDialogState extends ConsumerState<BlockConfirmDialog> {
       ),
       actions: [
         TextButton(
-          onPressed: _submitting ? null : () => Navigator.of(context).pop(false),
+          onPressed: _submitting
+              ? null
+              : () => Navigator.of(context).pop(false),
           child: const Text(
             'Cancelar',
             style: TextStyle(

@@ -1,6 +1,7 @@
 // Autor: Allan Giovanni Matias Paes - RA 25008211
 
 import 'dart:convert';
+
 import 'package:converge/core/network/interceptors/auth_interceptor.dart';
 import 'package:converge/core/services/auth/auth_service.dart';
 import 'package:converge/core/services/auth/auth_user.dart';
@@ -39,7 +40,8 @@ class _MockAuthService implements AuthService {
       throw UnimplementedError();
 
   @override
-  Future<void> sendPasswordResetEmail(String email) => throw UnimplementedError();
+  Future<void> sendPasswordResetEmail(String email) =>
+      throw UnimplementedError();
 
   @override
   Future<void> sendEmailVerification() => throw UnimplementedError();
@@ -74,8 +76,9 @@ class _TestErrorHandler extends ErrorInterceptorHandler {
 
 String _createJwt(int exp) {
   final header = base64Url.encode(utf8.encode(jsonEncode({'alg': 'none'})));
-  final payload = base64Url
-      .encode(utf8.encode(jsonEncode({'exp': exp, 'user_id': 'test_user'})));
+  final payload = base64Url.encode(
+    utf8.encode(jsonEncode({'exp': exp, 'user_id': 'test_user'})),
+  );
   return '$header.$payload.sig';
 }
 
@@ -87,46 +90,60 @@ void main() {
       dio = Dio();
     });
 
-    test('onRequest injeta Authorization se token válido estiver disponível', () async {
-      final nowSec = DateTime.now().toUtc().millisecondsSinceEpoch ~/ 1000;
-      final validToken = _createJwt(nowSec + 3600); // Válido por 1 hora
-      final auth = _MockAuthService(
-        currentToken: validToken,
-        user: const AuthUser(uid: 'u1', email: 'a@puc.br', emailVerified: true),
-      );
+    test(
+      'onRequest injeta Authorization se token válido estiver disponível',
+      () async {
+        final nowSec = DateTime.now().toUtc().millisecondsSinceEpoch ~/ 1000;
+        final validToken = _createJwt(nowSec + 3600); // Válido por 1 hora
+        final auth = _MockAuthService(
+          currentToken: validToken,
+          user: const AuthUser(
+            uid: 'u1',
+            email: 'a@puc.br',
+            emailVerified: true,
+          ),
+        );
 
-      final interceptor = AuthInterceptor(auth, dio);
-      final options = RequestOptions(path: '/api/v1/routes');
-      final handler = _TestRequestHandler();
+        final interceptor = AuthInterceptor(auth, dio);
+        final options = RequestOptions(path: '/api/v1/routes');
+        final handler = _TestRequestHandler();
 
-      await interceptor.onRequest(options, handler);
+        await interceptor.onRequest(options, handler);
 
-      expect(options.headers['Authorization'], 'Bearer $validToken');
-      expect(auth.forceRefreshCalled, isFalse);
-      expect(handler.nextOptions, isNotNull);
-    });
+        expect(options.headers['Authorization'], 'Bearer $validToken');
+        expect(auth.forceRefreshCalled, isFalse);
+        expect(handler.nextOptions, isNotNull);
+      },
+    );
 
-    test('onRequest força renovação se o token estiver a menos de 60s de expirar', () async {
-      final nowSec = DateTime.now().toUtc().millisecondsSinceEpoch ~/ 1000;
-      final expiringToken = _createJwt(nowSec + 20); // Expira em 20s
-      final freshToken = _createJwt(nowSec + 3600);
+    test(
+      'onRequest força renovação se o token estiver a menos de 60s de expirar',
+      () async {
+        final nowSec = DateTime.now().toUtc().millisecondsSinceEpoch ~/ 1000;
+        final expiringToken = _createJwt(nowSec + 20); // Expira em 20s
+        final freshToken = _createJwt(nowSec + 3600);
 
-      final auth = _MockAuthService(
-        currentToken: expiringToken,
-        refreshedToken: freshToken,
-        user: const AuthUser(uid: 'u1', email: 'a@puc.br', emailVerified: true),
-      );
+        final auth = _MockAuthService(
+          currentToken: expiringToken,
+          refreshedToken: freshToken,
+          user: const AuthUser(
+            uid: 'u1',
+            email: 'a@puc.br',
+            emailVerified: true,
+          ),
+        );
 
-      final interceptor = AuthInterceptor(auth, dio);
-      final options = RequestOptions(path: '/api/v1/routes');
-      final handler = _TestRequestHandler();
+        final interceptor = AuthInterceptor(auth, dio);
+        final options = RequestOptions(path: '/api/v1/routes');
+        final handler = _TestRequestHandler();
 
-      await interceptor.onRequest(options, handler);
+        await interceptor.onRequest(options, handler);
 
-      expect(auth.forceRefreshCalled, isTrue);
-      expect(options.headers['Authorization'], 'Bearer $freshToken');
-      expect(handler.nextOptions, isNotNull);
-    });
+        expect(auth.forceRefreshCalled, isTrue);
+        expect(options.headers['Authorization'], 'Bearer $freshToken');
+        expect(handler.nextOptions, isNotNull);
+      },
+    );
 
     test('onRequest não sobrescreve Authorization se flag auth_retried estiver ativa', () async {
       final auth = _MockAuthService(
@@ -160,42 +177,48 @@ void main() {
       expect(handler.nextOptions, isNotNull);
     });
 
-    test('onError repassa erro imediatamente se statusCode não for 401', () async {
-      final auth = _MockAuthService();
-      final interceptor = AuthInterceptor(auth, dio);
+    test(
+      'onError repassa erro imediatamente se statusCode não for 401',
+      () async {
+        final auth = _MockAuthService();
+        final interceptor = AuthInterceptor(auth, dio);
 
-      final options = RequestOptions(path: '/api/v1/routes');
-      final err = DioException(
-        requestOptions: options,
-        response: Response(requestOptions: options, statusCode: 500),
-      );
+        final options = RequestOptions(path: '/api/v1/routes');
+        final err = DioException(
+          requestOptions: options,
+          response: Response(requestOptions: options, statusCode: 500),
+        );
 
-      final handler = _TestErrorHandler();
-      await interceptor.onError(err, handler);
+        final handler = _TestErrorHandler();
+        await interceptor.onError(err, handler);
 
-      expect(auth.forceRefreshCalled, isFalse);
-      expect(handler.nextError, equals(err));
-    });
+        expect(auth.forceRefreshCalled, isFalse);
+        expect(handler.nextError, equals(err));
+      },
+    );
 
-    test('onError repassa erro se já tiver tentado retry anteriormente', () async {
-      final auth = _MockAuthService();
-      final interceptor = AuthInterceptor(auth, dio);
+    test(
+      'onError repassa erro se já tiver tentado retry anteriormente',
+      () async {
+        final auth = _MockAuthService();
+        final interceptor = AuthInterceptor(auth, dio);
 
-      final options = RequestOptions(
-        path: '/api/v1/routes',
-        extra: {'auth_retried': true},
-      );
-      final err = DioException(
-        requestOptions: options,
-        response: Response(requestOptions: options, statusCode: 401),
-      );
+        final options = RequestOptions(
+          path: '/api/v1/routes',
+          extra: {'auth_retried': true},
+        );
+        final err = DioException(
+          requestOptions: options,
+          response: Response(requestOptions: options, statusCode: 401),
+        );
 
-      final handler = _TestErrorHandler();
-      await interceptor.onError(err, handler);
+        final handler = _TestErrorHandler();
+        await interceptor.onError(err, handler);
 
-      expect(auth.forceRefreshCalled, isFalse);
-      expect(handler.nextError, equals(err));
-    });
+        expect(auth.forceRefreshCalled, isFalse);
+        expect(handler.nextError, equals(err));
+      },
+    );
 
     test('onError repassa erro se forceRefresh retornar token nulo', () async {
       final auth = _MockAuthService(currentToken: null, refreshedToken: null);

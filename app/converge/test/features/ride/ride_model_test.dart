@@ -3,6 +3,7 @@
 import 'package:converge/features/ride/data/models/participant_status.dart';
 import 'package:converge/features/ride/data/models/payment_status.dart';
 import 'package:converge/features/ride/data/models/ride_model.dart';
+import 'package:converge/features/ride/data/models/ride_participant_model.dart';
 import 'package:converge/features/ride/data/models/ride_stop_type.dart';
 import 'package:converge/features/ride/data/models/ride_payment_model.dart';
 import 'package:converge/features/ride/data/models/ride_status.dart';
@@ -67,8 +68,10 @@ void main() {
     });
 
     test('status desconhecido não quebra a leitura', () {
-      final ride =
-          fakeRide(status: 'NOVO_STATUS', passengerStatus: 'STATUS_INEXISTENTE');
+      final ride = fakeRide(
+        status: 'NOVO_STATUS',
+        passengerStatus: 'STATUS_INEXISTENTE',
+      );
 
       expect(ride.status, RideStatus.unknown);
       expect(
@@ -240,6 +243,55 @@ void main() {
       expect(payment.status, PaymentStatus.paid);
       expect(payment.isPaid, isTrue);
       expect(payment.isOpen, isFalse);
+    });
+  });
+
+  group('valores do rateio recebidos da API', () {
+    test('estimativa e cobrança final são independentes', () {
+      final passenger = RideParticipantModel.fromJson(const {
+        'role': 'PASSENGER',
+        'status': 'COMPLETED',
+        'estimatedAmount': 15,
+        'finalAmount': 12.5,
+        'paymentStatus': 'PENDING',
+      });
+
+      expect(passenger.estimatedAmount, 15.0);
+      expect(passenger.finalAmount, 12.5);
+      expect(passenger.paymentStatus, PaymentStatus.pending);
+    });
+
+    test('campos privados ausentes não viram cobrança de valor zero', () {
+      final passenger = RideParticipantModel.fromJson(const {
+        'role': 'PASSENGER',
+        'status': 'CONFIRMED',
+      });
+
+      expect(passenger.estimatedAmount, isNull);
+      expect(passenger.finalAmount, isNull);
+      expect(passenger.paymentStatus, isNull);
+    });
+
+    for (final status in ['PAID', 'NOT_APPLICABLE', 'NOVO_STATUS', null]) {
+      test('valor emitido com status $status não está em aberto', () {
+        final payment = RidePaymentModel.fromJson({
+          'amount': 12,
+          'status': status,
+        });
+
+        expect(payment.isRequested, isTrue);
+        expect(payment.isOpen, isFalse);
+      });
+    }
+
+    test('cobrança emitida sem PIX continua em aberto', () {
+      final payment = RidePaymentModel.fromJson(const {
+        'amount': 10,
+        'status': 'PENDING',
+      });
+
+      expect(payment.pixCopyPaste, isNull);
+      expect(payment.isOpen, isTrue);
     });
   });
 }

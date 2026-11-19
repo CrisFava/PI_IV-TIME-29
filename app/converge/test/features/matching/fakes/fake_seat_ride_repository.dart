@@ -117,13 +117,19 @@ class FakeSeatRideRepository implements RideRepository {
       throw UnimplementedError();
 
   @override
-  Future<RidePaymentModel> requestPayment(
-    String rideId,
-    String passengerId, {
-    required double amount,
-  }) => throw UnimplementedError();
+  Future<RideModel> arrivePassenger(String rideId, String passengerId) async {
+    calls.add('arrive:$rideId:$passengerId');
+    _maybeFail();
+    return fakeRide(status: 'IN_PROGRESS', passengerStatus: 'COMPLETED');
+  }
 
   @override
-  Future<RidePaymentModel> confirmPayment(String rideId, String passengerId) =>
+  Future<List<RidePaymentModel>> listPendingPayments() =>
       throw UnimplementedError();
+
+  @override
+  Future<RidePaymentModel> markPaymentAsPaid(
+    String rideId,
+    String passengerId,
+  ) => throw UnimplementedError();
 }

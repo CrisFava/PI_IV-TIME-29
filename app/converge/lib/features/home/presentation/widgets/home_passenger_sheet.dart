@@ -12,6 +12,9 @@ import '../../../matching/presentation/widgets/match_waiting_card.dart';
 import '../../../matching/state/passenger_match_controller.dart';
 import '../../../matching/state/passenger_match_phase.dart';
 import '../../../matching/state/passenger_match_state.dart';
+import '../../../ride/data/models/ride_payment_model.dart';
+import '../../../ride/presentation/widgets/payment_prompt_sheet.dart';
+import '../../../ride/state/pending_payments_provider.dart';
 import 'passenger_ride_step.dart';
 
 /// ============================================================================
@@ -64,13 +67,29 @@ class _HomePassengerSheetState extends ConsumerState<HomePassengerSheet> {
       case PassengerRideStep.waitingDriver:
         return _buildWaitingDriverSheet();
       case PassengerRideStep.driverAccepted:
+        final matchState = ref.watch(passengerMatchProvider);
         return _DriverAcceptedPipSheet(
-          driver: ref.watch(passengerMatchProvider).selected,
+          driver: matchState.selected,
+          pendingPayment: _openChargeOf(matchState.rideId),
           onSendMessage: widget.onSendMessageToDriver,
+          onPay: (payment) {
+            HapticFeedback.mediumImpact();
+            showPaymentPromptSheet(context, payment);
+          },
           onCancel: widget.onCancelFlow,
           bottomSafeArea: widget.bottomSafeArea,
         );
     }
+  }
+
+  /// Cobrança em aberto da viagem do pedido aceito: a viagem do passageiro já terminou.
+  RidePaymentModel? _openChargeOf(String? rideId) {
+    if (rideId == null) return null;
+    final pending = ref.watch(pendingPaymentsProvider).value ?? const [];
+    for (final payment in pending) {
+      if (payment.rideId == rideId && payment.isOpen) return payment;
+    }
+    return null;
   }
 
   // ==========================================================================
@@ -109,7 +128,12 @@ class _HomePassengerSheetState extends ConsumerState<HomePassengerSheet> {
                 ),
               ),
               SliverPadding(
-                padding: EdgeInsets.fromLTRB(16, 4, 16, 120 + widget.bottomSafeArea),
+                padding: EdgeInsets.fromLTRB(
+                  16,
+                  4,
+                  16,
+                  120 + widget.bottomSafeArea,
+                ),
                 sliver: SliverList(
                   delegate: SliverChildListDelegate([
                     Row(
@@ -140,7 +164,8 @@ class _HomePassengerSheetState extends ConsumerState<HomePassengerSheet> {
                         ),
                         IconButton(
                           icon: const Icon(Icons.refresh_rounded),
-                          onPressed: matchState.phase == PassengerMatchPhase.loading ||
+                          onPressed:
+                              matchState.phase == PassengerMatchPhase.loading ||
                                   matchState.isBusy
                               ? null
                               : widget.onRetryMatches,
@@ -169,7 +194,8 @@ class _HomePassengerSheetState extends ConsumerState<HomePassengerSheet> {
     final phase = matchState.phase;
     final drivers = matchState.matches;
 
-    if (phase == PassengerMatchPhase.loading || phase == PassengerMatchPhase.idle) {
+    if (phase == PassengerMatchPhase.loading ||
+        phase == PassengerMatchPhase.idle) {
       return const [
         Padding(
           padding: EdgeInsets.all(28),
@@ -204,7 +230,8 @@ class _HomePassengerSheetState extends ConsumerState<HomePassengerSheet> {
           padding: const EdgeInsets.only(bottom: 10),
           child: MatchDriverCard(
             match: driver,
-            isRequesting: phase == PassengerMatchPhase.requesting &&
+            isRequesting:
+                phase == PassengerMatchPhase.requesting &&
                 selected?.driverRouteId == driver.driverRouteId,
             isDisabled: matchState.isBusy,
             onRequest: () => widget.onSelectDriver(driver),
@@ -255,19 +282,26 @@ class _HomePassengerSheetState extends ConsumerState<HomePassengerSheet> {
 
 class _DriverAcceptedPipSheet extends StatefulWidget {
   final MatchModel? driver;
+
+  /// Cobrança da viagem que acabou de terminar: o card vira o atalho para pagar.
+  final RidePaymentModel? pendingPayment;
   final VoidCallback onSendMessage;
+  final ValueChanged<RidePaymentModel> onPay;
   final VoidCallback onCancel;
   final double bottomSafeArea;
 
   const _DriverAcceptedPipSheet({
     required this.driver,
+    required this.pendingPayment,
     required this.onSendMessage,
+    required this.onPay,
     required this.onCancel,
     required this.bottomSafeArea,
   });
 
   @override
-  State<_DriverAcceptedPipSheet> createState() => _DriverAcceptedPipSheetState();
+  State<_DriverAcceptedPipSheet> createState() =>
+      _DriverAcceptedPipSheetState();
 }
 
 class _DriverAcceptedPipSheetState extends State<_DriverAcceptedPipSheet>
@@ -282,6 +316,18 @@ class _DriverAcceptedPipSheetState extends State<_DriverAcceptedPipSheet>
   Offset? _bubblePosition;
 
   @override
+  void didUpdateWidget(covariant _DriverAcceptedPipSheet oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    // A cobrança chegou: o card abre sozinho para o passageiro pagar
+    if (oldWidget.pendingPayment == null && widget.pendingPayment != null) {
+      setState(() {
+        _isCollapsed = false;
+        _manuallyOpened = true;
+      });
+    }
+  }
+
+  @override
   void initState() {
     super.initState();
     _animController = AnimationController(
@@ -292,9 +338,10 @@ class _DriverAcceptedPipSheetState extends State<_DriverAcceptedPipSheet>
     _slideAnimation = Tween<double>(begin: 60.0, end: 0.0).animate(
       CurvedAnimation(parent: _animController, curve: Curves.easeOutCubic),
     );
-    _fadeAnimation = Tween<double>(begin: 0.0, end: 1.0).animate(
-      CurvedAnimation(parent: _animController, curve: Curves.easeOut),
-    );
+    _fadeAnimation = Tween<double>(
+      begin: 0.0,
+      end: 1.0,
+    ).animate(CurvedAnimation(parent: _animController, curve: Curves.easeOut));
     _scaleAnimation = Tween<double>(begin: 0.92, end: 1.0).animate(
       CurvedAnimation(parent: _animController, curve: Curves.easeOutBack),
     );
@@ -341,7 +388,9 @@ class _DriverAcceptedPipSheetState extends State<_DriverAcceptedPipSheet>
   @override
   Widget build(BuildContext context) {
     final screenSize = MediaQuery.sizeOf(context);
-    final pos = _bubblePosition ?? Offset(screenSize.width - 76, screenSize.height * 0.40);
+    final pos =
+        _bubblePosition ??
+        Offset(screenSize.width - 76, screenSize.height * 0.40);
 
     return Stack(
       children: [
@@ -408,7 +457,10 @@ class _DriverAcceptedPipSheetState extends State<_DriverAcceptedPipSheet>
                                 decoration: BoxDecoration(
                                   color: AppColors.success,
                                   shape: BoxShape.circle,
-                                  border: Border.all(color: Colors.white, width: 2),
+                                  border: Border.all(
+                                    color: Colors.white,
+                                    width: 2,
+                                  ),
                                 ),
                               ),
                             ),
@@ -446,13 +498,21 @@ class _DriverAcceptedPipSheetState extends State<_DriverAcceptedPipSheet>
                   );
                 },
                 child: Padding(
-                  padding: EdgeInsets.fromLTRB(16, 0, 16, 96 + widget.bottomSafeArea),
+                  padding: EdgeInsets.fromLTRB(
+                    16,
+                    0,
+                    16,
+                    96 + widget.bottomSafeArea,
+                  ),
                   child: Container(
                     padding: const EdgeInsets.all(20),
                     decoration: BoxDecoration(
                       color: AppColors.cardBackground,
                       borderRadius: BorderRadius.circular(26),
-                      border: Border.all(color: AppColors.borderSubtle, width: 1),
+                      border: Border.all(
+                        color: AppColors.borderSubtle,
+                        width: 1,
+                      ),
                       boxShadow: [
                         BoxShadow(
                           color: Colors.black.withValues(alpha: 0.18),
@@ -472,7 +532,9 @@ class _DriverAcceptedPipSheetState extends State<_DriverAcceptedPipSheet>
                               decoration: BoxDecoration(
                                 color: AppColors.successBackground,
                                 shape: BoxShape.circle,
-                                border: Border.all(color: AppColors.successBorder),
+                                border: Border.all(
+                                  color: AppColors.successBorder,
+                                ),
                               ),
                               child: const Icon(
                                 Icons.check_rounded,
@@ -485,8 +547,10 @@ class _DriverAcceptedPipSheetState extends State<_DriverAcceptedPipSheet>
                               child: Column(
                                 crossAxisAlignment: CrossAxisAlignment.start,
                                 children: [
-                                  const Text(
-                                    'Carona Confirmada!',
+                                  Text(
+                                    widget.pendingPayment != null
+                                        ? 'Viagem concluída'
+                                        : 'Carona Confirmada!',
                                     style: TextStyle(
                                       fontSize: 16,
                                       fontWeight: FontWeight.w800,
@@ -494,7 +558,9 @@ class _DriverAcceptedPipSheetState extends State<_DriverAcceptedPipSheet>
                                     ),
                                   ),
                                   Text(
-                                    widget.driver != null
+                                    widget.pendingPayment != null
+                                        ? 'Pague a carona para pedir ou oferecer outra'
+                                        : widget.driver != null
                                         ? '${widget.driver!.otherUserName} aceitou o seu pedido'
                                         : 'O motorista aceitou o seu pedido',
                                     style: const TextStyle(
@@ -549,7 +615,8 @@ class _DriverAcceptedPipSheetState extends State<_DriverAcceptedPipSheet>
                                     ),
                                   ),
                                 ),
-                                if (widget.driver!.estimatedCostPerPassenger != null)
+                                if (widget.driver!.estimatedCostPerPassenger !=
+                                    null)
                                   Text(
                                     CurrencyFormatter.format(
                                       widget.driver!.estimatedCostPerPassenger!,
@@ -566,36 +633,71 @@ class _DriverAcceptedPipSheetState extends State<_DriverAcceptedPipSheet>
                           const SizedBox(height: 16),
                         ],
 
-                        ElevatedButton.icon(
-                          onPressed: widget.onSendMessage,
-                          style: ElevatedButton.styleFrom(
-                            backgroundColor: AppColors.primary,
-                            foregroundColor: AppColors.textLight,
-                            padding: const EdgeInsets.symmetric(vertical: 14),
-                            shape: RoundedRectangleBorder(
-                              borderRadius: BorderRadius.circular(16),
+                        if (widget.pendingPayment case final payment?)
+                          ElevatedButton.icon(
+                            onPressed: () => widget.onPay(payment),
+                            style: ElevatedButton.styleFrom(
+                              backgroundColor: AppColors.primary,
+                              foregroundColor: AppColors.textLight,
+                              padding: const EdgeInsets.symmetric(vertical: 14),
+                              shape: RoundedRectangleBorder(
+                                borderRadius: BorderRadius.circular(16),
+                              ),
+                              elevation: 0,
                             ),
-                            elevation: 0,
+                            icon: const Icon(Icons.pix_rounded, size: 19),
+                            label: Text(
+                              payment.amount == null
+                                  ? 'Pagar a carona'
+                                  : 'Pagar ${CurrencyFormatter.format(payment.amount!)}',
+                              style: const TextStyle(
+                                fontSize: 14.5,
+                                fontWeight: FontWeight.w700,
+                              ),
+                            ),
+                          )
+                        else
+                          ElevatedButton.icon(
+                            onPressed: widget.onSendMessage,
+                            style: ElevatedButton.styleFrom(
+                              backgroundColor: AppColors.primary,
+                              foregroundColor: AppColors.textLight,
+                              padding: const EdgeInsets.symmetric(vertical: 14),
+                              shape: RoundedRectangleBorder(
+                                borderRadius: BorderRadius.circular(16),
+                              ),
+                              elevation: 0,
+                            ),
+                            icon: const Icon(
+                              Icons.chat_bubble_rounded,
+                              size: 19,
+                            ),
+                            label: const Text(
+                              'Enviar mensagem ao motorista',
+                              style: TextStyle(
+                                fontSize: 14.5,
+                                fontWeight: FontWeight.w700,
+                              ),
+                            ),
                           ),
-                          icon: const Icon(Icons.chat_bubble_rounded, size: 19),
-                          label: const Text(
-                            'Enviar mensagem ao motorista',
-                            style: TextStyle(fontSize: 14.5, fontWeight: FontWeight.w700),
-                          ),
-                        ),
                         const SizedBox(height: 8),
 
-                        TextButton(
-                          onPressed: widget.onCancel,
-                          style: TextButton.styleFrom(
-                            foregroundColor: AppColors.textSecondary,
-                            padding: const EdgeInsets.symmetric(vertical: 8),
+                        // Com a cobrança em aberto, o pedido só termina depois do pagamento
+                        if (widget.pendingPayment == null)
+                          TextButton(
+                            onPressed: widget.onCancel,
+                            style: TextButton.styleFrom(
+                              foregroundColor: AppColors.textSecondary,
+                              padding: const EdgeInsets.symmetric(vertical: 8),
+                            ),
+                            child: const Text(
+                              'Fechar',
+                              style: TextStyle(
+                                fontSize: 13,
+                                fontWeight: FontWeight.w600,
+                              ),
+                            ),
                           ),
-                          child: const Text(
-                            'Fechar',
-                            style: TextStyle(fontSize: 13, fontWeight: FontWeight.w600),
-                          ),
-                        ),
                       ],
                     ),
                   ),

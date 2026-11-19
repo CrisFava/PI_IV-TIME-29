@@ -1,6 +1,7 @@
 // Autor: Cristian Eduardo Fava - RA 25000636
 
 import 'features/indicator/presentation/pages/indicators_page.dart';
+
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
@@ -56,18 +57,9 @@ final appRouterProvider = Provider<GoRouter>((ref) {
     redirect: (context, state) =>
         authRedirect(session.value, state.matchedLocation),
     routes: [
-      GoRoute(
-        path: AppRoutes.splash,
-        builder: (_, _) => const SplashPage(),
-      ),
-      GoRoute(
-        path: AppRoutes.welcome,
-        builder: (_, _) => const WelcomePage(),
-      ),
-      GoRoute(
-        path: AppRoutes.login,
-        builder: (_, _) => const LoginPage(),
-      ),
+      GoRoute(path: AppRoutes.splash, builder: (_, _) => const SplashPage()),
+      GoRoute(path: AppRoutes.welcome, builder: (_, _) => const WelcomePage()),
+      GoRoute(path: AppRoutes.login, builder: (_, _) => const LoginPage()),
       GoRoute(
         path: AppRoutes.register,
         builder: (_, _) => const RegisterPage(),
@@ -80,10 +72,7 @@ final appRouterProvider = Provider<GoRouter>((ref) {
         path: AppRoutes.completeProfile,
         builder: (_, _) => const CompleteProfilePage(),
       ),
-      GoRoute(
-        path: AppRoutes.home,
-        builder: (_, _) => const HomePage(),
-      ),
+      GoRoute(path: AppRoutes.home, builder: (_, _) => const HomePage()),
       GoRoute(
         path: AppRoutes.indicators,
         builder: (_, _) => const IndicatorsPage(),

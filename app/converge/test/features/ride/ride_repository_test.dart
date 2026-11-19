@@ -122,64 +122,68 @@ void main() {
     expect(requests[1].path, '/rides/ride-1/complete');
   });
 
-  test('requestPayment envia o valor com duas casas e lê a cobrança', () async {
+  test('listPendingPayments lê as cobranças em aberto com o PIX', () async {
     respondWith(
-      success({
-        'rideId': 'ride-1',
-        'passengerId': 'passenger-1',
-        'driverId': 'driver-1',
-        'receiverName': 'Lucas Silveira',
-        'amount': 12.5,
-        'status': 'PENDING',
-        'confirmedByDriver': false,
-        'pixCopyPaste': '00020126...6304ABCD',
-        'requestedAt': '2026-11-16T07:00:00',
-        'paidAt': null,
-      }),
+      success([
+        {
+          'rideId': 'ride-1',
+          'passengerId': 'passenger-1',
+          'driverId': 'driver-1',
+          'receiverName': 'Lucas Silveira',
+          'amount': 12.5,
+          'status': 'PENDING',
+          'pixCopyPaste': '00020126...6304ABCD',
+          'requestedAt': '2026-11-16T07:00:00',
+          'paidAt': null,
+        },
+      ]),
     );
 
-    final payment = await repository.requestPayment(
-      'ride-1',
-      'passenger-1',
-      amount: 12.5,
-    );
+    final pending = await repository.listPendingPayments();
 
-    expect(requests.single.method, 'POST');
-    expect(
-      requests.single.path,
-      '/rides/ride-1/passengers/passenger-1/payment/request',
-    );
-    expect(requests.single.data, {'amount': '12.50'});
-    expect(payment.amount, 12.5);
-    expect(payment.isOpen, isTrue);
-    expect(payment.pixCopyPaste, '00020126...6304ABCD');
+    expect(requests.single.method, 'GET');
+    expect(requests.single.path, '/rides/payments/pending');
+    expect(pending.single.amount, 12.5);
+    expect(pending.single.isOpen, isTrue);
+    expect(pending.single.pixCopyPaste, '00020126...6304ABCD');
   });
 
-  test('confirmPayment e getPayment usam os endpoints de pagamento', () async {
-    respondWith(
-      success({
-        'rideId': 'ride-1',
-        'passengerId': 'passenger-1',
-        'driverId': 'driver-1',
-        'receiverName': 'Lucas Silveira',
-        'amount': 12.5,
-        'status': 'PAID',
-        'confirmedByDriver': true,
-        'pixCopyPaste': null,
-      }),
-    );
+  test(
+    'markPaymentAsPaid e getPayment usam os endpoints de pagamento',
+    () async {
+      respondWith(
+        success({
+          'rideId': 'ride-1',
+          'passengerId': 'passenger-1',
+          'driverId': 'driver-1',
+          'receiverName': 'Lucas Silveira',
+          'amount': 12.5,
+          'status': 'PAID',
+          'pixCopyPaste': null,
+        }),
+      );
 
-    final confirmed = await repository.confirmPayment('ride-1', 'passenger-1');
-    await repository.getPayment('ride-1', 'passenger-1');
+      final paid = await repository.markPaymentAsPaid('ride-1', 'passenger-1');
+      await repository.getPayment('ride-1', 'passenger-1');
 
-    expect(confirmed.status, PaymentStatus.paid);
-    expect(requests[0].method, 'POST');
-    expect(
-      requests[0].path,
-      '/rides/ride-1/passengers/passenger-1/payment/confirm',
-    );
-    expect(requests[1].method, 'GET');
-    expect(requests[1].path, '/rides/ride-1/passengers/passenger-1/payment');
+      expect(paid.status, PaymentStatus.paid);
+      expect(requests[0].method, 'POST');
+      expect(
+        requests[0].path,
+        '/rides/ride-1/passengers/passenger-1/payment/mark-paid',
+      );
+      expect(requests[1].method, 'GET');
+      expect(requests[1].path, '/rides/ride-1/passengers/passenger-1/payment');
+    },
+  );
+
+  test('arrivePassenger confirma a chegada do passageiro', () async {
+    respondWith(success(fakeRideJson(status: 'IN_PROGRESS')));
+
+    await repository.arrivePassenger('ride-1', 'passenger-1');
+
+    expect(requests.single.method, 'POST');
+    expect(requests.single.path, '/rides/ride-1/passengers/passenger-1/arrive');
   });
 
   test(
@@ -197,7 +201,7 @@ void main() {
       }, status: 400);
 
       await expectLater(
-        repository.confirmPayment('ride-1', 'passenger-1'),
+        repository.markPaymentAsPaid('ride-1', 'passenger-1'),
         throwsA(
           isA<ApiException>()
               .having((e) => e.status, 'status', 400)

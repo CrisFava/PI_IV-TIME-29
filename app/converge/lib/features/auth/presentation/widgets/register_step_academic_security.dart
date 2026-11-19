@@ -60,9 +60,7 @@ class RegisterStepAcademicSecurity extends StatelessWidget {
   static bool hasSpecialChar(String password) =>
       RegExp(r'[^A-Za-z0-9]').hasMatch(password);
   static bool isPasswordStrong(String password) =>
-      hasMinLength(password) &&
-      hasNumber(password) &&
-      hasSpecialChar(password);
+      hasMinLength(password) && hasNumber(password) && hasSpecialChar(password);
 
   @override
   Widget build(BuildContext context) {
@@ -185,10 +183,7 @@ class RegisterStepAcademicSecurity extends StatelessWidget {
           ],
         ),
         const SizedBox(height: 18),
-        const Text(
-          'Senha',
-          style: OnboardingDesignTokens.fieldLabelStyle,
-        ),
+        const Text('Senha', style: OnboardingDesignTokens.fieldLabelStyle),
         const SizedBox(height: 8),
         TextFormField(
           controller: passwordController,
@@ -273,35 +268,31 @@ class _CourseAutocompleteField extends StatelessWidget {
         );
       },
       onSelected: (_) => nextFocusNode.requestFocus(),
-      fieldViewBuilder: (
-        context,
-        fieldController,
-        fieldFocusNode,
-        onFieldSubmitted,
-      ) {
-        return TextFormField(
-          controller: fieldController,
-          focusNode: fieldFocusNode,
-          enabled: enabled,
-          keyboardType: TextInputType.text,
-          textInputAction: TextInputAction.next,
-          style: OnboardingDesignTokens.inputTextStyle,
-          autovalidateMode: AutovalidateMode.onUserInteraction,
-          validator: (v) => Validators.required(v, field: 'Curso'),
-          onFieldSubmitted: (_) {
-            onFieldSubmitted();
-            nextFocusNode.requestFocus();
+      fieldViewBuilder:
+          (context, fieldController, fieldFocusNode, onFieldSubmitted) {
+            return TextFormField(
+              controller: fieldController,
+              focusNode: fieldFocusNode,
+              enabled: enabled,
+              keyboardType: TextInputType.text,
+              textInputAction: TextInputAction.next,
+              style: OnboardingDesignTokens.inputTextStyle,
+              autovalidateMode: AutovalidateMode.onUserInteraction,
+              validator: (v) => Validators.required(v, field: 'Curso'),
+              onFieldSubmitted: (_) {
+                onFieldSubmitted();
+                nextFocusNode.requestFocus();
+              },
+              decoration: OnboardingDesignTokens.inputDecoration(
+                hintText: 'Eng. Software',
+                suffixIcon: const Icon(
+                  Icons.keyboard_arrow_down_rounded,
+                  color: OnboardingDesignTokens.subtitle,
+                  size: 20,
+                ),
+              ),
+            );
           },
-          decoration: OnboardingDesignTokens.inputDecoration(
-            hintText: 'Eng. Software',
-            suffixIcon: const Icon(
-              Icons.keyboard_arrow_down_rounded,
-              color: OnboardingDesignTokens.subtitle,
-              size: 20,
-            ),
-          ),
-        );
-      },
       optionsViewBuilder: (context, onSelected, options) {
         return Align(
           alignment: Alignment.topLeft,
@@ -350,10 +341,7 @@ class _PasswordRequirementItem extends StatelessWidget {
   final String label;
   final bool isMet;
 
-  const _PasswordRequirementItem({
-    required this.label,
-    required this.isMet,
-  });
+  const _PasswordRequirementItem({required this.label, required this.isMet});
 
   @override
   Widget build(BuildContext context) {

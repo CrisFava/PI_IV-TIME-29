@@ -41,8 +41,5 @@ List<T> unwrapApiListResponse<T>(
 
   final data = body['data'];
   if (data is! List<dynamic>) throw ApiException.fromStatus(500);
-  return data
-      .whereType<Map<String, dynamic>>()
-      .map(fromJson)
-      .toList();
+  return data.whereType<Map<String, dynamic>>().map(fromJson).toList();
 }

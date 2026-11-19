@@ -4,7 +4,6 @@ import 'package:flutter/material.dart';
 
 import '../../../../core/config/styles.dart';
 
-
 class HomeDraggableSheet extends StatelessWidget {
   final VoidCallback onSearchTap;
   final ValueChanged<String>? onDestinationSelected;
@@ -117,25 +116,32 @@ class HomeDraggableSheet extends StatelessWidget {
                           _buildShortcutChip(
                             icon: Icons.school_rounded,
                             label: 'Campus I - Bloco H',
-                            onTap: () => onDestinationSelected?.call('Campus I - Bloco H'),
+                            onTap: () => onDestinationSelected?.call(
+                              'Campus I - Bloco H',
+                            ),
                           ),
                           const SizedBox(width: 8),
                           _buildShortcutChip(
                             icon: Icons.local_hospital_rounded,
                             label: 'Campus II - Medicina',
-                            onTap: () => onDestinationSelected?.call('Campus II - Medicina'),
+                            onTap: () => onDestinationSelected?.call(
+                              'Campus II - Medicina',
+                            ),
                           ),
                           const SizedBox(width: 8),
                           _buildShortcutChip(
                             icon: Icons.local_library_rounded,
                             label: 'Biblioteca Central',
-                            onTap: () => onDestinationSelected?.call('Biblioteca Central'),
+                            onTap: () => onDestinationSelected?.call(
+                              'Biblioteca Central',
+                            ),
                           ),
                           const SizedBox(width: 8),
                           _buildShortcutChip(
                             icon: Icons.directions_bus_rounded,
                             label: 'Terminal Barão',
-                            onTap: () => onDestinationSelected?.call('Terminal Barão'),
+                            onTap: () =>
+                                onDestinationSelected?.call('Terminal Barão'),
                           ),
                         ],
                       ),
@@ -348,7 +354,11 @@ class HomeDraggableSheet extends StatelessWidget {
               // Rota: Origem -> Destino
               Row(
                 children: [
-                  const Icon(Icons.circle, size: 8, color: AppColors.textPrimary),
+                  const Icon(
+                    Icons.circle,
+                    size: 8,
+                    color: AppColors.textPrimary,
+                  ),
                   const SizedBox(width: 8),
                   Expanded(
                     child: Text(

@@ -31,7 +31,10 @@ ReviewModel givenTo(String reviewedId) => ReviewModel(
 
 void main() {
   // fakeRide: motorista 'driver-1' (Lucas Silveira) e passageira 'passenger-1' (Ana Souza)
-  final completedRide = fakeRide(status: 'COMPLETED', passengerStatus: 'COMPLETED');
+  final completedRide = fakeRide(
+    status: 'COMPLETED',
+    passengerStatus: 'COMPLETED',
+  );
 
   group('passageiro', () {
     test('avalia o motorista quando a viagem foi concluída', () {
@@ -75,7 +78,9 @@ void main() {
       final ride = fakeRide(
         status: 'COMPLETED',
         passengerStatus: 'COMPLETED',
-        extraParticipants: [passengerJson('passenger-2', 'Bia Lima', 'COMPLETED')],
+        extraParticipants: [
+          passengerJson('passenger-2', 'Bia Lima', 'COMPLETED'),
+        ],
       );
 
       final all = pendingReviewTargets(
@@ -120,12 +125,20 @@ void main() {
         final ride = fakeRide(status: status);
 
         expect(
-          pendingReviewTargets(ride: ride, viewerId: fakePassengerId, given: const []),
+          pendingReviewTargets(
+            ride: ride,
+            viewerId: fakePassengerId,
+            given: const [],
+          ),
           isEmpty,
           reason: 'passageiro, viagem $status',
         );
         expect(
-          pendingReviewTargets(ride: ride, viewerId: fakeDriverId, given: const []),
+          pendingReviewTargets(
+            ride: ride,
+            viewerId: fakeDriverId,
+            given: const [],
+          ),
           isEmpty,
           reason: 'motorista, viagem $status',
         );
@@ -165,7 +178,10 @@ void main() {
 
     test('viagem que não está concluída não aparece', () {
       final rides = recentlyCompletedRides(
-        rides: [fakeRide(status: 'IN_PROGRESS'), fakeRide(status: 'CANCELLED')],
+        rides: [
+          fakeRide(status: 'IN_PROGRESS'),
+          fakeRide(status: 'CANCELLED'),
+        ],
         now: DateTime(2026, 11, 16, 20),
       );
 
@@ -186,7 +202,10 @@ void main() {
     });
 
     test('na primeira carga não há nenhuma, mesmo com viagens concluídas', () {
-      final finished = newlyCompletedRides(previous: null, next: [completedRide]);
+      final finished = newlyCompletedRides(
+        previous: null,
+        next: [completedRide],
+      );
 
       expect(finished, isEmpty);
     });
@@ -201,7 +220,10 @@ void main() {
     });
 
     test('viagem que ainda não existia na lista anterior não conta', () {
-      final finished = newlyCompletedRides(previous: const [], next: [completedRide]);
+      final finished = newlyCompletedRides(
+        previous: const [],
+        next: [completedRide],
+      );
 
       expect(finished, isEmpty);
     });

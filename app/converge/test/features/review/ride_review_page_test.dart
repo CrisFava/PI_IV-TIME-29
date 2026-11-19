@@ -14,9 +14,21 @@ import 'package:flutter_test/flutter_test.dart';
 import '../ride/fakes/fake_ride.dart';
 import 'fakes/fake_review_repository.dart';
 
-const _ana = ReviewTarget(userId: 'passenger-1', name: 'Ana Souza', isDriver: false);
-const _bia = ReviewTarget(userId: 'passenger-2', name: 'Bia Lima', isDriver: false);
-const _lucas = ReviewTarget(userId: fakeDriverId, name: 'Lucas Silveira', isDriver: true);
+const _ana = ReviewTarget(
+  userId: 'passenger-1',
+  name: 'Ana Souza',
+  isDriver: false,
+);
+const _bia = ReviewTarget(
+  userId: 'passenger-2',
+  name: 'Bia Lima',
+  isDriver: false,
+);
+const _lucas = ReviewTarget(
+  userId: fakeDriverId,
+  name: 'Lucas Silveira',
+  isDriver: true,
+);
 
 void main() {
   late FakeReviewRepository reviews;
@@ -56,47 +68,55 @@ void main() {
     await tester.pumpAndSettle();
   }
 
-  testWidgets('motorista vê todos os passageiros, e o botão só liga com estrelas', (
-    tester,
-  ) async {
-    await openPage(tester, const [_ana, _bia]);
+  testWidgets(
+    'motorista vê todos os passageiros, e o botão só liga com estrelas',
+    (tester) async {
+      await openPage(tester, const [_ana, _bia]);
 
-    expect(find.text('Ana Souza'), findsOneWidget);
-    expect(find.text('Bia Lima'), findsOneWidget);
-    expect(find.text('Como foi a carona com cada passageiro?'), findsOneWidget);
-    expect(
-      tester.widget<FilledButton>(find.byType(FilledButton)).onPressed,
-      isNull,
-    );
+      expect(find.text('Ana Souza'), findsOneWidget);
+      expect(find.text('Bia Lima'), findsOneWidget);
+      expect(
+        find.text('Como foi a carona com cada passageiro?'),
+        findsOneWidget,
+      );
+      expect(
+        tester.widget<FilledButton>(find.byType(FilledButton)).onPressed,
+        isNull,
+      );
 
-    await tester.tap(find.byTooltip('4 de 5').first);
-    await tester.pump();
+      await tester.tap(find.byTooltip('4 de 5').first);
+      await tester.pump();
 
-    expect(
-      tester.widget<FilledButton>(find.byType(FilledButton)).onPressed,
-      isNotNull,
-    );
-  });
+      expect(
+        tester.widget<FilledButton>(find.byType(FilledButton)).onPressed,
+        isNotNull,
+      );
+    },
+  );
 
-  testWidgets('envia só quem recebeu estrelas, com o comentário, e fecha a tela', (
-    tester,
-  ) async {
-    await openPage(tester, const [_ana, _bia]);
+  testWidgets(
+    'envia só quem recebeu estrelas, com o comentário, e fecha a tela',
+    (tester) async {
+      await openPage(tester, const [_ana, _bia]);
 
-    await tester.tap(find.byTooltip('5 de 5').first);
-    await tester.enterText(find.byType(TextField).first, 'Pontual e simpática');
-    await tester.pump();
-    await tester.tap(find.text('Enviar avaliações'));
-    await tester.pumpAndSettle();
+      await tester.tap(find.byTooltip('5 de 5').first);
+      await tester.enterText(
+        find.byType(TextField).first,
+        'Pontual e simpática',
+      );
+      await tester.pump();
+      await tester.tap(find.text('Enviar avaliações'));
+      await tester.pumpAndSettle();
 
-    expect(reviews.reviews, hasLength(1));
-    expect(reviews.reviews.single.reviewedId, 'passenger-1');
-    expect(reviews.reviews.single.rating, 5);
-    expect(reviews.reviews.single.comment, 'Pontual e simpática');
+      expect(reviews.reviews, hasLength(1));
+      expect(reviews.reviews.single.reviewedId, 'passenger-1');
+      expect(reviews.reviews.single.rating, 5);
+      expect(reviews.reviews.single.comment, 'Pontual e simpática');
 
-    // Enviar encerra a avaliação, mesmo com a Bia sem estrelas
-    expect(find.byType(RideReviewPage), findsNothing);
-  });
+      // Enviar encerra a avaliação, mesmo com a Bia sem estrelas
+      expect(find.byType(RideReviewPage), findsNothing);
+    },
+  );
 
   testWidgets('comentário sem estrelas não é enviado e avisa', (tester) async {
     await openPage(tester, const [_ana, _bia]);
@@ -115,29 +135,32 @@ void main() {
     expect(find.byType(RideReviewPage), findsOneWidget);
   });
 
-  testWidgets('apagar o comentário sem estrelas e enviar de novo envia e fecha a tela', (
-    tester,
-  ) async {
-    await openPage(tester, const [_ana, _bia]);
+  testWidgets(
+    'apagar o comentário sem estrelas e enviar de novo envia e fecha a tela',
+    (tester) async {
+      await openPage(tester, const [_ana, _bia]);
 
-    await tester.tap(find.byTooltip('5 de 5').first);
-    await tester.enterText(find.byType(TextField).last, 'Chegou atrasada');
-    await tester.pump();
-    await tester.tap(find.text('Enviar avaliações'));
-    await tester.pumpAndSettle();
-    expect(
-      find.text('Escolha de 1 a 5 estrelas para enviar o comentário.'),
-      findsOneWidget,
-    );
+      await tester.tap(find.byTooltip('5 de 5').first);
+      await tester.enterText(find.byType(TextField).last, 'Chegou atrasada');
+      await tester.pump();
+      await tester.tap(find.text('Enviar avaliações'));
+      await tester.pumpAndSettle();
+      expect(
+        find.text('Escolha de 1 a 5 estrelas para enviar o comentário.'),
+        findsOneWidget,
+      );
 
-    await tester.enterText(find.byType(TextField).last, '');
-    await tester.pump();
-    await tester.tap(find.text('Enviar avaliações'));
-    await tester.pumpAndSettle();
+      await tester.enterText(find.byType(TextField).last, '');
+      await tester.pump();
+      await tester.tap(find.text('Enviar avaliações'));
+      await tester.pumpAndSettle();
 
-    expect(reviews.reviews.map((review) => review.reviewedId), ['passenger-1']);
-    expect(find.byType(RideReviewPage), findsNothing);
-  });
+      expect(reviews.reviews.map((review) => review.reviewedId), [
+        'passenger-1',
+      ]);
+      expect(find.byType(RideReviewPage), findsNothing);
+    },
+  );
 
   testWidgets('"Agora não" fecha sem enviar nada', (tester) async {
     await openPage(tester, const [_ana, _bia]);
@@ -167,55 +190,59 @@ void main() {
     expect(find.byType(RideReviewPage), findsNothing);
   });
 
-  testWidgets('comentário sem estrelas mostra o aviso na hora e some ao escolher estrelas', (
-    tester,
-  ) async {
-    await openPage(tester, const [_ana]);
+  testWidgets(
+    'comentário sem estrelas mostra o aviso na hora e some ao escolher estrelas',
+    (tester) async {
+      await openPage(tester, const [_ana]);
 
-    await tester.enterText(find.byType(TextField), 'Muito simpática');
-    await tester.pump();
+      await tester.enterText(find.byType(TextField), 'Muito simpática');
+      await tester.pump();
 
-    expect(
-      find.text('Escolha de 1 a 5 estrelas para enviar o comentário'),
-      findsOneWidget,
-    );
-    expect(
-      tester.widget<FilledButton>(find.byType(FilledButton)).onPressed,
-      isNull,
-    );
+      expect(
+        find.text('Escolha de 1 a 5 estrelas para enviar o comentário'),
+        findsOneWidget,
+      );
+      expect(
+        tester.widget<FilledButton>(find.byType(FilledButton)).onPressed,
+        isNull,
+      );
 
-    await tester.tap(find.byTooltip('5 de 5'));
-    await tester.pump();
+      await tester.tap(find.byTooltip('5 de 5'));
+      await tester.pump();
 
-    expect(
-      find.text('Escolha de 1 a 5 estrelas para enviar o comentário'),
-      findsNothing,
-    );
-    expect(find.text('Excelente'), findsOneWidget);
-    expect(
-      tester.widget<FilledButton>(find.byType(FilledButton)).onPressed,
-      isNotNull,
-    );
-  });
+      expect(
+        find.text('Escolha de 1 a 5 estrelas para enviar o comentário'),
+        findsNothing,
+      );
+      expect(find.text('Excelente'), findsOneWidget);
+      expect(
+        tester.widget<FilledButton>(find.byType(FilledButton)).onPressed,
+        isNotNull,
+      );
+    },
+  );
 
-  testWidgets('se um envio falha, a tela fica aberta com o erro e os outros foram enviados', (
-    tester,
-  ) async {
-    reviews = _FlakyReviews(failFor: 'passenger-2');
-    await openPage(tester, const [_ana, _bia]);
+  testWidgets(
+    'se um envio falha, a tela fica aberta com o erro e os outros foram enviados',
+    (tester) async {
+      reviews = _FlakyReviews(failFor: 'passenger-2');
+      await openPage(tester, const [_ana, _bia]);
 
-    await tester.tap(find.byTooltip('5 de 5').first); // Ana
-    await tester.tap(find.byTooltip('4 de 5').last); // Bia
-    await tester.pump();
-    await tester.tap(find.text('Enviar avaliações'));
-    await tester.pumpAndSettle();
+      await tester.tap(find.byTooltip('5 de 5').first); // Ana
+      await tester.tap(find.byTooltip('4 de 5').last); // Bia
+      await tester.pump();
+      await tester.tap(find.text('Enviar avaliações'));
+      await tester.pumpAndSettle();
 
-    expect(reviews.reviews.map((review) => review.reviewedId), ['passenger-1']);
-    expect(find.byType(RideReviewPage), findsOneWidget);
-    expect(find.text('Você avaliou com 5 de 5 estrelas'), findsOneWidget);
-    expect(find.text('Sem conexão.'), findsOneWidget);
-    expect(find.text('Fechar'), findsOneWidget);
-  });
+      expect(reviews.reviews.map((review) => review.reviewedId), [
+        'passenger-1',
+      ]);
+      expect(find.byType(RideReviewPage), findsOneWidget);
+      expect(find.text('Você avaliou com 5 de 5 estrelas'), findsOneWidget);
+      expect(find.text('Sem conexão.'), findsOneWidget);
+      expect(find.text('Fechar'), findsOneWidget);
+    },
+  );
 }
 
 /// Avaliações em que o envio para uma pessoa falha, como numa queda de rede.

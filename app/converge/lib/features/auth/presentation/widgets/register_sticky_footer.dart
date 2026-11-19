@@ -43,8 +43,7 @@ class RegisterStickyFooter extends StatelessWidget {
       textAlign: TextAlign.center,
       style: const TextStyle(
         fontFamily: OnboardingDesignTokens.fontFamily,
-        fontFamilyFallback:
-            OnboardingDesignTokens.fontFamilyFallback,
+        fontFamilyFallback: OnboardingDesignTokens.fontFamilyFallback,
         fontSize: 16,
         fontWeight: FontWeight.w600,
         color: OnboardingDesignTokens.background,

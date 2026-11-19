@@ -31,10 +31,7 @@ class RouteRepositoryImpl implements RouteRepository {
     try {
       final response = await _dio.get<dynamic>(
         RouteEndpoints.placesAutocomplete,
-        queryParameters: {
-          'input': input,
-          'sessionToken': ?sessionToken,
-        },
+        queryParameters: {'input': input, 'sessionToken': ?sessionToken},
       );
       return unwrapApiListResponse<PlaceSuggestionModel>(
         response.data,
@@ -54,9 +51,7 @@ class RouteRepositoryImpl implements RouteRepository {
     try {
       final response = await _dio.get<dynamic>(
         RouteEndpoints.placeDetails(placeId),
-        queryParameters: {
-          'sessionToken': ?sessionToken,
-        },
+        queryParameters: {'sessionToken': ?sessionToken},
       );
       return unwrapApiResponse<PlaceDetailsModel>(
         response.data,
@@ -102,7 +97,9 @@ class RouteRepositoryImpl implements RouteRepository {
   @override
   Future<RouteResponseModel> getRoute(String routeId) async {
     try {
-      final response = await _dio.get<dynamic>(RouteEndpoints.routeById(routeId));
+      final response = await _dio.get<dynamic>(
+        RouteEndpoints.routeById(routeId),
+      );
       return unwrapApiResponse<RouteResponseModel>(
         response.data,
         RouteResponseModel.fromJson,

@@ -1,12 +1,13 @@
 // Autor: Cristian Eduardo Fava - RA 25000636
 
 import 'package:converge/features/chat/data/models/chat_message_type.dart';
+import 'package:converge/features/chat/data/models/chat_message_model.dart';
+import 'package:converge/features/chat/state/ride_chat_announcer.dart';
 import 'package:converge/features/chat/data/models/chat_thread_ref.dart';
 import 'package:converge/features/chat/data/repository/chat_exception.dart';
 import 'package:converge/features/chat/data/repository/firebase_chat_repository.dart';
 import 'package:converge/features/chat/state/chat_actions_controller.dart';
 import 'package:converge/features/chat/state/chat_providers.dart';
-import 'package:converge/features/ride/data/models/payment_status.dart';
 import 'package:converge/features/ride/data/models/ride_status.dart';
 import 'package:converge/features/ride/data/repository/ride_repository_impl.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
@@ -79,69 +80,6 @@ void main() {
         chatErrorMessage(state.error!),
         'Não foi possível enviar a mensagem.',
       );
-    });
-  });
-
-  group('requestPayment', () {
-    test('registra a cobrança na API e avisa o passageiro no chat', () async {
-      final requested = await controller().requestPayment(12.5);
-
-      expect(requested, isTrue);
-      expect(rides.calls, contains('requestPayment:12.5'));
-
-      final notice = chat.messagesOf(thread).single;
-      expect(notice.type, ChatMessageType.paymentRequest);
-      expect(notice.amount, 12.5);
-      expect(notice.senderId, fakeDriverId);
-    });
-
-    test('se a API recusar, nada é enviado ao chat', () async {
-      rides.failNextActionWith =
-          'O valor cobrado não pode passar do valor máximo.';
-
-      final requested = await controller().requestPayment(999);
-
-      expect(requested, isFalse);
-      expect(chat.messagesOf(thread), isEmpty);
-      expect(
-        chatErrorMessage(container.read(chatActionsProvider(thread)).error!),
-        'O valor cobrado não pode passar do valor máximo.',
-      );
-    });
-
-    test('a cobrança vale mesmo se o aviso no chat falhar', () async {
-      chat.failOnSend = true;
-
-      final requested = await controller().requestPayment(12.5);
-
-      expect(requested, isTrue);
-      expect(rides.payment.amount, 12.5);
-      expect(container.read(chatActionsProvider(thread)).hasError, isFalse);
-    });
-  });
-
-  group('confirmPayment', () {
-    test('marca como pago na API e avisa o passageiro no chat', () async {
-      await controller().requestPayment(12.5);
-
-      final confirmed = await controller().confirmPayment();
-
-      expect(confirmed, isTrue);
-      expect(rides.payment.status, PaymentStatus.paid);
-      final notice = chat.messagesOf(thread).last;
-      expect(notice.type, ChatMessageType.paymentConfirmed);
-      expect(notice.amount, 12.5);
-    });
-
-    test('se a API recusar, o chat não recebe confirmação', () async {
-      rides.failNextActionWith =
-          'Solicite o pagamento antes de confirmar o recebimento.';
-
-      final confirmed = await controller().confirmPayment();
-
-      expect(confirmed, isFalse);
-      expect(chat.messagesOf(thread), isEmpty);
-      expect(rides.payment.status, PaymentStatus.pending);
     });
   });
 
@@ -220,4 +158,145 @@ void main() {
       'Entre na sua conta para usar o chat.',
     );
   });
+
+  group('RideChatAnnouncer', () {
+    RideChatAnnouncer announcer() => RideChatAnnouncer(
+      chat: chat,
+      viewer: () => fakeChatUser(id: fakeDriverId, name: 'Lucas Silveira'),
+    );
+
+    test('alsoTo não duplica o aviso para passageiro com vaga', () async {
+      await announcer().announce(
+        fakeRide(),
+        RideChatAnnouncer.rideStarted,
+        alsoTo: fakePassengerId,
+      );
+
+      final message = chat.messagesOf(thread).single;
+      expect(message.text, RideChatAnnouncer.rideStarted);
+      expect(message.type, ChatMessageType.system);
+      expect(message.senderId, fakeDriverId);
+      expect(message.senderName, 'Lucas Silveira');
+    });
+
+    for (final status in ['REQUESTED', 'REJECTED', 'CANCELLED', 'NO_SHOW', 'EXPIRED']) {
+      test('não avisa passageiro com status $status', () async {
+        await announcer().announce(
+          fakeRide(passengerStatus: status),
+          RideChatAnnouncer.rideStarted,
+        );
+
+        expect(chat.messagesOf(thread), isEmpty);
+      });
+    }
+
+    test('alsoTo recebe aviso mesmo sem vaga e usa sala informada', () async {
+      const alternate = ChatThreadRef(
+        chatRoomId: 'sala-alternativa',
+        rideId: fakeRideId,
+        passengerId: fakePassengerId,
+      );
+      await announcer().announce(
+        fakeRide(chatRoomId: null, passengerStatus: 'CANCELLED'),
+        RideChatAnnouncer.rideCompleted,
+        chatRoomId: alternate.chatRoomId,
+        alsoTo: fakePassengerId,
+      );
+
+      expect(chat.messagesOf(alternate).single.text, RideChatAnnouncer.rideCompleted);
+      expect(chat.messagesOf(thread), isEmpty);
+    });
+
+    test('sem sala não tenta enviar anúncio nem cobrança', () async {
+      final ride = fakeRide(chatRoomId: null);
+      await announcer().announce(ride, RideChatAnnouncer.rideStarted);
+      await announcer().notifyPassenger(
+        ride, fakePassengerId, ChatMessageType.paymentRequest, 'Cobrança',
+      );
+
+      expect(chat.messagesOf(thread), isEmpty);
+    });
+
+    test('sem usuário não envia anúncio nem cobrança', () async {
+      final anonymous = RideChatAnnouncer(chat: chat, viewer: () => null);
+      await anonymous.announce(fakeRide(), RideChatAnnouncer.rideStarted);
+      await anonymous.notifyPassenger(
+        fakeRide(), fakePassengerId, ChatMessageType.paymentRequest, 'Cobrança',
+      );
+
+      expect(chat.messagesOf(thread), isEmpty);
+    });
+
+    test('cobrança leva o valor só para o passageiro indicado', () async {
+      const otherThread = ChatThreadRef(
+        chatRoomId: 'ride_ride-1',
+        rideId: fakeRideId,
+        passengerId: 'passenger-2',
+      );
+      await announcer().notifyPassenger(
+        fakeRide(extraParticipants: [
+          {'userId': 'passenger-2', 'role': 'PASSENGER', 'status': 'CONFIRMED'},
+        ]),
+        fakePassengerId,
+        ChatMessageType.paymentRequest,
+        'Cobrança da carona',
+        amount: 12.5,
+      );
+
+      final message = chat.messagesOf(thread).single;
+      expect(message.type, ChatMessageType.paymentRequest);
+      expect(message.amount, 12.5);
+      expect(message.text, 'Cobrança da carona');
+      expect(chat.messagesOf(otherThread), isEmpty);
+    });
+
+    test('falha em uma conversa não impede avisar o próximo passageiro', () async {
+      final flaky = _FailFirstChatRepository();
+      addTearDown(flaky.dispose);
+      final service = RideChatAnnouncer(
+        chat: flaky,
+        viewer: () => fakeChatUser(id: fakeDriverId, name: 'Lucas Silveira'),
+      );
+      await service.announce(
+        fakeRide(extraParticipants: [
+          {'userId': 'passenger-2', 'role': 'PASSENGER', 'status': 'CONFIRMED'},
+        ]),
+        RideChatAnnouncer.rideStarted,
+      );
+
+      expect(flaky.attemptedPassengers, [fakePassengerId, 'passenger-2']);
+      expect(flaky.messagesOf(thread), isEmpty);
+      expect(flaky.messagesOf(const ChatThreadRef(
+        chatRoomId: 'ride_ride-1',
+        rideId: fakeRideId,
+        passengerId: 'passenger-2',
+      )).single.text, RideChatAnnouncer.rideStarted);
+    });
+
+    test('falha ao enviar cobrança não propaga erro', () async {
+      chat.failOnSend = true;
+
+      await expectLater(
+        announcer().notifyPassenger(
+          fakeRide(), fakePassengerId, ChatMessageType.paymentRequest, 'Cobrança',
+          amount: 12.5,
+        ),
+        completes,
+      );
+      expect(chat.messagesOf(thread), isEmpty);
+    });
+  });
+}
+
+class _FailFirstChatRepository extends FakeChatRepository {
+  final attemptedPassengers = <String>[];
+
+  @override
+  Future<void> sendMessage(ChatThreadRef thread, ChatMessageModel message) async {
+    attemptedPassengers.add(thread.passengerId);
+    if (attemptedPassengers.length == 1) {
+      throw const ChatException('Chat indisponível.');
+    }
+    await super.sendMessage(thread, message);
+  }
 }

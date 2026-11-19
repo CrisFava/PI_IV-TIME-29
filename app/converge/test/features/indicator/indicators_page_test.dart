@@ -63,10 +63,10 @@ void main() {
     'mobilidade e ambiental mostram os números do período escolhido',
     (tester) async {
       // Tela alta: os cartões e os gráficos cabem sem rolar
-    tester.view.physicalSize = const Size(800, 2400);
-    tester.view.devicePixelRatio = 1;
-    addTearDown(tester.view.reset);
-    final repository = _FakeIndicatorRepository();
+      tester.view.physicalSize = const Size(800, 2400);
+      tester.view.devicePixelRatio = 1;
+      addTearDown(tester.view.reset);
+      final repository = _FakeIndicatorRepository();
       await tester.pumpWidget(
         ProviderScope(
           overrides: [

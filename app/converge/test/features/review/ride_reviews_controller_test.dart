@@ -24,10 +24,18 @@ void main() {
 
   test('começa com as avaliações que o usuário já fez na viagem', () async {
     await reviews.createReview(
-      const CreateReviewRequest(rideId: 'ride-1', reviewedId: 'driver-1', rating: 4),
+      const CreateReviewRequest(
+        rideId: 'ride-1',
+        reviewedId: 'driver-1',
+        rating: 4,
+      ),
     );
     await reviews.createReview(
-      const CreateReviewRequest(rideId: 'ride-2', reviewedId: 'driver-9', rating: 2),
+      const CreateReviewRequest(
+        rideId: 'ride-2',
+        reviewedId: 'driver-9',
+        rating: 2,
+      ),
     );
 
     // O setUp já carregou a lista vazia; recarrega para enxergar as avaliações criadas.

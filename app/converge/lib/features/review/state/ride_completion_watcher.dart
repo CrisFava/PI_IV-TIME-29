@@ -42,20 +42,26 @@ final rideCompletionWatcherProvider = Provider.autoDispose<void>((ref) {
 
 /// Alguma viagem mudou de status, ou apareceu ou sumiu, entre as duas listas.
 bool rideStatusesChanged(List<RideModel> before, List<RideModel> after) {
-  String signature(List<RideModel> rides) =>
-      ([for (final ride in rides) '${ride.id}:${ride.status.name}']..sort())
-          .join('|');
+  // Inclui o status e o pagamento de cada participante: na chegada de um passageiro, a
+  // viagem continua em andamento e só o status dele muda (é aí que a cobrança dele é
+  // emitida); depois, o "Já paguei" dele só muda o pagamento
+  String signature(List<RideModel> rides) => ([
+    for (final ride in rides)
+      '${ride.id}:${ride.status.name}:'
+          '${[for (final participant in ride.participants) '${participant.status.name}:${participant.paymentStatus?.name}'].join(',')}',
+  ]..sort()).join('|');
 
   return signature(before) != signature(after);
 }
 
-/// Viagem que pode ser concluída em breve: em andamento, ou confirmada para hoje
-/// (ou para um dia que já passou). Viagens de dias futuros não precisam ser acompanhadas.
+/// Viagem que pode ser concluída em breve: em andamento, ou confirmada para sair nas
+/// próximas 24 horas (ou com a saída já passada). O motorista pode iniciar antes do
+/// horário, então uma carona de amanhã cedo também precisa ser acompanhada hoje.
 bool isRideOnItsWay(RideModel ride, DateTime now) {
   if (ride.status == RideStatus.inProgress) return true;
   if (ride.status != RideStatus.confirmed) return false;
 
   final departure = ride.departureDateTime;
-  final startOfTomorrow = DateTime(now.year, now.month, now.day + 1);
-  return departure != null && departure.isBefore(startOfTomorrow);
+  return departure != null &&
+      departure.isBefore(now.add(const Duration(hours: 24)));
 }

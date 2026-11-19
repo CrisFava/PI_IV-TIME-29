@@ -200,7 +200,8 @@ class _RideReviewPageState extends ConsumerState<RideReviewPage> {
                       draft: _drafts[target.userId]!,
                       labels: _ratingLabels,
                       enabled: !_submitting,
-                      onRating: (rating) => _selectRating(target.userId, rating),
+                      onRating: (rating) =>
+                          _selectRating(target.userId, rating),
                       onCommentChanged: () => setState(() {}),
                     );
                   },
@@ -210,7 +211,9 @@ class _RideReviewPageState extends ConsumerState<RideReviewPage> {
                 padding: const EdgeInsets.fromLTRB(20, 12, 20, 12),
                 decoration: const BoxDecoration(
                   color: AppColors.cardBackground,
-                  border: Border(top: BorderSide(color: AppColors.footerBorder)),
+                  border: Border(
+                    top: BorderSide(color: AppColors.footerBorder),
+                  ),
                 ),
                 child: Column(
                   mainAxisSize: MainAxisSize.min,
@@ -343,7 +346,10 @@ class _ReviewCard extends StatelessWidget {
                 ),
               ),
               if (draft.sent)
-                const Icon(Icons.check_circle_rounded, color: AppColors.success),
+                const Icon(
+                  Icons.check_circle_rounded,
+                  color: AppColors.success,
+                ),
             ],
           ),
           const SizedBox(height: 8),
@@ -405,7 +411,10 @@ class _ReviewCard extends StatelessWidget {
               maxLines: 3,
               maxLength: 500,
               textCapitalization: TextCapitalization.sentences,
-              style: const TextStyle(fontSize: 14, color: AppColors.textPrimary),
+              style: const TextStyle(
+                fontSize: 14,
+                color: AppColors.textPrimary,
+              ),
               decoration: InputDecoration(
                 hintText: 'Comentário (opcional)',
                 hintStyle: const TextStyle(color: AppColors.textPlaceholder),

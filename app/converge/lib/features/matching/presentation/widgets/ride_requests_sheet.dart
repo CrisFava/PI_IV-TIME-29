@@ -9,11 +9,13 @@ import 'package:go_router/go_router.dart';
 
 import '../../../../app_routes.dart';
 import '../../../../core/config/styles.dart';
+import '../../../../core/utils/currency_formatter.dart';
 import '../../../../core/widgets/details_sheet.dart';
 import '../../../../core/widgets/show_app_notice.dart';
 import '../../../auth/state/auth_action_controller.dart';
 import '../../../ride/data/models/participant_status.dart';
 import '../../../ride/data/models/ride_model.dart';
+import '../../../ride/data/models/ride_participant_model.dart';
 import '../../../ride/data/models/ride_status.dart';
 import '../../../ride/state/ride_providers.dart';
 import '../../data/models/driver_offer.dart';
@@ -104,6 +106,7 @@ class _RideRequestsSheetState extends ConsumerState<RideRequestsSheet> {
         onCancelOffer: _cancelOffer,
         onCancelRide: _cancelRide,
         onMarkNoShow: _markNoShow,
+        onArrive: _arrivePassenger,
       ),
     );
   }
@@ -141,8 +144,7 @@ class _RideRequestsSheetState extends ConsumerState<RideRequestsSheet> {
   Future<void> _cancelRide(String rideId) async {
     final confirmed = await _confirm(
       title: 'Cancelar esta viagem?',
-      message:
-          'Os passageiros confirmados serão avisados. Cancelar com passageiro confirmado conta na sua reputação.',
+      message: 'Os passageiros confirmados serão avisados. Cancelar com passageiro confirmado conta na sua reputação.',
       confirmLabel: 'Cancelar viagem',
     );
     if (!confirmed) return;
@@ -156,14 +158,39 @@ class _RideRequestsSheetState extends ConsumerState<RideRequestsSheet> {
   Future<void> _markNoShow(String rideId, String passengerId) async {
     final confirmed = await _confirm(
       title: 'Marcar como ausente?',
-      message:
-          'A vaga é liberada e o passageiro não é cobrado nem entra nos indicadores.',
+      message: 'A vaga é liberada e o passageiro não é cobrado nem entra nos indicadores.',
       confirmLabel: 'Marcar ausente',
     );
     if (!confirmed) return;
     final error = await ref
         .read(driverRideActionsProvider.notifier)
         .markNoShow(rideId, passengerId);
+    if (mounted && error != null) _showMessage(error);
+  }
+
+  /// "Chegou": o passageiro desceu, a viagem dele termina e ele recebe a cobrança do rateio.
+  Future<void> _arrivePassenger(String rideId, String passengerId) async {
+    final rides = ref.read(myRidesProvider).value ?? const <RideModel>[];
+    RideParticipantModel? passenger;
+    for (final ride in rides) {
+      if (ride.id == rideId) passenger = ride.passengerOf(passengerId);
+    }
+    final estimate = passenger?.estimatedAmount;
+    final amountHint = estimate != null && estimate > 0
+        ? ' (cerca de ${CurrencyFormatter.format(estimate)})'
+        : '';
+
+    final confirmed = await _confirm(
+      title:
+          'Confirmar a chegada de ${passenger?.displayName ?? 'o passageiro'}?',
+      message:
+          'A viagem dele termina aqui e ele recebe a cobrança do rateio pelo PIX$amountHint.',
+      confirmLabel: 'Confirmar chegada',
+    );
+    if (!confirmed) return;
+    final error = await ref
+        .read(driverRideActionsProvider.notifier)
+        .arrive(rideId, passengerId);
     if (mounted && error != null) _showMessage(error);
   }
 
@@ -386,7 +413,12 @@ class _RideRequestsSheetState extends ConsumerState<RideRequestsSheet> {
                       ],
                     ),
                     // Uma lista só: as viagens como passageiro e as caronas oferecidas
-                    ..._ridesList(offers, passengerRides, viewerId, rideActions),
+                    ..._ridesList(
+                      offers,
+                      passengerRides,
+                      viewerId,
+                      rideActions,
+                    ),
                   ]),
                 ),
               ),
@@ -422,9 +454,7 @@ class _RideRequestsSheetState extends ConsumerState<RideRequestsSheet> {
     final asPassenger = passengerList ?? const <RideModel>[];
     final asDriver = offerList ?? const <DriverOffer>[];
     if (asPassenger.isEmpty && asDriver.isEmpty) {
-      return const [
-        MatchingMessage(text: 'Você ainda não tem caronas.'),
-      ];
+      return const [MatchingMessage(text: 'Você ainda não tem caronas.')];
     }
 
     // A viagem em andamento como passageiro vem primeiro; as caronas oferecidas

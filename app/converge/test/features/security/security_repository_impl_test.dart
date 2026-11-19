@@ -84,14 +84,17 @@ void main() {
     expect(block.createdAt, DateTime.utc(2026, 11, 16, 12));
   });
 
-  test('unblockUser chama DELETE com o id e aceita resposta sem corpo', () async {
-    respondWith(null, status: 204);
+  test(
+    'unblockUser chama DELETE com o id e aceita resposta sem corpo',
+    () async {
+      respondWith(null, status: 204);
 
-    await repository.unblockUser('user-2');
+      await repository.unblockUser('user-2');
 
-    expect(requests.single.method, 'DELETE');
-    expect(requests.single.path, '/blocks/user-2');
-  });
+      expect(requests.single.method, 'DELETE');
+      expect(requests.single.path, '/blocks/user-2');
+    },
+  );
 
   test('listBlocks lê a lista do envelope', () async {
     respondWith(success([blockJson(), blockJson()..['blockedUserId'] = 'u3']));
@@ -134,33 +137,36 @@ void main() {
     expect(reports.single.rideId, 'ride-1');
   });
 
-  test('erro do backend vira ApiException com a mensagem do envelope', () async {
-    respondWith({
-      'success': false,
-      'data': null,
-      'error': {
-        'code': 'BAD_REQUEST',
-        'message': 'Você já fez essa denúncia e ela ainda está em análise.',
-        'fields': ['reportedId'],
-      },
-      'timestamp': '2026-11-16T12:00:00Z',
-    }, status: 400);
+  test(
+    'erro do backend vira ApiException com a mensagem do envelope',
+    () async {
+      respondWith({
+        'success': false,
+        'data': null,
+        'error': {
+          'code': 'BAD_REQUEST',
+          'message': 'Você já fez essa denúncia e ela ainda está em análise.',
+          'fields': ['reportedId'],
+        },
+        'timestamp': '2026-11-16T12:00:00Z',
+      }, status: 400);
 
-    await expectLater(
-      repository.createReport(
-        const CreateReportRequest(
-          reportedId: 'user-2',
-          reason: ReportReason.inappropriateConduct,
+      await expectLater(
+        repository.createReport(
+          const CreateReportRequest(
+            reportedId: 'user-2',
+            reason: ReportReason.inappropriateConduct,
+          ),
         ),
-      ),
-      throwsA(
-        isA<ApiException>()
-            .having((e) => e.code, 'code', ApiErrorCode.badRequest)
-            .having((e) => e.status, 'status', 400)
-            .having((e) => e.fields, 'fields', {'reportedId'}),
-      ),
-    );
-  });
+        throwsA(
+          isA<ApiException>()
+              .having((e) => e.code, 'code', ApiErrorCode.badRequest)
+              .having((e) => e.status, 'status', 400)
+              .having((e) => e.fields, 'fields', {'reportedId'}),
+        ),
+      );
+    },
+  );
 
   test('sem resposta do servidor, lança erro de rede', () async {
     dio.interceptors.insert(
@@ -173,7 +179,9 @@ void main() {
 
     await expectLater(
       repository.listBlocks(),
-      throwsA(isA<ApiException>().having((e) => e.isNetworkError, 'rede', true)),
+      throwsA(
+        isA<ApiException>().having((e) => e.isNetworkError, 'rede', true),
+      ),
     );
   });
 
@@ -197,7 +205,10 @@ void main() {
     });
 
     test('BlockModel sem nome mostra um texto genérico', () {
-      final block = BlockModel.fromJson(const {'id': 'b', 'blockedUserId': 'u'});
+      final block = BlockModel.fromJson(const {
+        'id': 'b',
+        'blockedUserId': 'u',
+      });
 
       expect(block.displayName, 'Usuário');
     });

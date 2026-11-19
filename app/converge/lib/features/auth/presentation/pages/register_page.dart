@@ -358,7 +358,9 @@ class _RegisterPageState extends ConsumerState<RegisterPage> {
                 ),
               ),
               RegisterStickyFooter(
-                label: _currentStep < 3 ? buildActionButtonLabel('Continuar') : 'Criar Conta',
+                label: _currentStep < 3
+                    ? buildActionButtonLabel('Continuar')
+                    : 'Criar Conta',
                 isEnabled: _isCurrentStepValid,
                 isLoading: isLoading,
                 showLoginPrompt: _currentStep == 1,

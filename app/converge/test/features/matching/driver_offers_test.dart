@@ -88,5 +88,4 @@ void main() {
     expect(offers.single.route, isNull);
     expect(offers.single.rides.single.id, fakeRideId);
   });
-
 }

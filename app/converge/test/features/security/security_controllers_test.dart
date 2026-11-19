@@ -113,7 +113,9 @@ void main() {
         // Sem nova tentativa automática, para o erro aparecer no teste.
         retry: (_, _) => null,
         overrides: [
-          securityRepositoryProvider.overrideWithValue(_FailingListRepository()),
+          securityRepositoryProvider.overrideWithValue(
+            _FailingListRepository(),
+          ),
         ],
       );
       failing.listen(blockedUsersProvider, (_, _) {});
@@ -149,28 +151,33 @@ void main() {
       expect(reports.first.rideId, 'ride-1');
     });
 
-    test('denúncia repetida propaga o erro do backend e não entra na lista', () async {
-      await container.read(reportsProvider.future);
-      final controller = container.read(reportsProvider.notifier);
-      await controller.submit(
-        reportedId: 'user-2',
-        reason: ReportReason.inappropriateConduct,
-      );
-
-      await expectLater(
-        controller.submit(
+    test(
+      'denúncia repetida propaga o erro do backend e não entra na lista',
+      () async {
+        await container.read(reportsProvider.future);
+        final controller = container.read(reportsProvider.notifier);
+        await controller.submit(
           reportedId: 'user-2',
           reason: ReportReason.inappropriateConduct,
-        ),
-        throwsA(
-          isA<ApiException>()
-              .having((e) => e.status, 'status', 400)
-              .having((e) => e.fields, 'fields', {'reportedId'}),
-        ),
-      );
+        );
 
-      expect(container.read(reportsProvider).value, hasLength(1));
-    });
+        await expectLater(
+          controller.submit(
+            reportedId: 'user-2',
+            reason: ReportReason.inappropriateConduct,
+          ),
+          throwsA(
+            isA<ApiException>().having((e) => e.status, 'status', 400).having(
+              (e) => e.fields,
+              'fields',
+              {'reportedId'},
+            ),
+          ),
+        );
+
+        expect(container.read(reportsProvider).value, hasLength(1));
+      },
+    );
   });
 }
 

@@ -40,7 +40,10 @@ void main() {
     });
 
     test('passageiro aceito tem uma conversa com o motorista', () {
-      final conversations = ChatConversation.ofRide(fakeRide(), fakePassengerId);
+      final conversations = ChatConversation.ofRide(
+        fakeRide(),
+        fakePassengerId,
+      );
 
       expect(conversations, hasLength(1));
       expect(conversations.single.viewerIsDriver, isFalse);
@@ -66,20 +69,23 @@ void main() {
       expect(ChatConversation.ofRide(ride, fakePassengerId), isEmpty);
     });
 
-    test('passageiro que ainda não foi aceito não entra na sala dos outros', () {
-      final ride = fakeRide(
-        extraParticipants: [
-          {
-            'userId': 'passenger-2',
-            'name': 'Bruno Lima',
-            'role': 'PASSENGER',
-            'status': 'REQUESTED',
-          },
-        ],
-      );
+    test(
+      'passageiro que ainda não foi aceito não entra na sala dos outros',
+      () {
+        final ride = fakeRide(
+          extraParticipants: [
+            {
+              'userId': 'passenger-2',
+              'name': 'Bruno Lima',
+              'role': 'PASSENGER',
+              'status': 'REQUESTED',
+            },
+          ],
+        );
 
-      expect(ChatConversation.ofRide(ride, 'passenger-2'), isEmpty);
-    });
+        expect(ChatConversation.ofRide(ride, 'passenger-2'), isEmpty);
+      },
+    );
 
     test('passageiro recusado, ausente ou que saiu perde a conversa', () {
       for (final status in ['REJECTED', 'NO_SHOW', 'CANCELLED']) {
@@ -90,7 +96,11 @@ void main() {
           isEmpty,
           reason: status,
         );
-        expect(ChatConversation.ofRide(ride, fakeDriverId), isEmpty, reason: status);
+        expect(
+          ChatConversation.ofRide(ride, fakeDriverId),
+          isEmpty,
+          reason: status,
+        );
       }
     });
 

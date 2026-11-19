@@ -38,5 +38,4 @@ void main() {
     expect(find.text('Iniciar trajeto'), findsNothing);
     expect(find.textContaining('Aceite um passageiro'), findsOneWidget);
   });
-
 }
