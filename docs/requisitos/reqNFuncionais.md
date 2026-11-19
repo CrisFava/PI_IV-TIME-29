@@ -27,7 +27,7 @@ Os requisitos não funcionais descrevem como o sistema deve se comportar — qua
 | **RNF19** | O sistema deve manter de forma consistente os dados necessários para geração dos indicadores de mobilidade e sustentabilidade. |
 | **RNF20** | A confirmação de carona e a atualização de vagas devem ser atômicas, impedindo que duas solicitações simultâneas ocupem a última vaga. |
 | **RNF21** | O backend deve tratar o cabeçalho `Idempotency-Key` enviado pelo cliente (RT11), evitando confirmações, cancelamentos ou registros de ausência duplicados em caso de repetição da requisição. |
-| **RNF22** | Valores monetários devem ser calculados e armazenados com precisão decimal, em duas casas, com regra de arredondamento definida. A soma das partes do rateio deve ser igual ao custo total, com a diferença de centavos atribuída ao motorista. |
+| **RNF22** | Valores monetários devem ser calculados e armazenados com precisão decimal, em duas casas, com regra de arredondamento definida. A soma das partes do rateio deve ser igual ao custo total: o que os passageiros não cobrirem (centavos do arredondamento e o que os tetos cortarem) fica com o motorista. |
 | **RNF23** | O sistema deve utilizar mecanismos que garantam a consistência dos valores de rateio durante entradas, cancelamentos e ausências de participantes. |
 | **RNF24** | O sistema deve manter de forma consistente os registros de viagens, participantes, pagamentos, cancelamentos e ausências para permitir a geração correta dos históricos e indicadores. |
 | **RNF25** | O backend deve ser organizado conforme a arquitetura de Monólito Modular Hexagonal definida no projeto, separando responsabilidades entre as camadas `presentation`, `application`, `domain` e `infrastructure` em cada módulo de negócio. |

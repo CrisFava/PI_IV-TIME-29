@@ -208,7 +208,8 @@ public class MatchRoutesHandler implements RequestHandler<MatchRoutesRequest, Ma
     }
 
     /**
-     * Custo da viagem com o desvio, dividido entre os que já ocupam o carro, o motorista e este passageiro.
+     * Custo da viagem com o desvio, dividido só entre os passageiros: os que já ocupam o carro e este.
+     * O motorista não entra na divisão.
      * É uma estimativa: o valor final depende de quem realmente for (RF35 a RF38).
      */
     static BigDecimal estimatedCostPerPassenger(MatchRoute offer, double detourKm) {
@@ -220,19 +221,19 @@ public class MatchRoutesHandler implements RequestHandler<MatchRoutesRequest, Ma
         int occupied = offer.getTotalSeats() == null
                 ? 0
                 : Math.max(0, offer.getTotalSeats() - offer.getAvailableSeats());
-        // Passageiros já confirmados + o motorista + este passageiro
-        int people = occupied + 2;
+        // Passageiros já confirmados + este passageiro
+        int passengers = occupied + 1;
 
-        return tripCost.divide(BigDecimal.valueOf(people), 2, RoundingMode.HALF_EVEN);
+        return tripCost.divide(BigDecimal.valueOf(passengers), 2, RoundingMode.HALF_EVEN);
     }
 
     /**
-     * Teto do passageiro (RF35, RF37): metade do custo da rota com o desvio dele.
-     * É o pior caso, em que só ele e o motorista dividem a viagem.
+     * Teto do passageiro (RF35, RF37): o custo inteiro da rota com o desvio dele.
+     * É o pior caso, em que ele é o único passageiro e paga a viagem sozinho.
      */
     static BigDecimal maxAmount(MatchRoute offer, double detourKm) {
         BigDecimal tripCost = tripCost(offer, detourKm);
-        return tripCost == null ? null : tripCost.divide(BigDecimal.TWO, 2, RoundingMode.HALF_EVEN);
+        return tripCost == null ? null : tripCost.setScale(2, RoundingMode.HALF_EVEN);
     }
 
     /** Energia da rota com o desvio mais pedágio e estacionamento. Null sem o custo por km do veículo. */

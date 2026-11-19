@@ -621,7 +621,7 @@ Estrutura composta e multivalorada que representa cada participante de uma viage
 | `cancellationReason` | Texto | Não | Preenchido pelo participante ao cancelar. |
 | `lateCancellation` | Booleano | Sim | `false` por padrão. `true` quando cancela com menos de 2h de antecedência. |
 | `estimatedAmount` | Número decimal monetário | Sim | `Decimal128`. Valor estimado atual (RF34/RF36). Recalculado a cada entrada, cancelamento ou ausência de participantes. Nunca ultrapassa o `maxAmount`. |
-| `maxAmount` | Número decimal monetário | Sim | `Decimal128`. Teto de proteção do passageiro (RF35/RF37): metade do custo da rota com o desvio do passageiro, gravado na confirmação. Nunca pode ser superado pelo `finalAmount`. |
+| `maxAmount` | Número decimal monetário | Sim | `Decimal128`. Teto de proteção do passageiro (RF35/RF37): custo inteiro da rota com o desvio do passageiro, gravado na confirmação. Nunca pode ser superado pelo `finalAmount`. |
 | `finalAmount` | Número decimal monetário | Não | `Decimal128`. Calculado somente ao concluir a viagem. Nulo até a conclusão. |
 | `paymentStatus` | Elemento de lista enumerada | Sim | Valores: `PENDING`, `AWAITING_DRIVER_CONFIRMATION`, `PAID`, `NOT_APPLICABLE`. Em `AWAITING_DRIVER_CONFIRMATION` o relógio da dívida fica **pausado** (a viagem não vira vencida enquanto espera o motorista confirmar). |
 | `paymentConfirmedByDriver` | Booleano | Sim | `false` por padrão. Atualizado pelo motorista ao confirmar recebimento. |

@@ -245,25 +245,25 @@ class MatchRoutesHandlerTest {
     }
 
     @Test
-    @DisplayName("Custo estimado: (km x custo por km + pedágio e estacionamento) dividido entre motorista e passageiro")
+    @DisplayName("Custo estimado: (km x custo por km + pedágio e estacionamento) dividido só entre os passageiros")
     void shouldEstimateCostPerPassenger() {
-        // 10 km x R$ 0,50 + R$ 4,00 = R$ 9,00, dividido por 2 (motorista + passageiro)
-        assertEquals(new BigDecimal("4.50"), MatchRoutesHandler.estimatedCostPerPassenger(driverOffer(), 0));
+        // 10 km x R$ 0,50 + R$ 4,00 = R$ 9,00, todo do único passageiro (o motorista não entra na divisão)
+        assertEquals(new BigDecimal("9.00"), MatchRoutesHandler.estimatedCostPerPassenger(driverOffer(), 0));
 
-        // Com 1 passageiro já confirmado (2 vagas livres de 3), divide por 3
+        // Com 1 passageiro já confirmado (2 vagas livres de 3), divide por 2
         MatchRoute withOnePassenger = offer("offer-1", "driver-1", "07:00", WEEKDAYS, 3.0, 2);
-        assertEquals(new BigDecimal("3.00"), MatchRoutesHandler.estimatedCostPerPassenger(withOnePassenger, 0));
+        assertEquals(new BigDecimal("4.50"), MatchRoutesHandler.estimatedCostPerPassenger(withOnePassenger, 0));
     }
 
     @Test
-    @DisplayName("Teto do passageiro: metade do custo da rota com o desvio, mesmo com outros passageiros no carro")
-    void shouldComputeMaxAmountAsHalfOfTripCost() {
-        // (10 km + 2 km de desvio) x R$ 0,50 + R$ 4,00 = R$ 10,00 -> teto de R$ 5,00
-        assertEquals(new BigDecimal("5.00"), MatchRoutesHandler.maxAmount(driverOffer(), 2.0));
+    @DisplayName("Teto do passageiro: o custo inteiro da rota com o desvio, mesmo com outros passageiros no carro")
+    void shouldComputeMaxAmountAsTheWholeTripCost() {
+        // (10 km + 2 km de desvio) x R$ 0,50 + R$ 4,00 = R$ 10,00 -> teto de R$ 10,00
+        assertEquals(new BigDecimal("10.00"), MatchRoutesHandler.maxAmount(driverOffer(), 2.0));
 
         // Outros passageiros baixam a estimativa, mas não o teto
         MatchRoute withOnePassenger = offer("offer-1", "driver-1", "07:00", WEEKDAYS, 3.0, 2);
-        assertEquals(new BigDecimal("5.00"), MatchRoutesHandler.maxAmount(withOnePassenger, 2.0));
+        assertEquals(new BigDecimal("10.00"), MatchRoutesHandler.maxAmount(withOnePassenger, 2.0));
         assertTrue(MatchRoutesHandler.estimatedCostPerPassenger(withOnePassenger, 2.0)
                 .compareTo(MatchRoutesHandler.maxAmount(withOnePassenger, 2.0)) < 0);
     }

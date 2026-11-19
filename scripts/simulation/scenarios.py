@@ -73,8 +73,8 @@ def happy_path(world: SimulationWorld) -> None:
     world.expect_participant(ride, driver, "COMPLETED")
     total_cost = Decimal(str((ride.get("costs") or {}).get("totalCost") or 0))
     if total_cost <= 0:
-        print("      AVISO: custo total da viagem R$ 0. O RideCostHandler do servidor de sockets ainda "
-              "devolve valores zerados (rateio não implementado); a cobrança abaixo usa R$ 10,00.")
+        print("      AVISO: custo total da viagem R$ 0 (o veículo tem consumo e preço da energia?); "
+              "a cobrança abaixo usa R$ 10,00.")
     for passenger in (ana, bruno):
         participant = world.expect_participant(ride, passenger, "COMPLETED")
         final = Decimal(str(participant.get("finalAmount") or 0))
