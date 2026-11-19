@@ -7,6 +7,7 @@ import 'package:converge/features/matching/state/passenger_match_phase.dart';
 import 'package:converge/features/matching/state/passenger_match_state.dart';
 import 'package:converge/features/ride/data/repository/ride_repository_impl.dart';
 import 'package:converge/features/route/data/models/create_route_request.dart';
+import 'package:converge/features/route/data/models/route_recurrence.dart';
 import 'package:converge/features/route/data/models/route_place_model.dart';
 import 'package:converge/features/route/data/repository/route_repository_impl.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
@@ -249,6 +250,38 @@ void main() {
       await pumpEventQueue();
 
       expect(routes.calls, contains('deleteRoute:created-1'));
+    });
+
+    test('fechar o pedido desativa também um trajeto avulso reaproveitado', () async {
+      final once = CreateRouteRequest(
+        type: request.type,
+        origin: request.origin,
+        destination: request.destination,
+        departureTime: request.departureTime,
+        estimatedArrivalTime: request.estimatedArrivalTime,
+        weekDays: request.weekDays,
+        recurrence: RouteRecurrence.once,
+        date: '2026-11-19',
+      );
+      routes.routes.add(FakeMatchingRouteRepository.routeFrom('saved-1', once));
+
+      await controller().prepareSearchRoute(once);
+      controller().reset();
+      await pumpEventQueue();
+
+      expect(routes.calls, contains('deleteRoute:saved-1'));
+    });
+
+    test('fechar o pedido mantém um trajeto semanal reaproveitado', () async {
+      routes.routes.add(
+        FakeMatchingRouteRepository.routeFrom('saved-1', request),
+      );
+
+      await controller().prepareSearchRoute(request);
+      controller().reset();
+      await pumpEventQueue();
+
+      expect(routes.calls, isNot(contains('deleteRoute:saved-1')));
     });
 
     test('com a carona aceita, o trajeto de procura continua', () async {
