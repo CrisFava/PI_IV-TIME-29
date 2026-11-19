@@ -9,7 +9,7 @@ import com.converge.api.shared.application.UseCase;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
 
-import java.time.LocalDate;
+import java.time.LocalDateTime;
 import java.util.List;
 
 @Service
@@ -20,11 +20,11 @@ public class ListMyRoutesUseCase implements UseCase<String, List<Route>> {
 
     @Override
     public List<Route> execute(String userId) {
-        LocalDate today = LocalDate.now(RouteAccess.APP_ZONE);
+        LocalDateTime now = LocalDateTime.now(RouteAccess.APP_ZONE);
 
-        // Caronas de um dia só que já passaram não aparecem mais
+        // Caronas de um dia só cujo horário já passou não aparecem mais
         return routeRepository.findByUserIdAndStatusNot(userId, RouteStatus.INACTIVE).stream()
-                .filter(route -> !route.isPast(today))
+                .filter(route -> !route.isPast(now))
                 .toList();
     }
 

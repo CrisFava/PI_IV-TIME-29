@@ -60,6 +60,44 @@ class RideTest {
     }
 
     @Test
+    @DisplayName("Pedidos param 5 min antes da saída; iniciar só de 5 min antes a 5 min depois")
+    void shouldApplyDepartureTimeWindows() {
+        Ride ride = validRide();
+        ride.requestSeat("passenger-1", "route-1", place("Rua A"), place("Campus PUC"));
+        ride.acceptPassenger("passenger-1");
+
+        // A 4 min da saída já não entra ninguém
+        ReflectionTestUtils.setField(ride, "departureDateTime", LocalDateTime.now().plusMinutes(4));
+        assertThatThrownBy(() -> ride.requestSeat("passenger-2", "route-2", place("Rua B"), place("Campus PUC")))
+                .isInstanceOf(ApplicationException.class);
+
+        LocalDateTime departure = ride.getDepartureDateTime();
+        assertThatThrownBy(() -> ride.start(departure.minusMinutes(6))).isInstanceOf(ApplicationException.class);
+        assertThatThrownBy(() -> ride.start(departure.plusMinutes(6))).isInstanceOf(ApplicationException.class);
+
+        ride.start(departure.plusMinutes(5));
+        assertThat(ride.getStatus()).isEqualTo(RideStatus.IN_PROGRESS);
+    }
+
+    @Test
+    @DisplayName("Viagem não iniciada é cancelada: confirmados saem sem penalidade e pedidos expiram")
+    void shouldCancelRideNotStarted() {
+        Ride ride = validRide();
+        ride.requestSeat("passenger-1", "route-1", place("Rua A"), place("Campus PUC"));
+        ride.acceptPassenger("passenger-1");
+        ride.requestSeat("passenger-2", "route-2", place("Rua B"), place("Campus PUC"));
+
+        var affected = ride.cancelNotStarted(LocalDateTime.now());
+
+        assertThat(ride.getStatus()).isEqualTo(RideStatus.CANCELLED);
+        assertThat(affected).containsExactlyInAnyOrder("passenger-1", "passenger-2");
+        assertThat(ride.getParticipants())
+                .filteredOn(participant -> "passenger-1".equals(participant.getUserId()))
+                .extracting(Participant::getStatus)
+                .containsExactly(ParticipantStatus.CANCELLED);
+    }
+
+    @Test
     @DisplayName("Viagem nova deve nascer aguardando confirmação e com as vagas todas livres")
     void shouldStartAwaitingConfirmationWithAllSeatsAvailable() {
         Ride ride = validRide();

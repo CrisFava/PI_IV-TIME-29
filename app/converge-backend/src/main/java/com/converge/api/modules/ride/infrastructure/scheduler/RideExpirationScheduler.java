@@ -3,6 +3,7 @@
 package com.converge.api.modules.ride.infrastructure.scheduler;
 
 import com.converge.api.modules.ride.application.ExpirePendingRideRequestsUseCase;
+import com.converge.api.modules.ride.application.CancelRidesNotStartedUseCase;
 import com.converge.api.modules.ride.application.ExpireRidesWithoutParticipantsUseCase;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
@@ -23,6 +24,7 @@ public class RideExpirationScheduler {
 
     private final ExpirePendingRideRequestsUseCase expirePendingRideRequests;
     private final ExpireRidesWithoutParticipantsUseCase expireRidesWithoutParticipants;
+    private final CancelRidesNotStartedUseCase cancelRidesNotStarted;
 
     @Scheduled(
             initialDelayString = "PT10S",
@@ -53,6 +55,22 @@ public class RideExpirationScheduler {
             }
         } catch (Exception e) {
             log.warn("Erro ao executar job de expiração de viagens sem participantes: {}", e.getMessage(), e);
+        }
+    }
+
+    // Viagens que passaram 5 min do horário sem o motorista iniciar
+    @Scheduled(
+            initialDelayString = "PT30S",
+            fixedDelayString = "${converge.ride.not-started-check-interval:PT1M}"
+    )
+    public void processNotStartedRides() {
+        try {
+            int cancelledCount = cancelRidesNotStarted.execute(LocalDateTime.now());
+            if (cancelledCount > 0) {
+                log.info("Job de início: {} viagem(ns) cancelada(s) por não terem sido iniciadas a tempo.", cancelledCount);
+            }
+        } catch (Exception e) {
+            log.warn("Erro ao executar job de viagens não iniciadas: {}", e.getMessage(), e);
         }
     }
 }

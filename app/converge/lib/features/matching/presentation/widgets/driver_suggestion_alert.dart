@@ -34,8 +34,8 @@ class DriverSuggestionAlert extends StatelessWidget {
     return ActionAlertCard(
       key: ValueKey('driver_suggestion_${match.driverRouteId}'),
       icon: Icons.directions_car_rounded,
-      accentColor: AppColors.info,
-      accentBackground: AppColors.infoBackground,
+      accentColor: AppColors.primary,
+      accentBackground: AppColors.neutralLight,
       title: 'Motorista disponível',
       message: vehicle.isEmpty
           ? '${match.otherUserName} pode te dar carona.'

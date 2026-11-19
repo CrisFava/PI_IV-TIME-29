@@ -11,7 +11,7 @@ import com.converge.api.shared.presentation.exception.ErrorCode;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Component;
 
-import java.time.LocalDate;
+import java.time.LocalDateTime;
 import java.util.Optional;
 import java.util.Set;
 
@@ -29,7 +29,7 @@ public class OfferOverlapValidator {
 
     private final RouteRepository routeRepository;
 
-    public void validate(Route route, LocalDate today) {
+    public void validate(Route route, LocalDateTime now) {
         if (route.getType() != RouteType.OFFER) {
             return;
         }
@@ -39,7 +39,7 @@ public class OfferOverlapValidator {
                 .filter(offer -> offer.getType() == RouteType.OFFER)
                 .filter(offer -> route.getId() == null || !route.getId().equals(offer.getId()))
                 .filter(offer -> LIVE_STATUSES.contains(offer.getStatus()))
-                .filter(offer -> !offer.isPast(today))
+                .filter(offer -> !offer.isPast(now))
                 .filter(route::sharesDayWith)
                 .filter(route::overlapsInTimeWith)
                 .findFirst();

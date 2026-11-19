@@ -16,6 +16,7 @@ import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
 
 import java.time.LocalDate;
+import java.time.LocalDateTime;
 import java.util.Set;
 
 @Service
@@ -38,7 +39,7 @@ public class CreateRouteUseCase implements UseCase<CreateRouteCommand, Route> {
         validateNotDuplicated(route);
         // A chegada estimada vem da rota: é ela que define até quando o motorista está dirigindo
         applyGeometry(route);
-        offerOverlapValidator.validate(route, today);
+        offerOverlapValidator.validate(route, LocalDateTime.now(RouteAccess.APP_ZONE));
         return routeRepository.save(route);
     }
 

@@ -50,8 +50,8 @@ class IncomingRideRequestAlert extends ConsumerWidget {
     return ActionAlertCard(
       key: ValueKey('incoming_request_${request.key}'),
       icon: Icons.person_pin_circle_rounded,
-      accentColor: AppColors.success,
-      accentBackground: AppColors.successBackground,
+      accentColor: AppColors.primary,
+      accentBackground: AppColors.neutralLight,
       title: 'Pedido de vaga',
       message: '${passenger.displayName} quer ir com você.',
       details: [

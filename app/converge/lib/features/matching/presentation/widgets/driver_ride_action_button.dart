@@ -47,6 +47,23 @@ class DriverRideActionButton extends StatelessWidget {
       );
     }
 
+    // "Iniciar trajeto" só de 5 min antes a 5 min depois do horário de saída
+    final departure = ride.departureDateTime;
+    if (departure != null) {
+      final now = DateTime.now();
+      final opensAt = departure.subtract(startTolerance);
+      if (now.isBefore(opensAt)) {
+        return _hint(
+          'Você poderá iniciar o trajeto a partir das ${_hhmm(opensAt)}.',
+        );
+      }
+      if (now.isAfter(departure.add(startTolerance))) {
+        return _hint(
+          'O prazo para iniciar passou: a viagem será cancelada automaticamente.',
+        );
+      }
+    }
+
     return _button(
       key: ValueKey('start_ride_${ride.id}'),
       label: 'Iniciar trajeto',
@@ -55,6 +72,23 @@ class DriverRideActionButton extends StatelessWidget {
       onPressed: onStart,
     );
   }
+
+  /// Tolerância para iniciar, igual à do backend (`Ride.START_TOLERANCE_MINUTES`).
+  static const Duration startTolerance = Duration(minutes: 5);
+
+  static String _hhmm(DateTime time) =>
+      '${time.hour.toString().padLeft(2, '0')}:'
+      '${time.minute.toString().padLeft(2, '0')}';
+
+  Widget _hint(String text) => Text(
+    text,
+    key: ValueKey('start_ride_hint_${ride.id}'),
+    style: const TextStyle(
+      fontSize: 12.5,
+      fontWeight: FontWeight.w600,
+      color: AppColors.textDark,
+    ),
+  );
 
   Widget _button({
     required Key key,

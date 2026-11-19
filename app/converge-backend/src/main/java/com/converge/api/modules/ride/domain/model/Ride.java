@@ -70,6 +70,15 @@ public class Ride {
 
     public static final String UNIQUE_OPEN_RIDE_INDEX = "unique_open_ride_per_route_date";
 
+    // Pedidos de vaga e aceites param este tanto antes da saída
+    public static final int REQUEST_CUTOFF_MINUTES = 5;
+
+    // "Iniciar trajeto" vale de 5 min antes a 5 min depois da saída; passado isso
+    // sem iniciar, a viagem é cancelada automaticamente
+    public static final int START_TOLERANCE_MINUTES = 5;
+
+    public static final String NOT_STARTED_REASON = "Viagem não iniciada até 5 min depois do horário de saída.";
+
     @Id
     @EqualsAndHashCode.Include
     private ObjectId id;
@@ -377,7 +386,16 @@ public class Ride {
         return Collections.unmodifiableList(this.itinerary);
     }
 
-        public void start() {
+    // Inicia exatamente no horário de saída (testes e simulações)
+    public void start() {
+        start(this.departureDateTime);
+    }
+
+    /**
+     * Inicia a viagem: só confirmada e de 5 min antes a 5 min depois da saída.
+     * Os pedidos que ainda esperavam resposta são recusados.
+     */
+    public void start(LocalDateTime now) {
         if (this.status != RideStatus.CONFIRMED) {
             throw new ApplicationException(
                     ErrorCode.BAD_REQUEST,
@@ -386,13 +404,67 @@ public class Ride {
             );
         }
 
-        LocalDateTime now = LocalDateTime.now();
+        if (!isWithinStartWindow(now)) {
+            throw new ApplicationException(
+                    ErrorCode.BAD_REQUEST,
+                    "Só é possível iniciar a viagem de " + START_TOLERANCE_MINUTES + " min antes a "
+                            + START_TOLERANCE_MINUTES + " min depois do horário de saída ("
+                            + String.format("%02d:%02d", this.departureDateTime.getHour(),
+                            this.departureDateTime.getMinute()) + ").",
+                    Set.of("departureDateTime")
+            );
+        }
+
         this.participants.stream()
                 .filter(participant -> participant.getRole() == ParticipationRole.PASSENGER)
                 .filter(participant -> participant.getStatus() == ParticipantStatus.REQUESTED)
                 .forEach(participant -> participant.reject("Viagem iniciada.", now));
 
         this.status = RideStatus.IN_PROGRESS;
+    }
+
+    // De 5 min antes a 5 min depois da saída
+    public boolean isWithinStartWindow(LocalDateTime now) {
+        return !now.isBefore(this.departureDateTime.minusMinutes(START_TOLERANCE_MINUTES))
+                && !now.isAfter(this.departureDateTime.plusMinutes(START_TOLERANCE_MINUTES));
+    }
+
+    // Faltam 5 min ou menos para a saída: não entram nem são aceitos novos passageiros
+    private boolean isPastRequestCutoff(LocalDateTime now) {
+        return !now.isBefore(this.departureDateTime.minusMinutes(REQUEST_CUTOFF_MINUTES));
+    }
+
+    /**
+     * Passou 5 min do horário de saída sem iniciar: a viagem é cancelada, os
+     * confirmados saem sem penalidade e os pedidos pendentes expiram.
+     * Devolve os passageiros afetados (confirmados e pendentes), para avisá-los.
+     */
+    public List<String> cancelNotStarted(LocalDateTime now) {
+        if (this.status != RideStatus.AWAITING_CONFIRMATION && this.status != RideStatus.CONFIRMED) {
+            throw new ApplicationException(
+                    ErrorCode.BAD_REQUEST,
+                    "Só é possível cancelar automaticamente uma viagem que ainda não começou.",
+                    Set.of("status")
+            );
+        }
+
+        this.markCancelled(this.driverId, NOT_STARTED_REASON);
+        this.updatedAt = now;
+
+        List<String> affected = new ArrayList<>();
+        for (Participant participant : this.participants) {
+            if (participant.getRole() != ParticipationRole.PASSENGER) {
+                continue;
+            }
+            if (participant.getStatus() == ParticipantStatus.CONFIRMED) {
+                participant.cancel(NOT_STARTED_REASON, false, now);
+                affected.add(participant.getUserId());
+            } else if (participant.getStatus() == ParticipantStatus.REQUESTED) {
+                participant.expire(now);
+                affected.add(participant.getUserId());
+            }
+        }
+        return affected;
     }
 
     public void markNoShow(String passengerId) {
@@ -638,10 +710,10 @@ public class Ride {
             );
         }
 
-        if (this.departureDateTime.isBefore(LocalDateTime.now())) {
+        if (isPastRequestCutoff(LocalDateTime.now())) {
             throw new ApplicationException(
                     ErrorCode.BAD_REQUEST,
-                    "Esta viagem já saiu e não aceita pedidos de vaga.",
+                    "Esta viagem sai em menos de " + REQUEST_CUTOFF_MINUTES + " min e não aceita mais pedidos de vaga.",
                     Set.of("departureDateTime")
             );
         }
@@ -717,10 +789,10 @@ public class Ride {
     private void validateCanAccept() {
         this.validateCanRespondToRequests();
 
-        if (this.departureDateTime.isBefore(LocalDateTime.now())) {
+        if (isPastRequestCutoff(LocalDateTime.now())) {
             throw new ApplicationException(
                     ErrorCode.BAD_REQUEST,
-                    "O horário de saída já passou e não é mais possível aceitar passageiros.",
+                    "Faltam menos de " + REQUEST_CUTOFF_MINUTES + " min para a saída: não é mais possível aceitar passageiros.",
                     Set.of("departureDateTime")
             );
         }

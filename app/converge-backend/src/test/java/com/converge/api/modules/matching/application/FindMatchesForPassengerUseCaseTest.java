@@ -97,7 +97,7 @@ class FindMatchesForPassengerUseCaseTest {
         List<MatchResponseDTO> view = List.of();
         when(matchViewAssembler.forPassenger(eq(matches), anyMap(), anyMap(), any())).thenReturn(view);
 
-        assertThat(useCase.execute(command())).isSameAs(view);
+        assertThat(useCase.execute(command())).isEqualTo(view);
 
         @SuppressWarnings("unchecked")
         ArgumentCaptor<List<MatchingRoute>> candidates = ArgumentCaptor.forClass(List.class);

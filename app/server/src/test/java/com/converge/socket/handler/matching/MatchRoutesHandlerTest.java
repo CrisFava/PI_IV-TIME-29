@@ -171,13 +171,18 @@ class MatchRoutesHandlerTest {
     }
 
     @Test
-    @DisplayName("Deve descartar saídas com mais de 30 min de diferença e aceitar exatamente 30")
+    @DisplayName("Motorista pode sair de 30 min antes a 5 min depois do passageiro (limites incluídos)")
     void shouldApplyScheduleWindow() throws ServerException {
-        MatchRoute late = search("search-1", "passenger-1", -22.9000, -47.0600, "07:31", WEEKDAYS);
-        MatchRoute limit = search("search-2", "passenger-2", -22.9000, -47.0600, "07:30", WEEKDAYS);
+        // Motorista às 07:00
+        MatchRoute driverTooEarly = search("search-1", "passenger-1", -22.9000, -47.0600, "07:31", WEEKDAYS);
+        MatchRoute driverThirtyEarlier = search("search-2", "passenger-2", -22.9000, -47.0600, "07:30", WEEKDAYS);
+        MatchRoute driverFiveLater = search("search-3", "passenger-3", -22.9000, -47.0600, "06:55", WEEKDAYS);
+        MatchRoute driverTooLate = search("search-4", "passenger-4", -22.9000, -47.0600, "06:54", WEEKDAYS);
 
-        assertTrue(passengerSeeks(late, driverOffer()).isEmpty());
-        assertEquals(1, passengerSeeks(limit, driverOffer()).size());
+        assertTrue(passengerSeeks(driverTooEarly, driverOffer()).isEmpty());
+        assertEquals(1, passengerSeeks(driverThirtyEarlier, driverOffer()).size());
+        assertEquals(1, passengerSeeks(driverFiveLater, driverOffer()).size());
+        assertTrue(passengerSeeks(driverTooLate, driverOffer()).isEmpty());
     }
 
     @Test
@@ -191,7 +196,8 @@ class MatchRoutesHandlerTest {
     @DisplayName("Deve ordenar do mais para o menos compatível")
     void shouldRankByScore() throws ServerException {
         MatchRoute close = offer("offer-close", "driver-1", "07:10", WEEKDAYS, 3.0, 3);
-        MatchRoute later = offer("offer-later", "driver-2", "07:35", WEEKDAYS, 3.0, 3);
+        // O passageiro sai às 07:10: um motorista 20 min antes ainda entra, mas pontua menos
+        MatchRoute later = offer("offer-later", "driver-2", "06:50", WEEKDAYS, 3.0, 3);
 
         List<MatchResult> results = passengerSeeks(nearbySearch(), later, close);
 

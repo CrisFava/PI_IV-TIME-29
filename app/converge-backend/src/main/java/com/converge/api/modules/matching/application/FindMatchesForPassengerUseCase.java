@@ -86,7 +86,11 @@ public class FindMatchesForPassengerUseCase implements UseCase<FindMatchesComman
         List<CompatibleMatch> matches = matchingGateway.findDriversFor(matchingRouteFactory.fromSearch(search), candidates);
         matchingRecorder.replaceForPassengerRoute(command.routeId(), matches);
 
-        return matchViewAssembler.forPassenger(matches, offersById, vehiclesByRouteId, search);
+        // Sem próxima data (já saiu ou sai em menos de 5 min), não dá para pedir vaga
+        return matchViewAssembler.forPassenger(matches, offersById, vehiclesByRouteId, search)
+                .stream()
+                .filter(match -> match.nextRideDate() != null)
+                .toList();
     }
 
     static boolean sameDayWhenFixed(Route offer, Route search) {

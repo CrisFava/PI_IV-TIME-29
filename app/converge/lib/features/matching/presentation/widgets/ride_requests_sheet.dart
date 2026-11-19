@@ -13,17 +13,24 @@ import '../../../../core/widgets/details_sheet.dart';
 import '../../../../core/widgets/show_app_notice.dart';
 import '../../../auth/state/auth_action_controller.dart';
 import '../../../ride/data/models/participant_status.dart';
+import '../../../ride/data/models/ride_model.dart';
+import '../../../ride/data/models/ride_status.dart';
 import '../../../ride/state/ride_providers.dart';
 import '../../data/models/driver_offer.dart';
 import '../../data/models/driver_ride_request.dart';
 import '../../state/driver_ride_actions_controller.dart';
 import '../../state/driver_ride_requests_provider.dart';
 import '../../state/driver_offers_provider.dart';
+import '../../state/matching_viewer_provider.dart';
+import '../../state/passenger_ride_actions_controller.dart';
+import '../../state/passenger_rides_provider.dart';
 import '../../state/ride_request_actions_controller.dart';
 import '../../../route/state/offer_route_controller.dart';
 import 'driver_offer_card.dart';
 import 'driver_offer_details.dart';
 import 'matching_message.dart';
+import 'passenger_ride_card.dart';
+import 'passenger_ride_details.dart';
 import 'matching_section_title.dart';
 import 'ride_request_card.dart';
 
@@ -95,8 +102,109 @@ class _RideRequestsSheetState extends ConsumerState<RideRequestsSheet> {
         },
         onOpenChat: _openChatWith,
         onCancelOffer: _cancelOffer,
+        onCancelRide: _cancelRide,
+        onMarkNoShow: _markNoShow,
       ),
     );
+  }
+
+  /// Confirmação padrão das ações que não dá para desfazer.
+  Future<bool> _confirm({
+    required String title,
+    required String message,
+    required String confirmLabel,
+  }) async {
+    final confirmed = await showDialog<bool>(
+      context: context,
+      builder: (context) => AlertDialog(
+        backgroundColor: AppColors.cardBackground,
+        title: Text(title),
+        content: Text(message),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.of(context).pop(false),
+            style: TextButton.styleFrom(foregroundColor: AppColors.textPrimary),
+            child: const Text('Voltar'),
+          ),
+          TextButton(
+            onPressed: () => Navigator.of(context).pop(true),
+            style: TextButton.styleFrom(foregroundColor: AppColors.error),
+            child: Text(confirmLabel),
+          ),
+        ],
+      ),
+    );
+    return confirmed == true && mounted;
+  }
+
+  /// O motorista cancela só uma viagem (os confirmados são avisados).
+  Future<void> _cancelRide(String rideId) async {
+    final confirmed = await _confirm(
+      title: 'Cancelar esta viagem?',
+      message:
+          'Os passageiros confirmados serão avisados. Cancelar com passageiro confirmado conta na sua reputação.',
+      confirmLabel: 'Cancelar viagem',
+    );
+    if (!confirmed) return;
+    final error = await ref
+        .read(driverRideActionsProvider.notifier)
+        .cancel(rideId);
+    if (mounted && error != null) _showMessage(error);
+  }
+
+  /// Durante a viagem, o motorista marca quem não apareceu.
+  Future<void> _markNoShow(String rideId, String passengerId) async {
+    final confirmed = await _confirm(
+      title: 'Marcar como ausente?',
+      message:
+          'A vaga é liberada e o passageiro não é cobrado nem entra nos indicadores.',
+      confirmLabel: 'Marcar ausente',
+    );
+    if (!confirmed) return;
+    final error = await ref
+        .read(driverRideActionsProvider.notifier)
+        .markNoShow(rideId, passengerId);
+    if (mounted && error != null) _showMessage(error);
+  }
+
+  /// Detalhes de uma viagem em que o usuário vai como passageiro.
+  void _openPassengerDetails(RideModel ride, String viewerId) {
+    showDetailsSheet<void>(
+      context,
+      title: 'Detalhes da viagem',
+      builder: (_) => PassengerRideDetails(
+        rideId: ride.id,
+        viewerId: viewerId,
+        onOpenChat: (rideId) => _openChatWith(rideId, viewerId),
+        onLeave: _leaveRide,
+      ),
+    );
+  }
+
+  /// O passageiro sai da viagem antes de ela começar. A menos de 2 h da saída,
+  /// conta como cancelamento tardio.
+  Future<bool> _leaveRide(RideModel ride) async {
+    final departure = ride.departureDateTime;
+    final late =
+        departure != null &&
+        departure.difference(DateTime.now()) < const Duration(hours: 2);
+    final confirmed = await _confirm(
+      title: 'Sair da viagem?',
+      message: late
+          ? 'Faltam menos de 2 h para a saída: sair agora conta como cancelamento tardio. O motorista será avisado.'
+          : 'Sua vaga será liberada e o motorista será avisado.',
+      confirmLabel: 'Sair da viagem',
+    );
+    if (!confirmed) return false;
+    final error = await ref
+        .read(passengerRideActionsProvider.notifier)
+        .leave(ride.id);
+    if (!mounted) return false;
+    if (error != null) {
+      _showMessage(error);
+      return false;
+    }
+    return true;
   }
 
   /// Pede a confirmação e cancela a carona; devolve se cancelou.
@@ -191,6 +299,8 @@ class _RideRequestsSheetState extends ConsumerState<RideRequestsSheet> {
     final requests = ref.watch(driverRideRequestsProvider);
     final busy = ref.watch(rideRequestActionsProvider);
     final offers = ref.watch(myDriverOffersProvider);
+    final passengerRides = ref.watch(myPassengerRidesProvider);
+    final viewerId = ref.watch(matchingViewerIdProvider);
     final rideActions = ref.watch(driverRideActionsProvider);
 
     return DraggableScrollableSheet(
@@ -275,42 +385,8 @@ class _RideRequestsSheetState extends ConsumerState<RideRequestsSheet> {
                         MatchingMessage(text: authErrorMessage(error)),
                       ],
                     ),
-                    const MatchingSectionTitle(title: 'Caronas oferecidas'),
-                    ...offers.when(
-                      skipLoadingOnReload: true,
-                      data: (list) => list.isEmpty
-                          ? const [
-                              MatchingMessage(
-                                text: 'Você ainda não ofereceu nenhuma carona.',
-                              ),
-                            ]
-                          : [
-                              for (final offer in list)
-                                Padding(
-                                  padding: const EdgeInsets.only(bottom: 12),
-                                  child: DriverOfferCard(
-                                    offer: offer,
-                                    busyRideIds: rideActions,
-                                    onOpenDetails: () => _openDetails(offer),
-                                    onStartRide: _startRide,
-                                    onCompleteRide: _completeRide,
-                                  ),
-                                ),
-                            ],
-                      loading: () => const [
-                        Padding(
-                          padding: EdgeInsets.all(28),
-                          child: Center(
-                            child: CircularProgressIndicator(
-                              color: AppColors.primary,
-                            ),
-                          ),
-                        ),
-                      ],
-                      error: (error, _) => [
-                        MatchingMessage(text: authErrorMessage(error)),
-                      ],
-                    ),
+                    // Uma lista só: as viagens como passageiro e as caronas oferecidas
+                    ..._ridesList(offers, passengerRides, viewerId, rideActions),
                   ]),
                 ),
               ),
@@ -319,6 +395,73 @@ class _RideRequestsSheetState extends ConsumerState<RideRequestsSheet> {
         );
       },
     );
+  }
+
+  List<Widget> _ridesList(
+    AsyncValue<List<DriverOffer>> offers,
+    AsyncValue<List<RideModel>> passengerRides,
+    String? viewerId,
+    Set<String> rideActions,
+  ) {
+    final offerList = offers.value;
+    final passengerList = passengerRides.value;
+    if (offerList == null && passengerList == null) {
+      if (offers.hasError) {
+        return [MatchingMessage(text: authErrorMessage(offers.error!))];
+      }
+      return const [
+        Padding(
+          padding: EdgeInsets.all(28),
+          child: Center(
+            child: CircularProgressIndicator(color: AppColors.primary),
+          ),
+        ),
+      ];
+    }
+
+    final asPassenger = passengerList ?? const <RideModel>[];
+    final asDriver = offerList ?? const <DriverOffer>[];
+    if (asPassenger.isEmpty && asDriver.isEmpty) {
+      return const [
+        MatchingMessage(text: 'Você ainda não tem caronas.'),
+      ];
+    }
+
+    // A viagem em andamento como passageiro vem primeiro; as caronas oferecidas
+    // já chegam ordenadas (em andamento, depois pela próxima viagem)
+    final inProgress = [
+      for (final ride in asPassenger)
+        if (ride.status == RideStatus.inProgress) ride,
+    ];
+    final upcoming = [
+      for (final ride in asPassenger)
+        if (ride.status != RideStatus.inProgress) ride,
+    ];
+
+    Widget passengerCard(RideModel ride) => Padding(
+      padding: const EdgeInsets.only(bottom: 12),
+      child: PassengerRideCard(
+        ride: ride,
+        viewerId: viewerId ?? '',
+        onOpenDetails: () => _openPassengerDetails(ride, viewerId ?? ''),
+      ),
+    );
+
+    return [
+      for (final ride in inProgress) passengerCard(ride),
+      for (final offer in asDriver)
+        Padding(
+          padding: const EdgeInsets.only(bottom: 12),
+          child: DriverOfferCard(
+            offer: offer,
+            busyRideIds: rideActions,
+            onOpenDetails: () => _openDetails(offer),
+            onStartRide: _startRide,
+            onCompleteRide: _completeRide,
+          ),
+        ),
+      for (final ride in upcoming) passengerCard(ride),
+    ];
   }
 
   Widget _buildHeader() {

@@ -65,10 +65,15 @@ Centraliza constantes de ambiente e tokens de cores da aplicação:
 ```dart
 abstract class AppConfig {
   static const String appName = 'Converge';
-  static const String apiBaseUrl = String.fromEnvironment(
-    'API_BASE_URL',
-    defaultValue: 'http://localhost:8080/api/v1',
-  );
+
+  // URL da API: `API_BASE_URL` no .env do app (sem valor fixo no código)
+  static String get apiBaseUrl {
+    final url = dotenv.isInitialized ? dotenv.maybeGet('API_BASE_URL') : null;
+    if (url == null || url.trim().isEmpty) {
+      throw StateError('API_BASE_URL não definida: adicione a URL da API no app/converge/.env');
+    }
+    return url.trim();
+  }
   static const Duration connectTimeout = Duration(seconds: 10);
   static const Duration receiveTimeout = Duration(seconds: 15);
 }

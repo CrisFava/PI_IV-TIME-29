@@ -2,6 +2,7 @@
 
 package com.converge.api.modules.ride.infrastructure.scheduler;
 
+import com.converge.api.modules.ride.application.CancelRidesNotStartedUseCase;
 import com.converge.api.modules.ride.application.ExpirePendingRideRequestsUseCase;
 import com.converge.api.modules.ride.application.ExpireRidesWithoutParticipantsUseCase;
 import org.junit.jupiter.api.BeforeEach;
@@ -22,6 +23,7 @@ class RideExpirationSchedulerTest {
 
     @Mock private ExpirePendingRideRequestsUseCase expirePendingRideRequestsUseCase;
     @Mock private ExpireRidesWithoutParticipantsUseCase expireRidesWithoutParticipantsUseCase;
+    @Mock private CancelRidesNotStartedUseCase cancelRidesNotStartedUseCase;
 
     private RideExpirationScheduler scheduler;
 
@@ -29,7 +31,8 @@ class RideExpirationSchedulerTest {
     void setUp() {
         scheduler = new RideExpirationScheduler(
                 expirePendingRideRequestsUseCase,
-                expireRidesWithoutParticipantsUseCase
+                expireRidesWithoutParticipantsUseCase,
+                cancelRidesNotStartedUseCase
         );
     }
 
