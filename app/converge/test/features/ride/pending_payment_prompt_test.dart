@@ -2,6 +2,7 @@
 
 import 'package:converge/features/ride/data/repository/ride_repository_impl.dart';
 import 'package:converge/features/ride/presentation/widgets/pending_payment_prompt.dart';
+import 'package:converge/features/ride/presentation/widgets/pix_qr_code.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
@@ -40,6 +41,9 @@ void main() {
 
     expect(find.text('Pague a carona'), findsOneWidget);
     expect(find.textContaining('Lucas Silveira'), findsOneWidget);
+    // QR Code do mesmo Pix Copia e Cola, para pagar com outro celular
+    expect(find.byType(PixQrCode), findsOneWidget);
+    expect(find.bySemanticsLabel('QR Code do PIX'), findsOneWidget);
 
     await tester.tap(find.text('Já paguei'));
     await tester.pumpAndSettle();

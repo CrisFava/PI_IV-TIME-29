@@ -10,6 +10,7 @@ import '../../../../core/widgets/show_app_notice.dart';
 import '../../../chat/presentation/widgets/copy_pix_button.dart';
 import '../../data/models/ride_payment_model.dart';
 import '../../state/payment_prompt_controller.dart';
+import 'pix_qr_code.dart';
 
 /// Abre o pagamento de uma cobrança em aberto: o valor, o PIX e o "Já paguei".
 /// Devolve `true` se o passageiro informou o pagamento.
@@ -91,10 +92,14 @@ class PaymentPromptSheet extends ConsumerWidget {
             style: const TextStyle(fontSize: 13, color: AppColors.textSecondary),
           ),
           const SizedBox(height: 16),
+          if (pixCode != null) ...[
+            PixQrCode(pixCode: pixCode),
+            const SizedBox(height: 14),
+          ],
           Text(
             pixCode == null
                 ? 'O código PIX não está disponível agora. Tente de novo em instantes.'
-                : 'Copie o código, pague no app do seu banco e volte aqui para informar o pagamento.',
+                : 'Escaneie o QR Code ou copie o código, pague no app do seu banco e volte aqui para informar o pagamento.',
             style: const TextStyle(fontSize: 13.5, color: AppColors.textSecondary),
           ),
           if (pixCode != null) ...[
