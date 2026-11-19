@@ -32,4 +32,12 @@ public class BlockAccess {
         }
         return blocked;
     }
+
+    // Existe bloqueio entre os dois, em qualquer sentido? (RF47)
+    public boolean isBlockedBetween(String userId, String otherUserId) {
+        if (userId == null || userId.isBlank() || otherUserId == null || otherUserId.isBlank()) {
+            return false;
+        }
+        return blockedUserIdsOf(userId).contains(otherUserId);
+    }
 }

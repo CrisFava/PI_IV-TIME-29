@@ -12,6 +12,7 @@ import com.converge.api.modules.route.application.RouteAccess;
 import com.converge.api.modules.route.domain.enums.RouteStatus;
 import com.converge.api.modules.route.domain.enums.RouteType;
 import com.converge.api.modules.route.domain.model.Route;
+import com.converge.api.modules.security.application.BlockAccess;
 import com.converge.api.modules.user.application.VehicleAccess;
 import com.converge.api.modules.user.domain.model.vehicle.Vehicle;
 import com.converge.api.shared.application.UseCase;
@@ -36,6 +37,7 @@ public class RequestRideSeatUseCase implements UseCase<RequestRideSeatCommand, R
     private final VehicleAccess vehicleAccess;
     private final RideRepository rideRepository;
     private final RideMapper rideMapper;
+    private final BlockAccess blockAccess;
 
     @Override
     public Ride execute(RequestRideSeatCommand command) {
@@ -49,6 +51,7 @@ public class RequestRideSeatUseCase implements UseCase<RequestRideSeatCommand, R
 
         Route driverRoute = routeAccess.getActiveRoute(command.request().driverRouteId());
         validateDriverRoute(driverRoute, passengerId, date);
+        assertNotBlocked(passengerId, driverRoute.getUserId());
 
         LocalDateTime departure = date.atTime(LocalTime.parse(driverRoute.getDepartureTime()));
 
@@ -122,6 +125,16 @@ public class RequestRideSeatUseCase implements UseCase<RequestRideSeatCommand, R
 
         return (message != null && message.contains(Ride.UNIQUE_OPEN_RIDE_INDEX))
                 || (exception.getMessage() != null && exception.getMessage().contains(Ride.UNIQUE_OPEN_RIDE_INDEX));
+    }
+
+    // Bloqueio entre motorista e passageiro vale nos dois sentidos (RF47)
+    private void assertNotBlocked(String passengerId, String driverId) {
+        if (blockAccess.isBlockedBetween(passengerId, driverId)) {
+            throw new ApplicationException(
+                    ErrorCode.NOT_ALLOWED,
+                    "Não é possível pedir vaga nesta carona."
+            );
+        }
     }
 
     private ApplicationException rideConflict() {

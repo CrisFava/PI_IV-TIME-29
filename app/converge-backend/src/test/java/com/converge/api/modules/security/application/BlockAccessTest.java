@@ -44,4 +44,28 @@ class BlockAccessTest {
         assertThat(blockAccess.blockedUserIdsOf(null)).isEmpty();
         verifyNoInteractions(blockRepository);
     }
+
+    @Test
+    @DisplayName("isBlockedBetween vale nos dois sentidos")
+    void shouldDetectBlockInBothDirections() {
+        when(blockRepository.findByUserIdOrBlockedUserId("a", "a")).thenReturn(List.of(new Block("b", "a")));
+
+        assertThat(blockAccess.isBlockedBetween("a", "b")).isTrue();
+    }
+
+    @Test
+    @DisplayName("isBlockedBetween é falso quando o bloqueio é com outra pessoa")
+    void shouldNotDetectBlockWithSomeoneElse() {
+        when(blockRepository.findByUserIdOrBlockedUserId("a", "a")).thenReturn(List.of(new Block("a", "c")));
+
+        assertThat(blockAccess.isBlockedBetween("a", "b")).isFalse();
+    }
+
+    @Test
+    @DisplayName("isBlockedBetween com usuário vazio é falso e o banco nem é consultado")
+    void shouldNotQueryWhenAnyUserIsMissing() {
+        assertThat(blockAccess.isBlockedBetween(null, "b")).isFalse();
+        assertThat(blockAccess.isBlockedBetween("a", " ")).isFalse();
+        verifyNoInteractions(blockRepository);
+    }
 }
