@@ -10,8 +10,10 @@ import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 
 import java.net.ServerSocket;
+import java.time.Duration;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.junit.jupiter.api.Assertions.assertTimeoutPreemptively;
 
 class SocketRenavamValidationGatewayTest {
 
@@ -78,6 +80,20 @@ class SocketRenavamValidationGatewayTest {
 
         assertThat(result.valid()).isFalse();
         assertThat(result.message()).isEqualTo("O RENAVAM deve ter 11 dígitos.");
+    }
+
+    @Test
+    @DisplayName("Deve validar localmente quando o servidor aceita a conexão mas não responde")
+    void shouldFallbackWhenServerDoesNotAnswer() throws Exception {
+        try (ServerSocket silentServer = new ServerSocket(0)) {
+            SocketRenavamValidationGateway gateway =
+                    new SocketRenavamValidationGateway("localhost", silentServer.getLocalPort());
+
+            Result result = assertTimeoutPreemptively(Duration.ofSeconds(10), () -> gateway.validate("14283256656"));
+
+            assertThat(result.valid()).isTrue();
+            assertThat(result.normalizedRenavam()).isEqualTo("14283256656");
+        }
     }
 
     @Test
