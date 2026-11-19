@@ -85,4 +85,15 @@ class ReportTest {
         assertBadRequest(
                 () -> new Report("reporter", "reported", null, ReportReason.OTHER, "a".repeat(501)), "description");
     }
+
+    @Test
+    @DisplayName("Descrição é guardada sem espaços nas pontas e o limite conta o texto sem eles")
+    void shouldTrimDescriptionBeforeStoringAndCounting() {
+        Report trimmed = new Report("reporter", "reported", null, ReportReason.OTHER, "  texto  ");
+        Report atLimitWithSpaces = new Report(
+                "reporter", "reported", null, ReportReason.OTHER, "  " + "a".repeat(500) + "  ");
+
+        assertThat(trimmed.getDescription()).isEqualTo("texto");
+        assertThat(atLimitWithSpaces.getDescription()).hasSize(500);
+    }
 }

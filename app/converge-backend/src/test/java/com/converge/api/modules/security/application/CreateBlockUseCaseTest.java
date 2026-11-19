@@ -102,4 +102,18 @@ class CreateBlockUseCaseTest {
         assertThat(ex.getError().code()).isEqualTo(ErrorCode.USER_NOT_FOUND);
         verifyNoInteractions(blockRepository);
     }
+
+    @Test
+    @DisplayName("Se o índice único barra o pedido e o bloqueio não aparece na releitura, repassa o erro original")
+    void shouldRethrowDuplicateKeyWhenBlockIsNotFoundAfterwards() {
+        DuplicateKeyException duplicate = new DuplicateKeyException("duplicado");
+        when(userLookup.exists(OTHER)).thenReturn(true);
+        when(blockRepository.findByUserIdAndBlockedUserId(ME, OTHER)).thenReturn(Optional.empty());
+        when(blockRepository.save(any(Block.class))).thenThrow(duplicate);
+
+        DuplicateKeyException thrown = assertThrows(DuplicateKeyException.class,
+                () -> createBlock().execute(new CreateBlockUseCase.Command(ME, OTHER)));
+
+        assertThat(thrown).isSameAs(duplicate);
+    }
 }
