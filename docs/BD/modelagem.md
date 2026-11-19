@@ -1242,7 +1242,7 @@ referência / infraestrutura (sem vínculo direto com um usuário):
 | `reviews`, `reports`, `blocks` | **Coleção própria** | Volume variável, consultados de forma independente. |
 | `skippedDates[]` dentro de `reserved_seats` | **Embedded** | Lista pequena de datas que o passageiro marcou "não vou"; sempre lida junto ao vínculo. |
 | `reserved_seats` | **Coleção própria** | Ciclo de vida independente — vínculo persistente entre par fixo. |
-| `series[]` dentro de `indicators` | **Embedded** | Volume controlado por período (máx. ~31 pontos para mensal). Período `TOTAL` removido para evitar crescimento ilimitado. |
+| `series[]` dentro de `indicators` | **Embedded** | Volume controlado por período (máx. ~31 pontos para mensal). Período `TOTAL` removido para evitar crescimento ilimitado. Evolução futura: `series[]` ainda não está implementado no MVP. |
 
 ---
 
