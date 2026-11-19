@@ -944,8 +944,10 @@ class _HomePageState extends ConsumerState<HomePage> {
             )
           : Stack(
               children: [
-                // Abre o pagamento sozinho quando há cobrança de carona em aberto
-                const PendingPaymentPrompt(),
+                // Abre o pagamento sozinho quando há cobrança de carona em aberto.
+                // Posicionado: um filho sem posição definiria o tamanho do Stack (0x0,
+                // porque o ouvinte não desenha nada) e a Home inteira sumiria.
+                const Positioned(left: 0, top: 0, child: PendingPaymentPrompt()),
 
                 // ============================================================
                 // CAMADA 1: CONTEÚDO PRINCIPAL (MAPA OU ABAS SECUNDÁRIAS)
