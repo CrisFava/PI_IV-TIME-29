@@ -12,6 +12,7 @@ import '../../ride/data/models/ride_model.dart';
 import '../../ride/data/repository/ride_repository.dart';
 import '../../ride/data/repository/ride_repository_impl.dart';
 import '../../route/data/models/create_route_request.dart';
+import '../../route/data/models/route_recurrence.dart';
 import '../../route/data/models/route_response_model.dart';
 import '../../route/data/repository/route_repository.dart';
 import '../../route/data/repository/route_repository_impl.dart';
@@ -33,9 +34,10 @@ class PassengerMatchController extends Notifier<PassengerMatchState> {
   Timer? _polling;
   int _pollGeneration = 0;
 
-  // Trajeto de procura criado só para este pedido: sai do matching quando o pedido
-  // é fechado sem carona aceita (cada pedido "agora" cria um trajeto novo)
-  String? _createdSearchRouteId;
+  // Trajeto de procura deste pedido que sai do matching quando o pedido é fechado sem
+  // carona aceita: o criado para ele ou um avulso reaproveitado. Um trajeto semanal
+  // reaproveitado fica, porque o passageiro o salvou para procurar carona toda semana.
+  String? _searchRouteToDiscard;
 
   MatchingRepository get _matching => ref.read(matchingRepositoryProvider);
   RideRepository get _rides => ref.read(rideRepositoryProvider);
@@ -50,18 +52,26 @@ class PassengerMatchController extends Notifier<PassengerMatchState> {
   /// Id de um trajeto de procura com estes dados: reaproveita o que já existe
   /// ou cria um novo. Devolve `null` (com o motivo em `notice`) se não conseguir.
   Future<String?> prepareSearchRoute(CreateRouteRequest request) async {
+    // Reaproveitado: só sai junto com o pedido se for avulso (o _findSame exige a mesma recorrência)
+    String reused(RouteResponseModel route) {
+      if (request.recurrence == RouteRecurrence.once) {
+        _searchRouteToDiscard = route.id;
+      }
+      return route.id;
+    }
+
     try {
       final existing = _findSame(await _routes.listMyRoutes(), request);
-      if (existing != null) return existing.id;
+      if (existing != null) return reused(existing);
 
       final created = await _routes.createRoute(request);
-      _createdSearchRouteId = created.id;
+      _searchRouteToDiscard = created.id;
       return created.id;
     } on ApiException catch (e) {
       // Outro pedido salvou o mesmo trajeto no meio do caminho: usa o que ficou no banco.
       if (e.isConflict) {
         final saved = _findSame(await _routes.listMyRoutes(), request);
-        if (saved != null) return saved.id;
+        if (saved != null) return reused(saved);
       }
       state = state.copyWith(notice: e.message);
       return null;
@@ -204,14 +214,15 @@ class PassengerMatchController extends Notifier<PassengerMatchState> {
   /// O aviso já foi mostrado.
   void clearNotice() => state = state.copyWith(notice: null);
 
-  /// Volta ao início (o passageiro fechou o fluxo). O trajeto de procura criado
-  /// para o pedido é desativado, a não ser que a carona tenha sido aceita.
+  /// Volta ao início (o passageiro fechou o fluxo). O trajeto de procura avulso do
+  /// pedido é desativado, a não ser que a carona tenha sido aceita: senão o passageiro
+  /// continuaria aparecendo como disponível para os motoristas.
   void reset() {
     _stopPolling();
-    final created = _createdSearchRouteId;
+    final searchRoute = _searchRouteToDiscard;
     final accepted = state.phase == PassengerMatchPhase.accepted;
-    _createdSearchRouteId = null;
-    if (created != null && !accepted) unawaited(_discardRoute(created));
+    _searchRouteToDiscard = null;
+    if (searchRoute != null && !accepted) unawaited(_discardRoute(searchRoute));
     state = const PassengerMatchState();
   }
 

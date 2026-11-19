@@ -610,6 +610,32 @@ class RideUseCasesTest {
     }
 
     @Test
+    @DisplayName("Concluir encerra a procura de um dia só de quem viajou ou faltou, mas não a de quem saiu antes")
+    void shouldEndPassengerSearchRoutesWhenRideIsCompleted() {
+        RouteAccess routeAccess = mock(RouteAccess.class);
+        CompleteRideUseCase completeRide = new CompleteRideUseCase(
+                rideAccess, rideCostCalculator, rideRepository, completionPublisher, routeAccess);
+        Ride ride = rideOf(userObjectId.toHexString(), LocalDateTime.now().plusDays(1));
+        ride.requestSeat("passenger-1", "route-viajou", place("Rua A"), place("Campus PUC"));
+        ride.requestSeat("passenger-2", "route-faltou", place("Rua B"), place("Campus PUC"));
+        ride.requestSeat("passenger-3", "route-saiu", place("Rua C"), place("Campus PUC"));
+        ride.acceptPassenger("passenger-1");
+        ride.acceptPassenger("passenger-2");
+        ride.leave("passenger-3", null);
+        ride.start();
+        ride.markNoShow("passenger-2");
+        currentUserIs(userObjectId);
+        when(rideRepository.findById(rideObjectId)).thenReturn(Optional.of(ride));
+        when(rideRepository.save(any(Ride.class))).thenAnswer(invocation -> invocation.getArgument(0));
+
+        completeRide.execute(new RideRefCommand(rideObjectId.toHexString(), UID));
+
+        verify(routeAccess).endIfOnce("route-viajou");
+        verify(routeAccess).endIfOnce("route-faltou");
+        verify(routeAccess, never()).endIfOnce("route-saiu");
+    }
+
+    @Test
     @DisplayName("Falha ao contabilizar os indicadores não deve falhar a conclusão já gravada")
     void shouldCompleteRideEvenWhenIndicatorPublishingFails() {
         CompleteRideUseCase completeRide = new CompleteRideUseCase(
