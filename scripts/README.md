@@ -48,7 +48,12 @@ em banco com `prod` no nome**.
 
 Sobe o ambiente do backend em dois terminais novos, na ordem certa: primeiro o servidor de
 sockets (`app/server`), depois o Spring (`app/converge-backend`) com as variáveis do `.env`.
-Não precisa do venv.
+Não precisa do venv. Funciona no Windows (cmd), no macOS (Terminal) e no Linux (gnome-terminal,
+konsole ou xterm).
+
+- Só abre o backend quando a porta 3000 do servidor de sockets responde (espera até 3 min). Se a
+  porta já estiver ocupada, usa o servidor de sockets que já está rodando.
+- O `.env` é lido dentro do terminal novo, então as variáveis chegam ao Spring em qualquer sistema.
 
 ```bash
 python scripts/run_servers.py
