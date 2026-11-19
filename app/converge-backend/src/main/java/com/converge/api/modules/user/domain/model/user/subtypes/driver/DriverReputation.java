@@ -36,6 +36,13 @@ public record DriverReputation(
         return new DriverReputation(updatedLevel, averageRating, totalReviews, updatedWindow, now);
     }
 
+    // Conta mais uma viagem concluída na janela e recalcula o level.
+    public DriverReputation recordCompletedRide(LocalDateTime now) {
+        DriverWindow updatedWindow = (window != null ? window : new DriverWindow(0, 0, 0, 0))
+                .withIncrementedCompletedRides();
+        return new DriverReputation(computeLevel(updatedWindow, averageRating), averageRating, totalReviews, updatedWindow, now);
+    }
+
     // Grava a média e a quantidade de avaliações já calculadas e recalcula o level.
     public DriverReputation withRating(double newAverage, int newTotal, LocalDateTime now) {
         DriverWindow currentWindow = window != null ? window : new DriverWindow(0, 0, 0, 0);

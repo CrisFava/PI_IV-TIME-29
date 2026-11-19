@@ -193,6 +193,29 @@ public class User {
         return this.badges.contains(badge);
     }
 
+    // Os selos são conferidos pelo tipo: o UserBadge também carrega a data, então a igualdade do record não serve.
+    public boolean hasBadgeOfType(Badge type) {
+        return this.badges.stream().anyMatch(b -> b.badge() == type);
+    }
+
+    // Concede o selo só se o usuário ainda não o tem, preservando a data da concessão original.
+    public boolean grantBadge(Badge type, LocalDateTime now) {
+        if (hasBadgeOfType(type)) {
+            return false;
+        }
+        this.badges.add(new UserBadge(type, now));
+        return true;
+    }
+
+    public boolean revokeBadge(Badge type) {
+        return this.badges.removeIf(b -> b.badge() == type);
+    }
+
+    // Selo de confiança (RF69): cumpre os critérios em algum papel e não estourou os limites de penalidade.
+    public boolean qualifiesForTrustBadge() {
+        return !trustThresholdExceeded();
+    }
+
     public boolean hasRole(ParticipationRole role) {
         // Todo usuário é passageiro, mesmo que o papel tenha se perdido no banco
         return role == PASSENGER || this.participationRoles.contains(role);
@@ -338,6 +361,14 @@ public class User {
         revokeTrustBadgeIfThresholdExceeded();
     }
 
+    public void recordDriverCompletedRide(LocalDateTime now) {
+        this.reputation = currentReputation().withDriverCompletedRide(now);
+    }
+
+    public void recordPassengerCompletedRide(LocalDateTime now) {
+        this.reputation = currentReputation().withPassengerCompletedRide(now);
+    }
+
     public void recordDriverRating(double averageRating, int totalReviews, LocalDateTime now) {
         this.reputation = currentReputation().withDriverRating(averageRating, totalReviews, now);
     }
@@ -351,21 +382,26 @@ public class User {
     }
 
     private void revokeTrustBadgeIfThresholdExceeded() {
-        boolean driverEligible = this.reputation.driver() != null && this.reputation.driver().meetsTrustCriteria();
-        boolean passengerEligible = this.reputation.passenger() != null && this.reputation.passenger().meetsTrustCriteria();
-        boolean driverViolated = this.reputation.driver() != null
-                && this.reputation.driver().window() != null
-                && this.reputation.driver().window().driverInitiatedCancellations() != null
-                && this.reputation.driver().window().driverInitiatedCancellations() > 2;
-        boolean passengerViolated = this.reputation.passenger() != null
-                && this.reputation.passenger().window() != null
-                && ((this.reputation.passenger().window().lateCancellations() != null
-                && this.reputation.passenger().window().lateCancellations() > 2)
-                || (this.reputation.passenger().window().noShows() != null
-                && this.reputation.passenger().window().noShows() > 1));
-
-        if (driverViolated || passengerViolated || (!driverEligible && !passengerEligible)) {
+        if (trustThresholdExceeded()) {
             this.badges.removeIf(b -> b.badge() == Badge.TRUST);
         }
+    }
+
+    private boolean trustThresholdExceeded() {
+        Reputation current = currentReputation();
+        boolean driverEligible = current.driver() != null && current.driver().meetsTrustCriteria();
+        boolean passengerEligible = current.passenger() != null && current.passenger().meetsTrustCriteria();
+        boolean driverViolated = current.driver() != null
+                && current.driver().window() != null
+                && current.driver().window().driverInitiatedCancellations() != null
+                && current.driver().window().driverInitiatedCancellations() > 2;
+        boolean passengerViolated = current.passenger() != null
+                && current.passenger().window() != null
+                && ((current.passenger().window().lateCancellations() != null
+                && current.passenger().window().lateCancellations() > 2)
+                || (current.passenger().window().noShows() != null
+                && current.passenger().window().noShows() > 1));
+
+        return driverViolated || passengerViolated || (!driverEligible && !passengerEligible);
     }
 }

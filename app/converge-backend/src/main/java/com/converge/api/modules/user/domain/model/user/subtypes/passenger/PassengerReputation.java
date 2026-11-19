@@ -38,6 +38,12 @@ public record PassengerReputation(
         return new PassengerReputation(computeLevel(updatedWindow, averageRating), averageRating, totalReviews, updatedWindow, now);
     }
 
+    // Conta mais uma viagem concluída na janela e recalcula o level.
+    public PassengerReputation recordCompletedRide(LocalDateTime now) {
+        PassengerWindow updatedWindow = baseWindow().withIncrementedCompletedRides();
+        return new PassengerReputation(computeLevel(updatedWindow, averageRating), averageRating, totalReviews, updatedWindow, now);
+    }
+
     // Grava a média e a quantidade de avaliações já calculadas e recalcula o level.
     public PassengerReputation withRating(double newAverage, int newTotal, LocalDateTime now) {
         PassengerWindow currentWindow = baseWindow();
