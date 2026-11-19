@@ -479,19 +479,23 @@ public class Ride {
     public void complete() {
         this.validateInProgress();
 
-        List<Participant> presentPassengers = this.participants.stream()
+        // Quem ainda está a bordo (CONFIRMED) e quem já desceu com a chegada confirmada (COMPLETED)
+        List<Participant> effectivePassengers = this.participants.stream()
                 .filter(participant -> participant.getRole() == ParticipationRole.PASSENGER)
-                .filter(participant -> participant.getStatus() == ParticipantStatus.CONFIRMED)
+                .filter(participant -> participant.getStatus() == ParticipantStatus.CONFIRMED
+                        || participant.getStatus() == ParticipantStatus.COMPLETED)
                 .toList();
 
-        if (presentPassengers.isEmpty()) {
+        if (effectivePassengers.isEmpty()) {
             this.markCancelled(this.driverId, "Todos os passageiros ausentes.");
             return;
         }
 
         LocalDateTime now = LocalDateTime.now();
 
-        presentPassengers.forEach(participant -> participant.complete(now));
+        effectivePassengers.stream()
+                .filter(participant -> participant.getStatus() == ParticipantStatus.CONFIRMED)
+                .forEach(participant -> participant.complete(now));
         this.participants.stream()
                 .filter(participant -> participant.getRole() == ParticipationRole.DRIVER)
                 .filter(participant -> participant.getStatus() == ParticipantStatus.CONFIRMED)
@@ -533,12 +537,94 @@ public class Ride {
         this.participants.stream()
                 .filter(participant -> participant.getRole() == ParticipationRole.PASSENGER
                         && participant.getStatus() == ParticipantStatus.COMPLETED)
+                // Quem já foi cobrado na chegada fica com o valor da cobrança
+                .filter(participant -> !participant.isCharged())
                 .forEach(participant -> {
                     BigDecimal amount = finalAmountsByPassenger.get(participant.getUserId());
                     if (amount != null) {
                         participant.defineFinalAmount(amount, now);
                     }
                 });
+    }
+
+    /**
+     * "Confirmar chegada": o passageiro desceu e a viagem dele termina aqui, com a do motorista
+     * ainda em andamento. O valor dele é definido logo depois, pelo rateio do momento.
+     */
+    public void arrivePassenger(String passengerId) {
+        this.validateInProgress();
+
+        Participant passenger = this.findConfirmedPassenger(passengerId);
+        passenger.complete(LocalDateTime.now());
+    }
+
+    // Valor de quem acabou de chegar, calculado com quem já desceu e quem ainda está a bordo.
+    public void applyArrivalAmount(String passengerId, @Nullable BigDecimal amount) {
+        if (amount == null) {
+            return;
+        }
+
+        this.participants.stream()
+                .filter(participant -> participant.getRole() == ParticipationRole.PASSENGER)
+                .filter(participant -> participant.getUserId().equals(passengerId))
+                .filter(participant -> participant.getStatus() == ParticipantStatus.COMPLETED)
+                .filter(participant -> !participant.isCharged())
+                .findFirst()
+                .ifPresent(participant -> participant.defineFinalAmount(amount, LocalDateTime.now()));
+    }
+
+    /**
+     * Cobra quem já terminou a viagem e ainda não foi cobrado, com o valor final do rateio (RF39).
+     * Sem valor a cobrar, o pagamento não se aplica. Devolve quem recebeu cobrança.
+     */
+    public List<String> chargeCompletedPassengers() {
+        LocalDateTime now = LocalDateTime.now();
+        List<String> charged = new ArrayList<>();
+
+        this.participants.stream()
+                .filter(participant -> participant.getRole() == ParticipationRole.PASSENGER)
+                .filter(participant -> participant.getStatus() == ParticipantStatus.COMPLETED)
+                .filter(participant -> !participant.isCharged())
+                .filter(participant -> participant.getPaymentStatus() == ParticipantPaymentStatus.PENDING)
+                .forEach(participant -> {
+                    BigDecimal amount = participant.getFinalAmount();
+                    if (amount != null && amount.signum() > 0) {
+                        participant.requestPayment(amount.setScale(2, RoundingMode.HALF_EVEN), now);
+                        charged.add(participant.getUserId());
+                    } else {
+                        participant.waivePayment(now);
+                    }
+                });
+
+        return charged;
+    }
+
+    /**
+     * "Já paguei": o passageiro informa o pagamento da própria cobrança, que fica paga.
+     * Repetir o pedido não muda nada.
+     */
+    public void markPaymentAsPaid(String passengerId) {
+        Participant passenger = this.participants.stream()
+                .filter(participant -> participant.getRole() == ParticipationRole.PASSENGER)
+                .filter(participant -> participant.getUserId().equals(passengerId))
+                .filter(Participant::isCharged)
+                .findFirst()
+                .orElseThrow(() -> new ApplicationException(
+                        ErrorCode.BAD_REQUEST,
+                        "Não há cobrança para você nesta viagem.",
+                        Set.of("passengerId")
+                ));
+
+        if (passenger.hasOpenCharge()) {
+            passenger.markPaidByPassenger(LocalDateTime.now());
+        }
+    }
+
+    public boolean hasOpenChargeFor(String passengerId) {
+        return this.participants.stream()
+                .filter(participant -> participant.getRole() == ParticipationRole.PASSENGER)
+                .filter(participant -> participant.getUserId().equals(passengerId))
+                .anyMatch(Participant::hasOpenCharge);
     }
 
     // Registra a fonte de energia do veículo no momento da viagem, para os indicadores não
@@ -587,23 +673,6 @@ public class Ride {
         passenger.requestPayment(amount.setScale(2, RoundingMode.HALF_EVEN), LocalDateTime.now());
     }
 
-    public void confirmPayment(String passengerId) {
-        this.validateCanCharge();
-
-        Participant passenger = this.findChargeablePassenger(passengerId);
-        this.validateNotPaid(passenger);
-
-        if (passenger.getRequestedAmount() == null) {
-            throw new ApplicationException(
-                    ErrorCode.BAD_REQUEST,
-                    "Solicite o pagamento antes de confirmar o recebimento.",
-                    Set.of("paymentStatus")
-            );
-        }
-
-        passenger.confirmPayment(LocalDateTime.now());
-    }
-
     private void validateCanCharge() {
         if (this.status != RideStatus.CONFIRMED
                 && this.status != RideStatus.IN_PROGRESS
@@ -634,7 +703,7 @@ public class Ride {
         if (passenger.getPaymentStatus() == ParticipantPaymentStatus.PAID) {
             throw new ApplicationException(
                     ErrorCode.BAD_REQUEST,
-                    "O pagamento deste passageiro já foi confirmado.",
+                    "O pagamento deste passageiro já foi feito.",
                     Set.of("paymentStatus")
             );
         }

@@ -595,7 +595,8 @@ class RideUseCasesTest {
     void shouldStartAndCompleteRideWhenUserIsTheDriver() {
         StartRideUseCase startRide = new StartRideUseCase(rideAccess, rideRepository);
         CompleteRideUseCase completeRide = new CompleteRideUseCase(
-                rideAccess, rideCostCalculator, rideRepository, completionPublisher, mock(RouteAccess.class));
+                rideAccess, rideCostCalculator, rideRepository, completionPublisher, mock(RouteAccess.class),
+                mock(RidePaymentNotifier.class));
         Ride ride = rideOf(userObjectId.toHexString(), LocalDateTime.now().plusDays(1));
         ride.requestSeat("passenger-456", "route-456", place("Rua A"), place("Campus PUC"));
         ride.acceptPassenger("passenger-456");
@@ -617,7 +618,8 @@ class RideUseCasesTest {
     void shouldEndPassengerSearchRoutesWhenRideIsCompleted() {
         RouteAccess routeAccess = mock(RouteAccess.class);
         CompleteRideUseCase completeRide = new CompleteRideUseCase(
-                rideAccess, rideCostCalculator, rideRepository, completionPublisher, routeAccess);
+                rideAccess, rideCostCalculator, rideRepository, completionPublisher, routeAccess,
+                mock(RidePaymentNotifier.class));
         Ride ride = rideOf(userObjectId.toHexString(), LocalDateTime.now().plusDays(1));
         ride.requestSeat("passenger-1", "route-viajou", place("Rua A"), place("Campus PUC"));
         ride.requestSeat("passenger-2", "route-faltou", place("Rua B"), place("Campus PUC"));
@@ -642,7 +644,8 @@ class RideUseCasesTest {
     @DisplayName("Falha ao contabilizar os indicadores não deve falhar a conclusão já gravada")
     void shouldCompleteRideEvenWhenIndicatorPublishingFails() {
         CompleteRideUseCase completeRide = new CompleteRideUseCase(
-                rideAccess, rideCostCalculator, rideRepository, completionPublisher, mock(RouteAccess.class));
+                rideAccess, rideCostCalculator, rideRepository, completionPublisher, mock(RouteAccess.class),
+                mock(RidePaymentNotifier.class));
         Ride ride = rideOf(userObjectId.toHexString(), LocalDateTime.now().plusDays(1));
         ride.requestSeat("passenger-456", "route-456", place("Rua A"), place("Campus PUC"));
         ride.acceptPassenger("passenger-456");

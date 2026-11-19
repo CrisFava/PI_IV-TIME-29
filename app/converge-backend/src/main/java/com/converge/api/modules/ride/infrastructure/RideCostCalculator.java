@@ -81,6 +81,22 @@ public class RideCostCalculator {
         ride.applyCostEstimates(updatedCosts, response.getSharesByPassenger());
     }
 
+    /**
+     * Valor de quem teve a chegada confirmada no meio da viagem: o rateio do momento, dividido entre
+     * quem já desceu e quem ainda está a bordo. Se ninguém mais faltar, é o mesmo valor do fim da viagem.
+     */
+    public void calculateArrivalShare(Ride ride, String passengerId) {
+        List<Participant> ridingPassengers = ride.getParticipants().stream()
+                .filter(p -> p.getRole() == ParticipationRole.PASSENGER)
+                .filter(p -> p.getStatus() == ParticipantStatus.COMPLETED || p.getStatus() == ParticipantStatus.CONFIRMED)
+                .toList();
+        FuelSource fuelSource = primaryFuelSource(ride);
+        double baseDistanceKm = resolveBaseDistanceKm(ride);
+        RideCostRequest request = buildCostSharingRequest(ride, ridingPassengers, fuelSource, baseDistanceKm);
+        RideCostResponse response = executeOnServer(request);
+        ride.applyArrivalAmount(passengerId, response.getSharesByPassenger().get(passengerId));
+    }
+
     public void calculateFinalShares(Ride ride) {
         List<Participant> completedPassengers = filterPassengersByStatus(ride, ParticipantStatus.COMPLETED);
         if (completedPassengers.isEmpty()) {

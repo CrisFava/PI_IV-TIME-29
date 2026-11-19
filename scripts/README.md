@@ -118,7 +118,9 @@ que o app faria:
 
 1. cria as contas no Firebase (`sim.<execução>.<n>.<nome>@converge-sim.test`);
 2. cadastra cada pessoa em `POST /users` e aprova os documentos no Mongo (usa o `verificar_usuario.py`);
-3. cadastra o carro do motorista e os trajetos de oferta e de procura para **amanhã**;
+3. cadastra o carro do motorista e os trajetos de oferta e de procura para **hoje**, saindo uns 7 min
+   depois de cada oferta. O pedido de vaga só vale até 5 min antes da saída e o "Iniciar trajeto" só de
+   5 min antes a 5 min depois, então cada cenário espera cerca de 2 min antes de iniciar a viagem;
 4. executa os passos do cenário e confere status, vagas, valores, PIX, avaliações e indicadores;
 5. no fim, apaga as contas do Firebase (a não ser que você use `--manter-contas`).
 
@@ -126,7 +128,7 @@ Cada cenário cria as próprias pessoas, então eles não dependem uns dos outro
 
 | Cenário | O que confere |
 | :-- | :-- |
-| `caminho-feliz` | matching acha o motorista, 2 pedidos na mesma viagem, aceite, início, conclusão (`COMPLETED`, `completedAt`, valor final ≤ teto), cobrança com PIX, confirmação (`PAID`), avaliação (e a segunda é recusada) e indicadores |
+| `caminho-feliz` | matching acha o motorista, 2 pedidos na mesma viagem, aceite, início, conclusão (`COMPLETED`, `completedAt`, valor final ≤ teto), cobrança automática com PIX, "Já paguei" da passageira (`PAID`), avaliação (e a segunda é recusada) e indicadores |
 | `ausencia-parcial` | quem falta fica `NO_SHOW` e `NOT_APPLICABLE`, a vaga volta, os presentes concluem e cobrar o ausente é recusado |
 | `todos-ausentes` | sem ninguém presente, concluir vira `CANCELLED` |
 | `transicoes-invalidas` | concluir antes de iniciar, avaliar antes de concluir, passageira iniciar ou concluir, cancelar ou sair com a viagem andando, concluir duas vezes, iniciar ou marcar ausência depois de concluída |
@@ -164,8 +166,9 @@ Se algum cenário falhar, ele mostra o passo e o motivo e o comando termina com 
 Linhas com `AVISO` não reprovam o cenário, mas indicam algo incompleto:
 
 - **custo total R$ 0**: a viagem saiu sem custo calculado, em geral porque o veículo não tem
-  consumo e preço da energia. Nesse caso a cobrança usa R$ 10,00. O rateio divide o custo só
-  entre os passageiros, cada um limitado ao próprio teto (o custo da rota com o desvio dele).
+  consumo e preço da energia. Sem valor não há cobrança, e os passos de pagamento do cenário
+  falham. O rateio divide o custo só entre os passageiros, cada um limitado ao próprio teto
+  (o custo da rota com o desvio dele).
 - **indicadores sem a viagem**: o `CompletedRidesIndicatorReconciler` reprocessa em até 15 min.
 
 ### Se a simulação cair no meio

@@ -2,6 +2,7 @@
 
 package com.converge.api.modules.route.application;
 
+import com.converge.api.modules.ride.application.PendingPaymentGuard;
 import com.converge.api.modules.route.application.dto.CreateRouteCommand;
 import com.converge.api.modules.route.application.gateway.RouteGeometry;
 import com.converge.api.modules.route.application.mapper.RouteMapper;
@@ -30,9 +31,12 @@ public class CreateRouteUseCase implements UseCase<CreateRouteCommand, Route> {
     private final RouteMapper routeMapper;
     private final RouteGeometryService routeGeometryService;
     private final OfferOverlapValidator offerOverlapValidator;
+    private final PendingPaymentGuard pendingPaymentGuard;
 
     @Override
     public Route execute(CreateRouteCommand command) {
+        // Com o pagamento de uma carona em aberto, não dá para oferecer nem procurar outra
+        pendingPaymentGuard.ensureNoPendingPayment(command.userId());
         Route route = routeMapper.toEntity(command.userId(), command.request());
         LocalDate today = LocalDate.now(RouteAccess.APP_ZONE);
         route.schedule(command.request().recurrence(), command.request().date(), today);

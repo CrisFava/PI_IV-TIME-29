@@ -21,7 +21,7 @@ import argparse
 import re
 import sys
 import time
-from datetime import date, timedelta
+from datetime import date
 from pathlib import Path
 
 import verificar_usuario
@@ -118,8 +118,8 @@ def main() -> int:
 
     selected = args.cenario or list(SCENARIOS)
     run_id = time.strftime("%m%d%H%M%S")
-    ride_date = date.today() + timedelta(days=1)
-    print(f"Simulação {run_id} | API {args.api} | banco {database} | viagens em {ride_date.isoformat()}\n")
+    ride_date = date.today()
+    print(f"Simulação {run_id} | API {args.api} | banco {database} | viagens hoje, saindo minutos depois de cada oferta\n")
 
     results = []
     try:

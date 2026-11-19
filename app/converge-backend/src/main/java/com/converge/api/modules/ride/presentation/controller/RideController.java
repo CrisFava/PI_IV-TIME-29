@@ -14,7 +14,10 @@ import com.converge.api.modules.ride.application.CompleteRideUseCase;
 import com.converge.api.modules.ride.application.GetRideUseCase;
 import com.converge.api.modules.ride.application.LeaveRideUseCase;
 import com.converge.api.modules.ride.application.ListMyRidesUseCase;
+import com.converge.api.modules.ride.application.ArrivePassengerUseCase;
+import com.converge.api.modules.ride.application.ListPendingPaymentsUseCase;
 import com.converge.api.modules.ride.application.MarkNoShowUseCase;
+import com.converge.api.modules.ride.application.dto.PaymentResponseDTO;
 import com.converge.api.modules.ride.application.RejectPassengerUseCase;
 import com.converge.api.modules.ride.application.RequestRideSeatUseCase;
 import com.converge.api.modules.ride.application.RideViewService;
@@ -56,6 +59,8 @@ public class RideController {
     private final StartRideUseCase startRide;
     private final CompleteRideUseCase completeRide;
     private final MarkNoShowUseCase markNoShow;
+    private final ArrivePassengerUseCase arrivePassenger;
+    private final ListPendingPaymentsUseCase listPendingPayments;
     private final LeaveRideUseCase leaveRide;
     private final AcceptPassengerUseCase acceptPassenger;
     private final RejectPassengerUseCase rejectPassenger;
@@ -102,6 +107,14 @@ public class RideController {
         return ResponseEntity.ok(ApplicationResponse.success(history));
     }
 
+    // Cobranças em aberto do usuário logado: o app abre o pagamento com elas
+    @GetMapping("/payments/pending")
+    public ResponseEntity<ApplicationResponse<List<PaymentResponseDTO>>> listPendingPayments(
+            @AuthenticationPrincipal AuthenticatedUser principal
+    ) {
+        return ResponseEntity.ok(ApplicationResponse.success(listPendingPayments.execute(uid(principal))));
+    }
+
     @GetMapping("/{rideId}")
     public ResponseEntity<ApplicationResponse<RideResponseDTO>> getRide(
             @AuthenticationPrincipal AuthenticatedUser principal,
@@ -140,6 +153,18 @@ public class RideController {
             @PathVariable String rideId
     ) {
         Ride ride = completeRide.execute(new RideRefCommand(rideId, uid(principal)));
+
+        return ResponseEntity.ok(ApplicationResponse.success(rideView.view(ride, uid(principal))));
+    }
+
+    // "Confirmar chegada" (só o motorista): o passageiro desceu e já recebe a cobrança
+    @PostMapping("/{rideId}/passengers/{passengerId}/arrive")
+    public ResponseEntity<ApplicationResponse<RideResponseDTO>> arrivePassenger(
+            @AuthenticationPrincipal AuthenticatedUser principal,
+            @PathVariable String rideId,
+            @PathVariable String passengerId
+    ) {
+        Ride ride = arrivePassenger.execute(new PassengerRequestCommand(rideId, passengerId, uid(principal)));
 
         return ResponseEntity.ok(ApplicationResponse.success(rideView.view(ride, uid(principal))));
     }

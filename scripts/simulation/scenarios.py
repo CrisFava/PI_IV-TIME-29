@@ -74,7 +74,7 @@ def happy_path(world: SimulationWorld) -> None:
     total_cost = Decimal(str((ride.get("costs") or {}).get("totalCost") or 0))
     if total_cost <= 0:
         print("      AVISO: custo total da viagem R$ 0 (o veículo tem consumo e preço da energia?); "
-              "a cobrança abaixo usa R$ 10,00.")
+              "sem valor não há cobrança, e os passos de pagamento abaixo vão falhar.")
     for passenger in (ana, bruno):
         participant = world.expect_participant(ride, passenger, "COMPLETED")
         final = Decimal(str(participant.get("finalAmount") or 0))
@@ -83,16 +83,19 @@ def happy_path(world: SimulationWorld) -> None:
                     f"o valor final de {passenger.nickname} ({final}) passou do teto ({ceiling})")
         print(f"      {passenger.nickname}: valor final R$ {final} (teto {ceiling})")
 
-    world.step("Motorista cobra a Ana pelo PIX e confirma o recebimento")
-    amount = world.charge_for(world.participant(ride, ana))
-    charge = world.expect_ok(world.payment(driver, ride_id, ana, "request", {"amount": str(amount)}),
-                             "cobrar Ana")
+    world.step("Concluir já cobra a Ana pelo PIX, e ela informa o pagamento (\"Já paguei\")")
+    pending = world.expect_ok(world.api.get("/rides/payments/pending", ana.token), "pagamentos em aberto da Ana") or []
+    charge = next((p for p in pending if p.get("rideId") == ride_id), None)
+    world.check(charge is not None, "concluir a viagem não gerou a cobrança da Ana")
     world.check((charge.get("pixCopyPaste") or "").startswith("000201"),
                 "a cobrança não trouxe um PIX Copia e Cola válido")
-    seen_by_ana = world.expect_ok(world.payment(ana, ride_id, ana), "Ana ver a própria cobrança")
-    world.check(seen_by_ana.get("status") == "PENDING", f"a cobrança da Ana deveria estar PENDING, está {seen_by_ana.get('status')}")
-    paid = world.expect_ok(world.payment(driver, ride_id, ana, "confirm"), "confirmar pagamento da Ana")
+    world.check(Decimal(str(charge.get("amount") or 0)) == Decimal(str(world.participant(ride, ana).get("finalAmount") or 0)),
+                f"a cobrança da Ana ({charge.get('amount')}) deveria ser o valor final do rateio")
+    paid = world.expect_ok(world.payment(ana, ride_id, ana, "mark-paid"), "Ana informar o pagamento")
     world.check(paid.get("status") == "PAID", f"o pagamento da Ana deveria estar PAID, está {paid.get('status')}")
+    still_pending = world.expect_ok(world.api.get("/rides/payments/pending", ana.token), "pagamentos da Ana depois de pagar") or []
+    world.check(all(p.get("rideId") != ride_id for p in still_pending),
+                "depois do \"Já paguei\", a cobrança da Ana continuou em aberto")
 
     world.step("O histórico da Ana mostra a viagem com o valor pago")
     history = world.expect_ok(world.api.get("/rides/history", ana.token), "histórico da Ana") or []

@@ -42,9 +42,9 @@ Os requisitos funcionais descrevem o que o sistema Converge deve fazer.
 | **RF36** | O sistema deve atualizar o valor estimado de cada participante sempre que houver entrada, cancelamento ou ausência de participantes. |
 | **RF37** | O sistema deve registrar o valor máximo no momento da confirmação da carona e garantir que o valor final cobrado do passageiro não o ultrapasse, mesmo que outros participantes cancelem ou faltem, ou que o custo da viagem seja alterado depois. |
 | **RF38** | O sistema deve calcular o valor final de cada participante apenas ao concluir a viagem, com base nos participantes efetivos, nos desvios e nas despesas informadas. |
-| **RF39** | O sistema deve gerar, ao término da viagem, o código PIX (Pix Copia e Cola e QR Code) de cada passageiro com cobrança, contendo a chave PIX do motorista e o valor final do participante já definido e não editável, permitindo o pagamento direto entre os participantes. |
+| **RF39** | O sistema deve gerar automaticamente, ao término da viagem de cada passageiro (na confirmação da chegada dele ou no encerramento da viagem), a cobrança e o código PIX (Pix Copia e Cola e QR Code) de cada passageiro com valor a pagar, contendo a chave PIX do motorista e o valor final do participante já definido e não editável, permitindo o pagamento direto entre os participantes. |
 | **RF40** | O sistema deve realizar a cobrança sempre por viagem individual, via PIX, inclusive para passageiros com vínculo recorrente. |
-| **RF41** | O sistema deve permitir que o passageiro marque uma viagem como paga e que o motorista confirme o recebimento, registrando o status do pagamento como pendente, aguardando confirmação, pago ou não aplicável. Enquanto estiver aguardando confirmação do motorista, a cobrança não é considerada vencida. |
+| **RF41** | O sistema deve permitir que o passageiro informe que pagou a viagem ("Já paguei"), registrando o status do pagamento como pendente, pago ou não aplicável. Não há confirmação de recebimento pelo motorista. |
 | **RF42** | O sistema deve registrar o histórico de viagens realizadas pelo usuário, incluindo data, trajeto e participantes. |
 | **RF43** | O sistema deve permitir que os participantes realizem avaliações mútuas após a conclusão de uma viagem. |
 | **RF44** | O sistema deve permitir a visualização do histórico de avaliações recebidas por um usuário. |
@@ -76,3 +76,5 @@ Os requisitos funcionais descrevem o que o sistema Converge deve fazer.
 | **RF70** | O sistema deve registrar o status de cada solicitação de vaga (solicitada, recusada, confirmada), mantendo o registro das recusas para histórico e moderação. |
 | **RF71** | O sistema deve manter uma trilha de auditoria das ações sensíveis da plataforma (confirmação de pagamento, registro de ausência, cancelamentos, bloqueios, resolução de denúncias e verificações), para fins de moderação e suporte. |
 | **RF72** | O sistema deve permitir que o motorista cadastre sua chave PIX, informando o tipo (CPF, celular, e-mail ou chave aleatória), e deve exigir a chave cadastrada para que ele possa oferecer carona. |
+| **RF73** | O sistema deve permitir que o motorista confirme a chegada de cada passageiro durante a viagem, encerrando a viagem daquele passageiro e emitindo a cobrança dele com o valor do rateio do momento, sem alterá-lo no encerramento da viagem. |
+| **RF74** | O sistema deve impedir que um usuário com cobrança emitida e ainda não paga peça vaga ou cadastre trajeto (de oferta ou de procura), até que ele informe o pagamento. |

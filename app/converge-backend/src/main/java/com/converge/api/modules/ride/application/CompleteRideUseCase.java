@@ -33,6 +33,7 @@ public class CompleteRideUseCase implements UseCase<RideRefCommand, Ride> {
     private final RideRepository rideRepository;
     private final RideCompletionPublisher completionPublisher;
     private final RouteAccess routeAccess;
+    private final RidePaymentNotifier paymentNotifier;
 
     // A viagem concluída e o fim da carona de um dia só são gravados juntos
     @Override
@@ -41,11 +42,15 @@ public class CompleteRideUseCase implements UseCase<RideRefCommand, Ride> {
         Ride ride = rideAccess.getOwnedRide(command.rideId(), command.firebaseUid());
 
         ride.complete();
+        List<String> charged = List.of();
         if (ride.getStatus() == RideStatus.COMPLETED) {
             rideCostCalculator.calculateFinalShares(ride);
+            // Quem ainda estava a bordo é cobrado com o valor final; quem desceu antes já foi cobrado na chegada
+            charged = ride.chargeCompletedPassengers();
         }
 
         Ride saved = rideRepository.save(ride);
+        paymentNotifier.notifyCharged(saved, charged);
         routeAccess.endIfOnce(saved.getDriverRouteId());
         // A procura de um dia só de quem estava na viagem também acabou: sem isso o passageiro
         // continuava aparecendo como disponível no matching dos motoristas.
