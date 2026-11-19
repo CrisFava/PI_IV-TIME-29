@@ -19,17 +19,32 @@ o script lê app/converge-backend/.env.
 import argparse
 import os
 import re
+import subprocess
 import sys
 from datetime import datetime, timezone
 from pathlib import Path
+
+REPO_ROOT = Path(__file__).resolve().parent.parent
+VENV_DIR = REPO_ROOT / "scripts" / ".venv"
+
+
+def rerun_in_venv() -> None:
+    """Sem pymongo no Python atual, roda o script de novo com o Python do scripts/.venv."""
+    venv_python = VENV_DIR / ("Scripts/python.exe" if os.name == "nt" else "bin/python")
+    if venv_python.is_file() and Path(sys.prefix).resolve() != VENV_DIR.resolve():
+        sys.exit(subprocess.call([str(venv_python), *sys.argv]))
+
+    sys.exit("Falta o pymongo. Crie o ambiente dos scripts (veja scripts/README.md):\n"
+             "  python3 -m venv scripts/.venv\n"
+             "  scripts/.venv/bin/python -m pip install -r scripts/requirements.txt")
+
 
 try:
     from pymongo import MongoClient
     from pymongo.errors import PyMongoError
 except ImportError:
-    sys.exit("Falta o pymongo. Instale com: python3 -m pip install -r scripts/requirements.txt")
+    rerun_in_venv()
 
-REPO_ROOT = Path(__file__).resolve().parent.parent
 DEFAULT_ENV_FILE = REPO_ROOT / "app" / "converge-backend" / ".env"
 DEFAULT_DATABASE = "converge-dev"
 USERS_COLLECTION = "users"
