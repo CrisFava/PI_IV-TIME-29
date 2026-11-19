@@ -2,6 +2,7 @@
 
 package com.converge.api.modules.route.application;
 
+import com.converge.api.modules.ride.application.PendingPaymentGuard;
 import com.converge.api.modules.route.application.dto.CreateRouteCommand;
 import com.converge.api.modules.route.application.dto.CreateRouteRequestDTO;
 import com.converge.api.modules.route.application.dto.PlaceRequestDTO;
@@ -32,6 +33,7 @@ import static org.mockito.ArgumentMatchers.anyCollection;
 import static org.mockito.ArgumentMatchers.anyString;
 import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.ArgumentMatchers.isNull;
+import static org.mockito.Mockito.doThrow;
 import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
@@ -42,13 +44,17 @@ class CreateRouteUseCaseTest {
     @Mock
     private RouteRepository routeRepository;
 
+    @Mock
+    private PendingPaymentGuard pendingPaymentGuard;
+
     private CreateRouteUseCase createRouteUseCase;
 
     @BeforeEach
     void setUp() {
         createRouteUseCase = new CreateRouteUseCase(
                 routeRepository, new RouteMapper(), new RouteGeometryService(new FakeMapsGateway(), new FakeDistanceGateway()),
-                new OfferOverlapValidator(routeRepository)
+                new OfferOverlapValidator(routeRepository),
+                pendingPaymentGuard
         );
     }
 
@@ -88,6 +94,19 @@ class CreateRouteUseCaseTest {
         assertThat(route.getRouteDistanceKm()).isEqualTo(FakeMapsGateway.GOOGLE_ROUTE.distanceKm());
         assertThat(route.getEncodedPolyline()).isEqualTo(FakeMapsGateway.GOOGLE_ROUTE.encodedPolyline());
         verify(routeRepository).save(route);
+    }
+
+    @Test
+    @DisplayName("Com o pagamento de uma carona em aberto, não dá para cadastrar trajeto, de oferta ou de procura")
+    void shouldRejectRouteWithPendingPayment() {
+        doThrow(new ApplicationException(ErrorCode.PAYMENT_PENDING, "Pagamento em aberto."))
+                .when(pendingPaymentGuard).ensureNoPendingPayment("user-123");
+
+        ApplicationException exception = assertThrows(ApplicationException.class,
+                () -> createRouteUseCase.execute(offerCommand()));
+
+        assertThat(exception.getError().code()).isEqualTo(ErrorCode.PAYMENT_PENDING);
+        verify(routeRepository, never()).save(any(Route.class));
     }
 
     @Test

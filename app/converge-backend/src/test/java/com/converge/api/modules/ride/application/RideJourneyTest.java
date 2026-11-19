@@ -46,6 +46,7 @@ import org.springframework.test.util.ReflectionTestUtils;
 
 import java.math.BigDecimal;
 import java.time.LocalDateTime;
+import java.util.List;
 import java.util.Map;
 import java.util.Optional;
 import java.util.Set;
@@ -53,6 +54,7 @@ import java.util.Set;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.ArgumentMatchers.anyString;
 import static org.mockito.Mockito.doAnswer;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.never;
@@ -111,6 +113,9 @@ class RideJourneyTest {
     @Mock
     private GetUserPixInfoUseCase getUserPixInfo;
 
+    @Mock
+    private RouteAccess routeAccess;
+
     private final ObjectId driverId = new ObjectId();
     private final ObjectId anaId = new ObjectId();
     private final ObjectId brunoId = new ObjectId();
@@ -125,7 +130,10 @@ class RideJourneyTest {
     private CancelRideUseCase cancelRide;
     private CompleteRideUseCase completeRide;
     private RequestPaymentUseCase requestPayment;
-    private ConfirmPaymentUseCase confirmPayment;
+    private MarkPaymentAsPaidUseCase markPaymentAsPaid;
+    private ArrivePassengerUseCase arrivePassenger;
+    private ListPendingPaymentsUseCase listPendingPayments;
+    private PendingPaymentGuard pendingPaymentGuard;
 
     @BeforeEach
     void setUp() {
@@ -172,9 +180,14 @@ class RideJourneyTest {
         cancelRide = new CancelRideUseCase(
                 rideAccess, rideRepository, recordReputationPenalty, auditLogService, eventPublisher, mock(RouteAccess.class));
         completeRide = new CompleteRideUseCase(
-                rideAccess, rideCostCalculator, rideRepository, completionPublisher, mock(RouteAccess.class));
+                rideAccess, rideCostCalculator, rideRepository, completionPublisher, mock(RouteAccess.class),
+                new RidePaymentNotifier(eventPublisher));
         requestPayment = new RequestPaymentUseCase(rideAccess, rideRepository, paymentView);
-        confirmPayment = new ConfirmPaymentUseCase(rideAccess, rideRepository, paymentView);
+        markPaymentAsPaid = new MarkPaymentAsPaidUseCase(rideAccess, rideRepository, paymentView, new RidePaymentNotifier(eventPublisher));
+        arrivePassenger = new ArrivePassengerUseCase(
+                rideAccess, rideCostCalculator, rideRepository, routeAccess, new RidePaymentNotifier(eventPublisher));
+        listPendingPayments = new ListPendingPaymentsUseCase(rideAccess, rideRepository, paymentView);
+        pendingPaymentGuard = new PendingPaymentGuard(rideRepository);
     }
 
     // ------------------------------------------------------------------ cenários
@@ -209,10 +222,57 @@ class RideJourneyTest {
         assertThat(charged.pixCopyPaste()).isEqualTo(FAKE_PIX);
         assertThat(charged.status()).isEqualTo(ParticipantPaymentStatus.PENDING);
 
-        PaymentResponseDTO paid = confirmPayment.execute(paymentRef(DRIVER_UID, anaId));
+        // "Já paguei": a própria Ana informa o pagamento, sem confirmação do motorista
+        PaymentResponseDTO paid = markPaymentAsPaid.execute(paymentRef(ANA_UID, anaId));
         assertThat(paid.status()).isEqualTo(ParticipantPaymentStatus.PAID);
-        assertThat(paid.confirmedByDriver()).isTrue();
         assertThat(paid.pixCopyPaste()).isNull();
+    }
+
+    @Test
+    @DisplayName("Chegada individual: quem desce é cobrado na hora, os demais no encerramento, e a cobrança bloqueia até o 'Já paguei'")
+    void shouldChargeOnArrivalAndBlockUntilThePassengerPays() {
+        // Na chegada, o rateio do momento dá R$ 11,00 para a Ana; no fim da viagem daria R$ 12,50
+        BigDecimal anaArrivalAmount = new BigDecimal("11.00");
+        doAnswer(invocation -> {
+            Ride riding = invocation.getArgument(0);
+            riding.applyArrivalAmount(invocation.getArgument(1), anaArrivalAmount);
+            return null;
+        }).when(rideCostCalculator).calculateArrivalShare(any(Ride.class), anyString());
+        when(rideRepository.findByParticipantsUserId(anaId.toHexString())).thenAnswer(invocation -> List.of(ride));
+        rideWithSeats(3);
+        requestSeat(anaId);
+        requestSeat(brunoId);
+        accept(anaId);
+        accept(brunoId);
+        start();
+
+        Ride afterArrival = arrivePassenger.execute(paymentRef(DRIVER_UID, anaId));
+
+        assertThat(afterArrival.getStatus()).isEqualTo(RideStatus.IN_PROGRESS);
+        assertThat(participant(anaId).getStatus()).isEqualTo(ParticipantStatus.COMPLETED);
+        assertThat(participant(anaId).getRequestedAmount()).isEqualByComparingTo(anaArrivalAmount);
+        assertThat(participant(brunoId).getStatus()).isEqualTo(ParticipantStatus.CONFIRMED);
+        verify(routeAccess).endIfOnce("route-" + anaId.toHexString());
+
+        // O pagamento em aberto aparece para a Ana com o PIX, e ela não pode pedir nem oferecer outra carona
+        assertThat(listPendingPayments.execute(ANA_UID)).singleElement().satisfies(payment -> {
+            assertThat(payment.amount()).isEqualByComparingTo(anaArrivalAmount);
+            assertThat(payment.pixCopyPaste()).isEqualTo(FAKE_PIX);
+        });
+        assertError(ErrorCode.PAYMENT_PENDING,
+                () -> pendingPaymentGuard.ensureNoPendingPayment(anaId.toHexString()));
+
+        complete();
+
+        // O Bruno, que estava a bordo, é cobrado no encerramento; a cobrança da Ana não muda
+        assertThat(participant(brunoId).getRequestedAmount()).isEqualByComparingTo(BRUNO_FINAL_AMOUNT);
+        assertThat(participant(anaId).getRequestedAmount()).isEqualByComparingTo(anaArrivalAmount);
+
+        markPaymentAsPaid.execute(paymentRef(ANA_UID, anaId));
+
+        assertThat(participant(anaId).getPaymentStatus()).isEqualTo(ParticipantPaymentStatus.PAID);
+        assertThat(listPendingPayments.execute(ANA_UID)).isEmpty();
+        pendingPaymentGuard.ensureNoPendingPayment(anaId.toHexString());
     }
 
     @Test

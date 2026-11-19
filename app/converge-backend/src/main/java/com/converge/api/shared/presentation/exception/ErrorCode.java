@@ -24,6 +24,8 @@ public enum ErrorCode {
     REVIEW_NOT_ALLOWED(HttpStatus.UNPROCESSABLE_CONTENT),
     RIDE_NOT_FOUND(HttpStatus.NOT_FOUND),
     RIDE_NOT_COMPLETED(HttpStatus.UNPROCESSABLE_CONTENT),
+    // 422, e não 409: o app trata 409 na criação de trajeto como "trajeto repetido" e reaproveita o salvo
+    PAYMENT_PENDING(HttpStatus.UNPROCESSABLE_CONTENT),
     SERVER_NOT_RUNNING(HttpStatus.INTERNAL_SERVER_ERROR);
 
     private final HttpStatus status;

@@ -40,6 +40,7 @@ import java.util.Set;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
@@ -208,37 +209,41 @@ class RidePaymentUseCasesTest {
         verify(rideRepository, never()).save(any());
     }
 
-    @Test
-    @DisplayName("'Passageiro já pagou' deve marcar como pago e parar de devolver o código PIX")
-    void shouldConfirmPaymentAndHidePixCopyPaste() {
-        ConfirmPaymentUseCase confirmPayment = new ConfirmPaymentUseCase(rideAccess, rideRepository, paymentView);
-        Ride ride = rideWithConfirmedPassenger();
-        ride.requestPayment(passengerId(), new BigDecimal("12.50"));
-        currentUserIs(driverObjectId);
-        rideIsStored(ride);
-        savingReturnsTheSameRide();
-        driverHasPixKey();
+    private final RidePaymentNotifier paymentNotifier = mock(RidePaymentNotifier.class);
 
-        PaymentResponseDTO payment = confirmPayment.execute(paymentRef(passengerId()));
-
-        assertThat(payment.status()).isEqualTo(ParticipantPaymentStatus.PAID);
-        assertThat(payment.confirmedByDriver()).isTrue();
-        assertThat(payment.paidAt()).isNotNull();
-        assertThat(payment.pixCopyPaste()).isNull();
-        assertThat(generatedCharges).isEmpty();
+    private MarkPaymentAsPaidUseCase markPaymentAsPaid() {
+        return new MarkPaymentAsPaidUseCase(rideAccess, rideRepository, paymentView, paymentNotifier);
     }
 
     @Test
-    @DisplayName("O passageiro não pode confirmar o próprio pagamento")
-    void shouldNotConfirmPaymentWhenUserIsNotTheDriver() {
-        ConfirmPaymentUseCase confirmPayment = new ConfirmPaymentUseCase(rideAccess, rideRepository, paymentView);
+    @DisplayName("'Já paguei' do passageiro marca como pago, para de devolver o código PIX e avisa o motorista")
+    void shouldMarkPaymentAsPaidAndHidePixCopyPaste() {
         Ride ride = rideWithConfirmedPassenger();
         ride.requestPayment(passengerId(), new BigDecimal("12.50"));
         currentUserIs(passengerObjectId);
         rideIsStored(ride);
+        savingReturnsTheSameRide();
+        driverHasPixKey();
 
-        assertThatThrownBy(() -> confirmPayment.execute(paymentRef(passengerId())))
-                .isInstanceOf(ApplicationException.class);
+        PaymentResponseDTO payment = markPaymentAsPaid().execute(paymentRef(passengerId()));
+
+        assertThat(payment.status()).isEqualTo(ParticipantPaymentStatus.PAID);
+        assertThat(payment.paidAt()).isNotNull();
+        assertThat(payment.pixCopyPaste()).isNull();
+        assertThat(generatedCharges).isEmpty();
+        verify(paymentNotifier).notifyMarkedAsPaid(ride);
+    }
+
+    @Test
+    @DisplayName("Só o próprio passageiro pode informar o pagamento: o motorista não marca como pago")
+    void shouldNotMarkAsPaidWhenUserIsNotThePassenger() {
+        Ride ride = rideWithConfirmedPassenger();
+        ride.requestPayment(passengerId(), new BigDecimal("12.50"));
+        currentUserIs(driverObjectId);
+
+        assertThatThrownBy(() -> markPaymentAsPaid().execute(paymentRef(passengerId())))
+                .isInstanceOfSatisfying(ApplicationException.class,
+                        exception -> assertThat(exception.getError().code()).isEqualTo(ErrorCode.NOT_ALLOWED));
 
         verify(rideRepository, never()).save(any());
     }

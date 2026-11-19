@@ -9,7 +9,7 @@
 > **Chat:** as mensagens entre participantes **não ficam no MongoDB** — vivem no **Firebase Realtime Database**, conforme a arquitetura do projeto (comunicação em tempo real). O MongoDB guarda apenas o identificador da sala de conversa quando necessário (ex.: um `chatRoomId` na viagem para localizar o histórico no Firebase). Por isso não há coleção `messages`/`chat` nesta modelagem.
 >
 > Estrutura no Realtime Database: `chats/{chatRoomId}/{passengerId}/messages/{pushId}`, com os campos `senderId`, `senderName`, `senderUid` (uid do Firebase, conferido pelas regras; é ele que diz de quem é a mensagem), `type` (`TEXT`, `PAYMENT_REQUEST`, `PAYMENT_CONFIRMED`, `SYSTEM`), `text`, `amount` e `sentAt` (horário do servidor). O `chatRoomId` é criado quando o motorista aceita o primeiro passageiro, e cada passageiro aceito tem uma conversa particular com o motorista. As mensagens de pagamento e de viagem são só avisos: a fonte de verdade continua sendo a API. As regras de acesso ficam em `app/converge/database.rules.json`.
-> **Pagamento PIX:** no MVP o pagamento usa **QR Code PIX estático** ("Pix Copia e Cola"), gerado pelo próprio backend, sem gateway e sem API externa. O valor da cobrança vai travado dentro do payload e o dinheiro vai direto da conta do passageiro para a do motorista — o Converge nunca toca no dinheiro. Como o banco não devolve nenhuma confirmação ao servidor, a confirmação de recebimento é **manual** (o motorista marca que recebeu). A verificação automática via gateway (QR Code dinâmico + webhook) fica como evolução futura.
+> **Pagamento PIX:** no MVP o pagamento usa **QR Code PIX estático** ("Pix Copia e Cola"), gerado pelo próprio backend, sem gateway e sem API externa. O valor da cobrança vai travado dentro do payload e o dinheiro vai direto da conta do passageiro para a do motorista — o Converge nunca toca no dinheiro. Como o banco não devolve nenhuma confirmação ao servidor, o pagamento é **informado pelo próprio passageiro** ("Já paguei"); o motorista não confirma o recebimento. A verificação automática via gateway (QR Code dinâmico + webhook) fica como evolução futura.
 
 ---
 
@@ -226,18 +226,14 @@ O selo `SUSTAINABILITY` reconhece o impacto ambiental acumulado do usuário. É 
 
 ### Regras de Negócio — Inadimplência (pagamento por viagem)
 
-O pagamento é **por viagem**. Cada viagem concluída gera uma cobrança que o passageiro paga por PIX.
+O pagamento é **por viagem**. Ao fim da viagem de cada passageiro (chegada confirmada pelo motorista ou encerramento da viagem), o sistema emite a cobrança, que o passageiro paga por PIX (RF39).
 
-**Estados de uma cobrança:**
-- **Pendente (`PENDING`):** viagem concluída, ainda não paga, mas **dentro do prazo** (3 dias). Situação normal — não penaliza nem bloqueia.
-- **Aguardando confirmação (`AWAITING_DRIVER_CONFIRMATION`):** o passageiro marcou que pagou e espera o motorista confirmar. **Enquanto está nesse estado, o relógio da dívida fica pausado** — a cobrança não vira vencida, protegendo o passageiro de boa-fé contra a lentidão do motorista.
-- **Vencida (`overdue`):** passou de **3 dias** em `PENDING` sem o passageiro sequer marcar pagamento. Vira dívida e conta para o bloqueio.
+**Estados de uma cobrança (implementado):**
+- **Pendente (`PENDING` com `paymentRequestedAt`):** cobrança emitida e ainda não paga. **Bloqueia na hora** (RF74): o passageiro não pede vaga nem cadastra trajeto, de oferta ou de procura, até informar o pagamento. A API recusa com `PAYMENT_PENDING` (HTTP 422). Todo passageiro já nasce com `PENDING`; o que marca a cobrança emitida é `paymentRequestedAt`.
+- **Pago (`PAID`):** o passageiro informou o pagamento ("Já paguei", RF41). Libera na hora. **Não há confirmação de recebimento pelo motorista**; se ele não recebeu, o caminho é a denúncia.
+- **Não aplicável (`NOT_APPLICABLE`):** sem valor a cobrar (viagem sem custo calculado), ausente ou cancelado sem penalidade.
 
-**Ponte entre confirmação e dívida:**
-- Se o motorista **confirmar** → `PAID`, cobrança encerrada.
-- Se o motorista alegar que **não recebeu** → a cobrança volta para `PENDING` e o relógio dos 3 dias é retomado (ou abre disputa para moderação). Só assim o passageiro pode voltar a acumular dívida — nunca por mera inércia do motorista.
-
-**Limite decrescente de tolerância** — quanto mais dívidas vencidas acumuladas, menor o prazo até o bloqueio. `overdueRidesCount` guarda a quantidade de viagens vencidas:
+**Limite decrescente de tolerância (planejado, ainda não implementado — hoje vale o bloqueio imediato acima)** — quanto mais dívidas vencidas acumuladas, menor o prazo até o bloqueio. `overdueRidesCount` guarda a quantidade de viagens vencidas:
 
 | Dívidas vencidas (`overdueRidesCount`) | Prazo para regularizar antes de bloquear | `paymentStanding` |
 |---|---|---|
@@ -505,8 +501,7 @@ Quando `active = false` (conta suspensa ou excluída):
       "estimatedAmount": "Decimal128",
       "maxAmount": "Decimal128",
       "finalAmount": "Decimal128 | null",
-      "paymentStatus": "PENDING | AWAITING_DRIVER_CONFIRMATION | PAID | NOT_APPLICABLE",
-      "paymentConfirmedByDriver": "Boolean",
+      "paymentStatus": "PENDING | PAID | NOT_APPLICABLE",
       "requestedAmount": "Decimal128 | null (valor combinado no chat)",
       "paymentRequestedAt": "ISODate | null",
       "paidAt": "ISODate | null",
@@ -584,39 +579,44 @@ O motorista vai até cada passageiro: `itinerary` guarda as paradas na ordem em 
 ### Pagamento — sempre por viagem
 
 - Todo pagamento no Converge é **por viagem**, via PIX, incluindo as viagens de passageiros com vínculo recorrente. Não há cobrança mensal consolidada nem valor fixo pré-combinado.
-- A chave PIX do motorista (`users.pixKey`) e o valor de cada participante são exibidos ao fim da viagem. O passageiro paga e o motorista confirma o recebimento (`participants[].paymentConfirmedByDriver`).
+- A chave PIX do motorista (`users.pixKey`) e o valor de cada participante são exibidos ao fim da viagem. O passageiro paga e informa o pagamento ("Já paguei"); o motorista não confirma o recebimento.
 - O prazo para pagar cada viagem é de **3 dias**; depois disso a cobrança vira dívida vencida (ver regra de inadimplência na coleção `users`).
 
-### Cobrança combinada no chat (MVP)
+### Cobrança automática
 
-Depois que o motorista aceita o passageiro, os dois combinam o valor no chat. A cobrança segue estes passos:
+O valor de cada passageiro vem do rateio (RF39, não editável) e a cobrança é emitida sozinha no fim da viagem dele:
 
-1. **Solicitar pagamento** — `POST /rides/{rideId}/passengers/{passengerId}/payment/request` com `{ "amount": "12.50" }`. Só o motorista da viagem, com chave PIX cadastrada. Grava `requestedAmount` e `paymentRequestedAt` e deixa `paymentStatus = PENDING`. O valor não pode passar do `maxAmount` quando este estiver definido. Pode ser repetido para corrigir o valor enquanto não estiver pago.
-2. **Pix Copia e Cola** — gerado sob demanda pelo **Servidor Java de sockets** (`PixPayloadHandler`, padrão BR Code com CRC16) a partir da chave do motorista e do `requestedAmount`. Nada é armazenado; se o servidor estiver fora do ar, o backend executa o mesmo handler localmente.
-3. **Passageiro já pagou** — `POST /rides/{rideId}/passengers/{passengerId}/payment/confirm`. Só o motorista. Grava `paymentStatus = PAID`, `paymentConfirmedByDriver = true` e `paidAt`.
-4. **Consulta** — `GET /rides/{rideId}/passengers/{passengerId}/payment`. Só o motorista e o próprio passageiro. O código PIX só vem enquanto a cobrança está em aberto.
+1. **Confirmar chegada** — `POST /rides/{rideId}/passengers/{passengerId}/arrive`. Só o motorista, com a viagem `IN_PROGRESS` e o passageiro `CONFIRMED` (RF73). O passageiro vira `COMPLETED`, recebe como `finalAmount` o rateio do momento (dividido entre quem já desceu e quem ainda está a bordo) e já é cobrado. A procura de um dia só dele é encerrada.
+2. **Encerrar a viagem** — `POST /rides/{rideId}/complete`. Quem ainda estava a bordo vira `COMPLETED` e é cobrado com o valor final do rateio. Quem já foi cobrado na chegada **mantém** o valor da cobrança. Se todos já desceram, a viagem é concluída normalmente (não é tratada como "todos ausentes").
+3. **Cobrança** — grava `requestedAmount = finalAmount` e `paymentRequestedAt`, com `paymentStatus = PENDING`. Sem valor a cobrar, o pagamento fica `NOT_APPLICABLE`. O passageiro recebe a notificação `PAYMENT_DUE`.
+4. **Pix Copia e Cola** — gerado sob demanda pelo **Servidor Java de sockets** (`PixPayloadHandler`, padrão BR Code com CRC16) a partir da chave do motorista e do `requestedAmount`. Nada é armazenado; se o servidor estiver fora do ar, o backend executa o mesmo handler localmente.
+5. **Cobranças em aberto** — `GET /rides/payments/pending`. As cobranças `PENDING` emitidas para o usuário logado, com o PIX de cada uma. É o que o app consulta para abrir o pagamento.
+6. **Já paguei** — `POST /rides/{rideId}/passengers/{passengerId}/payment/mark-paid`. Só o próprio passageiro (RF41). Grava `paymentStatus = PAID` e `paidAt`, libera o bloqueio e avisa o motorista (`PAYMENT_CONFIRMED`). Repetir não muda nada.
+7. **Consulta** — `GET /rides/{rideId}/passengers/{passengerId}/payment`. Só o motorista e o próprio passageiro. O código PIX só vem enquanto a cobrança está em aberto.
+
+O `POST .../payment/request` (cobrança com valor informado pelo motorista) continua na API, mas o app não o usa: o valor é o do rateio.
 
 A cobrança é aceita com a viagem `CONFIRMED`, `IN_PROGRESS` ou `COMPLETED`, sempre de um passageiro com vaga (`CONFIRMED` ou `COMPLETED`). Passageiro ausente (`NO_SHOW`) não é cobrado.
 
 ### Geração do PIX Copia e Cola
 
-> **MVP:** a cobrança segue o fluxo da seção anterior ("Cobrança combinada no chat"). O payload usa o `requestedAmount` combinado no chat, pode ser gerado a partir de `CONFIRMED` e é devolvido em `GET /rides/{rideId}/passengers/{passengerId}/payment`. O uso do `finalAmount` ao concluir a viagem, descrito abaixo, depende do cálculo de rateio no servidor de sockets e fica como evolução.
+A cobrança segue o fluxo da seção anterior ("Cobrança automática"): o payload usa o `requestedAmount`, que é o `finalAmount` do rateio gravado no fim da viagem do passageiro.
 
 O backend monta o payload sob demanda (padrão BR Code do Banco Central, CRC16 incluso). **Nada é armazenado**: o payload é derivado de dados que já existem.
 
 | Campo do payload | Origem |
 |---|---|
 | Chave PIX (campo 26) | `users.pixKey` do motorista, normalizada |
-| Valor (campo 54) | `participants[].finalAmount` do passageiro, com 2 casas decimais |
+| Valor (campo 54) | `participants[].requestedAmount` do passageiro (o `finalAmount` cobrado), com 2 casas decimais |
 | Nome do recebedor (campo 59) | `users.name` do motorista, sem acento, maiúsculas, máx. 25 caracteres |
 | Cidade (campo 60) | Valor fixo ou cidade da origem da rota, máx. 15 caracteres |
 | Identificador (campo 62) | `***` (PIX estático não tem txid útil) |
 
-- **Endpoint:** `GET /rides/{rideId}/payment-qr` devolve a string; o app desenha o QR e oferece o botão de copiar.
-- **Quando gera:** viagem `COMPLETED` e passageiro com `finalAmount > 0`. Para `NO_SHOW` e `NOT_APPLICABLE` não há cobrança, logo não há QR.
-- **Autorização:** só participantes da viagem (`CONFIRMED` ou `COMPLETED`) acessam, porque a chave PIX do motorista é dado pessoal.
+- **Endpoints:** `GET /rides/{rideId}/passengers/{passengerId}/payment` (uma cobrança) e `GET /rides/payments/pending` (as cobranças em aberto do usuário) devolvem a string em `pixCopyPaste`; o app desenha o QR e oferece o botão de copiar.
+- **Quando gera:** cobrança emitida e ainda em aberto (`requestedAmount` preenchido e `paymentStatus = PENDING`). Depois do "Já paguei" (`PAID`), e para `NO_SHOW` e `NOT_APPLICABLE`, não há código.
+- **Autorização:** só o motorista e o próprio passageiro acessam, porque a chave PIX do motorista é dado pessoal.
 - **Valor travado:** o app do banco exibe o valor fixo e o passageiro não consegue alterá-lo.
-- **Vínculo cobrança ↔ viagem:** como o PIX estático não devolve txid, o vínculo é feito pelo banco de dados (`rideId` + participante), e o `PAID` só acontece quando o motorista confirma.
+- **Vínculo cobrança ↔ viagem:** como o PIX estático não devolve txid, o vínculo é feito pelo banco de dados (`rideId` + participante), e o `PAID` acontece quando o passageiro informa o pagamento (`POST .../payment/mark-paid`).
 - **Validação:** o formato foi testado escaneando um payload real no app de um banco; um teste unitário fixa o CRC16 para evitar regressão.
 
 ### Vínculo recorrente (vaga reservada)
@@ -1137,7 +1137,7 @@ A tela de Dados (ver wireframes `indicadores` e `indicadores ambientais`) exibe 
   "key": "String (UUID v4 enviado pelo cliente no header Idempotency-Key)",
   "userId": "String (ref: users._id)",
   "method": "String (ex: 'POST')",
-  "path": "String (ex: '/api/v1/rides/64d.../confirm')",
+  "path": "String (ex: '/api/v1/rides/64d.../payment/mark-paid')",
   "requestFingerprint": "String (hash SHA-256 do payload para validar consistência)",
   "status": "IN_PROGRESS | COMPLETED | UNKNOWN_OUTCOME",
   "responseStatus": "Integer (código HTTP retornado, ex: 200, 201)",
@@ -1399,9 +1399,8 @@ Formato geoespacial padrão do MongoDB para o índice `2dsphere`.
 ### `PaymentStatus` (rides.participants[].paymentStatus)
 | Valor | Descrição |
 |---|---|
-| `PENDING` | Valor calculado, pagamento não realizado |
-| `AWAITING_DRIVER_CONFIRMATION` | Passageiro marcou como pago; aguarda motorista confirmar |
-| `PAID` | Motorista confirmou recebimento |
+| `PENDING` | Pagamento não realizado. Com `paymentRequestedAt`, é uma cobrança em aberto e bloqueia (RF74) |
+| `PAID` | O passageiro informou o pagamento ("Já paguei") |
 | `NOT_APPLICABLE` | Participante cancelou ou foi ausente sem cobrança |
 
 ### `ReportReason` (reports.reason)

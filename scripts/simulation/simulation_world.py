@@ -3,10 +3,10 @@
 from __future__ import annotations
 
 import random
+import time
 import re
 import unicodedata
-from datetime import date, datetime, timezone
-from decimal import Decimal
+from datetime import date, datetime, timedelta, timezone
 from typing import Optional
 
 import verificar_usuario
@@ -18,8 +18,12 @@ from simulation.simulation_failure import SimulationFailure
 FIREBASE_AUTH_URL = "https://identitytoolkit.googleapis.com/v1"
 PASSWORD = "Simulacao#2026"
 WEEK_DAYS = ["MONDAY", "TUESDAY", "WEDNESDAY", "THURSDAY", "FRIDAY", "SATURDAY", "SUNDAY"]
-DEPARTURE_TIME = "07:30"
-ARRIVAL_TIME = "08:10"
+# Regras de horário da viagem: o pedido de vaga só vale até 5 min antes da saída, e o "Iniciar
+# trajeto" só de 5 min antes a 5 min depois. Cada oferta sai uns 7 min depois de criada: dá tempo de
+# pedir e aceitar, e o "iniciar" espera a janela abrir (START_WINDOW antes da saída).
+DEPARTURE_LEAD = timedelta(minutes=6)
+START_WINDOW = timedelta(minutes=5)
+TRIP_DURATION = timedelta(minutes=40)
 
 CAMPUS = ("PUC-Campinas Campus I", "Parque das Universidades", -22.8338, -47.0519)
 DRIVER_ORIGIN = ("Av. Francisco Glicério, 1000", "Centro", -22.9064, -47.0616)
@@ -45,6 +49,7 @@ class SimulationWorld:
         self.run_id = run_id
         self.ride_date = ride_date
         self.week_day = WEEK_DAYS[ride_date.weekday()]
+        self.departure = datetime.combine(ride_date, datetime.min.time())
         self.created_users: list[SimulatedUser] = []
         self._sequence = 0
 
@@ -181,6 +186,7 @@ class SimulationWorld:
     # ------------------------------------------------------------------ trajetos e pedidos
 
     def offer_route(self, driver: SimulatedUser, seats: int, origin: tuple = DRIVER_ORIGIN) -> str:
+        self._schedule_next_departure()
         return self._create_route(driver, {
             "type": "OFFER",
             "vehicleId": driver.vehicle_id,
@@ -198,13 +204,20 @@ class SimulationWorld:
     def _create_route(self, user: SimulatedUser, fields: dict) -> str:
         body = {
             "destination": _place(CAMPUS),
-            "departureTime": DEPARTURE_TIME,
-            "estimatedArrivalTime": ARRIVAL_TIME,
+            "departureTime": self.departure.strftime("%H:%M"),
+            "estimatedArrivalTime": (self.departure + TRIP_DURATION).strftime("%H:%M"),
             "weekDays": [self.week_day],
             **fields,
         }
         route = self.expect_ok(self.api.post("/routes", user.token, body), f"criar o trajeto de {user.nickname}")
         return route["id"]
+
+    def _schedule_next_departure(self) -> None:
+        """A próxima oferta (e as procuras que vierem depois dela) sai daqui a poucos minutos, hoje."""
+        departure = (datetime.now() + DEPARTURE_LEAD).replace(second=0, microsecond=0) + timedelta(minutes=1)
+        self.departure = departure
+        self.ride_date = departure.date()
+        self.week_day = WEEK_DAYS[departure.weekday()]
 
     def request_seat(self, passenger: SimulatedUser, driver_route_id: str, passenger_route_id: str) -> ApiResponse:
         return self.api.post("/rides/request", passenger.token, {
@@ -220,8 +233,18 @@ class SimulationWorld:
                               f"{user.nickname} consultar a viagem")
 
     def ride_action(self, user: SimulatedUser, ride_id: str, action: str,
-                    body: Optional[dict] = None) -> ApiResponse:
+                    body: Optional[dict] = None, expect_success: bool = True) -> ApiResponse:
+        # Só um início que deve dar certo espera a janela abrir; o que deve ser recusado vai na hora
+        if action == "start" and expect_success:
+            self._wait_for_start_window()
         return self.api.post(f"/rides/{ride_id}/{action}", user.token, body)
+
+    def _wait_for_start_window(self) -> None:
+        opens_at = self.departure - START_WINDOW + timedelta(seconds=5)
+        wait = (opens_at - datetime.now()).total_seconds()
+        if wait > 0:
+            print(f"      (esperando {wait:.0f} s até a janela de início abrir)", flush=True)
+            time.sleep(wait)
 
     def passenger_action(self, driver: SimulatedUser, ride_id: str, passenger: SimulatedUser,
                          action: str, body: Optional[dict] = None) -> ApiResponse:
@@ -253,15 +276,6 @@ class SimulationWorld:
         self.check(participant.get("status") == status,
                    f"{user.nickname} deveria estar {status}, está {participant.get('status')}")
         return participant
-
-    @staticmethod
-    def charge_for(participant: dict) -> Decimal:
-        """Valor a cobrar: o final calculado, ou um valor fixo dentro do teto se ele não vier."""
-        final = Decimal(str(participant.get("finalAmount") or 0))
-        if final > 0:
-            return final
-        ceiling = Decimal(str(participant.get("maxAmount") or 0))
-        return min(Decimal("10.00"), ceiling) if ceiling > 0 else Decimal("10.00")
 
 
 def _place(spot: tuple) -> dict:

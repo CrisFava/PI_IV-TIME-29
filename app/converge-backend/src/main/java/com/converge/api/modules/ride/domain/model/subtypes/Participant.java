@@ -79,8 +79,6 @@ public class Participant {
     @NotNull
     private ParticipantPaymentStatus paymentStatus;
 
-    private boolean paymentConfirmedByDriver = false;
-
     // Valor combinado no chat e cobrado pelo motorista em "Solicitar pagamento"
     @Nullable
     @PositiveOrZero
@@ -163,15 +161,35 @@ public class Participant {
         this.requestedAmount = amount;
         this.paymentRequestedAt = now;
         this.paymentStatus = ParticipantPaymentStatus.PENDING;
-        this.paymentConfirmedByDriver = false;
         this.updatedAt = now;
     }
 
-    public void confirmPayment(LocalDateTime now) {
+    /**
+     * "Já paguei": o passageiro informa que pagou a cobrança (RF41) e ela fica paga.
+     * Não há confirmação de recebimento pelo motorista.
+     */
+    public void markPaidByPassenger(LocalDateTime now) {
         this.paymentStatus = ParticipantPaymentStatus.PAID;
-        this.paymentConfirmedByDriver = true;
         this.paidAt = now;
         this.updatedAt = now;
+    }
+
+    // Sem valor a cobrar (viagem sem custo calculado): não há pagamento.
+    public void waivePayment(LocalDateTime now) {
+        this.paymentStatus = ParticipantPaymentStatus.NOT_APPLICABLE;
+        this.updatedAt = now;
+    }
+
+    /**
+     * Cobrança emitida e ainda não paga. Todo passageiro nasce com o status PENDING, então o que
+     * marca a cobrança de verdade é a data em que ela foi emitida.
+     */
+    public boolean hasOpenCharge() {
+        return this.paymentRequestedAt != null && this.paymentStatus == ParticipantPaymentStatus.PENDING;
+    }
+
+    public boolean isCharged() {
+        return this.paymentRequestedAt != null;
     }
 
     public void cancel(@Nullable String reason, boolean late, LocalDateTime now) {
