@@ -2,6 +2,7 @@
 
 package com.converge.api.modules.user.application;
 
+import com.converge.api.modules.user.application.gateway.UserReputationWriter;
 import com.converge.api.modules.user.domain.enums.user.ParticipationRole;
 import com.converge.api.modules.user.domain.enums.user.ReputationLevel;
 import com.converge.api.modules.user.domain.enums.user.VerificationMethod;
@@ -21,6 +22,7 @@ import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.InjectMocks;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
+import org.springframework.test.util.ReflectionTestUtils;
 
 import java.time.LocalDateTime;
 import java.util.Optional;
@@ -28,6 +30,7 @@ import java.util.Set;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.verifyNoInteractions;
@@ -39,8 +42,17 @@ class RecordReviewRatingUseCaseTest {
     @Mock
     private UserRepository userRepository;
 
+    @Mock
+    private UserReputationWriter reputationWriter;
+
     @InjectMocks
     private RecordReviewRatingUseCase useCase;
+
+    private User userWithId(ObjectId id) {
+        User user = validUser();
+        ReflectionTestUtils.setField(user, "id", id);
+        return user;
+    }
 
     private User validUser() {
         AcademicRecord academic = new AcademicRecord(
@@ -66,10 +78,10 @@ class RecordReviewRatingUseCaseTest {
     }
 
     @Test
-    @DisplayName("Deve gravar média e total no papel de motorista e salvar o usuário")
+    @DisplayName("Deve gravar média e total só no papel de motorista")
     void shouldRecordDriverRating() {
         ObjectId id = new ObjectId();
-        User user = validUser();
+        User user = userWithId(id);
         when(userRepository.findById(id)).thenReturn(Optional.of(user));
 
         useCase.execute(id.toHexString(), ParticipationRole.DRIVER, 4.5, 3);
@@ -78,14 +90,16 @@ class RecordReviewRatingUseCaseTest {
         assertThat(user.getReputation().driver().totalReviews()).isEqualTo(3);
         assertThat(user.getReputation().driver().level()).isEqualTo(ReputationLevel.MEDIUM);
         assertThat(user.getReputation().passenger().totalReviews()).isZero();
-        verify(userRepository).save(user);
+        verify(reputationWriter).saveDriverReputation(eq(id), eq(user.getReputation().driver()), any(LocalDateTime.class));
+        verify(reputationWriter, never()).savePassengerReputation(any(), any(), any());
+        verify(userRepository, never()).save(any(User.class));
     }
 
     @Test
-    @DisplayName("Deve gravar média e total no papel de passageiro e salvar o usuário")
+    @DisplayName("Deve gravar média e total só no papel de passageiro")
     void shouldRecordPassengerRating() {
         ObjectId id = new ObjectId();
-        User user = validUser();
+        User user = userWithId(id);
         when(userRepository.findById(id)).thenReturn(Optional.of(user));
 
         useCase.execute(id.toHexString(), ParticipationRole.PASSENGER, 3.0, 2);
@@ -93,14 +107,16 @@ class RecordReviewRatingUseCaseTest {
         assertThat(user.getReputation().passenger().averageRating()).isEqualTo(3.0);
         assertThat(user.getReputation().passenger().totalReviews()).isEqualTo(2);
         assertThat(user.getReputation().driver().totalReviews()).isZero();
-        verify(userRepository).save(user);
+        verify(reputationWriter).savePassengerReputation(eq(id), eq(user.getReputation().passenger()), any(LocalDateTime.class));
+        verify(reputationWriter, never()).saveDriverReputation(any(), any(), any());
+        verify(userRepository, never()).save(any(User.class));
     }
 
     @Test
     @DisplayName("Deve arredondar a média para 2 casas")
     void shouldRoundAverageToTwoDecimals() {
         ObjectId id = new ObjectId();
-        User user = validUser();
+        User user = userWithId(id);
         when(userRepository.findById(id)).thenReturn(Optional.of(user));
 
         useCase.execute(id.toHexString(), ParticipationRole.DRIVER, 4.666666, 3);
@@ -112,7 +128,7 @@ class RecordReviewRatingUseCaseTest {
     @DisplayName("Deve promover a HIGH quando a nova média fecha os critérios de confiança")
     void shouldPromoteToHighWhenTrustCriteriaMet() {
         ObjectId id = new ObjectId();
-        User user = validUser();
+        User user = userWithId(id);
         LocalDateTime now = LocalDateTime.now();
         user.setReputation(new Reputation(
                 new DriverReputation(null, 0.0, 0, new DriverWindow(10, 0, 0, 0), now),
@@ -129,7 +145,7 @@ class RecordReviewRatingUseCaseTest {
     @DisplayName("Deve rebaixar para LOW quando a janela já estourou os limites")
     void shouldDowngradeToLowWhenLimitsExceeded() {
         ObjectId id = new ObjectId();
-        User user = validUser();
+        User user = userWithId(id);
         LocalDateTime now = LocalDateTime.now();
         user.setReputation(new Reputation(
                 new DriverReputation(ReputationLevel.HIGH, 4.8, 10, new DriverWindow(10, 3, 0, 0), now),
@@ -146,7 +162,7 @@ class RecordReviewRatingUseCaseTest {
     @DisplayName("Deve usar a reputação inicial quando o usuário não tem reputação")
     void shouldUseDefaultReputationWhenNull() {
         ObjectId id = new ObjectId();
-        User user = validUser();
+        User user = userWithId(id);
         user.setReputation(null);
         when(userRepository.findById(id)).thenReturn(Optional.of(user));
 
@@ -154,7 +170,7 @@ class RecordReviewRatingUseCaseTest {
 
         assertThat(user.getReputation().driver().totalReviews()).isEqualTo(1);
         assertThat(user.getReputation().passenger()).isNotNull();
-        verify(userRepository).save(user);
+        verify(reputationWriter).saveDriverReputation(eq(id), eq(user.getReputation().driver()), any(LocalDateTime.class));
     }
 
     @Test
@@ -166,6 +182,7 @@ class RecordReviewRatingUseCaseTest {
         useCase.execute(id.toHexString(), ParticipationRole.DRIVER, 4.0, 1);
 
         verify(userRepository, never()).save(any(User.class));
+        verifyNoInteractions(reputationWriter);
     }
 
     @Test
@@ -175,6 +192,6 @@ class RecordReviewRatingUseCaseTest {
         useCase.execute("nao-e-object-id", ParticipationRole.DRIVER, 4.0, 1);
         useCase.execute(new ObjectId().toHexString(), null, 4.0, 1);
 
-        verifyNoInteractions(userRepository);
+        verifyNoInteractions(userRepository, reputationWriter);
     }
 }

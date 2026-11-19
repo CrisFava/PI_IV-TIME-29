@@ -2,6 +2,7 @@
 
 package com.converge.api.modules.user.application;
 
+import com.converge.api.modules.user.application.gateway.UserReputationWriter;
 import com.converge.api.modules.user.domain.enums.user.ParticipationRole;
 import com.converge.api.modules.user.domain.model.user.User;
 import com.converge.api.modules.user.domain.repository.UserRepository;
@@ -18,6 +19,7 @@ import java.time.LocalDateTime;
 public class RecordReviewRatingUseCase {
 
     private final UserRepository userRepository;
+    private final UserReputationWriter reputationWriter;
 
     public void execute(String userId, ParticipationRole role, double averageRating, int totalReviews) {
         if (userId == null || !ObjectId.isValid(userId) || role == null) {
@@ -29,8 +31,16 @@ public class RecordReviewRatingUseCase {
 
         userRepository.findById(new ObjectId(userId)).ifPresent(user -> {
             apply(user, role, roundedAverage, totalReviews, now);
-            userRepository.save(user);
+            save(user, role, now);
         });
+    }
+
+    // Grava só a reputação do papel avaliado, sem regravar o usuário inteiro.
+    private void save(User user, ParticipationRole role, LocalDateTime now) {
+        switch (role) {
+            case DRIVER -> reputationWriter.saveDriverReputation(user.getId(), user.getReputation().driver(), now);
+            case PASSENGER -> reputationWriter.savePassengerReputation(user.getId(), user.getReputation().passenger(), now);
+        }
     }
 
     private void apply(User user, ParticipationRole role, double average, int total, LocalDateTime now) {
