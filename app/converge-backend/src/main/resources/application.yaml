@@ -18,6 +18,6 @@ google:
 
 converge:
   ride:
-    request-timeout: 3m
+    request-timeout: 1h
     request-timeout-check-interval: PT30S
     departure-expiration-check-interval: PT1M

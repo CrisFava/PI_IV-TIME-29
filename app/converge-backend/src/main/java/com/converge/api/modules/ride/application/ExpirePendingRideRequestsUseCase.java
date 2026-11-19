@@ -32,11 +32,11 @@ public class ExpirePendingRideRequestsUseCase implements UseCase<LocalDateTime, 
     public ExpirePendingRideRequestsUseCase(
             RideRepository rideRepository,
             ApplicationEventPublisher eventPublisher,
-            @Value("${converge.ride.request-timeout:3m}") Duration requestTimeout
+            @Value("${converge.ride.request-timeout:1h}") Duration requestTimeout
     ) {
         this.rideRepository = rideRepository;
         this.eventPublisher = eventPublisher;
-        this.requestTimeout = requestTimeout != null ? requestTimeout : Duration.ofMinutes(3);
+        this.requestTimeout = requestTimeout != null ? requestTimeout : Duration.ofHours(1);
     }
 
     public int execute() {

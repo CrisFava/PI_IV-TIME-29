@@ -40,6 +40,7 @@ class ChatConversation {
             thread: ChatThreadRef(
               chatRoomId: chatRoomId,
               rideId: ride.id,
+              driverId: ride.driverId,
               passengerId: passenger.userId!,
             ),
             ride: ride,
@@ -57,6 +58,7 @@ class ChatConversation {
         thread: ChatThreadRef(
           chatRoomId: chatRoomId,
           rideId: ride.id,
+          driverId: ride.driverId,
           passengerId: viewerId,
         ),
         ride: ride,

@@ -131,7 +131,8 @@ public class RideMapper {
                 participant.getFinalAmount(),
                 participant.getPaymentStatus(),
                 participant.isPaymentConfirmedByDriver(),
-                participant.getConfirmedAt()
+                participant.getConfirmedAt(),
+                participant.getRequestedAt()
         );
     }
 
@@ -148,6 +149,7 @@ public class RideMapper {
                 null,
                 null,
                 false,
+                null,
                 null
         );
     }

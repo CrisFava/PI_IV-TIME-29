@@ -52,6 +52,10 @@ class RideDockNavigation extends StatefulWidget {
   /// carro ganha o anel verde pulsante.
   final bool isOnTrip;
 
+  /// O passageiro está procurando motorista (lista ou esperando a resposta): o
+  /// botão do carro ganha o anel azul pulsante. Para quando o pedido é aceito.
+  final bool isLookingForDriver;
+
   /// Mensagens do chat ainda não vistas: o número aparece na aba "Chat".
   final int chatUnreadCount;
 
@@ -83,6 +87,7 @@ class RideDockNavigation extends StatefulWidget {
     this.onAddVehicle,
     this.isSearchingRide = false,
     this.isOnTrip = false,
+    this.isLookingForDriver = false,
     this.chatUnreadCount = 0,
     this.rideSearchTitle = 'Procurando motorista',
     this.rideSearchDestination,
@@ -325,9 +330,12 @@ class _RideDockNavigationState extends State<RideDockNavigation>
                     child: _CenterRideButton(
                       progress: progress,
                       onPressed: _handleToggle,
-                      // Só o anel verde, na viagem em andamento (motorista ou passageiro)
+                      // Verde na viagem em andamento (motorista ou passageiro); azul
+                      // enquanto o passageiro procura motorista, até o pedido ser aceito
                       pulseColor: widget.isOnShift || widget.isOnTrip
                           ? AppColors.success
+                          : widget.isLookingForDriver
+                          ? AppColors.info
                           : null,
                     ),
                   ),

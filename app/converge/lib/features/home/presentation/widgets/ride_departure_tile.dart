@@ -69,7 +69,7 @@ class RideDepartureTile extends StatelessWidget {
                 style: TextStyle(
                   fontSize: 12,
                   fontWeight: FontWeight.w700,
-                  color: AppColors.info,
+                  color: AppColors.textPrimary,
                 ),
               ),
             ],

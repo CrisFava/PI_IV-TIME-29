@@ -4,7 +4,6 @@ import 'dart:async';
 
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
-import '../../ride/data/models/participant_status.dart';
 import '../../ride/state/ride_providers.dart';
 import '../data/models/driver_ride_request.dart';
 import 'driver_ride_requests_provider.dart';
@@ -63,11 +62,10 @@ class IncomingRideRequestController extends Notifier<DriverRideRequest?> {
     List<DriverRideRequest> requests, {
     required DriverRideRequest? current,
   }) {
+    // Carro cheio não avisa: não há o que aceitar
     final pending = [
-      for (final request in requests)
-        if (request.passenger.status == ParticipantStatus.requested &&
-            !_handled.contains(request.key))
-          request,
+      for (final request in pendingRideRequests(requests))
+        if (!_handled.contains(request.key)) request,
     ];
 
     if (current != null) {

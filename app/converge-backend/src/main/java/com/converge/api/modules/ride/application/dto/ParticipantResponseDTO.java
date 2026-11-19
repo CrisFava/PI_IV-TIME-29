@@ -22,6 +22,7 @@ public record ParticipantResponseDTO(
         BigDecimal finalAmount,
         ParticipantPaymentStatus paymentStatus,
         boolean paymentConfirmedByDriver,
-        LocalDateTime confirmedAt
+        LocalDateTime confirmedAt,
+        LocalDateTime requestedAt
 ) {
 }

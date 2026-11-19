@@ -10,11 +10,13 @@ import '../../../../core/widgets/details_stat_tile.dart';
 import '../../../ride/presentation/widgets/ride_place_line.dart';
 import '../../../route/data/models/route_recurrence.dart';
 import '../../data/models/driver_offer.dart';
+import '../../data/models/driver_ride_request.dart';
 import '../../state/driver_offers_provider.dart';
 import '../../state/driver_ride_actions_controller.dart';
 import 'driver_offer_title.dart';
 import 'driver_ride_card.dart';
 import 'matching_message.dart';
+import 'offer_ride_requests.dart';
 
 /// Detalhes de uma carona de "Minhas caronas": o trajeto completo, as vagas, cada
 /// viagem com os passageiros (e o chat) e "Cancelar carona". Acompanha a lista,
@@ -28,11 +30,13 @@ class DriverOfferDetails extends ConsumerStatefulWidget {
   /// Pede a confirmação e cancela; devolve se cancelou.
   final Future<bool> Function(String routeId) onCancelOffer;
 
-  /// Cancela só uma viagem (pede a confirmação antes).
-  final ValueChanged<String> onCancelRide;
-
   /// Marca um passageiro como ausente na viagem em andamento.
   final void Function(String rideId, String passengerId) onMarkNoShow;
+
+  /// Respostas aos pedidos de vaga desta carona.
+  final ValueChanged<DriverRideRequest> onAcceptRequest;
+  final ValueChanged<DriverRideRequest> onRejectRequest;
+  final ValueChanged<DriverRideRequest> onOpenRequestChat;
 
   const DriverOfferDetails({
     super.key,
@@ -41,8 +45,10 @@ class DriverOfferDetails extends ConsumerStatefulWidget {
     required this.onCompleteRide,
     required this.onOpenChat,
     required this.onCancelOffer,
-    required this.onCancelRide,
     required this.onMarkNoShow,
+    required this.onAcceptRequest,
+    required this.onRejectRequest,
+    required this.onOpenRequestChat,
   });
 
   @override
@@ -58,11 +64,11 @@ class _DriverOfferDetailsState extends ConsumerState<DriverOfferDetails> {
   static String _km(double value) =>
       value.toStringAsFixed(1).replaceAll('.', ',');
 
-  Future<void> _cancel(String routeId) async {
+  Future<void> _cancel(String offerKey) async {
     // A folha de detalhes antes da espera: depois dela, só fecha se ainda for a da frente
     final sheet = ModalRoute.of(context);
     setState(() => _cancelling = true);
-    final cancelled = await widget.onCancelOffer(routeId);
+    final cancelled = await widget.onCancelOffer(offerKey);
     if (!mounted) return;
     if (cancelled) {
       if (sheet != null && sheet.isCurrent) Navigator.of(context).pop();
@@ -163,6 +169,13 @@ class _DriverOfferDetailsState extends ConsumerState<DriverOfferDetails> {
               ],
             ),
           ),
+        // Pedidos esperando resposta: só aqui, dentro da carona
+        OfferRideRequests(
+          offer: offer,
+          onAccept: widget.onAcceptRequest,
+          onReject: widget.onRejectRequest,
+          onOpenChat: widget.onOpenRequestChat,
+        ),
         DetailsSection(
           title: 'Viagens',
           child: offer.rides.isEmpty
@@ -183,7 +196,6 @@ class _DriverOfferDetailsState extends ConsumerState<DriverOfferDetails> {
                           onComplete: () => widget.onCompleteRide(ride.id),
                           onOpenChat: (passengerId) =>
                               widget.onOpenChat(ride.id, passengerId),
-                          onCancel: () => widget.onCancelRide(ride.id),
                           onMarkNoShow: (passengerId) =>
                               widget.onMarkNoShow(ride.id, passengerId),
                         ),
@@ -191,12 +203,13 @@ class _DriverOfferDetailsState extends ConsumerState<DriverOfferDetails> {
                   ],
                 ),
         ),
-        if (route != null)
+        // Um cancelar só: a carona e as viagens marcadas dela
+        if (route != null || offer.hasOpenRides)
           DetailsDangerButton(
-            key: ValueKey('cancel_offer_${route.id}'),
+            key: ValueKey('cancel_offer_${offer.key}'),
             label: 'Cancelar carona',
             isBusy: _cancelling,
-            onPressed: () => _cancel(route.id),
+            onPressed: () => _cancel(offer.key),
           ),
       ],
     );

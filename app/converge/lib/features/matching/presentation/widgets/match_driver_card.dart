@@ -123,7 +123,9 @@ class MatchDriverCard extends StatelessWidget {
                       ),
                     ),
                     Text(
-                      maxAmount == null
+                      // O teto só aparece quando é maior que a estimativa (com
+                      // outros passageiros); sozinho, a estimativa já é o teto
+                      maxAmount == null || cost == null || maxAmount <= cost
                           ? 'estimativa por passageiro'
                           : 'até ${CurrencyFormatter.format(maxAmount)} se alguém desistir',
                       style: const TextStyle(

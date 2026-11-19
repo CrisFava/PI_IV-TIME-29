@@ -1,5 +1,7 @@
 // Autor: Allan Giovanni Matias Paes - RA 25008211
 
+import 'dart:async';
+
 import 'package:converge/features/home/presentation/widgets/home_mode_selector_header.dart';
 import 'package:converge/features/home/presentation/widgets/home_passenger_sheet.dart';
 import 'package:converge/features/home/presentation/widgets/home_real_map_background.dart';
@@ -22,6 +24,8 @@ import '../../../route/state/trip_estimate_controller.dart';
 
 import '../../../../core/config/styles.dart';
 import '../../../../core/services/maps/google_maps_service.dart';
+import '../../../../core/widgets/confirm_dialog.dart';
+import '../../../../core/widgets/in_app_notification_card.dart';
 import '../../../../core/widgets/ride_dock_navigation.dart';
 import '../../../../core/widgets/sheet_drag_to_dismiss.dart';
 import '../../../../core/widgets/show_app_notice.dart';
@@ -38,10 +42,11 @@ import '../../../review/state/pending_reviews.dart';
 import '../../../review/state/ride_completion_watcher.dart';
 import '../../../matching/presentation/widgets/driver_suggestion_alert.dart';
 import '../../../matching/presentation/widgets/incoming_ride_request_alert.dart';
-import '../../../matching/state/matching_viewer_provider.dart';
+import '../../../matching/state/incoming_ride_request_controller.dart';
 import '../../../matching/state/passenger_match_controller.dart';
 import '../../../matching/state/passenger_match_phase.dart';
 import '../../../matching/state/passenger_match_state.dart';
+import '../../../matching/state/matching_viewer_provider.dart';
 import '../../../matching/state/passenger_rides_provider.dart';
 import '../../../ride/presentation/widgets/ride_history_list.dart';
 import '../../../vehicle/data/repository/vehicle_repository_impl.dart';
@@ -101,6 +106,17 @@ class _HomePageState extends ConsumerState<HomePage> {
 
   // Publicando a carona (inclui a busca do carro antes do envio)
   bool _publishingOffer = false;
+
+  // Notificações dentro do app: quando cada uma apareceu (pedido de vaga ou
+  // motorista encontrado). Cada uma aparece uma vez, por [_notificationDuration].
+  final Map<String, DateTime> _notifiedAt = {};
+
+  // Aviso de carona confirmada (o passageiro escolhe se abre "Minhas caronas")
+  ({String key, String? driverName})? _acceptedNotice;
+
+  // Carona que o painel abre assim que aparecer (tocou no aviso de pedido de vaga)
+  String? _openOfferKey;
+  static const Duration _notificationDuration = Duration(seconds: 6);
 
   // Pedido de carona em andamento com o painel escondido: a busca continua e o
   // botão do carro fica azul; o menu do carro reabre os detalhes
@@ -246,10 +262,10 @@ class _HomePageState extends ConsumerState<HomePage> {
     // Limpa a busca anterior: a lista mostra o carregamento até os novos motoristas chegarem
     controller.reset();
     final routeId = await controller.prepareSearchRoute(
-      // Sai agora, ou no dia e horário que o passageiro escolheu
+      // No dia e horário que o passageiro escolheu
       _buildRouteRequest(
         isDriver: false,
-        schedule: RouteSchedule.startingAt(_rideDeparture ?? DateTime.now()),
+        schedule: RouteSchedule.startingAt(_rideDeparture!),
       ),
     );
     if (!mounted) return;
@@ -314,37 +330,24 @@ class _HomePageState extends ConsumerState<HomePage> {
     }
   }
 
-  Future<void> _handleDriverAccepted(MatchModel? driver) async {
+  /// O motorista aceitou: o pedido termina e a viagem passa a aparecer em
+  /// "Minhas caronas". O app não troca de tela: mostra um aviso no topo, e o
+  /// toque nele abre "Minhas caronas".
+  void _handleDriverAccepted(MatchModel? driver) {
     HapticFeedback.mediumImpact();
+    ref.invalidate(myRidesProvider);
     setState(() {
-      _passengerStep = PassengerRideStep.driverAccepted;
+      _passengerStep = PassengerRideStep.idle;
       _passengerSheetHidden = false;
-    });
-
-    if (driver == null) return;
-    try {
-      final approachRoute = await GoogleMapsService.computeRoutes(
-        origin: LatLng(driver.origin.latitude, driver.origin.longitude),
-        destination: _pickupLocation,
+      _rideDeparture = null;
+      _driverApproachRoutePoints = null;
+      _resetDraftPlaces();
+      _acceptedNotice = (
+        key: 'accepted_${DateTime.now().microsecondsSinceEpoch}',
+        driverName: driver?.otherUserName,
       );
-      if (mounted) setState(() => _driverApproachRoutePoints = approachRoute);
-    } catch (e) {
-      debugPrint('Erro ao obter o trajeto de aproximação do motorista: $e');
-    }
-  }
-
-  /// Abre o chat da carona aceita (Parte B).
-  void _handleSendMessageToDriver() {
-    HapticFeedback.lightImpact();
-    final rideId = ref.read(passengerMatchProvider).rideId;
-    final viewerId = ref.read(matchingViewerIdProvider);
-
-    if (rideId == null || viewerId == null) {
-      _showError('Não foi possível abrir a conversa agora.');
-      return;
-    }
-
-    context.push(AppRoutes.chatOf(rideId: rideId, passengerId: viewerId));
+    });
+    ref.read(passengerMatchProvider.notifier).reset();
   }
 
   Future<void> _handleCancelFlow() async {
@@ -493,12 +496,13 @@ class _HomePageState extends ConsumerState<HomePage> {
     if (draftOpen) ref.read(passengerMatchProvider.notifier).reset();
   }
 
-  /// Escolhe outro dia e horário de saída (até 7 dias à frente), para o pedido de
-  /// carona ou para a carona do motorista. O matching junta o motorista que sai de 30 min
-  /// antes a 5 min depois do passageiro. [onPicked] recebe null quando a saída volta a ser "agora".
+  /// Escolhe o dia e o horário de saída (até 7 dias à frente), para o pedido de
+  /// carona ou para a carona do motorista. Não existe "agora": o horário é sempre
+  /// escolhido. O matching junta o motorista que sai de 5 min antes a 30 min depois
+  /// do passageiro.
   Future<void> _pickDeparture({
     required DateTime? current,
-    required void Function(DateTime? departure) onPicked,
+    required void Function(DateTime departure) onPicked,
   }) async {
     final now = DateTime.now();
     final initial = current ?? now;
@@ -514,24 +518,17 @@ class _HomePageState extends ConsumerState<HomePage> {
     );
     if (date == null || !mounted) return;
 
-    // Horário: atalhos (Agora, Em 30 min, Em 1 h) e a roda de 5 em 5 min
-    final picked = await showDepartureTimeSheet(
+    // Horário: a roda de hora e minuto
+    final chosen = await showDepartureTimeSheet(
       context,
       day: date,
       current: current,
     );
-    if (picked == null || !mounted) return;
+    if (chosen == null || !mounted) return;
 
-    final chosen = picked.departure;
-    if (chosen == null) {
-      HapticFeedback.selectionClick();
-      setState(() => onPicked(null));
-      return;
-    }
-    // Um horário que já passou vira "agora"
+    // Um horário que já passou não vale: continua o que estava escolhido
     if (!chosen.isAfter(DateTime.now())) {
-      setState(() => onPicked(null));
-      _showError('Esse horário já passou. A carona fica para agora.');
+      _showError('Esse horário já passou. Escolha um horário depois de agora.');
       return;
     }
     HapticFeedback.selectionClick();
@@ -615,7 +612,7 @@ class _HomePageState extends ConsumerState<HomePage> {
       vehicleId: vehicle.id,
       totalSeats: vehicle.seats,
       schedule: RouteSchedule.startingAt(
-        _offerDeparture ?? DateTime.now().add(RouteSchedule.immediateOfferLead),
+        _offerDeparture!,
         repeatWeekly: _offerRepeatWeekly,
       ),
       maxDetourKm: _driverSearchRadiusKm,
@@ -647,6 +644,14 @@ class _HomePageState extends ConsumerState<HomePage> {
   Future<void> _handleEndDriverShift() async {
     final ride = ref.read(driverRideInProgressProvider);
     if (ride == null) return;
+
+    final confirmed = await showConfirmDialog(
+      context,
+      title: 'Concluir a viagem?',
+      message: 'Os valores finais serão calculados com quem foi. Marque antes quem não apareceu.',
+      confirmLabel: 'Concluir',
+    );
+    if (!confirmed || !mounted) return;
 
     final error = await ref
         .read(driverRideActionsProvider.notifier)
@@ -726,6 +731,8 @@ class _HomePageState extends ConsumerState<HomePage> {
     final before = _lastRides;
     _lastRides = rides;
 
+    _noticeTripsStarted(before, rides);
+
     final toReview = before == null
         ? recentlyCompletedRides(rides: rides, now: DateTime.now())
         : newlyCompletedRides(previous: before, next: rides);
@@ -733,6 +740,31 @@ class _HomePageState extends ConsumerState<HomePage> {
       for (final ride in toReview)
         if (_reviewPrompted.add(ride.id)) ride,
     ]);
+  }
+
+  /// Avisa o passageiro quando o motorista inicia uma viagem em que ele está.
+  void _noticeTripsStarted(List<RideModel>? before, List<RideModel> rides) {
+    final viewerId = ref.read(matchingViewerIdProvider);
+    if (before == null || viewerId == null) return;
+    final wasInProgress = {
+      for (final ride in before)
+        if (ride.status == RideStatus.inProgress) ride.id,
+    };
+    for (final ride in rides) {
+      if (ride.status != RideStatus.inProgress ||
+          wasInProgress.contains(ride.id) ||
+          ride.isDrivenBy(viewerId) ||
+          ride.passengerOf(viewerId) == null) {
+        continue;
+      }
+      HapticFeedback.mediumImpact();
+      showAppNotice(
+        context,
+        'Sua viagem com ${ride.driverName} começou.',
+        type: AppNoticeType.success,
+      );
+      return;
+    }
   }
 
   /// Abre a tela de avaliação de uma viagem por vez: a próxima só depois que a anterior fecha.
@@ -779,9 +811,10 @@ class _HomePageState extends ConsumerState<HomePage> {
 
   /// Mostra "Minhas caronas" sobre o mapa. O motorista precisa de um carro
   /// liberado; quem só pede carona ([asPassenger]) vê as viagens em que vai.
-  void _openRideRequests({bool asPassenger = false}) {
+  void _openRideRequests({bool asPassenger = false, String? offerKey}) {
     if (!asPassenger && _isDriverActionBlocked()) return;
     setState(() {
+      _openOfferKey = offerKey;
       _isCarMenuOpen = false;
       _currentMode = AppRideMode.driver;
       _currentTabIndex = 0;
@@ -1000,6 +1033,10 @@ class _HomePageState extends ConsumerState<HomePage> {
                     // Pedido aceito também aparece: o menu reabre os detalhes da
                     // carona em vez de começar um pedido novo
                     isSearchingRide: _hasActiveRideRequest,
+                    // Anel azul só enquanto procura ou espera a resposta do motorista
+                    isLookingForDriver:
+                        _passengerStep == PassengerRideStep.driverList ||
+                        _passengerStep == PassengerRideStep.waitingDriver,
                     chatUnreadCount: ref.watch(chatUnreadCountProvider),
                     // Anel verde na viagem em andamento, como motorista ou passageiro
                     isOnTrip:
@@ -1008,7 +1045,8 @@ class _HomePageState extends ConsumerState<HomePage> {
                                 .watch(myPassengerRidesProvider)
                                 .value
                                 ?.any(
-                                  (ride) => ride.status == RideStatus.inProgress,
+                                  (ride) =>
+                                      ride.status == RideStatus.inProgress,
                                 ) ??
                             false),
                     rideSearchTitle: switch (_passengerStep) {
@@ -1038,32 +1076,119 @@ class _HomePageState extends ConsumerState<HomePage> {
     );
   }
 
-  /// Avisos de carona no topo: o motorista vê os pedidos de vaga das suas caronas
-  /// (eles só chegam antes de a viagem começar); o passageiro procurando carona vê
-  /// o motorista mais compatível.
+  /// A notificação [key] está na tela agora? Ela aparece uma vez, por
+  /// [_notificationDuration], e só se a tela da carona não estiver aberta. Se o
+  /// usuário já viu o pedido ou o motorista na própria tela, ela não vem depois.
+  bool _isNotifying(String key, {required bool onScreen}) {
+    final first = _notifiedAt[key];
+    if (first == null) {
+      if (onScreen) {
+        _notifiedAt[key] = DateTime(0); // já visto na tela da carona
+        return false;
+      }
+      _notifiedAt[key] = DateTime.now();
+      Timer(_notificationDuration, () {
+        if (mounted) setState(() {});
+      });
+      return true;
+    }
+    return !onScreen &&
+        DateTime.now().difference(first) < _notificationDuration;
+  }
+
+  void _dismissNotification(String key) =>
+      setState(() => _notifiedAt[key] = DateTime(0));
+
+  /// Notificações dentro do app, no topo: o motorista é avisado de um pedido de
+  /// vaga e o passageiro, de um motorista compatível. Somem sozinhas em alguns
+  /// segundos, e tocar abre a carona em questão (um lugar só para responder).
   Widget _buildRideAlert(bool canDrive) {
     final matchState = ref.watch(passengerMatchProvider);
-    final suggestion = _passengerStep == PassengerRideStep.driverList
+
+    // Passageiro: o motorista mais compatível, enquanto procura carona
+    final match = _passengerStep == PassengerRideStep.driverList
         ? matchState.suggestion
         : null;
+    final onDriverList =
+        _currentTabIndex == 0 &&
+        !_passengerSheetHidden &&
+        _currentMode.isPassenger;
+    final matchKey = match == null ? null : 'driver_${match.driverRouteId}';
+    final showMatch =
+        matchKey != null && _isNotifying(matchKey, onScreen: onDriverList);
 
-    return Column(
-      mainAxisSize: MainAxisSize.min,
-      crossAxisAlignment: CrossAxisAlignment.stretch,
-      children: [
-        // O pedido de vaga só vira aviso com "Minhas caronas" fechada: aberta,
-        // ele já aparece na lista para aceitar ou recusar
-        if (canDrive && !_showRideRequests) const IncomingRideRequestAlert(),
-        if (suggestion != null)
-          DriverSuggestionAlert(
-            match: suggestion,
-            isBusy: matchState.isBusy,
-            onConfirm: () => _handleSelectDriver(suggestion),
-            onDecline: () => ref
-                .read(passengerMatchProvider.notifier)
-                .declineSuggestion(suggestion),
-          ),
-      ],
+    // Motorista: o pedido de vaga mais antigo sem resposta
+    final request = canDrive ? ref.watch(incomingRideRequestProvider) : null;
+    final onRideRequests = _currentTabIndex == 0 && _showRideRequests;
+    final requestKey = request == null ? null : 'request_${request.key}';
+    final showRequest =
+        requestKey != null &&
+        _isNotifying(requestKey, onScreen: onRideRequests);
+    // Já avisado (ou visto na tela): libera o próximo pedido da fila
+    if (request != null && !showRequest) {
+      Future.microtask(
+        () => ref.read(incomingRideRequestProvider.notifier).dismiss(request),
+      );
+    }
+
+    // Passageiro: o motorista aceitou o pedido
+    final accepted = _acceptedNotice;
+    final showAccepted =
+        accepted != null &&
+        _isNotifying(
+          accepted.key,
+          onScreen: _currentTabIndex == 0 && _showRideRequests,
+        );
+
+    return AnimatedSwitcher(
+      duration: const Duration(milliseconds: 250),
+      child: Column(
+        key: ValueKey(
+          '${showAccepted ? accepted.key : ''}|'
+          '${showRequest ? requestKey : ''}|${showMatch ? matchKey : ''}',
+        ),
+        mainAxisSize: MainAxisSize.min,
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        children: [
+          if (showAccepted) ...[
+            InAppNotificationCard(
+              key: const ValueKey('ride_accepted_notification'),
+              icon: Icons.check_circle_rounded,
+              title: 'Carona confirmada',
+              message: accepted.driverName == null
+                  ? 'Seu pedido foi aceito. Toque para ver em "Minhas caronas".'
+                  : '${accepted.driverName} aceitou seu pedido. Toque para ver em "Minhas caronas".',
+              onTap: () {
+                _dismissNotification(accepted.key);
+                _openRideRequests(asPassenger: true);
+              },
+              onDismiss: () => _dismissNotification(accepted.key),
+            ),
+            if (showRequest || showMatch) const SizedBox(height: 8),
+          ],
+          if (showRequest)
+            IncomingRideRequestAlert(
+              request: request!,
+              // Abre direto a carona do pedido, onde ele é respondido
+              onOpen: () {
+                _dismissNotification(requestKey);
+                _openRideRequests(offerKey: request.ride.driverRouteId);
+              },
+              onDismiss: () => _dismissNotification(requestKey),
+            ),
+          if (showMatch) ...[
+            if (showRequest) const SizedBox(height: 8),
+            DriverSuggestionAlert(
+              match: match!,
+              onOpen: () {
+                _dismissNotification(matchKey);
+                _openRideSearch();
+              },
+              onDismiss: () => _dismissNotification(matchKey),
+            ),
+          ],
+        ],
+      ),
     );
   }
 
@@ -1071,7 +1196,9 @@ class _HomePageState extends ConsumerState<HomePage> {
   Widget _buildUberHomeView(dynamic user, bool canDrive, double bottomPadding) {
     // O desenho do caminho do rascunho vem do controlador da estimativa
     ref.listen(tripEstimateProvider, (_, next) {
-      setState(() => _tripRoutePoints = next.points.isEmpty ? null : next.points);
+      setState(
+        () => _tripRoutePoints = next.points.isEmpty ? null : next.points,
+      );
     });
     // Com a viagem em andamento (e sem um pedido de carona aberto), o mapa
     // mostra a rota da viagem com as paradas: buscar e deixar cada passageiro
@@ -1154,8 +1281,13 @@ class _HomePageState extends ConsumerState<HomePage> {
                 bottomSafeArea: bottomPadding,
                 onClose: _handleCloseRideRequests,
                 onRideStarted: _handleRideStarted,
+                openOfferKey: _openOfferKey,
+                // Só limpa: o painel já está abrindo a carona
+                onOfferOpened: () => _openOfferKey = null,
                 // Quem ainda não é motorista vê como liberar o perfil
-                onNewOffer: canDrive ? _openOfferForm : _showLockedDriverWarning,
+                onNewOffer: canDrive
+                    ? _openOfferForm
+                    : _showLockedDriverWarning,
               ),
             ),
           )
@@ -1178,7 +1310,6 @@ class _HomePageState extends ConsumerState<HomePage> {
                 onSelectDriver: _handleSelectDriver,
                 onRetryMatches: _handleRetryMatches,
                 onCancelRequest: _handleCancelRequest,
-                onSendMessageToDriver: _handleSendMessageToDriver,
                 onCancelFlow: _handleCancelFlow,
               ),
             ),
@@ -1191,6 +1322,11 @@ class _HomePageState extends ConsumerState<HomePage> {
   /// (motorista) ou busca os motoristas (passageiro).
   Future<void> _reviewAndSubmit() async {
     final isDriver = _currentMode.isDriver;
+    // O horário é sempre escolhido (não existe "agora")
+    if ((isDriver ? _offerDeparture : _rideDeparture) == null) {
+      _showError('Escolha o dia e o horário de saída.');
+      return;
+    }
     final confirmed = await showRideReview(
       context,
       isDriver: isDriver,

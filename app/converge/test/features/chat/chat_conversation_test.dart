@@ -2,6 +2,7 @@
 
 import 'package:converge/features/chat/data/models/chat_conversation.dart';
 import 'package:converge/features/chat/data/models/chat_thread_ref.dart';
+import 'package:converge/features/chat/state/chat_providers.dart';
 import 'package:flutter_test/flutter_test.dart';
 
 import '../ride/fakes/fake_ride.dart';
@@ -40,7 +41,10 @@ void main() {
     });
 
     test('passageiro aceito tem uma conversa com o motorista', () {
-      final conversations = ChatConversation.ofRide(fakeRide(), fakePassengerId);
+      final conversations = ChatConversation.ofRide(
+        fakeRide(),
+        fakePassengerId,
+      );
 
       expect(conversations, hasLength(1));
       expect(conversations.single.viewerIsDriver, isFalse);
@@ -50,6 +54,7 @@ void main() {
         const ChatThreadRef(
           chatRoomId: 'ride_ride-1',
           rideId: fakeRideId,
+          driverId: fakeDriverId,
           passengerId: fakePassengerId,
         ),
       );
@@ -66,20 +71,23 @@ void main() {
       expect(ChatConversation.ofRide(ride, fakePassengerId), isEmpty);
     });
 
-    test('passageiro que ainda não foi aceito não entra na sala dos outros', () {
-      final ride = fakeRide(
-        extraParticipants: [
-          {
-            'userId': 'passenger-2',
-            'name': 'Bruno Lima',
-            'role': 'PASSENGER',
-            'status': 'REQUESTED',
-          },
-        ],
-      );
+    test(
+      'passageiro que ainda não foi aceito não entra na sala dos outros',
+      () {
+        final ride = fakeRide(
+          extraParticipants: [
+            {
+              'userId': 'passenger-2',
+              'name': 'Bruno Lima',
+              'role': 'PASSENGER',
+              'status': 'REQUESTED',
+            },
+          ],
+        );
 
-      expect(ChatConversation.ofRide(ride, 'passenger-2'), isEmpty);
-    });
+        expect(ChatConversation.ofRide(ride, 'passenger-2'), isEmpty);
+      },
+    );
 
     test('passageiro recusado, ausente ou que saiu perde a conversa', () {
       for (final status in ['REJECTED', 'NO_SHOW', 'CANCELLED']) {
@@ -90,7 +98,11 @@ void main() {
           isEmpty,
           reason: status,
         );
-        expect(ChatConversation.ofRide(ride, fakeDriverId), isEmpty, reason: status);
+        expect(
+          ChatConversation.ofRide(ride, fakeDriverId),
+          isEmpty,
+          reason: status,
+        );
       }
     });
 
@@ -107,15 +119,34 @@ void main() {
   });
 
   group('ChatThreadRef', () {
-    test('cada passageiro tem o seu caminho dentro da sala da viagem', () {
+    test('a conversa é do par de pessoas, a mesma em todas as viagens', () {
       const thread = ChatThreadRef(
         chatRoomId: 'ride_abc',
         rideId: 'abc',
+        driverId: 'd1',
         passengerId: 'p1',
       );
+      // Outra viagem, com os papéis trocados: continua a mesma conversa
+      const otherRide = ChatThreadRef(
+        chatRoomId: 'ride_xyz',
+        rideId: 'xyz',
+        driverId: 'p1',
+        passengerId: 'd1',
+      );
 
-      expect(thread.path, 'chats/ride_abc/p1');
+      expect(thread.path, 'chats/pair_d1/p1');
+      expect(otherRide.path, thread.path);
       expect(thread.passenger, (rideId: 'abc', passengerId: 'p1'));
     });
+  });
+
+  test('a conversa expira uma semana depois da última viagem', () {
+    // Concluída em 16/11 às 08:12
+    final done = fakeRide(status: 'COMPLETED', passengerStatus: 'COMPLETED');
+
+    expect(isChatOpen(done, DateTime(2026, 11, 23, 8, 11)), isTrue);
+    expect(isChatOpen(done, DateTime(2026, 11, 23, 8, 13)), isFalse);
+    // Com uma viagem marcada entre os dois, continua aberta
+    expect(isChatOpen(fakeRide(), DateTime(2027)), isTrue);
   });
 }

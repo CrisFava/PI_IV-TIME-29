@@ -114,6 +114,7 @@ class ChatActionsController extends Notifier<AsyncValue<void>> {
         ChatThreadRef(
           chatRoomId: thread.chatRoomId,
           rideId: thread.rideId,
+          driverId: thread.driverId,
           passengerId: passengerId,
         ),
         ChatMessageType.system,

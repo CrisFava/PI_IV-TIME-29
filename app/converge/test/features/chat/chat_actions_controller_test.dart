@@ -21,6 +21,7 @@ void main() {
   const thread = ChatThreadRef(
     chatRoomId: 'ride_ride-1',
     rideId: fakeRideId,
+    driverId: fakeDriverId,
     passengerId: fakePassengerId,
   );
 
@@ -175,6 +176,7 @@ void main() {
       const otherThread = ChatThreadRef(
         chatRoomId: 'ride_ride-1',
         rideId: fakeRideId,
+        driverId: fakeDriverId,
         passengerId: 'passenger-2',
       );
 

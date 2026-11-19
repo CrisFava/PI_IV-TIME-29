@@ -44,9 +44,21 @@ class DriverOffer {
   int get confirmedPassengers =>
       rides.fold(0, (sum, r) => sum + _count(r, ParticipantStatus.confirmed));
 
-  /// Pedidos de vaga ainda sem resposta.
-  int get pendingRequests =>
-      rides.fold(0, (sum, r) => sum + _count(r, ParticipantStatus.requested));
+  /// Pedidos que dá para aceitar agora: os das viagens com vaga (carro cheio
+  /// não conta). É o número da bolinha vermelha do card.
+  int get openRequests => rides
+      .where((r) => r.availableSeats > 0)
+      .fold(0, (sum, r) => sum + _count(r, ParticipantStatus.requested));
+
+  /// Viagens ainda não iniciadas que dá para cancelar.
+  List<RideModel> get openRides => [
+    for (final ride in rides)
+      if (ride.status == RideStatus.awaitingConfirmation ||
+          ride.status == RideStatus.confirmed)
+        ride,
+  ];
+
+  bool get hasOpenRides => openRides.isNotEmpty;
 
   static int _count(RideModel ride, ParticipantStatus status) => ride
       .participants
