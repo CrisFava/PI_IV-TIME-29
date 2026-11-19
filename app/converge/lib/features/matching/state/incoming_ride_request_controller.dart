@@ -33,10 +33,14 @@ class IncomingRideRequestController extends Notifier<DriverRideRequest?> {
     );
     ref.onDispose(timer.cancel);
 
-    ref.listen(
-      driverRideRequestsProvider,
-      (_, next) => _showNext(next.value ?? const []),
-    );
+    // A lista pode mudar enquanto a tela está sendo desenhada (outro widget a lê
+    // pela primeira vez): o aviso é atualizado logo depois, nunca durante o desenho
+    ref.listen(driverRideRequestsProvider, (_, next) {
+      final requests = next.value ?? const <DriverRideRequest>[];
+      Future.microtask(() {
+        if (ref.mounted) _showNext(requests);
+      });
+    });
     return _nextPending(
       ref.read(driverRideRequestsProvider).value ?? const [],
       current: null,
