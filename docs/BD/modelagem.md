@@ -106,7 +106,7 @@
   },
   "badges": [
     {
-      "type": "TRUST | SUSTAINABILITY",
+      "badge": "TRUST | SUSTAINABILITY",
       "grantedAt": "ISODate"
     }
   ],
@@ -128,9 +128,53 @@
 | `reputation.driver.level` | Simples | Consultas de reputação de motoristas |
 | `isDefaulter` | Simples | Verificação rápida de inadimplência no matching |
 
+### Regras de Negócio — Reputação (`reputation`)
+
+A reputação é separada por papel (`reputation.driver` e `reputation.passenger`). Cada bloco guarda `level`, `averageRating`, `totalReviews`, `window` e `calculatedAt`. Um usuário novo começa com `averageRating = 0.0`, `totalReviews = 0`, `level = null` e a janela zerada.
+
+**O que grava cada campo hoje:**
+
+| Campo | Quem grava | Quando |
+|---|---|---|
+| `averageRating`, `totalReviews` | `CreateReviewUseCase` (módulo `review`), pelo caso de uso `RecordReviewRatingUseCase` (módulo `user`) | Logo depois de salvar uma avaliação. Só o papel avaliado (`reviewedRole`: `DRIVER` grava em `reputation.driver`, `PASSENGER` em `reputation.passenger`) |
+| `window.completedRides` | `RideCompletedReputationListener` (módulo `user`), pelo caso de uso `RecordCompletedRideUseCase` | Quando uma viagem é concluída: +1 para o motorista (`driver.window`) e +1 para cada passageiro efetivo (`passenger.window`) |
+| `window.driverInitiatedCancellations`, `window.lateCancellations`, `window.noShows` | `RecordReputationPenaltyUseCase` | Cancelamento do motorista, cancelamento tardio do passageiro e ausência |
+| `level`, `calculatedAt` | Os mesmos casos de uso acima | A cada gravação de média, de viagem concluída ou de penalidade |
+| `window.delays`, `window.substantiatedReports`, `window.overdueRides` | **Nenhum código grava** | Ficam em 0 (ver "Ainda não implementado") |
+
+**Média de avaliação (`averageRating`, `totalReviews`):**
+- A média e o total são **recalculados a partir de todas as avaliações recebidas no papel** (índice `reviewedId + reviewedRole` de `reviews`), nunca somados de forma incremental. Duas avaliações salvas ao mesmo tempo não se perdem: cada recálculo roda depois do próprio `save` e relê a coleção.
+- A média é gravada **arredondada a 2 casas** e esse mesmo valor entra nas regras de `level` e de selo (≥ 4.2 e ≥ 4.0).
+- Se a gravação da reputação falhar, a avaliação **continua salva**: o erro só vai para o log.
+
+**Regra de `level` (igual para motorista e passageiro):**
+
+| `level` | Quando |
+|---|---|
+| `LOW` | Algum limite de penalidade foi estourado. Motorista: mais de 2 cancelamentos iniciados por ele ou mais de 1 denúncia procedente. Passageiro: mais de 2 cancelamentos tardios, mais de 1 ausência, qualquer viagem vencida ou mais de 1 denúncia procedente |
+| `HIGH` | Cumpre os critérios de confiança do papel (tabelas do "Selo de Confiança" abaixo) |
+| `MEDIUM` | Todo o resto |
+
+- A mesma regra roda quando entra uma média nova, uma viagem concluída ou uma penalidade. Por isso uma penalidade pode **rebaixar** `HIGH` para `MEDIUM` e `MEDIUM` não é mais "fixo": ele é recalculado a cada gravação.
+- `level` só vira `HIGH` se `completedRides` for alto o bastante. Como `completedRides` só passou a ser contado com o listener de viagem concluída, **o `HIGH` só é alcançável com a gravação da média e a contagem de viagens funcionando juntas**.
+
+**Contagem de viagens (`completedRides`):**
+- O registro da viagem concluída roda **depois** que a conclusão da viagem é gravada, fora da transação da conclusão. Uma falha nele só vai para o log e **nunca desfaz nem impede** a conclusão.
+- Idempotência: não há lista de `rideId` aplicados. O listener ouve só o `RideCompletedEvent`, que o `RideCompletionPublisher` publica uma vez por viagem (só o `CompleteRideUseCase` o chama, e uma viagem só conclui uma vez). O reconciliador de indicadores **não** republica o evento, então não há recontagem.
+- Limitação: se o registro falhar, aquela viagem fica sem contagem (não há reprocessamento). Viagem sem passageiro efetivo não gera evento e não conta (RF49).
+
+**Atualização atômica por papel:** a reputação é gravada **por papel** (`reputation.driver` ou `reputation.passenger`), sem regravar o usuário inteiro. Assim uma avaliação, uma penalidade e o job dos selos não sobrescrevem as alterações uns dos outros.
+
+**Janela de 90 dias não é deslizante.** Os contadores de `window` **acumulam desde o início** e nunca são zerados nem descontados por data. Os limites "nos últimos 90 dias" das tabelas abaixo valem, na prática, sobre o total acumulado. A janela deslizante fica como evolução.
+
+**Ainda não implementado:**
+- Moderação das denúncias: `window.substantiatedReports` continua em 0 porque nenhuma denúncia chega a `RESOLVED` (ver coleção `reports`).
+- `window.delays` e `window.overdueRides` não são incrementados por nenhum fluxo.
+- Janela deslizante de 90 dias.
+
 ### Regras de Negócio — Selo de Confiança
 
-O selo é recalculado semanalmente com base na janela deslizante de **90 dias**.
+O selo é recalculado **uma vez por semana** por um job (ver "Job semanal dos selos" abaixo). A tabela abaixo usa o texto "90 dias", mas a janela **não é deslizante**: os contadores acumulam (ver "Reputação").
 
 **Motorista — critérios para ganhar `TRUST`:**
 
@@ -153,6 +197,8 @@ O selo é recalculado semanalmente com base na janela deslizante de **90 dias**.
 
 O selo é **removido automaticamente** se o usuário deixar de cumprir qualquer critério no próximo recálculo.
 
+**Regra aplicada pelo código (`User.qualifiesForTrustBadge`):** o usuário tem `TRUST` quando não estourou nenhum limite de penalidade **e** cumpre os critérios de confiança em **pelo menos um** dos papéis (motorista **ou** passageiro). A revogação imediata por penalidade (`revokeTrustBadgeIfThresholdExceeded`) e o job semanal usam o mesmo predicado, então o selo não alterna entre concedido e revogado. Se uma penalidade derruba o selo no meio da semana, ele só volta no próximo job.
+
 ### Regras de Negócio — Selo de Sustentabilidade
 
 O selo `SUSTAINABILITY` reconhece o impacto ambiental acumulado do usuário. É baseado em dados concretos dos indicadores, não apenas em "andar com mais gente". O critério usa o **CO₂ evitado acumulado** (somando os `indicators` mensais do usuário):
@@ -164,7 +210,19 @@ O selo `SUSTAINABILITY` reconhece o impacto ambiental acumulado do usuário. É 
 
 - O cálculo de CO₂ evitado já é feito e armazenado em `indicators.co2AvoidedKg`, com base na energia economizada × fator de emissão da fonte do veículo (metodologia verídica — ver dicionário).
 - O selo considera **apenas viagens concluídas com pelo menos um passageiro efetivo** — garante que o impacto seja real (compartilhamento de fato), não apenas o motorista rodando sozinho.
-- Recalculado semanalmente junto com o selo de confiança.
+- Recalculado semanalmente junto com o selo de confiança, pelo mesmo job.
+- O CO₂ acumulado vem do caso de uso de leitura do módulo `indicator` (`GetUserIndicatorsUseCase`, período `ALL_TIME`, que soma os `indicators` `MONTHLY`), por meio da porta `UserCo2Gateway`. O módulo `user` não acessa o repositório do `indicator`. O limite é inclusivo: **50,0 kg ou mais** concede o selo.
+- O degrau opcional de 200 kg (destaque na exibição) **não** é gravado nem calculado pelo código.
+
+### Job semanal dos selos (RF69)
+
+- **Agendamento:** `BadgeRecalculationScheduler`, toda **segunda-feira às 03h**, fuso `America/Sao_Paulo`. A expressão cron pode ser trocada pela propriedade `converge.user.badge-recalculation-cron`.
+- **Caso de uso:** `RecalculateBadgesUseCase` percorre os usuários **em páginas de 100**, ordenadas por `_id`, e para cada um concede ou revoga `TRUST` e `SUSTAINABILITY`.
+- **Gravação:** só grava quando algum selo muda. Antes de gravar, relê o usuário (a página pode ter ficado velha). A data `grantedAt` original é preservada em um selo que continua válido.
+- **Falha por usuário:** um erro em um usuário (por exemplo, ao ler o CO₂) é contado e logado, os selos dele **não** são revogados e o job segue com os demais.
+- **Custo:** uma consulta de indicadores por usuário. Aceitável no volume atual do MVP.
+- **Sem auditoria:** `AuditAction` não tem ação de selo e nenhuma foi criada. Concessão e revogação não geram linha em `audit_logs`.
+- O nome do campo é `badge` (não `type`): o código usa `UserBadge(Badge badge, LocalDateTime grantedAt)`.
 
 ### Regras de Negócio — Inadimplência (pagamento por viagem)
 
@@ -286,6 +344,7 @@ Quando `active = false` (conta suspensa ou excluída):
 | Gasolina / etanol / diesel (R$/L) | 3,00 | 12,00 |
 | Eletricidade (R$/kWh) | 0,30 | 3,00 |
 
+- **RENAVAM:** 11 dígitos, guardados só com números, não todos iguais, e o último é o dígito verificador (módulo 11). A conferência roda no **servidor de sockets** (`ValidateRenavamHandler`, ver "Cálculos no servidor de sockets"), chamada pelos casos de uso de criar e editar veículo **antes** de montar a entidade. As mensagens são `O RENAVAM deve ter 11 dígitos.` e `RENAVAM inválido.` (erro `BAD_REQUEST`, campo `renavam`). A entidade `Vehicle` só normaliza (tira a pontuação) e **não valida mais o dígito sozinha**: todo ponto novo que criar ou editar veículo precisa passar pela validação do servidor.
 - **Itens de `fuelSources`:** não pode haver duas entradas da mesma `energySource` no mesmo veículo. Flex tem 2 itens (gasolina + etanol). Híbrido tem 1 ou 2.
 
 ---
@@ -594,7 +653,9 @@ O backend monta o payload sob demanda (padrão BR Code do Banco Central, CRC16 i
 - Só é permitido avaliar se a viagem está `COMPLETED`, se avaliador e avaliado **concluíram** a mesma viagem (participante com `status = COMPLETED`) **e** um deles é `DRIVER` e o outro é `PASSENGER`. Avaliação `PASSENGER → PASSENGER` é rejeitada no service. Passageiro ausente (`NO_SHOW`), recusado, expirado, cancelado ou que saiu da viagem não avalia nem é avaliado.
 - O `reviewedRole` é calculado pelo servidor a partir da viagem; o cliente não envia.
 - A avaliação é imutável (sem edição nem exclusão) e não tem prazo no MVP.
-- Salvar a avaliação não grava nada no Usuário. A média exibida é calculada na hora a partir desta coleção, pelo índice `reviewedId + reviewedRole`. Gravar `averageRating`/`totalReviews` na reputação do Usuário ainda não foi implementado.
+- **Salvar a avaliação atualiza a reputação do avaliado.** Depois do `save`, o `CreateReviewUseCase` relê todas as avaliações recebidas no papel (índice `reviewedId + reviewedRole`), calcula a média e o total e os grava em `users.reputation.driver` (se `reviewedRole = DRIVER`) ou `users.reputation.passenger` (se `PASSENGER`), junto com o `level` e o `calculatedAt` (ver coleção `users`, "Reputação"). Cada recálculo parte de todas as avaliações, nunca soma de forma incremental.
+- Se a gravação da reputação falhar, a avaliação **já salva continua valendo** (o erro só vai para o log). `REVIEW_ALREADY_EXISTS` e recusas de regra não chamam a reputação.
+- A média exibida em telas como o matching continua sendo calculada na hora a partir desta coleção.
 - Duas avaliações iguais enviadas ao mesmo tempo: o índice único barra a segunda, e a API responde `REVIEW_ALREADY_EXISTS`.
 
 ---
@@ -603,6 +664,8 @@ O backend monta o payload sob demanda (padrão BR Code do Banco Central, CRC16 i
 
 **Módulo:** `modules/security`
 **Descrição:** Denúncias realizadas por usuários contra outros. Mantém histórico completo para moderação.
+
+> **Estado atual:** o **registro** e a **consulta das próprias denúncias** estão implementados (RF45, RF25). A **moderação** (análise, resolução, arquivamento) **não existe**: não há papel de moderador. Os campos `resolution` e `reviewedBy` e os status `UNDER_REVIEW`, `RESOLVED` e `ARCHIVED` existem no modelo, mas nenhum endpoint ou rotina os escreve. Por isso as denúncias nascem `PENDING` e ficam assim, e `substantiatedReports` das janelas de reputação continua em 0.
 
 ```json
 {
@@ -629,14 +692,40 @@ O backend monta o payload sob demanda (padrão BR Code do Banco Central, CRC16 i
 | `status` | Simples | Fila de moderação (PENDING, UNDER_REVIEW) |
 | `rideId` | Simples | Denúncias relacionadas a uma viagem específica |
 
+### Endpoints (módulo `security`)
+
+| Método e rota | O que faz |
+|---|---|
+| `POST /api/v1/reports` | Registra uma denúncia. Corpo: `reportedId`, `reason`, `description` (opcional) e `rideId` (opcional). Devolve a denúncia criada |
+| `GET /api/v1/reports/mine` | Lista as denúncias feitas pelo usuário logado, da mais recente para a mais antiga |
+
+- Quem denuncia (`reporterId`) é sempre o **usuário logado**, nunca vem do corpo.
+- A resposta traz `id`, `reportedId`, `rideId`, `reason`, `description`, `status` e `createdAt`. `resolution`, `reviewedBy` e `reporterId` **não são expostos**.
+
+### Regras de Negócio
+
+- `reportedId` diferente do denunciante (`BAD_REQUEST`) e o denunciado precisa existir (`USER_NOT_FOUND`). O `status` nasce `PENDING`.
+- `LATE_NO_SHOW` (RF25) **exige** `rideId`. Para os outros motivos, `rideId` é opcional.
+- Quando `rideId` vem, o denunciante **e** o denunciado precisam ter participado da viagem (`NOT_ALLOWED` se não); viagem inexistente dá `RIDE_NOT_FOUND`. "Participou" vale para o motorista e para passageiros que tiveram vaga em qualquer status da viagem (inclui ausente e cancelado) e **exclui** pedidos `REQUESTED`, `REJECTED` e `EXPIRED`. É uma leitura própria do módulo `ride` (`GetRideParticipantsUseCase`), porque a leitura de participantes concluídos barraria o motorista que denuncia um passageiro ausente. A regra **não** exige que o denunciado esteja `NO_SHOW`.
+- `OTHER` exige `description`. A `description` tem no máximo **500 caracteres** (limite definido no código, validado no DTO e na entidade).
+- Denúncia idêntica ainda `PENDING` (mesmo denunciante, denunciado, `rideId` e `reason`) é recusada com `BAD_REQUEST`. Não há índice único para isso: a checagem é uma consulta. Sem `rideId`, a consulta casa também denúncias sem o campo.
+- `createdAt` e `updatedAt` são preenchidos pela auditoria do Spring Data (`Instant`).
+
+### Fora do que está implementado
+
+- Moderação: mudança de status, `resolution`, `reviewedBy`, fila de análise e `REPORT_RESOLVED` em `audit_logs`.
+- Auditoria do registro da denúncia: nenhuma ação de `AuditAction` foi usada.
+- Efeito automático sobre a reputação (`substantiatedReports`).
+- Teste com MongoDB real: as consultas derivadas do Spring Data não foram executadas contra um banco nos testes (a suíte do projeto é unitária).
+
 ---
 
 ## 7. Coleção `blocks`
 
 **Módulo:** `modules/security`
 **Descrição:** Registros de bloqueio entre usuários. Usada para filtrar resultados de matching, aceites de carona e chat. O bloqueio é bidirecional para fins de interação.
-- **Hoje:** o matching já lê esta coleção pela porta `BlockAccess`, nos dois sentidos.
-- **Ainda falta:** as rotas para criar e desfazer bloqueios (RF46) e o uso no aceite de carona e no chat.
+- **Implementado (RF46, RF47):** as rotas para bloquear, desbloquear e listar, e o uso do bloqueio na busca (matching), no **pedido de vaga** e no **aceite** do passageiro. Tudo lê a coleção pela porta `BlockAccess`, nos dois sentidos.
+- **Não coberto pelo backend:** o chat depois do aceite (ver "Onde o bloqueio vale").
 
 ```json
 {
@@ -655,9 +744,38 @@ O backend monta o payload sob demanda (padrão BR Code do Banco Central, CRC16 i
 | `userId` | Simples | Listar quem o usuário bloqueou |
 | `blockedUserId` | Simples | Verificar se um usuário está bloqueado (usado no matching) |
 
+### Endpoints (módulo `security`)
+
+| Método e rota | O que faz |
+|---|---|
+| `POST /api/v1/blocks` | Bloqueia um usuário. Corpo: `blockedUserId`. Resposta `201` com o bloqueio |
+| `DELETE /api/v1/blocks/{blockedUserId}` | Desfaz o bloqueio feito pelo usuário logado. Resposta `204` |
+| `GET /api/v1/blocks` | Lista os usuários que o logado bloqueou, do mais recente para o mais antigo. Cada item traz `id`, `blockedUserId`, `blockedUserName` (pode vir nulo se o usuário não existe mais) e `createdAt` |
+
+- Quem bloqueia (`userId`) é sempre o **usuário logado**, nunca vem do corpo. O bloqueado precisa existir (`USER_NOT_FOUND`) e não pode ser o próprio usuário (`BAD_REQUEST`).
+- `POST` é **idempotente**: se o bloqueio já existe, devolve o existente (também `201`). Uma corrida em que o índice único barra a segunda gravação (`DuplicateKeyException`) é tratada devolvendo o bloqueio já salvo.
+- `DELETE` é **idempotente**: responde `204` mesmo sem bloqueio.
+- `createdAt` é preenchido pela auditoria do Spring Data (`@EnableMongoAuditing` está ligado em `MongoConfig`).
+
+### Onde o bloqueio vale
+
+| Fluxo | Situação |
+|---|---|
+| Matching (busca de motoristas e passageiros) | Aplicado, nos dois sentidos |
+| Pedido de vaga (`RequestRideSeatUseCase`) | Aplicado. Bloqueio entre passageiro e motorista dá `NOT_ALLOWED` ("Não é possível pedir vaga nesta carona."), antes de qualquer gravação |
+| Aceite do passageiro (`AcceptPassengerUseCase`) | Aplicado. `NOT_ALLOWED` ("Não é possível aceitar este passageiro."), antes de gravar o aceite |
+| Chat criado no aceite | O backend não cria a sala: só preenche `rides.chatRoomId` (`ride_<rideId>`) quando o passageiro é aceito. Como o aceite é barrado, a sala **não é liberada** para quem já está bloqueado |
+| Chat depois do aceite | **Não coberto pelo backend.** As mensagens passam direto pelo Firebase Realtime Database, sem a API no meio. O app desabilita o envio no chat com um usuário bloqueado |
+| Viagem já aceita, saída da viagem, cancelamentos | Não aplicado |
+
+- **Desbloquear remove só o bloqueio do usuário logado.** Se o outro lado também bloqueou, o bloqueio dele continua e a interação segue barrada.
+- Não há auditoria (`USER_BLOCKED` de `AuditAction` não é usado pelas rotas).
+
 ---
 
 ## 8. Coleção `reserved_seats`
+
+> **Ainda sem código:** não existe entidade (`@Document`), repositório nem endpoint para esta coleção no backend. A descrição abaixo é o desenho previsto, ainda não implementado.
 
 **Módulo:** `modules/ride`
 **Descrição:** Registra a parceria habitual entre um passageiro e um motorista — a **vaga reservada recorrente**. Criado por opt-in manual: **qualquer um dos dois propõe** (`proposedBy`) e o outro aceita. Garante ao passageiro uma vaga prioritária no trajeto do motorista nos dias combinados. **Não envolve cobrança mensal nem valor fixo** — cada viagem efetivada é paga individualmente por PIX, como qualquer viagem avulsa (ver coleção `rides`). O vínculo opera em modelo **opt-out**: o sistema assume que o passageiro vai nos dias do vínculo e reserva a vaga automaticamente; o passageiro só age quando **não** vai.
@@ -852,7 +970,7 @@ A tela de Dados (ver wireframes `indicadores` e `indicadores ambientais`) exibe 
 ## 11. Coleção `platform_indicators`
 
 **Módulo:** `modules/indicator`
-**Descrição:** Indicadores **globais da plataforma** (não de um usuário específico), para atender ao RF51 ("quantidade de caronas realizadas no total da plataforma") e exibições públicas de impacto coletivo. Um documento por período, agregando os números de todos os usuários. Atualizado por job periódico, não a cada viagem (evita contenção de escrita num documento único de alto tráfego).
+**Descrição:** Indicadores **globais da plataforma** (não de um usuário específico), para atender ao RF51 ("quantidade de caronas realizadas no total da plataforma") e exibições públicas de impacto coletivo. Um documento por período, agregando os números de todos os usuários. Atualizado **a cada viagem concluída**, com operações atômicas do MongoDB, e **reconciliado a cada 15 minutos** por uma tarefa agendada que completa as viagens que ficaram sem contabilização (ver "Regras de Negócio").
 
 ```json
 {
@@ -864,7 +982,7 @@ A tela de Dados (ver wireframes `indicadores` e `indicadores ambientais`) exibe 
   "totalCarsAvoided": "Integer",
   "totalCo2AvoidedKg": "Double",
   "activeUsers": "Integer",
-  "appliedRideIds": ["String (ref: rides._id — só nos períodos WEEKLY, MONTHLY e SEMESTERLY)"],
+  "appliedRideIds": ["String (ref: rides._id — só nos períodos WEEKLY, MONTHLY e SEMESTERLY; ausente em ALL_TIME)"],
   "calculatedAt": "ISODate"
 }
 ```
@@ -882,6 +1000,23 @@ A tela de Dados (ver wireframes `indicadores` e `indicadores ambientais`) exibe 
 - **Uma viagem é somada uma vez só em cada documento:** o update só casa se o `rideId` ainda não está em `appliedRideIds`, e o `$addToSet` registra a viagem no mesmo update. Quando a viagem termina de ser contabilizada, o `rideId` entra em `indicator_ride_registrations`. A mesma regra vale para a coleção `indicators`.
 - **Reprocessamento:** a viagem gravada como `COMPLETED` é o registro durável. Uma tarefa agendada (a cada 15 minutos) refaz a contabilização das viagens concluídas nos últimos 7 dias que ainda não estão em `indicator_ride_registrations`. Graças à regra acima, uma contabilização que parou no meio é completada sem contar nada em dobro.
 - Considera apenas viagens `COMPLETED` com ao menos um passageiro efetivo (RF49).
+- **`ALL_TIME` não usa `appliedRideIds`.** O documento é recalculado a partir dos documentos `SEMESTERLY` (`refreshAllTime`, com `$max`), não por viagem, então não guarda a lista de viagens aplicadas. Nos demais períodos `appliedRideIds` é a trava de idempotência.
+
+### Coleção `indicator_ride_registrations`
+
+**Módulo:** `modules/indicator`
+**Descrição:** Marca as viagens que já terminaram de ser contabilizadas nos indicadores, para a tarefa de reconciliação não reprocessar a mesma viagem. Existe em `MongoIndicatorStore` (`REGISTRATIONS_COLLECTION`), sem classe de entidade: o documento é gravado direto.
+
+```json
+{
+  "_id": "String (rideId, ref: rides._id)",
+  "registeredAt": "ISODate"
+}
+```
+
+- O `_id` é o próprio `rideId`, então o índice único padrão do MongoDB impede registrar a mesma viagem duas vezes (`DuplicateKeyException` é ignorada).
+- É gravado **depois** de todos os documentos de `indicators` e `platform_indicators` da viagem terem sido atualizados. A tarefa de reconciliação (a cada 15 minutos) busca as viagens concluídas nos últimos 7 dias que **não** estão aqui e completa o que faltar; `appliedRideIds` garante que nada seja somado em dobro.
+- Não há índices adicionais nem TTL.
 
 ---
 
@@ -922,6 +1057,8 @@ A tela de Dados (ver wireframes `indicadores` e `indicadores ambientais`) exibe 
 ---
 
 ## 13. Coleção `universities`
+
+> **Ainda sem código:** não existe entidade (`@Document`), repositório nem endpoint para esta coleção no backend. Hoje `academicRecord.university` é gravado como texto. A descrição abaixo é o desenho previsto, ainda não implementado.
 
 **Módulo:** `modules/shared`
 **Descrição:** Lista de referência das universidades suportadas. Existe para **padronizar** o campo `academicRecord.university` — sem ela, "PUC-Campinas" e "PUC Campinas" seriam tratadas como instituições diferentes e o matching por universidade (RF14) falharia. É uma tabela simples e estável, pouco alterada.
@@ -1011,12 +1148,42 @@ A tela de Dados (ver wireframes `indicadores` e `indicadores ambientais`) exibe 
 | Campo(s) | Tipo | Justificativa |
 |---|---|---|
 | `key` | Único | Garante que a mesma chave não seja processada duas vezes |
-| `createdAt` | Simples (TTL) | Expiração automática (ex: 24-48h) — chaves antigas não precisam ser retidas |
+| `createdAt` | Simples (TTL) | Expiração automática em **24 h** (`expireAfter = "24h"`) — chaves antigas não precisam ser retidas |
 
 ### Regras de Negócio
 
 - Antes de executar uma operação crítica, o backend verifica se a `key` já existe. Se existe, retorna o resultado anterior sem reexecutar.
-- TTL curto (24-48h) é suficiente — reenvios por falha de rede acontecem em minutos, não dias.
+- O TTL é de **24 h** — reenvios por falha de rede acontecem em minutos, não dias.
+
+---
+
+## Cálculos no servidor de sockets (RT04, RT20, RT22)
+
+Cálculos em memória e validações determinísticas rodam no **Servidor Java de sockets** (`app/server`, pacote `com.converge.socket.handler`). O backend chama o servidor por `SocketClient`. Se o servidor estiver fora do ar, responder outro tipo de mensagem ou der erro, o backend registra um aviso no log e executa **o mesmo handler localmente** (a classe vem do artefato do servidor no classpath). O resultado é o mesmo nos dois caminhos. Nenhum desses cálculos grava dados: o resultado é usado pelo caso de uso, que grava nas coleções de sempre.
+
+| Handler | O que calcula ou valida | Quem chama no backend | Onde o resultado aparece |
+|---|---|---|---|
+| `SustainabilityHandler` | Carros evitados, energia poupada, CO₂ evitado e árvores equivalentes de uma viagem | `RegisterCompletedRideUseCase` (módulo `indicator`), pela porta `SustainabilityGateway` | `indicators` e `platform_indicators` (`carsAvoided`, `co2AvoidedKg`) |
+| `IndicatorReferenceHandler` | Texto de `reference` de um período: `AAAA-MM` (mensal), `AAAA-S1/S2` (semestral), `AAAA-W##` (semana ISO, com o ano ISO na virada) e `ALL_TIME`. Aceita **lote** (até 1000 datas por chamada) | `RegisterCompletedRideUseCase` (3 períodos por viagem, 1 chamada) e `GetUserIndicatorSeriesUseCase` (série do gráfico, 1 chamada), pela porta `IndicatorReferenceGateway` | `indicators.reference` e `platform_indicators.reference` |
+| `DistanceHandler` | Distância Haversine em km (raio da Terra 6371 km). Aceita **lote** de pares (até 1000 por chamada) e devolve as distâncias na mesma ordem. Recusa latitude fora de [-90, 90], longitude fora de [-180, 180], `NaN` e par malformado | `RouteGeometryService`, `RideItineraryPlanner` e `RideCompletionPublisher`, pela porta `DistanceGateway` (módulo `route`) | `routes.routeDistanceKm` e `rides.itineraryDistanceKm` quando o Google não responde (soma dos trechos em linha reta), ordem das paradas de `rides.itinerary`, e a distância da viagem enviada ao registro de indicadores quando nem a viagem nem o trajeto têm distância |
+| `ValidateRenavamHandler` | RENAVAM: 11 dígitos, não todos iguais, dígito verificador (módulo 11) | `CreateVehicleUseCase` e `UpdateVehicleUseCase`, pela porta `RenavamValidationGateway` | `vehicles.renavam` (só os dígitos) |
+| `ValidateCpfHandler` | CPF: dígitos verificadores | `ValidateCpfUseCase` (módulo `user`), chamado por `POST /api/v1/users/validate-cpf` | Só responde se o CPF é válido; não grava nada |
+
+Handlers que já existiam e seguem o mesmo padrão: `RideCostHandler` (rateio da viagem), `PixPayloadHandler` (Pix Copia e Cola) e `MatchRoutesHandler` (compatibilidade do matching).
+
+**Sustentabilidade (fórmulas do `SustainabilityHandler`):**
+- Carros evitados = passageiros efetivos (nunca negativo).
+- Energia poupada = carros evitados × distância ÷ consumo médio. Distância, consumo ou carros inválidos dão 0, sem erro.
+- CO₂ evitado (kg) = energia poupada × fator da fonte: gasolina 2,31 kg/L, etanol 1,50 kg/L, diesel 2,68 kg/L, elétrico 0,0385 kg/kWh. Fonte desconhecida dá 0.
+- Árvores equivalentes = CO₂ evitado ÷ 22.
+- O `RegisterCompletedRideUseCase` continua dividindo o CO₂ entre os participantes (`co2 ÷ (passageiros + 1)`) e gravando pelo `IndicatorStore`; essa divisão **não** foi para o servidor.
+
+**Garantias:**
+- Nenhum número calculado mudou com a migração: os adaptadores foram comparados com as classes antigas do backend em testes descartáveis, com igualdade exata (milhares de pares de pontos, todas as datas de 2010 a 2044 nos quatro períodos e casos aleatórios de sustentabilidade).
+- Para não abrir uma conexão por par dentro de laços (RNF17), distância e referência de período usam **lote**. O `RideItineraryPlanner` abre uma conexão por passo da escolha gulosa, porque o passo seguinte depende do ponto escolhido.
+- As classes `SustainabilityCalculator`, `IndicatorReference` e `HaversineCalculator` saíram do backend. A regra do dígito do RENAVAM também saiu da entidade `Vehicle`.
+- As mensagens de erro de RENAVAM que o app recebe são as mesmas de antes (`O RENAVAM deve ter 11 dígitos.` e `RENAVAM inválido.`).
+- Limitação: coordenadas com `NaN` passavam pelo `Coordinates` do backend e agora o servidor as recusa. Isso não acontece pela API (o JSON não carrega `NaN`).
 
 ---
 
@@ -1056,9 +1223,10 @@ users (1) ──────────────────── (N) vehic
     └──── (N) notifications (avisos do usuário)
 
 referência / infraestrutura (sem vínculo direto com um usuário):
-  platform_indicators — totais globais agregados por job periódico
+  platform_indicators — totais globais agregados (por viagem concluída + reconciliação a cada 15 min)
+  indicator_ride_registrations — viagens já contabilizadas nos indicadores (idempotência)
   universities        — lista de referência (academicRecord.university aponta pra cá)
-  idempotency_keys    — chaves processadas (TTL curto)
+  idempotency_keys    — chaves processadas (TTL de 24 h)
 ```
 
 ---
@@ -1123,15 +1291,17 @@ referência / infraestrutura (sem vínculo direto com um usuário):
 ### `ReputationLevel` (users.reputation.*.level)
 | Valor | Descrição |
 |---|---|
-| `HIGH` | Boa avaliação e baixa taxa de problemas |
-| `MEDIUM` | Desempenho intermediário |
-| `LOW` | Avaliação baixa ou alta taxa de problemas |
+| `HIGH` | Cumpre os critérios de confiança do papel (média, viagens concluídas e limites de penalidade) |
+| `MEDIUM` | Nem estourou limites de penalidade nem cumpre os critérios de confiança |
+| `LOW` | Estourou algum limite de penalidade (cancelamentos, ausências, viagens vencidas ou denúncias procedentes) |
 
-### `BadgeType` (users.badges[].type)
+### `Badge` (users.badges[].badge)
+O enum no código chama-se `Badge` e o campo gravado em cada item de `badges` chama-se `badge` (`UserBadge(Badge badge, LocalDateTime grantedAt)`).
+
 | Valor | Descrição |
 |---|---|
-| `TRUST` | Concedido quando atinge os critérios de comportamento na janela de 90 dias |
-| `SUSTAINABILITY` | Concedido com base nos indicadores de impacto ambiental acumulados |
+| `TRUST` | Concedido pelo job semanal quando o usuário cumpre os critérios de confiança em algum papel e não estourou limites de penalidade |
+| `SUSTAINABILITY` | Concedido pelo job semanal quando o CO₂ evitado acumulado chega a 50 kg |
 
 ### `VehicleType` (vehicles.type)
 | Valor | Descrição |
@@ -1198,6 +1368,12 @@ Formato geoespacial padrão do MongoDB para o índice `2dsphere`.
 | `IN_PROGRESS` | Viagem iniciada |
 | `COMPLETED` | Viagem finalizada com sucesso |
 | `CANCELLED` | Cancelada por motorista ou passageiro |
+
+### `RideStopType` (rides.itinerary[].type)
+| Valor | Descrição |
+|---|---|
+| `PICKUP` | Parada para buscar o passageiro (embarque) |
+| `DROPOFF` | Parada para deixar o passageiro (desembarque) |
 
 ### `ParticipantRole` (rides.participants[].role)
 | Valor | Descrição |

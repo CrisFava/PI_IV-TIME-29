@@ -25,6 +25,7 @@
 | 12/11/2026 | Cristian Eduardo Fava | 1.5.0 | Cobrança combinada no chat na Participação (`requestedAmount`, `paymentRequestedAt`, `paidAt`); estrutura do chat no Firebase Realtime Database; indicadores atualizados ao concluir a viagem |
 | 13/11/2026 | Daniela Mikie Kikuchi Gonçalves | 1.5.1 | Avaliação: quem pode avaliar (participante que concluiu a viagem), avaliação imutável e sem prazo no MVP, média calculada a partir das avaliações; índice de duplicidade corrigido para `rideId + reviewerId + reviewedId` |
 | 15/11/2026 | Allan Giovanni Matias Paes | 1.6.0 | Alinhamento com as entidades Java: `toll` e `parking` no Trajeto; `EXPIRED` e `version` na Viagem; `appliedRideIds` nos Indicadores e Plataforma; `IdempotencyKey` completo com replay e fingerprint; `REQUEST_EXPIRED` em Notificação; complementação dos schemas JSON 4.11 a 4.15 e índices de integridade |
+| 18/11/2026 | Daniela Mikie Kikuchi Gonçalves | 1.7.0 | Itinerário da Viagem (`itinerary`, `itineraryDistanceKm`, `itineraryPolyline`, `RideStop`, `RideStopType`); `IndicatorRideRegistration` documentada; reputação gravada a partir das avaliações e regra de `level`; selos automáticos (job semanal) e `completedRides` contado ao concluir a viagem; denúncias e bloqueios implementados (endpoints, onde valem, moderação fora); campo do selo `badge`; `appliedRideIds` ausente em `ALL_TIME`; indicadores na versão enxuta; atualização por viagem com reconciliação a cada 15 min; TTL de idempotência de 24 h; avisos de "sem código" para `reserved_seats` e `universities`; cálculos migrados para o servidor de sockets (sustentabilidade, referência de período, distância, RENAVAM) |
 
 ---
 
@@ -44,7 +45,7 @@ A seguir são descritas as entidades que o projeto Converge contempla, seus atri
 
 ### 2.1. User (Usuário)
 
-Usuário é toda pessoa que se cadastra na plataforma Converge. Pode assumir um ou mais papéis: passageiro (`PASSENGER`) ou motorista (`DRIVER`). O usuário deve ter vínculo acadêmico verificado com uma universidade para utilizar as funcionalidades principais da plataforma. O sistema mantém indicadores de reputação separados por papel e concede selos de reconhecimento com base em comportamento ao longo do tempo.
+Usuário é toda pessoa que se cadastra na plataforma Converge. Pode assumir um ou mais papéis: passageiro (`PASSENGER`) ou motorista (`DRIVER`). O usuário deve ter vínculo acadêmico verificado com uma universidade para utilizar as funcionalidades principais da plataforma. O sistema mantém indicadores de reputação separados por papel e concede selos de reconhecimento com base em comportamento ao longo do tempo (ver tipos 3.2 e 3.3 para o que o código grava hoje).
 
 #### Atributos de User
 
@@ -65,8 +66,8 @@ Usuário é toda pessoa que se cadastra na plataforma Converge. Pode assumir um 
 | `overdueRidesCount` | Número inteiro | Sim | Simples | `0`, `1`, `2`, `3` | negativo | Quantidade de viagens vencidas (não pagas após o prazo de 3 dias). Define o prazo decrescente até o bloqueio. |
 | `isDefaulter` | Booleano | Sim | Simples | `true`, `false` | nulo | `false` por padrão. Muda para `true` quando o passageiro é bloqueado (3 dívidas vencidas ou prazo estourado). Só volta a `false` quando **todas** as viagens vencidas forem pagas. |
 | `defaulterSince` | Data e hora | Não | Simples | `2025-05-20T00:00:00Z` | data futura | Preenchido quando `isDefaulter = true`. Nulo quando em dia. |
-| `reputation` | Dados de reputação por papel | Sim | Composto (C) | ver tipo especial 3.2 | nulo | Calculada semanalmente com base na janela de 90 dias. Separada por papel (driver e passenger). |
-| `badges` | Selos de reconhecimento | Não | Multivalorado e Composto (MC) | ver tipo especial 3.3 | — | Concedidos automaticamente quando o usuário atinge os critérios da janela de 90 dias. Removidos se deixar de atender. |
+| `reputation` | Dados de reputação por papel | Sim | Composto (C) | ver tipo especial 3.2 | nulo | Separada por papel (driver e passenger). A média e o `level` são gravados quando uma avaliação é salva; `completedRides` quando a viagem é concluída; cancelamentos e ausências quando ocorrem. A janela de 90 dias **não é deslizante** (os contadores acumulam). Ver tipo especial 3.2. |
+| `badges` | Selos de reconhecimento | Não | Multivalorado e Composto (MC) | ver tipo especial 3.3 | — | Concedidos e removidos automaticamente por um job semanal (segunda-feira, 03h, America/Sao_Paulo) quando o usuário atinge ou deixa de atender os critérios. Cada item grava o selo no campo `badge` (não `type`). Ver tipo especial 3.3. |
 | `active` | Booleano | Sim | Simples | `true`, `false` | nulo | `true` por padrão. `false` para contas suspensas ou excluídas. |
 | `createdAt` | Data e hora | Sim | Simples | `2025-05-01T10:00:00Z` | data futura | Gerado automaticamente no cadastro. |
 | `updatedAt` | Data e hora | Sim | Simples | `2025-09-15T08:30:00Z` | data anterior à criação | Atualizado a cada alteração no documento. |
@@ -86,7 +87,7 @@ Veículo é o automóvel cadastrado por um motorista. Um usuário pode ter múlt
 | `nickname` | Texto | Não | Simples | `Gol Azul`, `Van da Manhã` | — | Facilita a seleção quando o motorista tem mais de um veículo. |
 | `model` | Texto | Sim | Simples | `Volkswagen Gol`, `Fiat Uno` | vazio | Exibido nos detalhes da viagem. |
 | `licensePlate` | Texto alfanumérico | Sim | Simples | `ABC1234`, `ABC1D23` | placa duplicada, vazio | Única por proprietário. Armazenada em maiúsculas sem hífen. |
-| `renavam` | Texto numérico | Sim | Simples | `14283256656` | `1428325665` (10 dígitos), `14283256657` (dígito verificador errado), `11111111111` | Registro Nacional de Veículos Automotores. 11 dígitos, guardados sem pontuação; o último é o dígito verificador (soma dos 10 primeiros com os pesos 3, 2, 9, 8, 7, 6, 5, 4, 3, 2; dígito = soma × 10 mod 11, com 10 virando 0). Pode faltar em veículos cadastrados antes do campo existir. |
+| `renavam` | Texto numérico | Sim | Simples | `14283256656` | `1428325665` (10 dígitos), `14283256657` (dígito verificador errado), `11111111111` | Registro Nacional de Veículos Automotores. 11 dígitos, guardados sem pontuação; o último é o dígito verificador (soma dos 10 primeiros com os pesos 3, 2, 9, 8, 7, 6, 5, 4, 3, 2; dígito = soma × 10 mod 11, com 10 virando 0). Pode faltar em veículos cadastrados antes do campo existir. A conferência é feita pelo **servidor de sockets** (`ValidateRenavamHandler`) ao criar e ao editar o veículo, antes de montar a entidade; o `Vehicle` só guarda os dígitos e não valida o dígito verificador sozinho. Mensagens de erro: `O RENAVAM deve ter 11 dígitos.` e `RENAVAM inválido.` |
 | `color` | Texto | Sim | Simples | `Branco`, `Prata`, `Azul` | vazio | Texto livre. Auxilia o passageiro a identificar o veículo. |
 | `type` | Elemento de lista enumerada | Sim | Simples | `HATCH`, `VAN`, `MOTORCYCLE` | valor fora do enum | Valores: `HATCH`, `SEDAN`, `SUV`, `PICKUP`, `VAN`, `MOTORCYCLE`, `OTHER`. Moto tem capacidade máxima de 1. |
 | `totalCapacity` | Número inteiro | Sim | Simples | `5`, `7`, `15` (van), `2` (moto) | `0`, negativo, carro com mais de 7, maior que 15 | Inclui o motorista. Carro (hatch, sedã, SUV, picape): até 7. Van ou outro: até 15. Moto: até 2. |
@@ -121,7 +122,7 @@ Route é o registro de um deslocamento recorrente cadastrado por um usuário. Po
 | `parking` | Número decimal monetário | Não | Simples | `20.00`, `null` | negativo | Somente para `OFFER`. Valor estimado de estacionamento informado pelo motorista na oferta. `Decimal128`. |
 | `totalSeats` | Número inteiro | Não | Simples | `3`, `8` | `0`, negativo | Somente para `OFFER`. Calculado como `totalCapacity do veículo - 1`. |
 | `availableSeats` | Número inteiro | Não | Simples | `3`, `1`, `0` | negativo, maior que totalSeats | Somente para `OFFER`. Decrementado ao confirmar; incrementado ao cancelar. |
-| `routeDistanceKm` | Número decimal | Não | Simples | `12.4`, `5.8` | negativo, zero | Distância pelas ruas, calculada pela Routes API (Google Maps) na criação e em cada edição. Se o Google estiver indisponível, recebe a distância em linha reta (Haversine). Base para custos e desvios. |
+| `routeDistanceKm` | Número decimal | Não | Simples | `12.4`, `5.8` | negativo, zero | Distância pelas ruas, calculada pela Routes API (Google Maps) na criação e em cada edição. Se o Google estiver indisponível, recebe a distância em linha reta (Haversine), calculada pelo **servidor de sockets** (`DistanceHandler`, em lote). Base para custos e desvios. |
 | `encodedPolyline` | Texto | Não | Simples | `x~ijCzbe_HnAkBtCwE` | `""` (texto vazio) | Desenho do caminho no formato *encoded polyline* do Google, usado pelo app para traçar o trajeto no mapa. Calculado junto com `routeDistanceKm`. Nulo quando a distância veio do Haversine. |
 | `status` | Elemento de lista enumerada | Sim | Simples | `ACTIVE`, `PAUSED`, `INACTIVE` | valor fora do enum | Somente `ACTIVE` entra no matching. |
 | `createdAt` | Data e hora | Sim | Simples | `2025-03-01T08:00:00Z` | data futura | Gerado automaticamente. |
@@ -159,6 +160,9 @@ Ride é o evento central do sistema. Representa uma viagem concreta com data, ho
 | `chatRoomId` | Texto | Não | Simples | `ride_64d4c3b2` | — | Identificador da sala de chat no **Firebase Realtime Database**. As mensagens não ficam no MongoDB — só a referência da sala. |
 | `costs` | Detalhamento de custos | Sim | Composto (C) | ver tipo especial 3.7 | nulo | Calculado ao concluir a viagem. Todos os valores monetários em `Decimal128`. |
 | `participants` | Participação na viagem | Sim | Multivalorado e Composto (MC) | ver tipo especial 3.8 | lista vazia | Mínimo 1 elemento (o motorista). |
+| `itinerary` | Parada do itinerário | Não | Multivalorado e Composto (MC) | ver tipo especial 3.14 | — | Paradas na ordem em que o motorista busca (`PICKUP`) e deixa (`DROPOFF`) os passageiros confirmados. Lista vazia quando não há passageiro confirmado. Recalculada ao aceitar um passageiro, quando um confirmado sai e quando o motorista remove um confirmado. Não muda depois de `IN_PROGRESS`. |
+| `itineraryDistanceKm` | Número decimal | Não | Simples | `15.8`, `null` | negativo | Distância da rota passando pelas paradas. Vem da Routes API (Google); sem o Google, é a soma das linhas retas entre os pontos (calculada pelo servidor de sockets). Nulo quando não há paradas. `Double`. |
+| `itineraryPolyline` | Texto | Não | Simples | `x~ijCzbe_HnAkBtCwE`, `null` | `""` | Desenho da rota com as paradas, em *encoded polyline* do Google. Nulo sem o Google ou sem paradas. Só o motorista a recebe na API. |
 | `createdAt` | Data e hora | Sim | Simples | `2025-05-10T20:00:00Z` | data futura | Gerado automaticamente. |
 | `updatedAt` | Data e hora | Sim | Simples | `2025-05-12T08:15:00Z` | anterior à criação | Atualizado a cada mudança de status ou participante. |
 
@@ -173,7 +177,7 @@ Review é o registro de nota e comentário na relação **motorista ↔ passagei
 - **Sem edição e sem exclusão:** a avaliação é imutável depois de criada.
 - **Sem prazo:** não há limite de tempo para avaliar depois que a viagem termina. Um prazo pode ser definido numa versão futura.
 - **Papel do avaliado:** o servidor calcula o `reviewedRole` a partir da viagem. O cliente não envia esse campo.
-- **Média de avaliação:** salvar a avaliação **não** grava nada no Usuário. A média e a quantidade de avaliações exibidas (ex.: nos resultados do matching) são calculadas na hora, a partir das avaliações recebidas no papel (`reviewedId + reviewedRole`). Gravar `averageRating` e `totalReviews` na reputação do Usuário, para o recálculo dos selos, ainda não foi implementado.
+- **Média de avaliação:** depois de salvar a avaliação, o sistema recalcula a média e a quantidade a partir de **todas** as avaliações recebidas no papel (`reviewedId + reviewedRole`) e as grava em `reputation.driver` (se `reviewedRole = DRIVER`) ou `reputation.passenger` (se `PASSENGER`) do avaliado, junto com o `level` (ver tipo 3.2). A média gravada tem 2 casas decimais. Se essa gravação falhar, a avaliação continua salva e o erro só vai para o log. A média exibida no matching continua calculada na hora a partir desta coleção.
 
 #### Atributos de Review
 
@@ -194,6 +198,14 @@ Review é o registro de nota e comentário na relação **motorista ↔ passagei
 
 Report é o registro formal de uma ocorrência reportada por um usuário contra outro. Mantém histórico completo para suporte à moderação da plataforma.
 
+**Estado atual:** o registro (`POST /api/v1/reports`) e a consulta das próprias denúncias (`GET /api/v1/reports/mine`) estão implementados (RF45, RF25). A **moderação não existe**: não há papel de moderador, então `resolution`, `reviewedBy` e os status `UNDER_REVIEW`, `RESOLVED` e `ARCHIVED` não são escritos por nenhum fluxo. As denúncias ficam `PENDING` e `substantiatedReports` das janelas de reputação continua em 0.
+
+**Regras do registro:**
+- Quem denuncia é o usuário logado; não pode denunciar a si mesmo; o denunciado precisa existir.
+- `LATE_NO_SHOW` exige `rideId`. `OTHER` exige `description`. Os demais motivos aceitam `rideId` opcional.
+- Quando `rideId` vem, denunciante e denunciado precisam ter participado da viagem (motorista ou passageiro que teve vaga, em qualquer status da viagem, inclusive ausente ou cancelado; pedido `REQUESTED`, `REJECTED` ou `EXPIRED` não conta).
+- Denúncia idêntica (mesmo denunciante, denunciado, `rideId` e `reason`) ainda `PENDING` é recusada.
+
 #### Atributos de Report
 
 | Atributo / Dado | Tipo conceitual | Obrigatório | Característica | Ex. aceitos | Ex. não aceitos | Comentários |
@@ -201,12 +213,12 @@ Report é o registro formal de uma ocorrência reportada por um usuário contra 
 | `_id` | Texto alfanumérico | Sim | Simples | `64f6e5d4...` | vazio, nulo | Gerado pelo banco. |
 | `reporterId` | Texto alfanumérico | Sim | Simples | `64a1f3c2...` | nulo | Referência ao User que registra a denúncia. |
 | `reportedId` | Texto alfanumérico | Sim | Simples | `64a9f8e7...` | igual ao reporterId, nulo | Referência ao User denunciado. |
-| `rideId` | Texto alfanumérico | Não | Simples | `64d4c3b2...` | — | Referência ao Ride relacionado, quando aplicável. |
+| `rideId` | Texto alfanumérico | Não | Simples | `64d4c3b2...` | `LATE_NO_SHOW` sem viagem | Referência ao Ride relacionado. **Obrigatório quando `reason = LATE_NO_SHOW`**; opcional nos demais. Quando vem, os dois usuários precisam ter participado da viagem. |
 | `reason` | Elemento de lista enumerada | Sim | Simples | `INAPPROPRIATE_CONDUCT`, `LATE_NO_SHOW` | valor fora do enum | Valores: `LATE_NO_SHOW`, `INAPPROPRIATE_CONDUCT`, `IMPROPER_CHARGE`, `OTHER`. |
-| `description` | Texto | Não | Simples | `O motorista cobrou mais do combinado.` | — | Campo opcional para detalhamento livre. |
-| `status` | Elemento de lista enumerada | Sim | Simples | `PENDING`, `UNDER_REVIEW` | valor fora do enum | Valores: `PENDING`, `UNDER_REVIEW`, `RESOLVED`, `ARCHIVED`. Default: `PENDING`. |
-| `resolution` | Texto | Não | Simples | `Usuário advertido.` | — | Preenchido pela moderação ao encerrar a análise. |
-| `reviewedBy` | Texto alfanumérico | Não | Simples | `64mod1...` | — | Referência ao User moderador que analisou. |
+| `description` | Texto | Não | Simples | `O motorista cobrou mais do combinado.` | mais de 500 caracteres, vazio com `OTHER` | Detalhamento livre, **máximo 500 caracteres** (limite definido no código). **Obrigatório quando `reason = OTHER`.** |
+| `status` | Elemento de lista enumerada | Sim | Simples | `PENDING`, `UNDER_REVIEW` | valor fora do enum | Valores: `PENDING`, `UNDER_REVIEW`, `RESOLVED`, `ARCHIVED`. Nasce `PENDING`. Hoje só `PENDING` é gravado; os demais dependem da moderação, que não existe. |
+| `resolution` | Texto | Não | Simples | `Usuário advertido.` | — | **Pendente (sem moderação):** nenhum fluxo escreve este campo e a API não o expõe. Seria preenchido pela moderação ao encerrar a análise. |
+| `reviewedBy` | Texto alfanumérico | Não | Simples | `64mod1...` | — | **Pendente (sem moderação):** nenhum fluxo escreve este campo e a API não o expõe. Seria a referência ao User moderador que analisou. |
 | `createdAt` | Data e hora | Sim | Simples | `2025-05-12T10:00:00Z` | data futura | Gerado automaticamente. |
 | `updatedAt` | Data e hora | Sim | Simples | `2025-05-15T14:00:00Z` | anterior à criação | Atualizado ao mudar o status. |
 
@@ -214,7 +226,15 @@ Report é o registro formal de uma ocorrência reportada por um usuário contra 
 
 ### 2.7. Block (Bloqueio)
 
-Block é o registro de que um usuário optou por impedir interações com outro. O bloqueio é bidirecional — se A bloqueou B, nenhum dos dois verá o outro em matching, caronas ou chat.
+Block é o registro de que um usuário optou por impedir interações com outro. O bloqueio é bidirecional para fins de interação — se A bloqueou B, nenhum dos dois verá o outro no matching nem consegue pedir ou aceitar vaga com o outro.
+
+**Endpoints (RF46):** `POST /api/v1/blocks` (idempotente, `201`), `DELETE /api/v1/blocks/{blockedUserId}` (idempotente, `204`) e `GET /api/v1/blocks` (lista de quem o logado bloqueou, com o nome do bloqueado). Quem bloqueia é sempre o usuário logado.
+
+**Onde o bloqueio vale (RF47):**
+- Matching: sim, nos dois sentidos.
+- Pedido de vaga e aceite do passageiro: sim, nos dois sentidos (`NOT_ALLOWED`). Como a sala de chat só é liberada no aceite, quem já está bloqueado não chega a ter a conversa criada.
+- Chat **depois** do aceite: **não coberto pelo backend**. As mensagens vivem no Firebase Realtime Database, sem a API no meio. O app desabilita o envio no chat com um usuário bloqueado.
+- Desbloquear remove só o bloqueio do usuário logado; se o outro lado também bloqueou, a interação segue barrada.
 
 #### Atributos de Block
 
@@ -228,6 +248,8 @@ Block é o registro de que um usuário optou por impedir interações com outro.
 ---
 
 ### 2.8. ReservedSeat (Vaga Reservada Recorrente)
+
+> **Ainda sem código:** não existe entidade (`@Document`), repositório nem endpoint para `reserved_seats` no backend. Esta seção descreve o desenho previsto.
 
 ReservedSeat é o vínculo de **vaga reservada recorrente** entre um passageiro e um motorista. Criado por opt-in: **qualquer um dos dois propõe** (`proposedBy`) e o outro aceita. Garante ao passageiro vaga prioritária nos dias combinados (`weekDays`). **Não envolve cobrança mensal nem valor fixo** — cada viagem é paga individualmente por PIX, como qualquer viagem avulsa. Opera em modelo **opt-out**: o sistema assume que o passageiro vai e reserva a vaga; ele só age para avisar que **não** vai num dia (entra em `skippedDates`).
 
@@ -276,7 +298,7 @@ Matching é o resultado calculado pelo algoritmo de compatibilidade entre dois t
 
 ### 2.10. Indicator (Indicadores)
 
-Indicator é o conjunto de métricas de mobilidade, sustentabilidade e financeiro de um usuário em um período específico. São pré-calculados por período (`WEEKLY`, `MONTHLY`, `SEMESTERLY`) e atualizados ao concluir cada viagem. A tela de Dados usa um **filtro de período** (semana / mês / 3 meses / semestre). O período `TOTAL` foi removido — o acumulado histórico é calculado **somando apenas os documentos `MONTHLY`** sob demanda (nunca misturar granularidades, pois têm dados sobrepostos), com paginação quando houver muitos meses. Sem cache persistente — o cálculo soma poucos documentos pequenos, é leve.
+Indicator é o conjunto de métricas de mobilidade e sustentabilidade de um usuário em um período específico (o financeiro fica para evolução futura). São pré-calculados por período (`WEEKLY`, `MONTHLY`, `SEMESTERLY`) e atualizados ao concluir cada viagem. O CO₂ e os carros evitados vêm do `SustainabilityHandler` e o texto de `reference` do `IndicatorReferenceHandler`, ambos no servidor de sockets. A tela de Dados usa um **filtro de período** (semana / mês / 3 meses / semestre). O período `TOTAL` foi removido — o acumulado histórico é calculado **somando apenas os documentos `MONTHLY`** sob demanda (nunca misturar granularidades, pois têm dados sobrepostos), com paginação quando houver muitos meses. Sem cache persistente — o cálculo soma poucos documentos pequenos, é leve.
 
 #### Atributos de Indicator
 
@@ -300,7 +322,7 @@ Indicator é o conjunto de métricas de mobilidade, sustentabilidade e financeir
 
 ### 2.11. PlatformIndicator (Indicadores da Plataforma)
 
-Indicadores **globais** agregados de toda a plataforma, por período, para atender ao RF51 (totais da plataforma) e exibições de impacto coletivo. Diferente de Indicator, não tem `userId` — representa o somatório de todos os usuários. Atualizado por job periódico.
+Indicadores **globais** agregados de toda a plataforma, por período, para atender ao RF51 (totais da plataforma) e exibições de impacto coletivo. Diferente de Indicator, não tem `userId` — representa o somatório de todos os usuários. Atualizado **a cada viagem concluída**, com operações atômicas, e **reconciliado a cada 15 minutos** por uma tarefa agendada que completa as viagens que ficaram sem contabilização.
 
 #### Atributos de PlatformIndicator
 
@@ -314,8 +336,8 @@ Indicadores **globais** agregados de toda a plataforma, por período, para atend
 | `totalCarsAvoided` | Número inteiro | Sim | Simples | `340` | negativo | Estimativa de carros evitados no período. |
 | `totalCo2AvoidedKg` | Número decimal | Sim | Simples | `3100.0` | negativo | Total de CO₂ evitado. `Double`. |
 | `activeUsers` | Número inteiro | Sim | Simples | `214` | negativo | Usuários ativos no período. |
-| `appliedRideIds` | Texto alfanumérico | Sim | Multivalorado (M) | `["64d4c3b2..."]` | lista nula | Lista de IDs de caronas (`rides._id`) já processadas para garantia de idempotência no recálculo. |
-| `calculatedAt` | Data e hora | Sim | Simples | `2025-05-31T23:00:00Z` | — | Timestamp do último recálculo pelo job. |
+| `appliedRideIds` | Texto alfanumérico | Sim nos períodos `WEEKLY`, `MONTHLY` e `SEMESTERLY`; **não existe em `ALL_TIME`** | Multivalorado (M) | `["64d4c3b2..."]` | lista nula (nos três períodos que a usam) | Lista de IDs de caronas (`rides._id`) já somadas neste documento, para idempotência. O documento `ALL_TIME` não a guarda: é recalculado a partir dos documentos `SEMESTERLY`, não por viagem. |
+| `calculatedAt` | Data e hora | Sim | Simples | `2025-05-31T23:00:00Z` | — | Timestamp da última atualização do documento (por viagem ou pela reconciliação). |
 
 ---
 
@@ -339,6 +361,8 @@ Registro append-only de ações sensíveis (financeiras, de segurança e de mode
 ---
 
 ### 2.13. University (Universidade)
+
+> **Ainda sem código:** não existe entidade (`@Document`), repositório nem endpoint para `universities` no backend. Hoje `academicRecord.university` é gravado como texto. Esta seção descreve o desenho previsto.
 
 Lista de referência das universidades suportadas. Padroniza o campo `university` do vínculo acadêmico — sem ela o matching por instituição falharia por diferenças de digitação.
 
@@ -395,6 +419,19 @@ Registra as chaves de idempotência já processadas, para evitar que uma operaç
 | `responseBody` | Texto | Não | Simples | payload JSON serializado | — | Resposta retornada para responder requisições repetidas sem reprocessar mutações. |
 | `createdAt` | Data e hora | Sim | Simples | `2025-05-12T08:20:00Z` | — | Momento do primeiro recebimento. Expira por TTL de 24 horas. |
 
+### 2.16. IndicatorRideRegistration (Viagem Contabilizada nos Indicadores)
+
+Marca as viagens que já terminaram de ser contabilizadas nos indicadores (`indicators` e `platform_indicators`). A tarefa de reconciliação, que roda a cada 15 minutos, usa esta coleção para achar as viagens concluídas nos últimos 7 dias que ficaram sem contabilização. Existe só em `MongoIndicatorStore` (`REGISTRATIONS_COLLECTION`): não tem classe de entidade, o documento é gravado direto. Módulo dono: `modules/indicator`.
+
+#### Atributos de IndicatorRideRegistration
+
+| Atributo / Dado | Tipo conceitual | Obrigatório | Característica | Ex. aceitos | Ex. não aceitos | Comentários |
+| :--- | :---: | :---: | :---: | :--- | :--- | :--- |
+| `_id` | Texto alfanumérico | Sim | Simples | `64d4c3b2...` | duplicado, nulo | É o próprio `rides._id`. Como `_id` é único, a mesma viagem não é registrada duas vezes (a duplicata é ignorada). |
+| `registeredAt` | Data e hora | Sim | Simples | `2025-05-12T08:20:00Z` | — | Momento em que a viagem terminou de ser contabilizada. Gravado só depois de todos os documentos de indicadores da viagem terem sido atualizados. Sem TTL. |
+
+---
+
 ---
 
 ## 3. Tipos especiais, compostos ou específicos
@@ -420,7 +457,21 @@ Estrutura composta que representa os dados universitários do usuário e o statu
 
 ### 3.2. Reputation (Reputação por Papel)
 
-Estrutura composta que representa os indicadores de comportamento do usuário separados por papel. Calculada semanalmente com base na janela deslizante de **90 dias**.
+Estrutura composta que representa os indicadores de comportamento do usuário separados por papel.
+
+**Como cada campo é gravado hoje:**
+- `averageRating` e `totalReviews`: recalculados a partir de **todas** as avaliações recebidas no papel, logo depois de salvar uma avaliação (só o papel avaliado). A média é gravada com 2 casas decimais, e esse valor entra nas regras de `level` e de selo. Se a gravação falhar, a avaliação continua salva (só log).
+- `window.completedRides`: +1 para o motorista e +1 para cada passageiro efetivo quando a viagem é concluída. O registro roda **depois** que a conclusão da viagem é gravada, fora da transação dela; uma falha nele só vai para o log e nunca desfaz nem impede a conclusão. Cada conclusão conta uma vez (o evento é publicado uma vez por viagem). Viagem sem passageiro efetivo não gera evento e não conta.
+- `window.driverInitiatedCancellations`, `window.lateCancellations` e `window.noShows`: incrementados pelas penalidades.
+- `level` e `calculatedAt`: recalculados a cada gravação acima.
+- A reputação é gravada **por papel** (`reputation.driver` ou `reputation.passenger`), de forma atômica, sem regravar o usuário inteiro, para uma avaliação, uma penalidade e o job dos selos não sobrescreverem uns aos outros.
+
+**Regra de `level` (igual nos dois papéis):** `LOW` quando algum limite de penalidade é estourado; `HIGH` quando cumpre os critérios de confiança do papel (tabelas abaixo); `MEDIUM` no resto. A regra roda de novo a cada média, viagem concluída ou penalidade, então uma penalidade pode rebaixar `HIGH` para `MEDIUM`.
+
+**Limitações conhecidas:**
+- A janela de 90 dias **não é deslizante**: os contadores acumulam desde o início e nunca são descontados por data. Os limites "nos últimos 90 dias" abaixo valem, na prática, sobre o total acumulado.
+- `HIGH` só é alcançável com a gravação da média e a contagem de `completedRides` funcionando juntas.
+- Nenhum fluxo grava `window.delays`, `window.substantiatedReports` (depende da moderação de denúncias, que não existe) nem `window.overdueRides`; ficam em 0.
 
 **Critérios para ganhar o selo `TRUST` — Driver:**
 
@@ -447,10 +498,10 @@ A estrutura `reputation` tem dois blocos: `reputation.driver` e `reputation.pass
 
 | Atributo / Dado | Tipo conceitual | Obrigatório | Comentários |
 | :---: | :--- | :---: | :--- |
-| `level` | Elemento de lista enumerada | Sim | Valores: `HIGH`, `MEDIUM`, `LOW`, `null` (sem histórico ainda). |
-| `averageRating` | Número decimal | Sim | Média das notas recebidas no papel. |
+| `level` | Elemento de lista enumerada | Sim | Valores: `HIGH`, `MEDIUM`, `LOW`, `null` (sem histórico ainda). Ver a regra de `level` acima. |
+| `averageRating` | Número decimal | Sim | Média das notas recebidas no papel, com 2 casas. Começa em `0.0`. |
 | `totalReviews` | Número inteiro | Sim | Quantidade total de avaliações recebidas no papel. |
-| `calculatedAt` | Data e hora | Sim | Timestamp do último recálculo semanal. |
+| `calculatedAt` | Data e hora | Sim | Timestamp da última gravação da reputação do papel (média, viagem concluída ou penalidade). |
 
 **`driver.window` — janela de 90 dias do motorista:**
 
@@ -475,18 +526,20 @@ A estrutura `reputation` tem dois blocos: `reputation.driver` e `reputation.pass
 
 ### 3.3. Badge (Selo de Reconhecimento)
 
-Estrutura composta que representa um selo concedido ao usuário. Removido automaticamente se o usuário deixar de atender os critérios no próximo recálculo semanal.
+Estrutura composta que representa um selo concedido ao usuário. Concedido e removido automaticamente pelo **job semanal** (`BadgeRecalculationScheduler`, toda segunda-feira às 03h, fuso America/Sao_Paulo; expressão trocável pela propriedade `converge.user.badge-recalculation-cron`).
 
 **Critérios de concessão:**
 
 | Selo | Critério |
 | :--- | :--- |
-| `TRUST` | Atinge os limiares de comportamento da janela de 90 dias (ver tipo 3.2 Reputation). |
-| `SUSTAINABILITY` | CO₂ evitado acumulado ≥ 50 kg (somando os `indicators` mensais do usuário). Considera apenas viagens concluídas com ao menos um passageiro efetivo — impacto real de compartilhamento, não motorista rodando sozinho. |
+| `TRUST` | Não estourou nenhum limite de penalidade **e** cumpre os critérios de confiança (ver tipo 3.2 Reputation) em **pelo menos um** dos papéis, motorista ou passageiro. A janela "90 dias" não é deslizante: os contadores acumulam. |
+| `SUSTAINABILITY` | CO₂ evitado acumulado **≥ 50 kg** (soma dos `indicators` `MONTHLY` do usuário, lida pelo caso de uso de leitura do módulo `indicator`, período `ALL_TIME`). Considera apenas viagens concluídas com ao menos um passageiro efetivo — impacto real de compartilhamento, não motorista rodando sozinho. |
+
+**Como o job funciona:** percorre os usuários em páginas de 100 (ordenadas por `_id`), concede ou revoga os dois selos e só grava quando algo muda, relendo o usuário antes. A data `grantedAt` original é preservada em um selo que continua válido. Um erro em um usuário é contado e logado, os selos dele não são revogados e o job segue. Uma penalidade que estoura o limite revoga o `TRUST` na hora; ele só volta no próximo job. Não há auditoria de concessão ou revogação (não existe ação de selo em `AuditAction`).
 
 | Atributo / Dado | Tipo conceitual | Obrigatório | Comentários |
 | :---: | :--- | :---: | :--- |
-| `type` | Elemento de lista enumerada | Sim | Valores: `TRUST`, `SUSTAINABILITY`. |
+| `badge` | Elemento de lista enumerada | Sim | Valores: `TRUST`, `SUSTAINABILITY`. O nome do campo no código e no banco é `badge` (record `UserBadge(Badge badge, LocalDateTime grantedAt)`), não `type`. |
 | `grantedAt` | Data e hora | Sim | Data em que o selo foi concedido. |
 
 ---
@@ -582,9 +635,11 @@ Estrutura composta e multivalorada que representa cada participante de uma viage
 
 ---
 
-> **Nota:** as seções 3.9 a 3.12 descrevem a **estrutura completa prevista**. No MVP, o indicador por usuário grava uma versão **enxuta e plana** (ver seção 4.10): só `ridesAsDriver`, `ridesAsPassenger`, `sharedKm`, `carsAvoided` e `co2AvoidedKg`. Os subdocumentos `financial` (3.11) e `series` (3.12), e os campos `fuelSavedL`/`energySavedKwh` (3.10), ficam como **evolução futura**.
+> **Nota:** as seções 3.9 a 3.12 descrevem a **estrutura completa prevista**. No MVP, o indicador por usuário grava uma versão **enxuta e plana** (ver seção 2.10 e o JSON 4.10): só `ridesAsDriver`, `ridesAsPassenger`, `sharedKm`, `carsAvoided` e `co2AvoidedKg`. Não existem os subdocumentos `mobility` e `sustainability` no banco. As seções 3.9 e 3.10 mostram, cada uma, **o que já existe** (campos que no MVP ficam planos no documento) e **o que é evolução futura**. As seções 3.11 e 3.12 são inteiramente evolução futura.
 
-### 3.9. MobilityData (Dados de Mobilidade)
+### 3.9. MobilityData (Dados de Mobilidade) — campos planos no MVP; subdocumento é evolução futura
+
+> No MVP estes campos ficam **direto no documento `indicators`**, sem o subdocumento `mobility`. `totalRides` não é gravado: é calculado na leitura (`ridesAsDriver + ridesAsPassenger`).
 
 | Atributo / Dado | Tipo conceitual | Obrigatório | Comentários |
 | :---: | :--- | :---: | :--- |
@@ -595,7 +650,9 @@ Estrutura composta e multivalorada que representa cada participante de uma viage
 
 ---
 
-### 3.10. SustainabilityData (Dados de Sustentabilidade)
+### 3.10. SustainabilityData (Dados de Sustentabilidade) — só `co2AvoidedKg` existe no MVP
+
+> No MVP só `co2AvoidedKg` é gravado, direto no documento `indicators` (sem o subdocumento `sustainability`). `equivalentTrees` é calculado na leitura (`co2AvoidedKg / 22`). `fuelSavedL` e `energySavedKwh` **não são gravados** e ficam como evolução futura. O cálculo vem do `SustainabilityHandler` do servidor de sockets.
 
 | Atributo / Dado | Tipo conceitual | Obrigatório | Comentários |
 | :---: | :--- | :---: | :--- |
@@ -648,6 +705,22 @@ Estrutura composta que representa a CNH do motorista. Opcional — só preenchid
 
 ---
 
+### 3.14. RideStop (Parada do Itinerário)
+
+Estrutura composta e multivalorada usada no array `itinerary` da Ride. Cada item é uma parada em que o motorista busca ou deixa um passageiro confirmado. A ordem do array é a ordem de visita.
+
+| Atributo / Dado | Tipo conceitual | Obrigatório | Comentários |
+| :---: | :--- | :---: | :--- |
+| `type` | Elemento de lista enumerada | Sim | Enum `RideStopType`. Valores: `PICKUP` (buscar o passageiro no embarque) e `DROPOFF` (deixar o passageiro no desembarque). |
+| `passengerId` | Texto alfanumérico | Sim | Referência ao `_id` do User passageiro da parada. |
+| `place` | Location (C) | Sim | Local da parada (endereço, bairro, cidade e coordenadas GeoJSON; ver tipo 3.5). |
+
+**Ordem (`RideItineraryPlanner`):** o motorista sai da origem e busca todos os confirmados, sempre o embarque mais próximo de onde ele está. Depois deixa cada um, sempre o desembarque mais próximo, e segue para o destino. Em empate de distância vence o menor `userId`. As distâncias vêm do `DistanceHandler` do servidor de sockets, em lote.
+
+**Privacidade:** os pontos são endereços dos passageiros. Na API, o motorista recebe todas as paradas, a distância e a polyline; cada passageiro recebe só as próprias paradas, sem a polyline.
+
+---
+
 ## 4. Desdobramento físico — banco orientado a documentos (MongoDB)
 
 | Entidade conceitual | Coleção MongoDB | Módulo dono | Estratégia |
@@ -655,18 +728,19 @@ Estrutura composta que representa a CNH do motorista. Opcional — só preenchid
 | User | `users` | `modules/user` | `academicRecord`, `reputation` e `badges[]` embutidos (sempre consultados juntos). |
 | Vehicle | `vehicles` | `modules/user` | `fuelSources[]` como MC. Referenciado por id em routes e rides. |
 | Route | `routes` | `modules/route` | `origin` e `destination` embutidos com coordenadas (índice geoespacial). `weekDays` como array de strings. |
-| Ride | `rides` | `modules/ride` | `participants[]` embutidos (atomicidade). `costs` e `vehicleSnapshot` embutidos (snapshot imutável). |
+| Ride | `rides` | `modules/ride` | `participants[]` embutidos (atomicidade). `costs` e `vehicleSnapshot` embutidos (snapshot imutável). `itinerary[]` (`RideStop`), `itineraryDistanceKm` e `itineraryPolyline` embutidos (paradas na ordem de visita). |
 | Review | `reviews` | `modules/review` | Documento simples com referências por id. |
-| Report | `reports` | `modules/security` | Documento simples com referências por id. |
-| Block | `blocks` | `modules/security` | Documento simples com referências por id. |
-| ReservedSeat | `reserved_seats` | `modules/ride` | Vínculo de vaga reservada. `weekDays` e `skippedDates[]` como arrays simples. |
+| Report | `reports` | `modules/security` | Documento simples com referências por id. Registro e consulta das próprias denúncias implementados; moderação ainda não existe. |
+| Block | `blocks` | `modules/security` | Documento simples com referências por id. Endpoints de bloquear, desbloquear e listar implementados. |
+| ReservedSeat | `reserved_seats` | `modules/ride` | **Ainda sem código** (sem `@Document`). Vínculo de vaga reservada. `weekDays` e `skippedDates[]` como arrays simples. |
 | Matching | `matchings` | `modules/matching` | `compatibleDays` como array de strings. `passengerId` e `driverId` denormalizados. |
-| Indicator | `indicators` | `modules/indicator` | `mobility`, `sustainability` e `financial` embutidos. `series[]` embutida com volume controlado. Sem período `TOTAL`. |
-| PlatformIndicator | `platform_indicators` | `modules/indicator` | Documento global por período. `ALL_TIME` é armazenado (pequeno, só totais). Atualizado por job. |
+| Indicator | `indicators` | `modules/indicator` | Versão enxuta: campos planos (`ridesAsDriver`, `ridesAsPassenger`, `sharedKm`, `carsAvoided`, `co2AvoidedKg`) e `appliedRideIds[]`, sem subdocumentos. `financial` e `series[]` são evolução futura. Sem período `TOTAL` nem `ALL_TIME` por usuário (o acumulado soma os `MONTHLY`). |
+| PlatformIndicator | `platform_indicators` | `modules/indicator` | Documento global por período. `ALL_TIME` é armazenado (pequeno, só totais) e não tem `appliedRideIds`. Atualizado a cada viagem concluída e reconciliado a cada 15 minutos. |
+| IndicatorRideRegistration | `indicator_ride_registrations` | `modules/indicator` | Sem classe de entidade. `_id` é o `rideId` (impede registrar a viagem duas vezes). Marca as viagens já contabilizadas nos indicadores. |
 | AuditLog | `audit_logs` | `modules/shared` | Append-only. Referências por id. `metadata` flexível sem esquema rígido. |
-| University | `universities` | `modules/shared` | Lista de referência. `emailDomains` como array. Pouco alterada. |
+| University | `universities` | `modules/shared` | **Ainda sem código** (sem `@Document`). Lista de referência. `emailDomains` como array. Pouco alterada. |
 | Notification | `notifications` | `modules/shared` | Documento simples por aviso. TTL para expirar antigos. |
-| IdempotencyKey | `idempotency_keys` | `modules/shared` | Documento simples com `key` única e TTL curto (24-48h). |
+| IdempotencyKey | `idempotency_keys` | `modules/shared` | Documento simples com `key` única e TTL de 24 h. |
 
 ---
 
@@ -736,7 +810,7 @@ Estrutura composta que representa a CNH do motorista. Opcional — só preenchid
     }
   },
   "badges": [
-    { "type": "TRUST", "grantedAt": "2025-09-15T00:00:00Z" }
+    { "badge": "TRUST", "grantedAt": "2025-09-15T00:00:00Z" }
   ],
   "active": true,
   "createdAt": "2025-03-01T09:00:00Z",
@@ -855,6 +929,30 @@ Estrutura composta que representa a CNH do motorista. Opcional — só preenchid
   "cancellationReason": null,
   "cancelledBy": null,
   "chatRoomId": "ride_64d4c3b2f7e3d4c5b6a7f8e9",
+  "itinerary": [
+    {
+      "type": "PICKUP",
+      "passengerId": "64a9f8e7d6c5b4a3f2e1d0c9",
+      "place": {
+        "address": "Rua das Flores, 50",
+        "neighborhood": "Centro",
+        "city": "Campinas",
+        "location": { "type": "Point", "coordinates": [-47.0650, -22.9100] }
+      }
+    },
+    {
+      "type": "DROPOFF",
+      "passengerId": "64a9f8e7d6c5b4a3f2e1d0c9",
+      "place": {
+        "address": "Campus UNIV — Bloco B",
+        "neighborhood": "Jardim Universitário",
+        "city": "Campinas",
+        "location": { "type": "Point", "coordinates": [-47.0500, -22.8333] }
+      }
+    }
+  ],
+  "itineraryDistanceKm": 14.5,
+  "itineraryPolyline": "x~ijCzbe_HnAkBtCwE",
   "costs": {
     "routeDistanceKm": 12.4,
     "totalDistanceWithDetoursKm": 14.5,
@@ -1064,6 +1162,8 @@ Estrutura composta que representa a CNH do motorista. Opcional — só preenchid
 }
 ```
 
+> `appliedRideIds` existe nos períodos `WEEKLY`, `MONTHLY` e `SEMESTERLY`. O documento `ALL_TIME` (`reference = "ALL_TIME"`) não tem esse campo: é recalculado a partir dos documentos `SEMESTERLY`.
+
 ---
 
 ### 4.12. Coleção `audit_logs`
@@ -1141,6 +1241,19 @@ Estrutura composta que representa a CNH do motorista. Opcional — só preenchid
 
 ---
 
+### 4.16. Coleção `indicator_ride_registrations`
+
+```json
+{
+  "_id": "64d4c3b2f7e3d4c5b6a7f8e9",
+  "registeredAt": "2025-05-12T08:20:05Z"
+}
+```
+
+> O `_id` é o `rides._id` da viagem contabilizada. Não há classe de entidade: o documento é gravado direto pelo `MongoIndicatorStore`.
+
+---
+
 ## 5. Consultas, índices e observações de arquitetura
 
 | Consulta esperada | Campos envolvidos | Índices sugeridos | Observações |
@@ -1167,7 +1280,12 @@ Estrutura composta que representa a CNH do motorista. Opcional — só preenchid
 | Verificar avaliação duplicada | `rideId`, `reviewerId`, `reviewedId` | `{ rideId: 1, reviewerId: 1, reviewedId: 1 }` único | Impede dupla avaliação do mesmo par na mesma viagem. O `reviewedId` é necessário porque o motorista avalia cada passageiro da mesma viagem. Também atende "avaliações que o usuário já fez na viagem" (`rideId + reviewerId`). |
 | Listar avaliações dadas por um usuário | `reviewerId` | `{ reviewerId: 1 }` | Verificar se o usuário já avaliou determinada viagem. |
 | Buscar avaliações recebidas por papel | `reviewedId`, `reviewedRole` | `{ reviewedId: 1, reviewedRole: 1 }` | Base do cálculo de reputação por papel. |
-| Buscar fila de denúncias pendentes | `status` | `{ status: 1 }` | Moderação — filtro por `PENDING` e `UNDER_REVIEW`. |
+| Buscar fila de denúncias pendentes | `status` | `{ status: 1 }` | Moderação — filtro por `PENDING` e `UNDER_REVIEW`. A fila de moderação ainda não existe; o índice existe na entidade `Report`. |
+| Listar denúncias feitas por um usuário | `reporterId` | `{ reporterId: 1 }` | `GET /api/v1/reports/mine`, ordenado por `createdAt` decrescente. |
+| Denúncias contra um usuário e por viagem | `reportedId`, `rideId` | `{ reportedId: 1 }`, `{ rideId: 1 }` | Histórico de denúncias de um usuário e de uma viagem. Também apoia a checagem de denúncia idêntica pendente. |
+| Listar bloqueios feitos por um usuário | `userId` | `{ userId: 1 }` | `GET /api/v1/blocks`, do mais recente para o mais antigo. |
+| Viagens já contabilizadas nos indicadores | `_id` (= `rideId`) | índice `_id` padrão | `indicator_ride_registrations`: o `_id` único impede registrar a mesma viagem duas vezes e a reconciliação busca as ausentes. |
+| Percorrer usuários no job semanal de selos | `_id` | índice `_id` padrão | Leitura paginada (100 por página, ordenada por `_id`) feita pelo `RecalculateBadgesUseCase`. |
 | Buscar vínculo recorrente entre par | `passengerId`, `driverRouteId` | `{ passengerId: 1, driverRouteId: 1 }` único | Verificar se já existe vínculo e seu status. |
 | Listar vínculos ativos de um usuário | `passengerId`/`driverId`, `status` | `{ passengerId: 1, status: 1 }` | Montar a lista de caronas reservadas (opt-out). |
 | Buscar indicadores de um usuário por período | `userId`, `period`, `reference` | `{ userId: 1, period: 1, reference: 1 }` único | Tela de Dados. |
@@ -1180,6 +1298,20 @@ Estrutura composta que representa a CNH do motorista. Opcional — só preenchid
 | Validar chave de idempotência | `key` | `{ key: 1 }` único | Verificar se a operação já foi processada. |
 | Validar e-mail institucional | `emailDomains` | `{ emailDomains: 1 }` | Verificação acadêmica automática pelo domínio. |
 | Limpeza automática de matchings obsoletos | `expiresAt` | `{ expiresAt: 1 }` TTL | MongoDB remove automaticamente. |
+
+### Cálculos no servidor de sockets (RT04, RT20, RT22)
+
+Cálculos em memória e validações determinísticas rodam no **servidor de sockets** (`app/server`). O backend chama o servidor por `SocketClient` e, se ele estiver fora do ar ou responder outro tipo de mensagem, executa o **mesmo handler localmente**, com o mesmo resultado. Nenhum handler grava dados; o caso de uso do backend grava o resultado nas coleções.
+
+| Handler | Calcula ou valida | Campos afetados |
+| :--- | :--- | :--- |
+| `SustainabilityHandler` | Carros evitados, energia poupada, CO₂ evitado e árvores equivalentes | `indicators.carsAvoided`, `indicators.co2AvoidedKg` e os totais de `platform_indicators` |
+| `IndicatorReferenceHandler` | Texto de `reference` (`AAAA-MM`, `AAAA-S1/S2`, semana ISO `AAAA-W##`, `ALL_TIME`), em lote | `indicators.reference`, `platform_indicators.reference` |
+| `DistanceHandler` | Distância Haversine em km, em lote (até 1000 pares por chamada) | `routes.routeDistanceKm` e `rides.itineraryDistanceKm` (sem o Google), ordem de `rides.itinerary` |
+| `ValidateRenavamHandler` | RENAVAM com dígito verificador módulo 11 | `vehicles.renavam` |
+| `ValidateCpfHandler` | CPF com dígitos verificadores | Nenhum (só a resposta de `POST /api/v1/users/validate-cpf`) |
+
+Já existiam e seguem o mesmo padrão: `RideCostHandler` (rateio da viagem), `PixPayloadHandler` (Pix Copia e Cola) e `MatchRoutesHandler` (compatibilidade do matching). Os números calculados não mudaram com a migração (comparação exata com as classes antigas do backend, que saíram do backend: `SustainabilityCalculator`, `IndicatorReference` e `HaversineCalculator`).
 
 ### Pagamento PIX — geração do "Copia e Cola"
 
