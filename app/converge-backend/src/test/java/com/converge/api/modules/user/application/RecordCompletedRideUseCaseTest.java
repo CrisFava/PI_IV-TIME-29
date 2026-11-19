@@ -2,6 +2,7 @@
 
 package com.converge.api.modules.user.application;
 
+import com.converge.api.modules.user.application.gateway.UserReputationWriter;
 import com.converge.api.modules.user.domain.enums.user.ParticipationRole;
 import com.converge.api.modules.user.domain.enums.user.VerificationMethod;
 import com.converge.api.modules.user.domain.enums.user.VerificationStatus;
@@ -15,6 +16,7 @@ import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.InjectMocks;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
+import org.springframework.test.util.ReflectionTestUtils;
 
 import java.time.LocalDateTime;
 import java.util.List;
@@ -24,6 +26,8 @@ import java.util.Set;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.junit.jupiter.api.Assertions.assertDoesNotThrow;
 import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.ArgumentMatchers.eq;
+import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.times;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.verifyNoInteractions;
@@ -34,6 +38,9 @@ class RecordCompletedRideUseCaseTest {
 
     @Mock
     private UserRepository userRepository;
+
+    @Mock
+    private UserReputationWriter reputationWriter;
 
     @InjectMocks
     private RecordCompletedRideUseCase useCase;
@@ -51,7 +58,7 @@ class RecordCompletedRideUseCaseTest {
                 LocalDateTime.now().minusDays(1),
                 null
         );
-        return new User(
+        User user = new User(
                 "firebase-uid-" + uid,
                 "Ana Souza",
                 "ana" + uid + "@puc-campinas.edu.br",
@@ -59,6 +66,8 @@ class RecordCompletedRideUseCaseTest {
                 Set.of(ParticipationRole.PASSENGER),
                 academic
         );
+        ReflectionTestUtils.setField(user, "id", new ObjectId());
+        return user;
     }
 
     @Test
@@ -81,9 +90,11 @@ class RecordCompletedRideUseCaseTest {
         assertThat(a.getReputation().passenger().window().completedRides()).isEqualTo(1);
         assertThat(a.getReputation().driver().window().completedRides()).isZero();
         assertThat(b.getReputation().passenger().window().completedRides()).isEqualTo(1);
-        verify(userRepository).save(driver);
-        verify(userRepository).save(a);
-        verify(userRepository).save(b);
+        verify(reputationWriter).saveDriverReputation(eq(driver.getId()), eq(driver.getReputation().driver()), any(LocalDateTime.class));
+        verify(reputationWriter).savePassengerReputation(eq(a.getId()), eq(a.getReputation().passenger()), any(LocalDateTime.class));
+        verify(reputationWriter).savePassengerReputation(eq(b.getId()), eq(b.getReputation().passenger()), any(LocalDateTime.class));
+        verify(reputationWriter, never()).savePassengerReputation(eq(driver.getId()), any(), any());
+        verify(userRepository, never()).save(any(User.class));
     }
 
     @Test
@@ -98,8 +109,8 @@ class RecordCompletedRideUseCaseTest {
         useCase.execute(driverId.toHexString(), List.of(passengerId.toHexString()));
 
         assertThat(passenger.getReputation().passenger().window().completedRides()).isEqualTo(1);
-        verify(userRepository).save(passenger);
-        verify(userRepository, times(1)).save(any(User.class));
+        verify(reputationWriter, times(1)).savePassengerReputation(eq(passenger.getId()), eq(passenger.getReputation().passenger()), any(LocalDateTime.class));
+        verify(reputationWriter, never()).saveDriverReputation(any(), any(), any());
     }
 
     @Test
@@ -111,11 +122,12 @@ class RecordCompletedRideUseCaseTest {
         User passenger = validUser("p");
         when(userRepository.findById(driverId)).thenReturn(Optional.of(driver));
         when(userRepository.findById(passengerId)).thenReturn(Optional.of(passenger));
-        when(userRepository.save(driver)).thenThrow(new IllegalStateException("banco fora do ar"));
+        when(reputationWriter.saveDriverReputation(eq(driver.getId()), any(), any()))
+                .thenThrow(new IllegalStateException("banco fora do ar"));
 
         assertDoesNotThrow(() -> useCase.execute(driverId.toHexString(), List.of(passengerId.toHexString())));
 
-        verify(userRepository).save(passenger);
+        verify(reputationWriter).savePassengerReputation(eq(passenger.getId()), eq(passenger.getReputation().passenger()), any(LocalDateTime.class));
     }
 
     @Test
@@ -124,6 +136,6 @@ class RecordCompletedRideUseCaseTest {
         useCase.execute(null, null);
         useCase.execute("nao-e-object-id", List.of("outro-invalido"));
 
-        verifyNoInteractions(userRepository);
+        verifyNoInteractions(userRepository, reputationWriter);
     }
 }

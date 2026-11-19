@@ -3,11 +3,13 @@
 package com.converge.api.modules.user.application;
 
 import com.converge.api.modules.user.application.gateway.UserCo2Gateway;
+import com.converge.api.modules.user.application.gateway.UserReputationWriter;
 import com.converge.api.modules.user.domain.enums.user.Badge;
 import com.converge.api.modules.user.domain.model.user.User;
 import com.converge.api.modules.user.domain.repository.UserRepository;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
+import org.bson.types.ObjectId;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.PageRequest;
 import org.springframework.data.domain.Sort;
@@ -30,6 +32,7 @@ public class RecalculateBadgesUseCase {
 
     private final UserRepository userRepository;
     private final UserCo2Gateway userCo2Gateway;
+    private final UserReputationWriter reputationWriter;
 
     public record Result(int processed, int changed, int failures) {
     }
@@ -77,14 +80,15 @@ public class RecalculateBadgesUseCase {
         boolean trustChanged = sync(user, Badge.TRUST, user.qualifiesForTrustBadge(), now);
         boolean sustainabilityChanged = sync(user, Badge.SUSTAINABILITY, sustainable, now);
 
-        if (trustChanged || sustainabilityChanged) {
-            userRepository.save(user);
-            return true;
-        }
-        return false;
+        return trustChanged || sustainabilityChanged;
     }
 
+    // Concede ou revoga só o selo que mudou, por update parcial ($push/$pull), sem regravar o usuário.
     private boolean sync(User user, Badge badge, boolean shouldHave, LocalDateTime now) {
-        return shouldHave ? user.grantBadge(badge, now) : user.revokeBadge(badge);
+        if (user.hasBadgeOfType(badge) == shouldHave) {
+            return false;
+        }
+        ObjectId id = user.getId();
+        return shouldHave ? reputationWriter.grantBadge(id, badge, now) : reputationWriter.revokeBadge(id, badge);
     }
 }

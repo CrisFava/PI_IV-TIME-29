@@ -3,6 +3,7 @@
 package com.converge.api.modules.user.application;
 
 import com.converge.api.modules.user.application.gateway.UserCo2Gateway;
+import com.converge.api.modules.user.application.gateway.UserReputationWriter;
 import com.converge.api.modules.user.domain.enums.user.Badge;
 import com.converge.api.modules.user.domain.enums.user.ParticipationRole;
 import com.converge.api.modules.user.domain.enums.user.VerificationMethod;
@@ -35,8 +36,10 @@ import java.util.Set;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
+import static org.mockito.Mockito.verifyNoInteractions;
 import static org.mockito.Mockito.when;
 
 @ExtendWith(MockitoExtension.class)
@@ -50,11 +53,14 @@ class RecalculateBadgesUseCaseTest {
     @Mock
     private UserCo2Gateway userCo2Gateway;
 
+    @Mock
+    private UserReputationWriter reputationWriter;
+
     private RecalculateBadgesUseCase useCase;
 
     @BeforeEach
     void setUp() {
-        useCase = new RecalculateBadgesUseCase(userRepository, userCo2Gateway);
+        useCase = new RecalculateBadgesUseCase(userRepository, userCo2Gateway, reputationWriter);
     }
 
     private static User newUser(String suffix, DriverWindow driverWindow, double driverAverage) {
@@ -107,20 +113,30 @@ class RecalculateBadgesUseCaseTest {
         when(userCo2Gateway.co2AvoidedKgOf(user.getId().toHexString())).thenReturn(kg);
     }
 
+    private void givenGrantWorks(User user, Badge badge) {
+        when(reputationWriter.grantBadge(eq(user.getId()), eq(badge), any(LocalDateTime.class))).thenReturn(true);
+    }
+
+    private void givenRevokeWorks(User user, Badge badge) {
+        when(reputationWriter.revokeBadge(user.getId(), badge)).thenReturn(true);
+    }
+
     @Test
-    @DisplayName("Deve conceder o selo de confiança a quem cumpre os critérios")
+    @DisplayName("Deve conceder o selo de confiança a quem cumpre os critérios, sem regravar o usuário")
     void shouldGrantTrustBadge() {
         User user = trustworthy("1");
         givenUsers(user);
         givenReload(user);
         givenCo2(user, 0.0);
+        givenGrantWorks(user, Badge.TRUST);
 
         RecalculateBadgesUseCase.Result result = useCase.execute();
 
-        assertThat(user.hasBadgeOfType(Badge.TRUST)).isTrue();
-        assertThat(user.hasBadgeOfType(Badge.SUSTAINABILITY)).isFalse();
         assertThat(result).isEqualTo(new RecalculateBadgesUseCase.Result(1, 1, 0));
-        verify(userRepository).save(user);
+        verify(reputationWriter).grantBadge(eq(user.getId()), eq(Badge.TRUST), any(LocalDateTime.class));
+        verify(reputationWriter, never()).grantBadge(any(), eq(Badge.SUSTAINABILITY), any());
+        verify(reputationWriter, never()).revokeBadge(any(), any());
+        verify(userRepository, never()).save(any(User.class));
     }
 
     @Test
@@ -130,12 +146,13 @@ class RecalculateBadgesUseCaseTest {
         givenUsers(user);
         givenReload(user);
         givenCo2(user, 50.0);
+        givenGrantWorks(user, Badge.SUSTAINABILITY);
 
         useCase.execute();
 
-        assertThat(user.hasBadgeOfType(Badge.SUSTAINABILITY)).isTrue();
-        assertThat(user.hasBadgeOfType(Badge.TRUST)).isFalse();
-        verify(userRepository).save(user);
+        verify(reputationWriter).grantBadge(eq(user.getId()), eq(Badge.SUSTAINABILITY), any(LocalDateTime.class));
+        verify(reputationWriter, never()).grantBadge(any(), eq(Badge.TRUST), any());
+        verify(userRepository, never()).save(any(User.class));
     }
 
     @Test
@@ -147,8 +164,8 @@ class RecalculateBadgesUseCaseTest {
 
         RecalculateBadgesUseCase.Result result = useCase.execute();
 
-        assertThat(user.getBadges()).isEmpty();
         assertThat(result.changed()).isZero();
+        verifyNoInteractions(reputationWriter);
         verify(userRepository, never()).save(any(User.class));
     }
 
@@ -160,11 +177,13 @@ class RecalculateBadgesUseCaseTest {
         givenUsers(user);
         givenReload(user);
         givenCo2(user, 0.0);
+        givenRevokeWorks(user, Badge.TRUST);
 
-        useCase.execute();
+        RecalculateBadgesUseCase.Result result = useCase.execute();
 
-        assertThat(user.hasBadgeOfType(Badge.TRUST)).isFalse();
-        verify(userRepository).save(user);
+        assertThat(result.changed()).isEqualTo(1);
+        verify(reputationWriter).revokeBadge(user.getId(), Badge.TRUST);
+        verify(userRepository, never()).save(any(User.class));
     }
 
     @Test
@@ -175,11 +194,12 @@ class RecalculateBadgesUseCaseTest {
         givenUsers(user);
         givenReload(user);
         givenCo2(user, 10.0);
+        givenRevokeWorks(user, Badge.SUSTAINABILITY);
 
         useCase.execute();
 
-        assertThat(user.hasBadgeOfType(Badge.SUSTAINABILITY)).isFalse();
-        verify(userRepository).save(user);
+        verify(reputationWriter).revokeBadge(user.getId(), Badge.SUSTAINABILITY);
+        verify(reputationWriter, never()).revokeBadge(any(), eq(Badge.TRUST));
     }
 
     @Test
@@ -197,8 +217,23 @@ class RecalculateBadgesUseCaseTest {
 
         assertThat(result.changed()).isZero();
         assertThat(user.getBadges()).allMatch(badge -> badge.grantedAt().equals(grantedAt));
+        verifyNoInteractions(reputationWriter);
         verify(userRepository, never()).save(any(User.class));
         verify(userRepository, never()).findById(any(ObjectId.class));
+    }
+
+    @Test
+    @DisplayName("Não deve contar como alterado o selo que já existia no banco")
+    void shouldNotCountChangeWhenWriterModifiesNothing() {
+        User user = trustworthy("1");
+        givenUsers(user);
+        givenReload(user);
+        givenCo2(user, 0.0);
+
+        RecalculateBadgesUseCase.Result result = useCase.execute();
+
+        assertThat(result.changed()).isZero();
+        verify(reputationWriter).grantBadge(eq(user.getId()), eq(Badge.TRUST), any(LocalDateTime.class));
     }
 
     @Test
@@ -210,7 +245,7 @@ class RecalculateBadgesUseCaseTest {
 
         useCase.execute();
 
-        assertThat(user.hasBadgeOfType(Badge.TRUST)).isFalse();
+        verify(reputationWriter, never()).grantBadge(any(), eq(Badge.TRUST), any());
     }
 
     @Test
@@ -225,13 +260,13 @@ class RecalculateBadgesUseCaseTest {
         when(userCo2Gateway.co2AvoidedKgOf(broken.getId().toHexString()))
                 .thenThrow(new IllegalStateException("indicadores fora do ar"));
         givenCo2(ok, 0.0);
+        givenGrantWorks(ok, Badge.TRUST);
 
         RecalculateBadgesUseCase.Result result = useCase.execute();
 
         assertThat(result).isEqualTo(new RecalculateBadgesUseCase.Result(2, 1, 1));
-        assertThat(broken.hasBadgeOfType(Badge.TRUST)).isTrue();
-        assertThat(ok.hasBadgeOfType(Badge.TRUST)).isTrue();
-        verify(userRepository).save(ok);
+        verify(reputationWriter, never()).revokeBadge(eq(broken.getId()), any());
+        verify(reputationWriter).grantBadge(eq(ok.getId()), eq(Badge.TRUST), any(LocalDateTime.class));
     }
 
     @Test
@@ -246,12 +281,14 @@ class RecalculateBadgesUseCaseTest {
         when(userRepository.findById(second.getId())).thenReturn(Optional.of(second));
         givenCo2(first, 0.0);
         givenCo2(second, 0.0);
+        givenGrantWorks(first, Badge.TRUST);
+        givenGrantWorks(second, Badge.TRUST);
 
         RecalculateBadgesUseCase.Result result = useCase.execute();
 
         assertThat(result).isEqualTo(new RecalculateBadgesUseCase.Result(2, 2, 0));
-        verify(userRepository).save(first);
-        verify(userRepository).save(second);
+        verify(reputationWriter).grantBadge(eq(first.getId()), eq(Badge.TRUST), any(LocalDateTime.class));
+        verify(reputationWriter).grantBadge(eq(second.getId()), eq(Badge.TRUST), any(LocalDateTime.class));
     }
 
     @Test
@@ -266,6 +303,6 @@ class RecalculateBadgesUseCaseTest {
         RecalculateBadgesUseCase.Result result = useCase.execute();
 
         assertThat(result.changed()).isZero();
-        verify(userRepository, never()).save(any(User.class));
+        verifyNoInteractions(reputationWriter);
     }
 }

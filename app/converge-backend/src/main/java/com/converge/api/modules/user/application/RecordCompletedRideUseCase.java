@@ -2,6 +2,7 @@
 
 package com.converge.api.modules.user.application;
 
+import com.converge.api.modules.user.application.gateway.UserReputationWriter;
 import com.converge.api.modules.user.domain.enums.user.ParticipationRole;
 import com.converge.api.modules.user.domain.model.user.User;
 import com.converge.api.modules.user.domain.repository.UserRepository;
@@ -22,6 +23,7 @@ import java.util.List;
 public class RecordCompletedRideUseCase {
 
     private final UserRepository userRepository;
+    private final UserReputationWriter reputationWriter;
 
     public void execute(String driverId, List<String> passengerIds) {
         LocalDateTime now = LocalDateTime.now();
@@ -39,10 +41,18 @@ public class RecordCompletedRideUseCase {
         try {
             userRepository.findById(new ObjectId(userId)).ifPresent(user -> {
                 apply(user, role, now);
-                userRepository.save(user);
+                save(user, role, now);
             });
         } catch (RuntimeException e) {
             log.warn("Não foi possível contar a viagem concluída do usuário {} ({}): {}", userId, role, e.getMessage());
+        }
+    }
+
+    // Grava só a reputação do papel que mudou, sem regravar o usuário inteiro.
+    private void save(User user, ParticipationRole role, LocalDateTime now) {
+        switch (role) {
+            case DRIVER -> reputationWriter.saveDriverReputation(user.getId(), user.getReputation().driver(), now);
+            case PASSENGER -> reputationWriter.savePassengerReputation(user.getId(), user.getReputation().passenger(), now);
         }
     }
 
