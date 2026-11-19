@@ -5,11 +5,11 @@ package com.converge.api.modules.ride.application;
 import com.converge.api.modules.ride.application.event.RideCompletedEvent;
 import com.converge.api.modules.ride.domain.model.Ride;
 import com.converge.api.modules.ride.domain.model.subtypes.VehicleSnapshot;
+import com.converge.api.modules.route.application.FakeDistanceGateway;
 import com.converge.api.modules.route.application.RouteAccess;
 import com.converge.api.modules.route.domain.model.Route;
 import com.converge.api.modules.route.domain.model.subtypes.Coordinates;
 import com.converge.api.modules.route.domain.model.subtypes.Place;
-import com.converge.api.modules.route.domain.service.HaversineCalculator;
 import com.converge.api.modules.user.application.VehicleAccess;
 import com.converge.api.modules.user.domain.enums.vehicle.ConsumptionUnit;
 import com.converge.api.modules.user.domain.enums.vehicle.EnergySource;
@@ -19,11 +19,11 @@ import com.converge.api.modules.user.domain.model.vehicle.subtypes.FuelSource;
 import com.converge.api.shared.presentation.exception.ApplicationException;
 import com.converge.api.shared.presentation.exception.ErrorCode;
 import org.bson.types.ObjectId;
+import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.ArgumentCaptor;
-import org.mockito.InjectMocks;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 import org.springframework.context.ApplicationEventPublisher;
@@ -63,10 +63,16 @@ class RideCompletionPublisherTest {
     @Mock
     private Vehicle vehicle;
 
-    @InjectMocks
+    private final FakeDistanceGateway distanceGateway = new FakeDistanceGateway();
+
     private RideCompletionPublisher publisher;
 
     private final ObjectId rideObjectId = new ObjectId();
+
+    @BeforeEach
+    void setUp() {
+        publisher = new RideCompletionPublisher(eventPublisher, routeAccess, vehicleAccess, distanceGateway);
+    }
 
     private Ride confirmedRide() {
         LocalDateTime departure = LocalDateTime.now().plusDays(1);
@@ -147,7 +153,7 @@ class RideCompletionPublisherTest {
 
         RideCompletedEvent event = publishedEvent();
         assertThat(event.passengerIds()).containsExactly("passenger-1", "passenger-2");
-        assertThat(event.distanceKm()).isCloseTo(HaversineCalculator.distanceKm(HOME, CAMPUS), within(0.0001));
+        assertThat(event.distanceKm()).isCloseTo(distanceGateway.distanceKm(HOME, CAMPUS), within(0.0001));
         assertThat(event.distanceKm()).isGreaterThan(0);
         assertThat(event.energySource()).isNull();
         assertThat(event.averageConsumption()).isNull();

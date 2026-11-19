@@ -54,7 +54,7 @@ class ManageRouteUseCasesTest {
         listMyRoutes = new ListMyRoutesUseCase(routeRepository);
         getRoute = new GetRouteUseCase(routeAccess);
         updateRoute = new UpdateRouteUseCase(
-                routeAccess, routeRepository, new RouteMapper(), new RouteGeometryService(new FakeMapsGateway()),
+                routeAccess, routeRepository, new RouteMapper(), new RouteGeometryService(new FakeMapsGateway(), new FakeDistanceGateway()),
                 eventPublisher, new OfferOverlapValidator(routeRepository)
         );
         deleteRoute = new DeleteRouteUseCase(routeAccess, routeRepository, eventPublisher);

@@ -9,7 +9,7 @@ import com.converge.api.modules.ride.domain.model.Ride;
 import com.converge.api.modules.ride.domain.model.subtypes.Participant;
 import com.converge.api.modules.ride.domain.model.subtypes.RideCosts;
 import com.converge.api.modules.route.application.RouteAccess;
-import com.converge.api.modules.route.domain.service.HaversineCalculator;
+import com.converge.api.modules.route.application.gateway.DistanceGateway;
 import com.converge.api.modules.user.application.VehicleAccess;
 import com.converge.api.modules.user.domain.enums.user.ParticipationRole;
 import com.converge.api.modules.user.domain.model.vehicle.subtypes.FuelSource;
@@ -36,6 +36,7 @@ public class RideCompletionPublisher {
     private final ApplicationEventPublisher eventPublisher;
     private final RouteAccess routeAccess;
     private final VehicleAccess vehicleAccess;
+    private final DistanceGateway distanceGateway;
 
     public void publish(Ride ride) {
         eventOf(ride).ifPresent(eventPublisher::publishEvent);
@@ -103,7 +104,7 @@ public class RideCompletionPublisher {
             // Trajeto excluído depois da viagem: cai no Haversine.
         }
 
-        return HaversineCalculator.distanceKm(ride.getOrigin().coordinates(), ride.getDestination().coordinates());
+        return distanceGateway.distanceKm(ride.getOrigin().coordinates(), ride.getDestination().coordinates());
     }
 
     // Só para viagens antigas: fonte principal do veículo hoje; vazio se ele foi desativado.

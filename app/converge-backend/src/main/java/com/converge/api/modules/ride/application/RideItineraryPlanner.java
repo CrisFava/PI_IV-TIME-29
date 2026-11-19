@@ -7,14 +7,14 @@ import com.converge.api.modules.ride.domain.enums.RideStopType;
 import com.converge.api.modules.ride.domain.model.Ride;
 import com.converge.api.modules.ride.domain.model.subtypes.Participant;
 import com.converge.api.modules.ride.domain.model.subtypes.RideStop;
+import com.converge.api.modules.route.application.gateway.DistanceGateway;
 import com.converge.api.modules.route.domain.model.subtypes.Coordinates;
 import com.converge.api.modules.route.domain.model.subtypes.Place;
-import com.converge.api.modules.route.domain.service.HaversineCalculator;
 import com.converge.api.modules.user.domain.enums.user.ParticipationRole;
+import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Component;
 
 import java.util.ArrayList;
-import java.util.Comparator;
 import java.util.List;
 import java.util.function.Function;
 
@@ -25,7 +25,10 @@ import java.util.function.Function;
  * Buscar todos antes de deixar garante que ninguém é deixado antes de embarcar.
  */
 @Component
+@RequiredArgsConstructor
 public class RideItineraryPlanner {
+
+    private final DistanceGateway distanceGateway;
 
     public List<RideStop> plan(Ride ride) {
         List<Participant> passengers = ride.getParticipants().stream()
@@ -43,7 +46,7 @@ public class RideItineraryPlanner {
     }
 
     // Acrescenta uma parada por passageiro, sempre a mais próxima de onde o carro está; devolve onde ele termina
-    private static Coordinates appendNearestFirst(
+    private Coordinates appendNearestFirst(
             List<RideStop> stops,
             List<Participant> passengers,
             Coordinates start,
@@ -54,13 +57,7 @@ public class RideItineraryPlanner {
         Coordinates current = start;
 
         while (!remaining.isEmpty()) {
-            Coordinates from = current;
-            Participant next = remaining.stream()
-                    .min(Comparator
-                            .comparingDouble((Participant p) ->
-                                    HaversineCalculator.distanceKm(from, placeOf.apply(p).coordinates()))
-                            .thenComparing(Participant::getUserId))
-                    .orElseThrow();
+            Participant next = nearestTo(current, remaining, placeOf);
 
             Place place = placeOf.apply(next);
             stops.add(new RideStop(type, next.getUserId(), place));
@@ -68,5 +65,22 @@ public class RideItineraryPlanner {
             remaining.remove(next);
         }
         return current;
+    }
+
+    // As distâncias de todos os restantes vêm numa chamada só; empate no menor vai para o menor userId
+    private Participant nearestTo(Coordinates from, List<Participant> candidates, Function<Participant, Place> placeOf) {
+        List<DistanceGateway.CoordinatePair> pairs = candidates.stream()
+                .map(candidate -> new DistanceGateway.CoordinatePair(from, placeOf.apply(candidate).coordinates()))
+                .toList();
+        List<Double> distances = distanceGateway.distancesKm(pairs);
+        int nearest = 0;
+        for (int i = 1; i < candidates.size(); i++) {
+            int byDistance = Double.compare(distances.get(i), distances.get(nearest));
+            if (byDistance < 0 || (byDistance == 0
+                    && candidates.get(i).getUserId().compareTo(candidates.get(nearest).getUserId()) < 0)) {
+                nearest = i;
+            }
+        }
+        return candidates.get(nearest);
     }
 }
