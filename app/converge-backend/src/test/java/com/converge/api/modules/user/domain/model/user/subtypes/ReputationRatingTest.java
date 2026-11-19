@@ -161,4 +161,40 @@ class ReputationRatingTest {
         assertThat(empty.withDriverRating(4.0, 1, NOW).driver().totalReviews()).isEqualTo(1);
         assertThat(empty.withPassengerRating(4.0, 1, NOW).passenger().totalReviews()).isEqualTo(1);
     }
-}
+    @Test
+    @DisplayName("Passageiro só fica LOW com mais de uma denúncia procedente")
+    void shouldMakePassengerLowOnlyWhenSubstantiatedReportsExceedOne() {
+        PassengerReputation oneReport = passenger(null, new PassengerWindow(8, 0, 0, 1, 0)).withRating(5.0, 8, NOW);
+        PassengerReputation twoReports = passenger(null, new PassengerWindow(8, 0, 0, 2, 0)).withRating(5.0, 8, NOW);
+
+        assertThat(oneReport.level()).isEqualTo(ReputationLevel.HIGH);
+        assertThat(twoReports.level()).isEqualTo(ReputationLevel.LOW);
+    }
+
+    @Test
+    @DisplayName("Motorista cumpre os critérios de confiança só com nota, viagens, cancelamentos e denúncias dentro do limite")
+    void shouldReportDriverTrustCriteria() {
+        DriverReputation trusted = new DriverReputation(null, 4.2, 10, new DriverWindow(10, 2, 0, 1), NOW);
+        DriverReputation lowAverage = new DriverReputation(null, 4.1, 10, new DriverWindow(10, 2, 0, 1), NOW);
+        DriverReputation noAverage = new DriverReputation(null, null, 0, new DriverWindow(10, 0, 0, 0), NOW);
+        DriverReputation noWindow = new DriverReputation(null, 5.0, 10, null, NOW);
+
+        assertThat(trusted.meetsTrustCriteria()).isTrue();
+        assertThat(lowAverage.meetsTrustCriteria()).isFalse();
+        assertThat(noAverage.meetsTrustCriteria()).isFalse();
+        assertThat(noWindow.meetsTrustCriteria()).isFalse();
+    }
+
+    @Test
+    @DisplayName("Passageiro cumpre os critérios de confiança só sem viagem em atraso e com os limites respeitados")
+    void shouldReportPassengerTrustCriteria() {
+        PassengerReputation trusted = new PassengerReputation(null, 4.0, 5, new PassengerWindow(5, 2, 1, 0, 0), NOW);
+        PassengerReputation overdue = new PassengerReputation(null, 4.0, 5, new PassengerWindow(5, 2, 1, 0, 1), NOW);
+        PassengerReputation lowAverage = new PassengerReputation(null, 3.9, 5, new PassengerWindow(5, 0, 0, 0, 0), NOW);
+        PassengerReputation noAverage = new PassengerReputation(null, null, 0, new PassengerWindow(5, 0, 0, 0, 0), NOW);
+
+        assertThat(trusted.meetsTrustCriteria()).isTrue();
+        assertThat(overdue.meetsTrustCriteria()).isFalse();
+        assertThat(lowAverage.meetsTrustCriteria()).isFalse();
+        assertThat(noAverage.meetsTrustCriteria()).isFalse();
+    }}
