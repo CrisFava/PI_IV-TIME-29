@@ -1,6 +1,9 @@
 // Autor: Gustavo Alves de Siqueira Costa - RA 25001650
 
+import 'dart:async';
+
 import 'package:converge/features/chat/data/models/chat_message_type.dart';
+import 'package:converge/core/utils/currency_formatter.dart';
 import 'package:converge/features/chat/data/models/chat_thread_ref.dart';
 import 'package:converge/features/chat/data/repository/firebase_chat_repository.dart';
 import 'package:converge/features/chat/state/chat_providers.dart';
@@ -147,6 +150,80 @@ void main() {
       ]);
     },
   );
+
+  test('chegada recusada não envia cobrança e permite tentar novamente', () async {
+    final rides = FakeSeatRideRepository()
+      ..failNextWith = 'Passageiro não confirmado.';
+    final container = containerWith(rides);
+    final actions = container.read(driverRideActionsProvider.notifier);
+    const thread = ChatThreadRef(
+      chatRoomId: 'ride_ride-1', rideId: fakeRideId, passengerId: fakePassengerId,
+    );
+
+    expect(await actions.arrive(fakeRideId, fakePassengerId), 'Passageiro não confirmado.');
+    expect(chat.messagesOf(thread), isEmpty);
+    expect(container.read(driverRideActionsProvider), isEmpty);
+    expect(await actions.arrive(fakeRideId, fakePassengerId), isNull);
+    expect(chat.messagesOf(thread), hasLength(1));
+  });
+
+  test('falha no chat não transforma chegada gravada em erro', () async {
+    chat.failOnSend = true;
+    final rides = FakeSeatRideRepository();
+    final container = containerWith(rides);
+
+    expect(await container.read(driverRideActionsProvider.notifier)
+        .arrive(fakeRideId, fakePassengerId), isNull);
+    expect(rides.calls.where((call) => call.startsWith('arrive:')), hasLength(1));
+    expect(container.read(driverRideActionsProvider), isEmpty);
+  });
+
+  for (final amount in <double?>[12.5, null]) {
+    test('aviso de chegada usa valor final $amount devolvido pela API', () async {
+      final rides = _ControlledArrivalRepository();
+      final container = containerWith(rides);
+      final result = container.read(driverRideActionsProvider.notifier)
+          .arrive(fakeRideId, fakePassengerId);
+      rides.arrival.complete(fakeRide(
+        status: 'IN_PROGRESS',
+        passengerStatus: 'CANCELLED',
+        extraParticipants: [
+          {
+            'userId': fakePassengerId,
+            'role': 'PASSENGER',
+            'status': 'COMPLETED',
+            'estimatedAmount': 20,
+            'finalAmount': amount,
+          },
+        ],
+      ));
+
+      expect(await result, isNull);
+      final notice = chat.messagesOf(const ChatThreadRef(
+        chatRoomId: 'ride_ride-1', rideId: fakeRideId, passengerId: fakePassengerId,
+      )).single;
+      expect(notice.amount, amount);
+      expect(notice.text, amount == null
+          ? 'Você chegou. A cobrança da carona foi enviada.'
+          : 'Você chegou. A cobrança de ${CurrencyFormatter.format(amount)} foi enviada.');
+    });
+  }
+
+  test('duplo toque em Chegou não cobra duas vezes', () async {
+    final rides = _ControlledArrivalRepository();
+    final container = containerWith(rides);
+    final actions = container.read(driverRideActionsProvider.notifier);
+    final first = actions.arrive(fakeRideId, fakePassengerId);
+
+    expect(container.read(driverRideActionsProvider), {fakeRideId});
+    expect(await actions.arrive(fakeRideId, fakePassengerId), isNull);
+    expect(rides.arrivalCalls, 1);
+    expect(container.read(driverRideActionsProvider), {fakeRideId});
+
+    rides.arrival.complete(fakeRide(status: 'IN_PROGRESS', passengerStatus: 'COMPLETED'));
+    expect(await first, isNull);
+    expect(container.read(driverRideActionsProvider), isEmpty);
+  });
 }
 
 List<Override> _chatOverrides(FakeChatRepository chat) => [
@@ -164,5 +241,16 @@ class _SlowRides extends FakeSeatRideRepository {
   Future<RideModel> completeRide(String rideId) async {
     await Future<void>.delayed(const Duration(milliseconds: 50));
     return super.completeRide(rideId);
+  }
+}
+
+class _ControlledArrivalRepository extends FakeSeatRideRepository {
+  final arrival = Completer<RideModel>();
+  int arrivalCalls = 0;
+
+  @override
+  Future<RideModel> arrivePassenger(String rideId, String passengerId) {
+    arrivalCalls++;
+    return arrival.future;
   }
 }
