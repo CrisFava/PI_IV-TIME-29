@@ -1,0 +1,61 @@
+// Autor: Sara Fernandes Monteiro - RA 25024107
+
+import 'dart:async';
+
+import 'package:flutter_riverpod/flutter_riverpod.dart';
+
+import '../../ride/data/models/ride_model.dart';
+import '../../ride/data/models/ride_status.dart';
+import '../../ride/data/repository/ride_repository_impl.dart';
+import '../../ride/state/ride_providers.dart';
+
+/// De quanto em quanto tempo o app consulta as viagens enquanto há uma a caminho.
+final rideCompletionPollIntervalProvider = Provider<Duration>(
+  (ref) => const Duration(seconds: 15),
+);
+
+/// Acompanha, em silêncio, as viagens do usuário enquanto ele tem uma a caminho, para o app
+/// perceber em qualquer tela quando ela é concluída (por qualquer botão do motorista) e abrir
+/// a avaliação. A consulta não mexe em nenhuma tela: a lista do app só é recarregada quando
+/// algum status de viagem realmente mudou (recarregar sem mudança faria as telas piscarem
+/// o "carregando" a cada consulta). Sem viagem a caminho, não consulta nada.
+/// Só existe enquanto alguém o observa: a Home observa.
+final rideCompletionWatcherProvider = Provider.autoDispose<void>((ref) {
+  final rides = ref.watch(myRidesProvider).value ?? const <RideModel>[];
+  final now = DateTime.now();
+  if (!rides.any((ride) => isRideOnItsWay(ride, now))) return;
+
+  final timer = Timer.periodic(ref.read(rideCompletionPollIntervalProvider), (
+    _,
+  ) async {
+    try {
+      final fresh = await ref.read(rideRepositoryProvider).listMyRides();
+      if (ref.mounted && rideStatusesChanged(rides, fresh)) {
+        ref.invalidate(myRidesProvider);
+      }
+    } catch (_) {
+      // Sem conexão agora: tenta de novo na próxima consulta.
+    }
+  });
+  ref.onDispose(timer.cancel);
+});
+
+/// Alguma viagem mudou de status, ou apareceu ou sumiu, entre as duas listas.
+bool rideStatusesChanged(List<RideModel> before, List<RideModel> after) {
+  String signature(List<RideModel> rides) =>
+      ([for (final ride in rides) '${ride.id}:${ride.status.name}']..sort())
+          .join('|');
+
+  return signature(before) != signature(after);
+}
+
+/// Viagem que pode ser concluída em breve: em andamento, ou confirmada para hoje
+/// (ou para um dia que já passou). Viagens de dias futuros não precisam ser acompanhadas.
+bool isRideOnItsWay(RideModel ride, DateTime now) {
+  if (ride.status == RideStatus.inProgress) return true;
+  if (ride.status != RideStatus.confirmed) return false;
+
+  final departure = ride.departureDateTime;
+  final startOfTomorrow = DateTime(now.year, now.month, now.day + 1);
+  return departure != null && departure.isBefore(startOfTomorrow);
+}

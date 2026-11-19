@@ -32,6 +32,10 @@ import '../../../matching/state/driver_ride_actions_controller.dart';
 import '../../../matching/state/driver_rides_provider.dart';
 import '../../../ride/data/models/ride_model.dart';
 import '../../../ride/data/models/ride_stop_type.dart';
+import '../../../ride/state/ride_providers.dart';
+import '../../../review/presentation/widgets/ride_review_prompt.dart';
+import '../../../review/state/pending_reviews.dart';
+import '../../../review/state/ride_completion_watcher.dart';
 import '../../../matching/presentation/widgets/driver_suggestion_alert.dart';
 import '../../../matching/presentation/widgets/incoming_ride_request_alert.dart';
 import '../../../matching/state/matching_viewer_provider.dart';
@@ -76,6 +80,12 @@ class _HomePageState extends ConsumerState<HomePage> {
 
   // No modo motorista: painel de caronas e pedidos no lugar do formulário de oferta
   bool _showRideRequests = false;
+
+  /// Viagens para as quais a tela de avaliação já abriu, para não abrir duas vezes.
+  final Set<String> _reviewPrompted = {};
+
+  /// Última lista de viagens recebida, para notar quando uma delas é concluída.
+  List<RideModel>? _lastRides;
 
   // Rota da viagem em andamento já decodificada (evita decodificar a cada build)
   String? _itineraryPolylineCache;
@@ -701,6 +711,36 @@ class _HomePageState extends ConsumerState<HomePage> {
     });
   }
 
+  /// Abre a avaliação quando uma viagem é concluída, por qualquer botão ("Encerrar",
+  /// "Concluir viagem" no chat ou no cartão da carona) ou pelo motorista. Quando o app
+  /// abre, lembra das viagens concluídas nas últimas 24 horas que ainda têm avaliação pendente.
+  void _onRidesChanged(
+    AsyncValue<List<RideModel>>? previous,
+    AsyncValue<List<RideModel>> next,
+  ) {
+    final rides = next.value;
+    if (rides == null) return;
+
+    final before = _lastRides;
+    _lastRides = rides;
+
+    final toReview = before == null
+        ? recentlyCompletedRides(rides: rides, now: DateTime.now())
+        : newlyCompletedRides(previous: before, next: rides);
+    _promptReviews([
+      for (final ride in toReview)
+        if (_reviewPrompted.add(ride.id)) ride,
+    ]);
+  }
+
+  /// Abre a tela de avaliação de uma viagem por vez: a próxima só depois que a anterior fecha.
+  Future<void> _promptReviews(List<RideModel> rides) async {
+    for (final ride in rides) {
+      if (!mounted) return;
+      await promptRideReviews(context, ref, ride);
+    }
+  }
+
   static LatLng _latLngOf(RoutePlaceModel place) =>
       LatLng(place.latitude, place.longitude);
 
@@ -890,6 +930,9 @@ class _HomePageState extends ConsumerState<HomePage> {
 
     ref.listen(passengerMatchProvider, _onPassengerMatchChanged);
     ref.listen(driverAccessProvider, _onDriverAccessChanged);
+    ref.listen(myRidesProvider, _onRidesChanged);
+    // Enquanto há uma viagem a caminho, mantém a lista em dia para a avaliação abrir em qualquer tela
+    ref.watch(rideCompletionWatcherProvider);
     final driverAccess = ref.watch(driverAccessProvider);
     // A viagem que o motorista está fazendo agora (botão verde e rota com paradas)
     final shiftRide = ref.watch(driverRideInProgressProvider);
