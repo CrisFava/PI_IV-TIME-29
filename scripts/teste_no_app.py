@@ -23,8 +23,12 @@ import argparse
 import json
 import sys
 import time
+<<<<<<< HEAD
 import uuid
 from datetime import date, datetime, timedelta
+=======
+from datetime import date, datetime, timedelta, timezone
+>>>>>>> 5496b89 (Coderabit: fixes)
 from pathlib import Path
 
 import verificar_usuario
@@ -86,6 +90,7 @@ def route_body(kind: str, departure: datetime, extra: dict) -> dict:
 # ---------------------------------------------------------------------------------- preparar
 
 def prepare(api: ApiClient, key: str, connection: str, database: str) -> None:
+<<<<<<< HEAD
     run_id = uuid.uuid4().hex
     emails = [
         f"sim.{run_id}.1.conta-do-app@converge-sim.test",
@@ -98,12 +103,25 @@ def prepare(api: ApiClient, key: str, connection: str, database: str) -> None:
     except FileExistsError:
         raise SimulationFailure("Já existe uma preparação. Rode limpar antes de preparar novamente.")
 
+=======
+    # Um segundo preparar apagaria o registro das contas do primeiro, e o limpar não as acharia mais
+    if STATE_FILE.is_file():
+        sys.exit("Já existe um teste preparado. Rode antes: python3 scripts/teste_no_app.py limpar")
+
+    run_id = time.strftime("%m%d%H%M%S")
+>>>>>>> 5496b89 (Coderabit: fixes)
     with MongoClient(connection, serverSelectionTimeoutMS=10_000) as client:
         users = client[database][verificar_usuario.USERS_COLLECTION]
         world = SimulationWorld(api, key, users, run_id, date.today())
-        app_user = world.create_driver("Conta do App")
-        driver_bot = world.create_driver("Motorista Robo")
-        passenger_bot = world.create_passenger("Passageira Robo")
+        try:
+            app_user = world.create_driver("Conta do App")
+            driver_bot = world.create_driver("Motorista Robo")
+            passenger_bot = world.create_passenger("Passageira Robo")
+        except BaseException:
+            # Falhou no meio: apaga do Firebase as contas já criadas, que ficariam sem registro
+            for email in world.delete_firebase_accounts():
+                log(f"Não deu para apagar a conta {email} do Firebase.")
+            raise
 
     state = {
         "runId": run_id,
@@ -190,6 +208,19 @@ def run_driver_bot(api: ApiClient, key: str, minutes: int, ride_minutes: int) ->
 
 # ---------------------------------------------------------------------------------- robô passageira
 
+def runs_on(route: dict, day: date) -> bool:
+    """Igual ao Route.runsOn do backend: ONCE só na data dele; WEEKLY nos dias da semana dele."""
+    if route.get("recurrence", "WEEKLY") != "ONCE":
+        return WEEK_DAYS[day.weekday()] in (route.get("weekDays") or [])
+    stored = route.get("date")
+    if isinstance(stored, datetime):
+        # O Mongo devolve o LocalDate como meia-noite do fuso do backend, em UTC
+        stored = stored.replace(tzinfo=timezone.utc).astimezone().date()
+    elif isinstance(stored, str):
+        stored = date.fromisoformat(stored[:10])
+    return stored == day
+
+
 def run_passenger_bot(api: ApiClient, key: str, connection: str, database: str, pay_after: int) -> None:
     """A conta do app é a MOTORISTA: o robô pede vaga na carona que ela publicou e informa o pagamento."""
     state = load_state()
@@ -197,10 +228,12 @@ def run_passenger_bot(api: ApiClient, key: str, connection: str, database: str, 
     my_id = state["passageiro"]["id"]
 
     log("Procurando a carona publicada pela conta do app (de hoje, ainda ativa)...")
+    today = date.today()
     with MongoClient(connection, serverSelectionTimeoutMS=10_000) as client:
         routes = client[database]["routes"]
         offer = None
         for _ in range(120):
+<<<<<<< HEAD
             today = date.today()
             midnight = datetime.combine(today, datetime.min.time())
             offer = routes.find_one({
@@ -210,13 +243,17 @@ def run_passenger_bot(api: ApiClient, key: str, connection: str, database: str, 
                     {"recurrence": {"$ne": "ONCE"}, "weekDays": WEEK_DAYS[today.weekday()]},
                 ],
             }, sort=[("createdAt", -1)])
+=======
+            offers = routes.find({"userId": state["app"]["id"], "type": "OFFER", "status": "ACTIVE"},
+                                 sort=[("createdAt", -1)])
+            offer = next((route for route in offers if runs_on(route, today)), None)
+>>>>>>> 5496b89 (Coderabit: fixes)
             if offer:
                 break
             time.sleep(POLL_SECONDS)
     if not offer:
-        sys.exit("A conta do app não publicou carona nos últimos 10 min.")
+        sys.exit("A conta do app não publicou carona para hoje nos últimos 10 min.")
 
-    today = date.today()
     hour, minute = map(int, offer["departureTime"].split(":"))
     departure = datetime.combine(today, datetime.min.time()).replace(hour=hour, minute=minute)
     if datetime.now() >= departure - REQUEST_CUTOFF:

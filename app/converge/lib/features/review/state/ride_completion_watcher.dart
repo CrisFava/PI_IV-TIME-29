@@ -42,8 +42,9 @@ final rideCompletionWatcherProvider = Provider.autoDispose<void>((ref) {
 
 /// Alguma viagem mudou de status, ou apareceu ou sumiu, entre as duas listas.
 bool rideStatusesChanged(List<RideModel> before, List<RideModel> after) {
-  // Inclui o status de cada participante: na chegada de um passageiro, a viagem continua
-  // em andamento e só o status dele muda (é aí que a cobrança dele é emitida)
+  // Inclui o status e o pagamento de cada participante: na chegada de um passageiro, a
+  // viagem continua em andamento e só o status dele muda (é aí que a cobrança dele é
+  // emitida); depois, o "Já paguei" dele só muda o pagamento
   String signature(List<RideModel> rides) => ([
     for (final ride in rides)
       '${ride.id}:${ride.status.name}:'

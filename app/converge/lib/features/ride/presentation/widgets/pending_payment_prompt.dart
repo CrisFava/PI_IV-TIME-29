@@ -35,9 +35,11 @@ class _PendingPaymentPromptState extends ConsumerState<PendingPaymentPrompt> {
 
   Future<void> _maybeShow(AsyncValue<List<RidePaymentModel>> payments) async {
     // Recarregando, o valor ainda é o antigo: depois do "Já paguei", ele ainda traz a
-    // cobrança que acabou de ser paga, e o pagamento abriria de novo
+    // cobrança que acabou de ser paga, e o pagamento abriria de novo. Com erro na
+    // consulta, o valor também é o antigo: espera a próxima consulta dar certo.
     final pending = payments.value;
-    if (_open || payments.isLoading || payments.hasError || pending == null) return;
+    if (_open || payments.isLoading || payments.hasError || pending == null)
+      return;
 
     final payment = ref
         .read(paymentPromptProvider.notifier)
@@ -55,5 +57,7 @@ class _PendingPaymentPromptState extends ConsumerState<PendingPaymentPrompt> {
     } else {
       await _maybeShow(ref.read(pendingPaymentsProvider));
     }
+    // Pagou: uma cobrança que chegou com o pagamento aberto foi ignorada; confere de novo
+    _maybeShow(ref.read(pendingPaymentsProvider));
   }
 }

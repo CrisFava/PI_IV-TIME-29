@@ -779,6 +779,7 @@ class _HomePageState extends ConsumerState<HomePage> {
     final pending = payments.value;
     if (payments.isLoading || payments.hasError) return;
     if (rideId == null || rides == null || pending == null) return;
+    if (payments.isLoading) return;
 
     RideModel? ride;
     for (final candidate in rides) {
