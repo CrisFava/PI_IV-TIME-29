@@ -9,6 +9,8 @@ import com.converge.api.shared.application.UseCase;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
 
+import java.time.LocalDateTime;
+
 @Service
 @RequiredArgsConstructor
 public class StartRideUseCase implements UseCase<RideRefCommand, Ride> {
@@ -20,7 +22,7 @@ public class StartRideUseCase implements UseCase<RideRefCommand, Ride> {
     public Ride execute(RideRefCommand command) {
         Ride ride = rideAccess.getOwnedRide(command.rideId(), command.firebaseUid());
 
-        ride.start();
+        ride.start(LocalDateTime.now());
 
         return rideRepository.save(ride);
     }

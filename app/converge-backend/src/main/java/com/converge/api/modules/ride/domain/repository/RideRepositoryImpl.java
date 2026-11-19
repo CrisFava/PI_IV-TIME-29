@@ -145,4 +145,13 @@ public class RideRepositoryImpl implements RideRepositoryCustom {
         ));
         return mongoTemplate.find(query, Ride.class);
     }
+
+    @Override
+    public List<Ride> findOpenRidesDepartedBefore(LocalDateTime limit) {
+        Query query = new Query(new Criteria().andOperator(
+                where("status").in(RideStatus.AWAITING_CONFIRMATION, RideStatus.CONFIRMED),
+                where("departureDateTime").lte(limit)
+        ));
+        return mongoTemplate.find(query, Ride.class);
+    }
 }

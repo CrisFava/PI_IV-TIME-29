@@ -42,6 +42,7 @@ import org.mockito.junit.jupiter.MockitoExtension;
 import org.mockito.junit.jupiter.MockitoSettings;
 import org.mockito.quality.Strictness;
 import org.springframework.context.ApplicationEventPublisher;
+import org.springframework.test.util.ReflectionTestUtils;
 
 import java.math.BigDecimal;
 import java.time.LocalDateTime;
@@ -425,7 +426,9 @@ class RideJourneyTest {
         acceptPassenger.execute(new PassengerRequestCommand(rideId.toHexString(), passengerId.toHexString(), DRIVER_UID));
     }
 
+    // "Iniciar trajeto" só vale perto do horário: a viagem passa a sair agora
     private void start() {
+        ReflectionTestUtils.setField(ride, "departureDateTime", LocalDateTime.now());
         startRide.execute(rideRef(DRIVER_UID));
     }
 

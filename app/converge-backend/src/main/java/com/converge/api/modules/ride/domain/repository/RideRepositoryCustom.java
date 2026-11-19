@@ -42,4 +42,7 @@ public interface RideRepositoryCustom {
     List<Ride> findRidesWithExpiredRequests(LocalDateTime cutoff);
 
     List<Ride> findOpenRidesPastDepartureWithoutConfirmedPassengers(LocalDateTime now);
+
+    // Viagens ainda não iniciadas (aguardando ou confirmadas) com saída até o limite
+    List<Ride> findOpenRidesDepartedBefore(LocalDateTime limit);
 }

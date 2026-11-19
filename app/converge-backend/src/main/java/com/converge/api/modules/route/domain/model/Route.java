@@ -249,9 +249,12 @@ public class Route {
         return this.recurrence == null ? RecurrenceType.WEEKLY : this.recurrence;
     }
 
-    // Carona de um dia só cuja data já passou: não acontece mais
-    public boolean isPast(LocalDate today) {
-        return getRecurrence() == RecurrenceType.ONCE && this.date != null && this.date.isBefore(today);
+    // Carona de um dia só cujo horário de saída já passou: some da lista e da busca.
+    // A semanal nunca passa: segue para a próxima ocorrência.
+    public boolean isPast(LocalDateTime now) {
+        return getRecurrence() == RecurrenceType.ONCE
+                && this.date != null
+                && this.date.atTime(LocalTime.parse(this.departureTime)).isBefore(now);
     }
 
     /**

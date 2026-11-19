@@ -33,6 +33,10 @@ class NextRideDateTest {
                 .contains(LocalDate.of(2026, 11, 11));
         assertThat(NextRideDate.onDate(LocalDate.of(2026, 11, 11), "06:00", WEDNESDAY_MORNING)).isEmpty();
         assertThat(NextRideDate.onDate(LocalDate.of(2026, 11, 10), "07:00", WEDNESDAY_MORNING)).isEmpty();
+        // A 5 min ou menos da saída já não vale (06:35 com o relógio em 06:30)
+        assertThat(NextRideDate.onDate(LocalDate.of(2026, 11, 11), "06:35", WEDNESDAY_MORNING)).isEmpty();
+        assertThat(NextRideDate.onDate(LocalDate.of(2026, 11, 11), "06:36", WEDNESDAY_MORNING))
+                .contains(LocalDate.of(2026, 11, 11));
     }
 
     @Test

@@ -40,6 +40,7 @@ import org.mockito.InOrder;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 import org.springframework.context.ApplicationEventPublisher;
+import org.springframework.test.util.ReflectionTestUtils;
 import org.springframework.transaction.PlatformTransactionManager;
 import org.springframework.transaction.TransactionStatus;
 import org.springframework.transaction.annotation.AnnotationTransactionAttributeSource;
@@ -602,6 +603,8 @@ class RideUseCasesTest {
         when(rideRepository.findById(rideObjectId)).thenReturn(Optional.of(ride));
         when(rideRepository.save(any(Ride.class))).thenAnswer(invocation -> invocation.getArgument(0));
         RideRefCommand command = new RideRefCommand(rideObjectId.toHexString(), UID);
+        // "Iniciar trajeto" só vale perto do horário: a viagem passa a sair agora
+        ReflectionTestUtils.setField(ride, "departureDateTime", LocalDateTime.now());
 
         assertThat(startRide.execute(command).getStatus()).isEqualTo(RideStatus.IN_PROGRESS);
         assertThat(completeRide.execute(command).getStatus()).isEqualTo(RideStatus.COMPLETED);

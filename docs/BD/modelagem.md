@@ -410,7 +410,7 @@ Quando `active = false` (conta suspensa ou excluída):
 ### Recorrência (carona de um dia só ou semanal)
 
 - **`ONCE`** (padrão no app): o trajeto vale só em `date`. A data não pode ter passado, e `weekDays` vira o dia da semana dela.
-  - A carona de um dia só termina junto com a viagem dela: quando a viagem é concluída ou cancelada, o trajeto fica `INACTIVE`. Ele também some da lista do usuário e da busca depois que a data passa.
+  - A carona de um dia só termina junto com a viagem dela: quando a viagem é concluída ou cancelada, o trajeto fica `INACTIVE`. Ele também some da lista do usuário e da busca assim que passa o **horário** de saída (e não só a data). A semanal nunca some por horário: segue para a próxima ocorrência.
 - **`WEEKLY`** ("Repetir toda semana"): o trajeto vale toda semana nos `weekDays`, e `date` fica nulo.
   - A carona semanal continua ativa até o motorista cancelar. Cada semana em que alguém pede vaga gera uma viagem nova (uma por data), e as viagens concluídas vão para o histórico.
 - Documentos antigos, sem o campo, valem como `WEEKLY`. Se o app não envia `recurrence`, o backend também usa `WEEKLY`.
@@ -576,6 +576,10 @@ O motorista vai até cada passageiro: `itinerary` guarda as paradas na ordem em 
 - `totalCost / qtdParticipantesEfetivos = valorPorPessoa`. Diferença de centavos vai para o motorista.
 - Se o passageiro cancelar com menos de 2h de antecedência (ou depois das 20h da véspera, no caso de vaga reservada recorrente), `lateCancellation = true` e a viagem é cobrada como se tivesse ido.
 - Se entrar passageiro avulso, o valor daquele dia cai para todos — cada um paga o `finalAmount` real da viagem.
+- **Horários da viagem:**
+  - **Pedidos e aceites param 5 min antes da saída** (`Ride.REQUEST_CUTOFF_MINUTES`): a partir daí ninguém entra nem é aceito, e o matching já mostra a próxima data (para a semanal) ou deixa de mostrar a viagem.
+  - **"Iniciar trajeto" só vale de 5 min antes a 5 min depois da saída** (`Ride.START_TOLERANCE_MINUTES`).
+  - **Cancelamento automático:** passados 5 min do horário de saída sem o motorista iniciar, a viagem é cancelada por uma tarefa agendada (`CancelRidesNotStartedUseCase`, a cada minuto). Os confirmados saem sem penalidade, os pedidos pendentes expiram, o motorista e os passageiros são avisados e a carona de um dia só termina junto.
 
 ### Pagamento — sempre por viagem
 
@@ -883,7 +887,7 @@ Ficam de fora:
 |---|---|
 | Dias | Nenhum dia da semana em comum |
 | Vagas | `availableSeats` do motorista menor que 1 |
-| Horário | Saídas com mais de **30 min** de diferença (considera a virada da meia-noite) |
+| Horário | O motorista sai mais de **30 min antes** ou mais de **5 min depois** do horário do passageiro (considera a virada da meia-noite) |
 | Embarque | Embarque do passageiro a mais de `maxDetourKm` do caminho do motorista (a rota pelas ruas, `encodedPolyline`; sem ela, a linha reta origem → destino) |
 | Destino | Destino do passageiro a mais de `maxDetourKm` do destino do motorista |
 
@@ -900,7 +904,7 @@ O resultado vai para `calculatedDetourKm` e é o candidato natural ao `participa
 | Componente | Peso | Fórmula |
 |---|---|---|
 | Embarque | 0,4 | `1 − distância do embarque ao caminho / maxDetourKm` |
-| Horário | 0,3 | `1 − diferença de saída / 30 min` |
+| Horário | 0,3 | `1 − |diferença de saída| / 30 min` |
 | Dias | 0,2 | dias em comum ÷ dias do passageiro |
 | Destino | 0,1 | `1 − d(destino p, destino m) / maxDetourKm` |
 

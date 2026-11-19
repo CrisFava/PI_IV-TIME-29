@@ -116,6 +116,11 @@ class RouteTest {
         assertThat(weekly.runsOn(today.plusWeeks(1))).isTrue();
 
         assertThrows(ApplicationException.class, () -> offer(2.0, 3).schedule(RecurrenceType.ONCE, today.minusDays(1), today));
+
+        // A de um dia só some quando passa o horário de saída (07:00); a semanal não some
+        assertThat(once.isPast(saturday.atTime(6, 59))).isFalse();
+        assertThat(once.isPast(saturday.atTime(7, 1))).isTrue();
+        assertThat(weekly.isPast(saturday.atTime(23, 0))).isFalse();
     }
 
     @Test

@@ -22,8 +22,9 @@ import java.util.Set;
  * Algoritmo de matching (RF14 a RF17 e RF31): compara um trajeto com N candidatos do tipo oposto.
  *
  * Para cada par oferta (motorista) x procura (passageiro):
- * 1. Filtros eliminatórios: um dia da semana em comum, vaga livre, saídas a no máximo
- *    {@value #MAX_SCHEDULE_DIFFERENCE_MIN} min uma da outra e, com X = maxDetourKm do motorista:
+ * 1. Filtros eliminatórios: um dia da semana em comum, vaga livre, o motorista saindo de
+ *    {@value #MAX_DRIVER_EARLIER_MIN} min antes a {@value #MAX_DRIVER_LATER_MIN} min depois do
+ *    horário do passageiro e, com X = maxDetourKm do motorista:
  *    - o embarque do passageiro a até X km do caminho do motorista (a rota pelas ruas);
  *    - o destino do passageiro a até X km do destino do motorista.
  * 2. Desvio: quanto o caminho do motorista aumenta para buscar e deixar o passageiro,
@@ -35,8 +36,13 @@ import java.util.Set;
  */
 public class MatchRoutesHandler implements RequestHandler<MatchRoutesRequest, MatchRoutesResponse> {
 
-    // Janela de horário: saídas com mais de 30 min de diferença não combinam
-    static final int MAX_SCHEDULE_DIFFERENCE_MIN = 30;
+    // Janela de horário em relação à saída do passageiro: o motorista pode sair até
+    // 30 min antes ou até 5 min depois (o passageiro não espera muito além do horário dele)
+    static final int MAX_DRIVER_EARLIER_MIN = 30;
+    static final int MAX_DRIVER_LATER_MIN = 5;
+
+    // Maior diferença aceita: normaliza a nota de horário do índice
+    static final int MAX_SCHEDULE_DIFFERENCE_MIN = MAX_DRIVER_EARLIER_MIN;
 
     // Pesos do índice. Somam 1, então o índice fica entre 0 e 1.
     static final double PICKUP_WEIGHT = 0.4;
@@ -95,10 +101,11 @@ public class MatchRoutesHandler implements RequestHandler<MatchRoutesRequest, Ma
             return Optional.empty();
         }
 
-        Integer scheduleDifference = scheduleDifferenceMin(offer.getDepartureTime(), search.getDepartureTime());
-        if (scheduleDifference == null || scheduleDifference > MAX_SCHEDULE_DIFFERENCE_MIN) {
+        Integer driverOffset = driverOffsetMin(offer.getDepartureTime(), search.getDepartureTime());
+        if (driverOffset == null || driverOffset < -MAX_DRIVER_EARLIER_MIN || driverOffset > MAX_DRIVER_LATER_MIN) {
             return Optional.empty();
         }
+        int scheduleDifference = Math.abs(driverOffset);
 
         // O embarque precisa ficar perto do caminho do motorista e o destino, perto do destino dele
         double pickupKm = RoutePath.distanceKm(search.getOriginLat(), search.getOriginLng(), offer);
@@ -147,6 +154,23 @@ public class MatchRoutesHandler implements RequestHandler<MatchRoutesRequest, Ma
      * Diferença entre os horários de saída em minutos, considerando a virada da meia-noite
      * (23:50 e 00:10 estão a 20 min). Null se algum horário for inválido.
      */
+    /**
+     * Quantos minutos o motorista sai depois do passageiro (negativo: antes), considerando
+     * a virada da meia-noite (motorista 23:50 e passageiro 00:10: -20). Null se algum
+     * horário for inválido.
+     */
+    static Integer driverOffsetMin(String driverTime, String passengerTime) {
+        try {
+            int driver = LocalTime.parse(driverTime).toSecondOfDay() / 60;
+            int passenger = LocalTime.parse(passengerTime).toSecondOfDay() / 60;
+            int offset = Math.floorMod(driver - passenger, MINUTES_IN_DAY);
+
+            return offset > MINUTES_IN_DAY / 2 ? offset - MINUTES_IN_DAY : offset;
+        } catch (DateTimeParseException | NullPointerException e) {
+            return null;
+        }
+    }
+
     static Integer scheduleDifferenceMin(String first, String second) {
         try {
             int a = LocalTime.parse(first).toSecondOfDay() / 60;
