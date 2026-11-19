@@ -9,7 +9,7 @@
 > **Chat:** as mensagens entre participantes **não ficam no MongoDB** — vivem no **Firebase Realtime Database**, conforme a arquitetura do projeto (comunicação em tempo real). O MongoDB guarda apenas o identificador da sala de conversa quando necessário (ex.: um `chatRoomId` na viagem para localizar o histórico no Firebase). Por isso não há coleção `messages`/`chat` nesta modelagem.
 >
 > Estrutura no Realtime Database: `chats/{chatRoomId}/{passengerId}/messages/{pushId}`, com os campos `senderId`, `senderName`, `senderUid` (uid do Firebase, conferido pelas regras; é ele que diz de quem é a mensagem), `type` (`TEXT`, `PAYMENT_REQUEST`, `PAYMENT_CONFIRMED`, `SYSTEM`), `text`, `amount` e `sentAt` (horário do servidor). O `chatRoomId` é criado quando o motorista aceita o primeiro passageiro, e cada passageiro aceito tem uma conversa particular com o motorista. As mensagens de pagamento e de viagem são só avisos: a fonte de verdade continua sendo a API. As regras de acesso ficam em `app/converge/database.rules.json`.
-> **Pagamento PIX:** no MVP o pagamento usa **QR Code PIX estático** ("Pix Copia e Cola"), gerado pelo próprio backend, sem gateway e sem API externa. O valor da cobrança vai travado dentro do payload e o dinheiro vai direto da conta do passageiro para a do motorista — o Converge nunca toca no dinheiro. Como o banco não devolve nenhuma confirmação ao servidor, a confirmação de recebimento é **manual** (o motorista marca que recebeu). A verificação automática via gateway (QR Code dinâmico + webhook) fica como evolução futura.
+> **Pagamento PIX:** no MVP o pagamento usa **QR Code PIX estático** ("Pix Copia e Cola"), gerado pelo próprio backend, sem gateway e sem API externa. O valor da cobrança vai travado dentro do payload e o dinheiro vai direto da conta do passageiro para a do motorista — o Converge nunca toca no dinheiro. Como o banco não devolve nenhuma confirmação ao servidor, o pagamento é **informado pelo próprio passageiro** ("Já paguei"); o motorista não confirma o recebimento. A verificação automática via gateway (QR Code dinâmico + webhook) fica como evolução futura.
 
 ---
 
@@ -600,23 +600,23 @@ A cobrança é aceita com a viagem `CONFIRMED`, `IN_PROGRESS` ou `COMPLETED`, se
 
 ### Geração do PIX Copia e Cola
 
-> **MVP:** a cobrança segue o fluxo da seção anterior ("Cobrança combinada no chat"). O payload usa o `requestedAmount` combinado no chat, pode ser gerado a partir de `CONFIRMED` e é devolvido em `GET /rides/{rideId}/passengers/{passengerId}/payment`. O uso do `finalAmount` ao concluir a viagem, descrito abaixo, depende do cálculo de rateio no servidor de sockets e fica como evolução.
+A cobrança segue o fluxo da seção anterior ("Cobrança automática"): o payload usa o `requestedAmount`, que é o `finalAmount` do rateio gravado no fim da viagem do passageiro.
 
 O backend monta o payload sob demanda (padrão BR Code do Banco Central, CRC16 incluso). **Nada é armazenado**: o payload é derivado de dados que já existem.
 
 | Campo do payload | Origem |
 |---|---|
 | Chave PIX (campo 26) | `users.pixKey` do motorista, normalizada |
-| Valor (campo 54) | `participants[].finalAmount` do passageiro, com 2 casas decimais |
+| Valor (campo 54) | `participants[].requestedAmount` do passageiro (o `finalAmount` cobrado), com 2 casas decimais |
 | Nome do recebedor (campo 59) | `users.name` do motorista, sem acento, maiúsculas, máx. 25 caracteres |
 | Cidade (campo 60) | Valor fixo ou cidade da origem da rota, máx. 15 caracteres |
 | Identificador (campo 62) | `***` (PIX estático não tem txid útil) |
 
-- **Endpoint:** `GET /rides/{rideId}/payment-qr` devolve a string; o app desenha o QR e oferece o botão de copiar.
-- **Quando gera:** viagem `COMPLETED` e passageiro com `finalAmount > 0`. Para `NO_SHOW` e `NOT_APPLICABLE` não há cobrança, logo não há QR.
-- **Autorização:** só participantes da viagem (`CONFIRMED` ou `COMPLETED`) acessam, porque a chave PIX do motorista é dado pessoal.
+- **Endpoints:** `GET /rides/{rideId}/passengers/{passengerId}/payment` (uma cobrança) e `GET /rides/payments/pending` (as cobranças em aberto do usuário) devolvem a string em `pixCopyPaste`; o app desenha o QR e oferece o botão de copiar.
+- **Quando gera:** cobrança emitida e ainda em aberto (`requestedAmount` preenchido e `paymentStatus = PENDING`). Depois do "Já paguei" (`PAID`), e para `NO_SHOW` e `NOT_APPLICABLE`, não há código.
+- **Autorização:** só o motorista e o próprio passageiro acessam, porque a chave PIX do motorista é dado pessoal.
 - **Valor travado:** o app do banco exibe o valor fixo e o passageiro não consegue alterá-lo.
-- **Vínculo cobrança ↔ viagem:** como o PIX estático não devolve txid, o vínculo é feito pelo banco de dados (`rideId` + participante), e o `PAID` só acontece quando o motorista confirma.
+- **Vínculo cobrança ↔ viagem:** como o PIX estático não devolve txid, o vínculo é feito pelo banco de dados (`rideId` + participante), e o `PAID` acontece quando o passageiro informa o pagamento (`POST .../payment/mark-paid`).
 - **Validação:** o formato foi testado escaneando um payload real no app de um banco; um teste unitário fixa o CRC16 para evitar regressão.
 
 ### Vínculo recorrente (vaga reservada)

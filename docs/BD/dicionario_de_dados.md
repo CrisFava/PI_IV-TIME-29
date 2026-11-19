@@ -1313,8 +1313,8 @@ Já existiam e seguem o mesmo padrão: `RideCostHandler` (rateio da viagem), `Pi
 
 No MVP o pagamento usa **QR Code PIX estático** ("Pix Copia e Cola") gerado pelo próprio backend, **sem gateway e sem API externa**. O dinheiro vai direto da conta do passageiro para a do motorista — o Converge nunca toca no dinheiro. Como o banco não devolve confirmação ao servidor, o pagamento é **informado pelo próprio passageiro** ("Já paguei", que grava `paymentStatus = PAID`); o motorista não confirma o recebimento.
 
-- O payload (padrão BR Code do Banco Central, com CRC16) é **montado sob demanda e não armazenado** — é derivado de dados que já existem (`users.pixKey`, `users.name`, `participants[].finalAmount`).
-- **Endpoint:** `GET /rides/{rideId}/payment-qr` devolve a string; o app desenha o QR.
-- **Quando gera:** viagem `COMPLETED` e passageiro com `finalAmount > 0`. Não há QR para `NO_SHOW` nem `NOT_APPLICABLE`.
-- **Autorização:** só participantes da viagem acessam o QR, pois a chave PIX do motorista é dado pessoal.
-- **Vínculo cobrança ↔ viagem:** como o PIX estático não tem txid, o vínculo é feito no banco (`rideId` + participante); o status `PAID` só muda quando o motorista confirma.
+- O payload (padrão BR Code do Banco Central, com CRC16) é **montado sob demanda e não armazenado** — é derivado de dados que já existem (`users.pixKey`, `users.name`, `participants[].requestedAmount`, que é o `finalAmount` cobrado).
+- **Endpoints:** `GET /rides/{rideId}/passengers/{passengerId}/payment` e `GET /rides/payments/pending` devolvem a string em `pixCopyPaste`; o app desenha o QR.
+- **Quando gera:** cobrança emitida e em aberto (`requestedAmount` preenchido e `paymentStatus = PENDING`). Não há código depois do "Já paguei" (`PAID`), nem para `NO_SHOW` e `NOT_APPLICABLE`.
+- **Autorização:** só o motorista e o próprio passageiro acessam, pois a chave PIX do motorista é dado pessoal.
+- **Vínculo cobrança ↔ viagem:** como o PIX estático não tem txid, o vínculo é feito no banco (`rideId` + participante); o status `PAID` muda quando o passageiro informa o pagamento (`POST .../payment/mark-paid`).

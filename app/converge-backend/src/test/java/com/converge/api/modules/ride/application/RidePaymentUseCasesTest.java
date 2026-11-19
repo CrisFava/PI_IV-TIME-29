@@ -209,12 +209,14 @@ class RidePaymentUseCasesTest {
         verify(rideRepository, never()).save(any());
     }
 
+    private final RidePaymentNotifier paymentNotifier = mock(RidePaymentNotifier.class);
+
     private MarkPaymentAsPaidUseCase markPaymentAsPaid() {
-        return new MarkPaymentAsPaidUseCase(rideAccess, rideRepository, paymentView, mock(RidePaymentNotifier.class));
+        return new MarkPaymentAsPaidUseCase(rideAccess, rideRepository, paymentView, paymentNotifier);
     }
 
     @Test
-    @DisplayName("'Já paguei' do passageiro marca como pago e para de devolver o código PIX")
+    @DisplayName("'Já paguei' do passageiro marca como pago, para de devolver o código PIX e avisa o motorista")
     void shouldMarkPaymentAsPaidAndHidePixCopyPaste() {
         Ride ride = rideWithConfirmedPassenger();
         ride.requestPayment(passengerId(), new BigDecimal("12.50"));
@@ -229,6 +231,7 @@ class RidePaymentUseCasesTest {
         assertThat(payment.paidAt()).isNotNull();
         assertThat(payment.pixCopyPaste()).isNull();
         assertThat(generatedCharges).isEmpty();
+        verify(paymentNotifier).notifyMarkedAsPaid(ride);
     }
 
     @Test

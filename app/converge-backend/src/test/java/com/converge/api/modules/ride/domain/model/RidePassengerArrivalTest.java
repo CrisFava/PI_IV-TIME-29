@@ -144,6 +144,40 @@ class RidePassengerArrivalTest {
     }
 
     @Test
+    @DisplayName("\"Já paguei\" de quem saiu e voltou paga a cobrança em aberto da participação atual")
+    void shouldPayTheOpenChargeOfARejoinedPassenger() {
+        LocalDateTime departure = LocalDateTime.now().plusHours(3);
+        Ride ride = new Ride(
+                1, "driver-123", "vehicle-123",
+                new VehicleSnapshot("Volkswagen Gol", "ABC1234", VehicleType.HATCH, "Azul"),
+                "route-123", place("Rua das Flores, 50"), place("Campus PUC"),
+                departure, departure.plusMinutes(40), Set.of(DayOfWeek.MONDAY), 3, null, null
+        );
+        // Ana foi cobrada (cobrança antiga, de valor combinado), saiu sem penalidade e pediu vaga de novo
+        ride.requestSeat(ANA, "route-ana", place("Rua A"), place("Campus PUC"));
+        ride.acceptPassenger(ANA);
+        ride.requestPayment(ANA, new BigDecimal("5.00"));
+        ride.leave(ANA, null);
+        ride.requestSeat(ANA, "route-ana", place("Rua A"), place("Campus PUC"));
+        ride.acceptPassenger(ANA);
+        ride.start();
+        ride.arrivePassenger(ANA);
+        ride.applyArrivalAmount(ANA, new BigDecimal("9.50"));
+        ride.chargeCompletedPassengers();
+        assertThat(ride.hasOpenChargeFor(ANA)).isTrue();
+
+        ride.markPaymentAsPaid(ANA);
+
+        assertThat(ride.hasOpenChargeFor(ANA)).isFalse();
+        Participant current = ride.getParticipants().stream()
+                .filter(participant -> participant.getUserId().equals(ANA))
+                .filter(participant -> participant.getStatus() == ParticipantStatus.COMPLETED)
+                .findFirst()
+                .orElseThrow();
+        assertThat(current.getPaymentStatus()).isEqualTo(ParticipantPaymentStatus.PAID);
+    }
+
+    @Test
     @DisplayName("\"Já paguei\" sem cobrança emitida é recusado")
     void shouldRejectMarkAsPaidWithoutCharge() {
         Ride ride = rideInProgress();

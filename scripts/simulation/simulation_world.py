@@ -233,8 +233,9 @@ class SimulationWorld:
                               f"{user.nickname} consultar a viagem")
 
     def ride_action(self, user: SimulatedUser, ride_id: str, action: str,
-                    body: Optional[dict] = None) -> ApiResponse:
-        if action == "start":
+                    body: Optional[dict] = None, expect_success: bool = True) -> ApiResponse:
+        # Só um início que deve dar certo espera a janela abrir; o que deve ser recusado vai na hora
+        if action == "start" and expect_success:
             self._wait_for_start_window()
         return self.api.post(f"/rides/{ride_id}/{action}", user.token, body)
 

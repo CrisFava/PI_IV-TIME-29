@@ -167,7 +167,7 @@ def invalid_transitions(world: SimulationWorld) -> None:
                        "avaliar antes de concluir", "RIDE_NOT_COMPLETED")
 
     world.step("A passageira tenta iniciar a viagem")
-    world.expect_error(world.ride_action(ana, ride_id, "start"), "passageira iniciar", "RIDE_NOT_FOUND")
+    world.expect_error(world.ride_action(ana, ride_id, "start", expect_success=False), "passageira iniciar", "RIDE_NOT_FOUND")
 
     world.expect_ok(world.ride_action(driver, ride_id, "start"), "iniciar")
 
@@ -182,7 +182,7 @@ def invalid_transitions(world: SimulationWorld) -> None:
 
     world.step("Depois de concluída: concluir de novo, iniciar de novo, marcar ausência")
     world.expect_error(world.ride_action(driver, ride_id, "complete"), "concluir duas vezes", "BAD_REQUEST")
-    world.expect_error(world.ride_action(driver, ride_id, "start"), "iniciar concluída", "BAD_REQUEST")
+    world.expect_error(world.ride_action(driver, ride_id, "start", expect_success=False), "iniciar concluída", "BAD_REQUEST")
     world.expect_error(world.passenger_action(driver, ride_id, ana, "no-show"), "ausência após concluir", "BAD_REQUEST")
     world.expect_ride(world.ride(driver, ride_id), "COMPLETED")
 
@@ -195,7 +195,7 @@ def leave_and_cancel(world: SimulationWorld) -> None:
     world.expect_participant(ride, ana, "CANCELLED")
     ride = world.ride(driver, ride_id)
     world.expect_ride(ride, "AWAITING_CONFIRMATION", available_seats=3)
-    world.expect_error(world.ride_action(driver, ride_id, "start"), "iniciar sem passageiro", "BAD_REQUEST")
+    world.expect_error(world.ride_action(driver, ride_id, "start", expect_success=False), "iniciar sem passageiro", "BAD_REQUEST")
 
     world.step("Bruno entra na mesma viagem e o motorista cancela tudo")
     bruno = world.create_passenger("Bruno")
@@ -204,7 +204,7 @@ def leave_and_cancel(world: SimulationWorld) -> None:
     ride = world.expect_ok(world.ride_action(driver, ride_id, "cancel", {"reason": "Simulação"}), "cancelar")
     world.expect_ride(ride, "CANCELLED")
     world.expect_participant(ride, bruno, "CANCELLED")
-    world.expect_error(world.ride_action(driver, ride_id, "start"), "iniciar cancelada", "BAD_REQUEST")
+    world.expect_error(world.ride_action(driver, ride_id, "start", expect_success=False), "iniciar cancelada", "BAD_REQUEST")
 
 
 def full_and_rejected(world: SimulationWorld) -> None:

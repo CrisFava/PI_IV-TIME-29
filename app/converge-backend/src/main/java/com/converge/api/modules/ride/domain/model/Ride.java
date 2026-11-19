@@ -600,24 +600,30 @@ public class Ride {
     }
 
     /**
-     * "Já paguei": o passageiro informa o pagamento da própria cobrança, que fica paga.
-     * Repetir o pedido não muda nada.
+     * "Já paguei": o passageiro informa o pagamento das próprias cobranças em aberto nesta viagem,
+     * que ficam pagas. Quem saiu e voltou tem mais de uma participação, e a cobrança em aberto
+     * pode estar em qualquer uma delas: todas são pagas, para nenhuma continuar bloqueando.
+     * Repetir o pedido com tudo pago não muda nada.
      */
     public void markPaymentAsPaid(String passengerId) {
-        Participant passenger = this.participants.stream()
+        List<Participant> charged = this.participants.stream()
                 .filter(participant -> participant.getRole() == ParticipationRole.PASSENGER)
                 .filter(participant -> participant.getUserId().equals(passengerId))
                 .filter(Participant::isCharged)
-                .findFirst()
-                .orElseThrow(() -> new ApplicationException(
-                        ErrorCode.BAD_REQUEST,
-                        "Não há cobrança para você nesta viagem.",
-                        Set.of("passengerId")
-                ));
+                .toList();
 
-        if (passenger.hasOpenCharge()) {
-            passenger.markPaidByPassenger(LocalDateTime.now());
+        if (charged.isEmpty()) {
+            throw new ApplicationException(
+                    ErrorCode.BAD_REQUEST,
+                    "Não há cobrança para você nesta viagem.",
+                    Set.of("passengerId")
+            );
         }
+
+        LocalDateTime now = LocalDateTime.now();
+        charged.stream()
+                .filter(Participant::hasOpenCharge)
+                .forEach(participant -> participant.markPaidByPassenger(now));
     }
 
     public boolean hasOpenChargeFor(String passengerId) {
