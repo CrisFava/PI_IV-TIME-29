@@ -109,7 +109,7 @@ class ExpirePendingRideRequestsUseCaseTest {
                 now.minusMinutes(1)
         );
 
-        when(rideRepository.findRidesWithExpiredRequests(cutoff)).thenReturn(List.of(ride));
+        when(rideRepository.findRidesWithExpiredRequests(cutoff, now.plusMinutes(5))).thenReturn(List.of(ride));
 
         int expiredCount = useCase.execute(now);
 
@@ -141,12 +141,29 @@ class ExpirePendingRideRequestsUseCaseTest {
         LocalDateTime now = LocalDateTime.now();
         LocalDateTime cutoff = now.minusMinutes(3);
 
-        when(rideRepository.findRidesWithExpiredRequests(cutoff)).thenReturn(List.of());
+        when(rideRepository.findRidesWithExpiredRequests(cutoff, now.plusMinutes(5))).thenReturn(List.of());
 
         int expiredCount = useCase.execute(now);
 
         assertThat(expiredCount).isZero();
         verify(rideRepository, never()).save(any());
         verify(eventPublisher, never()).publishEvent(any());
+    }
+
+    @Test
+    @DisplayName("Faltando 5 min ou menos para a saída, todo pedido pendente expira, mesmo o recente")
+    void shouldExpireEveryRequestAtTheRequestCutoff() {
+        LocalDateTime now = LocalDateTime.now();
+        LocalDateTime cutoff = now.minusMinutes(3);
+        Ride ride = createRide();
+        ReflectionTestUtils.setField(ride, "id", new ObjectId());
+        ride.requestSeat(PASSENGER_1, "route-p1", place("Origem P1"), place("Destino P1"), now.minusMinutes(1));
+        // A viagem passa a sair daqui a 4 minutos
+        ReflectionTestUtils.setField(ride, "departureDateTime", now.plusMinutes(4));
+
+        when(rideRepository.findRidesWithExpiredRequests(cutoff, now.plusMinutes(5))).thenReturn(List.of(ride));
+
+        assertThat(useCase.execute(now)).isEqualTo(1);
+        assertThat(ride.getParticipants().get(1).getStatus()).isEqualTo(ParticipantStatus.EXPIRED);
     }
 }

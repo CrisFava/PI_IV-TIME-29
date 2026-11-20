@@ -51,7 +51,8 @@ public class GoogleMapsGateway implements MapsGateway {
     private static final String API_KEY_HEADER = "X-Goog-Api-Key";
     private static final String FIELD_MASK_HEADER = "X-Goog-FieldMask";
     private static final String DETAILS_FIELD_MASK = "formattedAddress,addressComponents,location";
-    private static final String ROUTES_FIELD_MASK = "routes.distanceMeters,routes.duration,routes.polyline.encodedPolyline";
+    private static final String ROUTES_FIELD_MASK = "routes.distanceMeters,routes.duration,routes.polyline.encodedPolyline,"
+            + "routes.legs.polyline.encodedPolyline";
     private static final String LANGUAGE = "pt-BR";
     private static final List<String> REGIONS = List.of("br");
 
@@ -154,7 +155,19 @@ public class GoogleMapsGateway implements MapsGateway {
 
         String encodedPolyline = route.polyline() != null ? route.polyline().encodedPolyline() : null;
         return Optional.of(new RouteGeometry(
-                route.distanceMeters() / 1000.0, encodedPolyline, durationMinutes(route.duration())));
+                route.distanceMeters() / 1000.0, encodedPolyline, durationMinutes(route.duration()),
+                legPolylines(route)));
+    }
+
+    // Os trechos só valem completos: faltando o desenho de algum, o app usa o caminho inteiro
+    static List<String> legPolylines(GoogleRoute route) {
+        if (route.legs() == null || route.legs().isEmpty()) {
+            return List.of();
+        }
+        List<String> legs = route.legs().stream()
+                .map(leg -> leg.polyline() != null ? leg.polyline().encodedPolyline() : null)
+                .toList();
+        return legs.contains(null) ? List.of() : legs;
     }
 
     // "1234s" -> 21 min (arredonda para cima); null se o Google não mandar

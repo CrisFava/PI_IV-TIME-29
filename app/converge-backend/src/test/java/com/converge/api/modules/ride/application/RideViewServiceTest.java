@@ -6,6 +6,7 @@ import com.converge.api.modules.ride.application.dto.RideResponseDTO;
 import com.converge.api.modules.ride.application.mapper.RideMapper;
 import com.converge.api.modules.ride.domain.model.Ride;
 import com.converge.api.modules.ride.domain.model.subtypes.VehicleSnapshot;
+import com.converge.api.modules.route.application.RouteAccess;
 import com.converge.api.modules.route.domain.model.subtypes.Coordinates;
 import com.converge.api.modules.route.domain.model.subtypes.Place;
 import com.converge.api.modules.user.application.GetUserNamesUseCase;
@@ -42,11 +43,14 @@ class RideViewServiceTest {
     @Mock
     private GetUserNamesUseCase getUserNames;
 
+    @Mock
+    private RouteAccess routeAccess;
+
     private RideViewService rideView;
 
     @BeforeEach
     void setUp() {
-        rideView = new RideViewService(rideAccess, getUserNames, new RideMapper());
+        rideView = new RideViewService(rideAccess, getUserNames, new RideMapper(), routeAccess);
     }
 
     private Place place(String address) {

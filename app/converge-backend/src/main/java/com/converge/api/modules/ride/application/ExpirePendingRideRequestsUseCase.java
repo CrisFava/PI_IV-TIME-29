@@ -46,7 +46,9 @@ public class ExpirePendingRideRequestsUseCase implements UseCase<LocalDateTime, 
     @Override
     public Integer execute(LocalDateTime now) {
         LocalDateTime cutoff = now.minus(this.requestTimeout);
-        List<Ride> ridesWithExpiredRequests = rideRepository.findRidesWithExpiredRequests(cutoff);
+        // Também os pedidos de viagens que saem em 5 min ou menos: não dá mais para aceitar
+        List<Ride> ridesWithExpiredRequests = rideRepository.findRidesWithExpiredRequests(
+                cutoff, now.plusMinutes(Ride.REQUEST_CUTOFF_MINUTES));
 
         int totalExpired = 0;
 

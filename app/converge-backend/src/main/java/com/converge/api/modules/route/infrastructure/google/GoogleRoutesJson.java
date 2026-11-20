@@ -39,7 +39,11 @@ final class GoogleRoutesJson {
     }
 
     // duration vem como texto em segundos, ex.: "1234s"
-    record GoogleRoute(Integer distanceMeters, String duration, Polyline polyline) {
+    // legs: um trecho entre cada par de pontos (origem, paradas, destino), na ordem
+    record GoogleRoute(Integer distanceMeters, String duration, Polyline polyline, List<Leg> legs) {
+    }
+
+    record Leg(Polyline polyline) {
     }
 
     record Polyline(String encodedPolyline) {

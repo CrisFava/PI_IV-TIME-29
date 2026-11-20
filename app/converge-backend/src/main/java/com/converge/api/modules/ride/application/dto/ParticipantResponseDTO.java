@@ -22,6 +22,10 @@ public record ParticipantResponseDTO(
         BigDecimal finalAmount,
         ParticipantPaymentStatus paymentStatus,
         LocalDateTime confirmedAt,
-        LocalDateTime requestedAt
+        LocalDateTime requestedAt,
+        // O motorista confirmou que o passageiro entrou no carro
+        LocalDateTime boardedAt,
+        // Horário que o passageiro escolheu (HH:mm), do trajeto dele
+        String requestedDepartureTime
 ) {
 }

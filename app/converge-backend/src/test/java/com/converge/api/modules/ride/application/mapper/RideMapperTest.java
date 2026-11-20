@@ -248,4 +248,21 @@ class RideMapperTest {
         assertThat(anaView.itineraryPolyline()).isNull();
         assertThat(anaView.itineraryDistanceKm()).isNull();
     }
+
+    @Test
+    @DisplayName("Com a viagem em andamento, o passageiro com vaga também vê a rota; o pendente, não")
+    void shouldShowItineraryPathToConfirmedPassengerDuringTheRide() {
+        Ride ride = rideWithEveryKindOfPassenger();
+        ride.updateItinerary(List.of(
+                new RideStop(RideStopType.PICKUP, ANA, place("Rua da Ana, 1")),
+                new RideStop(RideStopType.DROPOFF, ANA, place("Campus PUC"))
+        ), 15.0, "polyline");
+        ride.start();
+
+        assertThat(mapper.toResponse(ride, ANA, names).itineraryPolyline()).isEqualTo("polyline");
+        // A Ana sabe onde ficam as paradas dela na viagem, para ver só o caminho até elas
+        assertThat(mapper.toResponse(ride, ANA, names).itineraryMyPickupStop()).isZero();
+        assertThat(mapper.toResponse(ride, ANA, names).itineraryMyDropOffStop()).isEqualTo(1);
+        assertThat(mapper.toResponse(ride, BIA, names).itineraryPolyline()).isNull();
+    }
 }

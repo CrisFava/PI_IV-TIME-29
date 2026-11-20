@@ -11,6 +11,7 @@ import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.Mock;
+import org.springframework.context.ApplicationEventPublisher;
 import org.mockito.junit.jupiter.MockitoExtension;
 import org.springframework.dao.DuplicateKeyException;
 
@@ -36,8 +37,11 @@ class CreateBlockUseCaseTest {
     @Mock
     private UserLookupGateway userLookup;
 
+    @Mock
+    private ApplicationEventPublisher eventPublisher;
+
     private CreateBlockUseCase createBlock() {
-        return new CreateBlockUseCase(blockRepository, userLookup);
+        return new CreateBlockUseCase(blockRepository, userLookup, eventPublisher);
     }
 
     @Test

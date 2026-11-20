@@ -9,6 +9,7 @@ import com.converge.api.shared.application.UseCase;
 import com.converge.api.shared.presentation.exception.ApplicationException;
 import com.converge.api.shared.presentation.exception.ErrorCode;
 import lombok.RequiredArgsConstructor;
+import org.springframework.context.ApplicationEventPublisher;
 import org.springframework.dao.DuplicateKeyException;
 import org.springframework.stereotype.Service;
 
@@ -19,6 +20,7 @@ public class CreateBlockUseCase implements UseCase<CreateBlockUseCase.Command, B
 
     private final BlockRepository blockRepository;
     private final UserLookupGateway userLookup;
+    private final ApplicationEventPublisher eventPublisher;
 
     // Entrada: quem bloqueia (do token) e quem será bloqueado.
     public record Command(String userId, String blockedUserId) {
@@ -32,7 +34,12 @@ public class CreateBlockUseCase implements UseCase<CreateBlockUseCase.Command, B
             throw new ApplicationException(ErrorCode.USER_NOT_FOUND, "Usuário não encontrado.");
         }
         return blockRepository.findByUserIdAndBlockedUserId(command.userId(), command.blockedUserId())
-                .orElseGet(() -> save(block));
+                .orElseGet(() -> {
+                    Block saved = save(block);
+                    // As caronas que eles ainda iam fazer juntos deixam de ter os dois
+                    eventPublisher.publishEvent(new UserBlockedEvent(command.userId(), command.blockedUserId()));
+                    return saved;
+                });
     }
 
     private Block save(Block block) {
