@@ -29,6 +29,15 @@ class RideParticipantModel {
   final RoutePlaceModel? boardingLocation;
   final RoutePlaceModel? dropOffLocation;
 
+  /// Quando o passageiro pediu a vaga (os pedidos aparecem do mais antigo ao mais novo).
+  final DateTime? requestedAt;
+
+  /// Quando o motorista confirmou que o passageiro entrou no carro.
+  final DateTime? boardedAt;
+
+  /// Horário que o passageiro escolheu para sair (HH:mm). Só o motorista recebe.
+  final String? requestedDepartureTime;
+
   const RideParticipantModel({
     required this.userId,
     required this.name,
@@ -39,6 +48,9 @@ class RideParticipantModel {
     this.finalAmount,
     this.boardingLocation,
     this.dropOffLocation,
+    this.requestedAt,
+    this.boardedAt,
+    this.requestedDepartureTime,
   });
 
   bool get isDriver => role == ParticipationRole.driver;
@@ -63,6 +75,9 @@ class RideParticipantModel {
       finalAmount: (json['finalAmount'] as num?)?.toDouble(),
       boardingLocation: _placeOrNull(json['boardingLocation']),
       dropOffLocation: _placeOrNull(json['dropOffLocation']),
+      requestedAt: DateTime.tryParse(json['requestedAt'] as String? ?? ''),
+      boardedAt: DateTime.tryParse(json['boardedAt'] as String? ?? ''),
+      requestedDepartureTime: json['requestedDepartureTime'] as String?,
     );
   }
 

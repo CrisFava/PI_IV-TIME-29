@@ -6,17 +6,12 @@ import 'route_recurrence.dart';
 
 /// Horário e dias de um trajeto, no formato da API (`HH:mm` e `MONDAY`...).
 /// A carona de um dia só leva a data (`yyyy-MM-dd`); a semanal, só os dias.
-/// O matching junta o motorista que sai de 30 min antes a 5 min depois do
+/// O matching junta o motorista que sai de 5 min antes a 30 min depois do
 /// passageiro, com um dia em comum.
 @immutable
 class RouteSchedule {
   /// Tempo de viagem usado na chegada prevista enquanto a rota real não é calculada.
   static const Duration defaultTripDuration = Duration(minutes: 45);
-
-  /// Carona oferecida "Agora": sai daqui a pouco, para dar tempo de alguém pedir
-  /// vaga. Com a saída no minuto atual, ela já teria "saído" para o servidor e não
-  /// apareceria para nenhum passageiro.
-  static const Duration immediateOfferLead = Duration(minutes: 15);
 
   static const List<String> _apiWeekDays = [
     'MONDAY',

@@ -7,7 +7,6 @@ import '../../../../core/config/styles.dart';
 import '../../../../core/widgets/more_info_hint.dart';
 import '../../../ride/data/models/ride_status.dart';
 import '../../../ride/presentation/widgets/ride_place_line.dart';
-import '../../../ride/presentation/widgets/ride_role_tag.dart';
 import '../../data/models/driver_offer.dart';
 import 'driver_offer_title.dart';
 import 'driver_ride_action_button.dart';
@@ -36,7 +35,7 @@ class DriverOfferCard extends StatelessWidget {
       return 'Viagem em andamento';
     }
     final confirmed = offer.confirmedPassengers;
-    final pending = offer.pendingRequests;
+    final pending = offer.openRequests;
     return [
       if (confirmed > 0)
         confirmed == 1
@@ -84,8 +83,10 @@ class DriverOfferCard extends StatelessWidget {
               Row(
                 children: [
                   Expanded(child: DriverOfferTitle(offer: offer)),
-                  const SizedBox(width: 8),
-                  const RideRoleTag(isDriver: true),
+                  if (offer.openRequests > 0) ...[
+                    const SizedBox(width: 8),
+                    _RequestsBadge(count: offer.openRequests),
+                  ],
                 ],
               ),
               const SizedBox(height: 8),
@@ -120,6 +121,38 @@ class DriverOfferCard extends StatelessWidget {
                 ),
               ],
             ],
+          ),
+        ),
+      ),
+    );
+  }
+}
+
+/// Bolinha vermelha com o número de pedidos de vaga esperando resposta.
+class _RequestsBadge extends StatelessWidget {
+  final int count;
+
+  const _RequestsBadge({required this.count});
+
+  @override
+  Widget build(BuildContext context) {
+    return Semantics(
+      label: count == 1 ? '1 pedido de vaga' : '$count pedidos de vaga',
+      child: Container(
+        key: const ValueKey('offer_requests_badge'),
+        constraints: const BoxConstraints(minWidth: 22, minHeight: 22),
+        padding: const EdgeInsets.symmetric(horizontal: 6),
+        alignment: Alignment.center,
+        decoration: BoxDecoration(
+          color: AppColors.error,
+          borderRadius: BorderRadius.circular(11),
+        ),
+        child: Text(
+          count > 99 ? '99+' : '$count',
+          style: const TextStyle(
+            fontSize: 12,
+            fontWeight: FontWeight.w800,
+            color: AppColors.textLight,
           ),
         ),
       ),

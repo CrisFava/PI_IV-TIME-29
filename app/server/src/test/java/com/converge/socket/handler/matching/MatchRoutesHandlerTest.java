@@ -51,7 +51,7 @@ class MatchRoutesHandlerTest {
 
     // Passageiro a algumas quadras da origem do motorista, indo para o mesmo destino
     private static MatchRoute nearbySearch() {
-        return search("search-1", "passenger-1", -22.9000, -47.0600, "07:10", Set.of(DayOfWeek.MONDAY, DayOfWeek.WEDNESDAY));
+        return search("search-1", "passenger-1", -22.9000, -47.0600, "06:50", Set.of(DayOfWeek.MONDAY, DayOfWeek.WEDNESDAY));
     }
 
     private List<MatchResult> passengerSeeks(MatchRoute passengerRoute, MatchRoute... offers) throws ServerException {
@@ -171,17 +171,17 @@ class MatchRoutesHandlerTest {
     }
 
     @Test
-    @DisplayName("Motorista pode sair de 30 min antes a 5 min depois do passageiro (limites incluídos)")
+    @DisplayName("Motorista pode sair de 5 min antes a 30 min depois do passageiro (limites incluídos)")
     void shouldApplyScheduleWindow() throws ServerException {
         // Motorista às 07:00
-        MatchRoute driverTooEarly = search("search-1", "passenger-1", -22.9000, -47.0600, "07:31", WEEKDAYS);
-        MatchRoute driverThirtyEarlier = search("search-2", "passenger-2", -22.9000, -47.0600, "07:30", WEEKDAYS);
-        MatchRoute driverFiveLater = search("search-3", "passenger-3", -22.9000, -47.0600, "06:55", WEEKDAYS);
-        MatchRoute driverTooLate = search("search-4", "passenger-4", -22.9000, -47.0600, "06:54", WEEKDAYS);
+        MatchRoute driverTooEarly = search("search-1", "passenger-1", -22.9000, -47.0600, "07:06", WEEKDAYS);
+        MatchRoute driverFiveEarlier = search("search-2", "passenger-2", -22.9000, -47.0600, "07:05", WEEKDAYS);
+        MatchRoute driverThirtyLater = search("search-3", "passenger-3", -22.9000, -47.0600, "06:30", WEEKDAYS);
+        MatchRoute driverTooLate = search("search-4", "passenger-4", -22.9000, -47.0600, "06:29", WEEKDAYS);
 
         assertTrue(passengerSeeks(driverTooEarly, driverOffer()).isEmpty());
-        assertEquals(1, passengerSeeks(driverThirtyEarlier, driverOffer()).size());
-        assertEquals(1, passengerSeeks(driverFiveLater, driverOffer()).size());
+        assertEquals(1, passengerSeeks(driverFiveEarlier, driverOffer()).size());
+        assertEquals(1, passengerSeeks(driverThirtyLater, driverOffer()).size());
         assertTrue(passengerSeeks(driverTooLate, driverOffer()).isEmpty());
     }
 
@@ -195,9 +195,9 @@ class MatchRoutesHandlerTest {
     @Test
     @DisplayName("Deve ordenar do mais para o menos compatível")
     void shouldRankByScore() throws ServerException {
-        MatchRoute close = offer("offer-close", "driver-1", "07:10", WEEKDAYS, 3.0, 3);
-        // O passageiro sai às 07:10: um motorista 20 min antes ainda entra, mas pontua menos
-        MatchRoute later = offer("offer-later", "driver-2", "06:50", WEEKDAYS, 3.0, 3);
+        MatchRoute close = offer("offer-close", "driver-1", "06:50", WEEKDAYS, 3.0, 3);
+        // O passageiro sai às 06:50: um motorista 20 min depois ainda entra, mas pontua menos
+        MatchRoute later = offer("offer-later", "driver-2", "07:10", WEEKDAYS, 3.0, 3);
 
         List<MatchResult> results = passengerSeeks(nearbySearch(), later, close);
 
@@ -225,7 +225,7 @@ class MatchRoutesHandlerTest {
     @DisplayName("O motorista deve encontrar N passageiros compatíveis com a sua oferta")
     void shouldMatchManyPassengersForOneDriver() throws ServerException {
         MatchRoute near = search("search-near", "passenger-1", -22.9000, -47.0600, "07:00", WEEKDAYS);
-        MatchRoute alsoNear = search("search-also", "passenger-2", -22.8900, -47.0590, "07:15", WEEKDAYS);
+        MatchRoute alsoNear = search("search-also", "passenger-2", -22.8900, -47.0590, "06:45", WEEKDAYS);
         MatchRoute farAway = search("search-far", "passenger-3", -22.9706, -46.9958, "07:00", WEEKDAYS);
 
         List<MatchResult> results = handler.execute(new MatchRoutesRequest(

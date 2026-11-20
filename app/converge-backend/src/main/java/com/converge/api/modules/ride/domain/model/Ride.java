@@ -5,6 +5,7 @@ package com.converge.api.modules.ride.domain.model;
 import com.converge.api.modules.ride.domain.enums.ParticipantPaymentStatus;
 import com.converge.api.modules.ride.domain.enums.ParticipantStatus;
 import com.converge.api.modules.ride.domain.enums.RideStatus;
+import com.converge.api.modules.ride.domain.enums.RideStopType;
 import com.converge.api.modules.ride.domain.model.subtypes.Participant;
 import com.converge.api.modules.ride.domain.model.subtypes.RideCosts;
 import com.converge.api.modules.ride.domain.model.subtypes.RideStop;
@@ -123,6 +124,10 @@ public class Ride {
     @Nullable
     private LocalDateTime completedAt;
 
+    // Quando o motorista iniciou de verdade (o histórico mostra início e fim reais)
+    @Nullable
+    private LocalDateTime startedAt;
+
     // Sem final (aqui e em participants): o Spring Data não preenche campo final ao ler do Mongo.
     private Set<DayOfWeek> weekDays = new HashSet<>();
 
@@ -163,6 +168,9 @@ public class Ride {
 
     @Nullable
     private String itineraryPolyline;
+
+    // O caminho em trechos: um até cada parada e o último até o destino (vazio sem o Google)
+    private List<String> itineraryLegPolylines = new ArrayList<>();
 
     @CreatedDate
     private LocalDateTime createdAt;
@@ -324,6 +332,48 @@ public class Ride {
         return late;
     }
 
+    /**
+     * Bloqueio entre dois participantes de uma viagem que ainda não começou: se quem
+     * bloqueou dirige, o passageiro bloqueado sai; senão, sai quem bloqueou. Ninguém é
+     * penalizado. Viagem em andamento não muda. Devolve quem saiu, ou null.
+     */
+    @Nullable
+    public String separateAfterBlock(String blockerId, String blockedId, @Nullable String reason) {
+        if (this.status != RideStatus.AWAITING_CONFIRMATION && this.status != RideStatus.CONFIRMED) {
+            return null;
+        }
+        String leaving = this.isOwnedBy(blockerId) ? blockedId : blockerId;
+        String staying = leaving.equals(blockerId) ? blockedId : blockerId;
+        // Só separa quem de fato está junto: o outro também precisa estar na viagem
+        boolean stayingIsActive = this.isOwnedBy(staying) || this.participants.stream()
+                .filter(participant -> participant.getRole() == ParticipationRole.PASSENGER)
+                .filter(participant -> participant.getUserId().equals(staying))
+                .anyMatch(this::isActive);
+        if (!stayingIsActive) {
+            return null;
+        }
+        Participant passenger = this.participants.stream()
+                .filter(participant -> participant.getRole() == ParticipationRole.PASSENGER)
+                .filter(participant -> participant.getUserId().equals(leaving))
+                .filter(this::isActive)
+                .findFirst()
+                .orElse(null);
+        if (passenger == null) {
+            return null;
+        }
+
+        LocalDateTime now = LocalDateTime.now();
+        if (passenger.getStatus() == ParticipantStatus.CONFIRMED) {
+            passenger.cancel(reason, false, now);
+            this.availableSeats++;
+            downgradeToAwaitingIfNoConfirmedLeft();
+        } else {
+            passenger.reject(reason, now);
+        }
+        this.updatedAt = now;
+        return leaving;
+    }
+
     private Participant findActivePassenger(String passengerId) {
         return this.participants.stream()
                 .filter(participant -> participant.getRole() == ParticipationRole.PASSENGER)
@@ -356,7 +406,16 @@ public class Ride {
      * Sem paradas, a distância e o desenho também ficam vazios.
      */
     public void updateItinerary(List<RideStop> stops, @Nullable Double distanceKm, @Nullable String polyline) {
-        updateItinerary(stops, distanceKm, polyline, null);
+        updateItinerary(stops, distanceKm, polyline, null, List.of());
+    }
+
+    public void updateItinerary(
+            List<RideStop> stops,
+            @Nullable Double distanceKm,
+            @Nullable String polyline,
+            @Nullable Integer durationMinutes
+    ) {
+        updateItinerary(stops, distanceKm, polyline, durationMinutes, List.of());
     }
 
     /**
@@ -368,7 +427,8 @@ public class Ride {
             List<RideStop> stops,
             @Nullable Double distanceKm,
             @Nullable String polyline,
-            @Nullable Integer durationMinutes
+            @Nullable Integer durationMinutes,
+            List<String> legPolylines
     ) {
         this.itinerary = stops == null ? new ArrayList<>() : new ArrayList<>(stops);
         boolean hasStops = !this.itinerary.isEmpty();
@@ -380,6 +440,46 @@ public class Ride {
         }
         this.itineraryDistanceKm = hasStops ? distanceKm : null;
         this.itineraryPolyline = hasStops ? polyline : null;
+        // Um trecho por parada mais o último até o destino; com outra contagem, não servem
+        boolean legsMatch = legPolylines != null && legPolylines.size() == this.itinerary.size() + 1;
+        this.itineraryLegPolylines = hasStops && legsMatch ? new ArrayList<>(legPolylines) : new ArrayList<>();
+    }
+
+    /**
+     * Em que parada a viagem em andamento está: a primeira ainda não feita (embarque
+     * sem "entrou", desembarque de quem ainda está a bordo). O trecho atual é o que
+     * termina nela; igual ao tamanho do itinerário quando falta só chegar ao destino.
+     * Nulo fora da viagem em andamento.
+     */
+    @Nullable
+    public Integer getItineraryNextStop() {
+        if (this.status != RideStatus.IN_PROGRESS) {
+            return null;
+        }
+        for (int i = 0; i < this.itinerary.size(); i++) {
+            RideStop stop = this.itinerary.get(i);
+            Participant passenger = this.participants.stream()
+                    .filter(participant -> participant.getRole() == ParticipationRole.PASSENGER)
+                    .filter(participant -> participant.getUserId().equals(stop.passengerId()))
+                    // A participação que vale é a confirmada (pode haver uma cancelada antes)
+                    .filter(participant -> participant.getStatus() == ParticipantStatus.CONFIRMED)
+                    .findFirst()
+                    .orElse(null);
+            boolean onBoard = passenger != null;
+            boolean done = stop.type() == RideStopType.PICKUP
+                    ? !onBoard || passenger.getBoardedAt() != null
+                    : !onBoard;
+            if (!done) {
+                return i;
+            }
+        }
+        return this.itinerary.size();
+    }
+
+    public List<String> getItineraryLegPolylines() {
+        return this.itineraryLegPolylines == null
+                ? List.of()
+                : Collections.unmodifiableList(this.itineraryLegPolylines);
     }
 
     public List<RideStop> getItinerary() {
@@ -421,6 +521,7 @@ public class Ride {
                 .forEach(participant -> participant.reject("Viagem iniciada.", now));
 
         this.status = RideStatus.IN_PROGRESS;
+        this.startedAt = now;
     }
 
     // De 5 min antes a 5 min depois da saída
@@ -467,10 +568,28 @@ public class Ride {
         return affected;
     }
 
+    /**
+     * "Entrou": o motorista confirma que o passageiro embarcou. Confirmar de novo não muda nada.
+     */
+    public void boardPassenger(String passengerId) {
+        this.validateInProgress();
+
+        Participant passenger = this.findConfirmedPassenger(passengerId);
+        passenger.board(LocalDateTime.now());
+    }
+
     public void markNoShow(String passengerId) {
         this.validateInProgress();
 
         Participant passenger = this.findConfirmedPassenger(passengerId);
+        // Quem já entrou no carro não pode ser marcado como ausente
+        if (passenger.getBoardedAt() != null) {
+            throw new ApplicationException(
+                    ErrorCode.BAD_REQUEST,
+                    "Este passageiro já entrou no carro.",
+                    Set.of("passengerId")
+            );
+        }
 
         passenger.markNoShow(LocalDateTime.now());
         this.availableSeats++;
@@ -905,12 +1024,17 @@ public class Ride {
         this.updatedAt = now;
     }
 
+    /**
+     * Expira os pedidos sem resposta: os feitos até [cutoff] (o motorista demorou demais)
+     * e todos quando faltam 5 min ou menos para a saída (aí não dá mais para aceitar).
+     */
     public List<String> expireRequestsOlderThan(LocalDateTime cutoff, LocalDateTime now) {
+        boolean pastRequestCutoff = isPastRequestCutoff(now);
         List<String> expiredPassengerIds = new ArrayList<>();
         for (Participant participant : this.participants) {
             if (participant.getRole() == ParticipationRole.PASSENGER
                     && participant.getStatus() == ParticipantStatus.REQUESTED
-                    && !participant.getRequestedAt().isAfter(cutoff)) {
+                    && (pastRequestCutoff || !participant.getRequestedAt().isAfter(cutoff))) {
                 participant.expire(now);
                 expiredPassengerIds.add(participant.getUserId());
             }

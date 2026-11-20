@@ -23,12 +23,8 @@ import argparse
 import json
 import sys
 import time
-<<<<<<< HEAD
 import uuid
-from datetime import date, datetime, timedelta
-=======
 from datetime import date, datetime, timedelta, timezone
->>>>>>> 5496b89 (Coderabit: fixes)
 from pathlib import Path
 
 import verificar_usuario
@@ -90,7 +86,6 @@ def route_body(kind: str, departure: datetime, extra: dict) -> dict:
 # ---------------------------------------------------------------------------------- preparar
 
 def prepare(api: ApiClient, key: str, connection: str, database: str) -> None:
-<<<<<<< HEAD
     run_id = uuid.uuid4().hex
     emails = [
         f"sim.{run_id}.1.conta-do-app@converge-sim.test",
@@ -103,13 +98,6 @@ def prepare(api: ApiClient, key: str, connection: str, database: str) -> None:
     except FileExistsError:
         raise SimulationFailure("Já existe uma preparação. Rode limpar antes de preparar novamente.")
 
-=======
-    # Um segundo preparar apagaria o registro das contas do primeiro, e o limpar não as acharia mais
-    if STATE_FILE.is_file():
-        sys.exit("Já existe um teste preparado. Rode antes: python3 scripts/teste_no_app.py limpar")
-
-    run_id = time.strftime("%m%d%H%M%S")
->>>>>>> 5496b89 (Coderabit: fixes)
     with MongoClient(connection, serverSelectionTimeoutMS=10_000) as client:
         users = client[database][verificar_usuario.USERS_COLLECTION]
         world = SimulationWorld(api, key, users, run_id, date.today())
@@ -233,21 +221,9 @@ def run_passenger_bot(api: ApiClient, key: str, connection: str, database: str, 
         routes = client[database]["routes"]
         offer = None
         for _ in range(120):
-<<<<<<< HEAD
-            today = date.today()
-            midnight = datetime.combine(today, datetime.min.time())
-            offer = routes.find_one({
-                "userId": state["app"]["id"], "type": "OFFER", "status": "ACTIVE",
-                "$or": [
-                    {"recurrence": "ONCE", "date": midnight},
-                    {"recurrence": {"$ne": "ONCE"}, "weekDays": WEEK_DAYS[today.weekday()]},
-                ],
-            }, sort=[("createdAt", -1)])
-=======
             offers = routes.find({"userId": state["app"]["id"], "type": "OFFER", "status": "ACTIVE"},
                                  sort=[("createdAt", -1)])
             offer = next((route for route in offers if runs_on(route, today)), None)
->>>>>>> 5496b89 (Coderabit: fixes)
             if offer:
                 break
             time.sleep(POLL_SECONDS)

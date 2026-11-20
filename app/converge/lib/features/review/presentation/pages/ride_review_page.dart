@@ -7,6 +7,8 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../../../../core/config/styles.dart';
 import '../../../../core/network/api_exception.dart';
 import '../../../auth/state/auth_action_controller.dart';
+import '../../../security/presentation/widgets/report_sheet.dart';
+import '../../data/repository/review_dismissal_store.dart';
 import '../../state/pending_reviews.dart';
 import '../../state/ride_reviews_controller.dart';
 
@@ -14,7 +16,10 @@ import '../../state/ride_reviews_controller.dart';
 ///
 /// Lista quem o usuário ainda não avaliou: o passageiro vê o motorista; o motorista
 /// vê cada passageiro que viajou. Cada um tem estrelas e um comentário opcional, e
-/// só quem recebeu estrelas é enviado. É possível sair sem avaliar ("Agora não").
+/// só quem recebeu estrelas é enviado. "Não quero avaliar" fecha e a avaliação desta
+/// viagem não abre mais sozinha.
+/// Os passageiros aparecem em linhas compactas (com muitos, a tela não fica enorme),
+/// e todos têm o atalho para denunciar.
 /// Devolve `true` quando todas as avaliações escolhidas foram enviadas.
 class RideReviewPage extends ConsumerStatefulWidget {
   final String rideId;
@@ -36,6 +41,9 @@ class _Draft {
   int rating = 0;
   bool sent = false;
   String? error;
+
+  // Linha compacta: o comentário só abre quando a pessoa quer escrever
+  bool commentOpen = false;
 }
 
 class _RideReviewPageState extends ConsumerState<RideReviewPage> {
@@ -192,9 +200,34 @@ class _RideReviewPageState extends ConsumerState<RideReviewPage> {
                     16 + MediaQuery.viewInsetsOf(context).bottom,
                   ),
                   itemCount: widget.targets.length,
-                  separatorBuilder: (_, _) => const SizedBox(height: 12),
+                  separatorBuilder: (_, _) =>
+                      SizedBox(height: widget.targets.length > 1 ? 8 : 12),
                   itemBuilder: (_, index) {
                     final target = widget.targets[index];
+                    void report() => showReportSheet(
+                      context,
+                      reportedId: target.userId,
+                      reportedName: target.name,
+                      rideId: widget.rideId,
+                      // O motorista pode denunciar o passageiro que não pagou
+                      canReportNonPayment: !target.isDriver,
+                    );
+                    // Vários passageiros: linhas compactas (um só fica no card grande)
+                    if (!reviewingDriver && widget.targets.length > 1) {
+                      final draft = _drafts[target.userId]!;
+                      return _CompactReviewRow(
+                        target: target,
+                        draft: draft,
+                        enabled: !_submitting,
+                        onRating: (rating) =>
+                            _selectRating(target.userId, rating),
+                        onToggleComment: () => setState(
+                          () => draft.commentOpen = !draft.commentOpen,
+                        ),
+                        onCommentChanged: () => setState(() {}),
+                        onReport: _submitting ? null : report,
+                      );
+                    }
                     return _ReviewCard(
                       target: target,
                       draft: _drafts[target.userId]!,
@@ -203,6 +236,7 @@ class _RideReviewPageState extends ConsumerState<RideReviewPage> {
                       onRating: (rating) =>
                           _selectRating(target.userId, rating),
                       onCommentChanged: () => setState(() {}),
+                      onReport: _submitting ? null : report,
                     );
                   },
                 ),
@@ -253,9 +287,26 @@ class _RideReviewPageState extends ConsumerState<RideReviewPage> {
                     TextButton(
                       onPressed: _submitting
                           ? null
-                          : () => Navigator.of(context).pop(anySent),
+                          : () async {
+                              // Fechar depois de enviar, ou dispensar de vez
+                              if (!anySent) {
+                                setState(() => _submitting = true);
+                                try {
+                                  await ref
+                                      .read(reviewDismissalStoreProvider)
+                                      .dismiss(widget.rideId);
+                                } finally {
+                                  if (mounted) {
+                                    setState(() => _submitting = false);
+                                  }
+                                }
+                              }
+                              if (context.mounted) {
+                                Navigator.of(context).pop(anySent);
+                              }
+                            },
                       child: Text(
-                        anySent ? 'Fechar' : 'Agora não',
+                        anySent ? 'Fechar' : 'Não quero avaliar',
                         style: const TextStyle(
                           fontWeight: FontWeight.w600,
                           color: AppColors.textSecondary,
@@ -281,6 +332,7 @@ class _ReviewCard extends StatelessWidget {
   final bool enabled;
   final ValueChanged<int> onRating;
   final VoidCallback onCommentChanged;
+  final VoidCallback? onReport;
 
   const _ReviewCard({
     required this.target,
@@ -289,6 +341,7 @@ class _ReviewCard extends StatelessWidget {
     required this.enabled,
     required this.onRating,
     required this.onCommentChanged,
+    required this.onReport,
   });
 
   @override
@@ -350,6 +403,7 @@ class _ReviewCard extends StatelessWidget {
                   Icons.check_circle_rounded,
                   color: AppColors.success,
                 ),
+              _ReportButton(name: target.name, onReport: onReport),
             ],
           ),
           const SizedBox(height: 8),
@@ -454,6 +508,195 @@ class _ReviewCard extends StatelessWidget {
               ),
             ),
           ],
+        ],
+      ),
+    );
+  }
+}
+
+/// Denunciar quem está sendo avaliado.
+class _ReportButton extends StatelessWidget {
+  final String name;
+  final VoidCallback? onReport;
+
+  const _ReportButton({required this.name, required this.onReport});
+
+  @override
+  Widget build(BuildContext context) {
+    return IconButton(
+      tooltip: 'Denunciar $name',
+      visualDensity: VisualDensity.compact,
+      // Desligado enquanto as avaliações são enviadas
+      onPressed: onReport == null
+          ? null
+          : () {
+              HapticFeedback.lightImpact();
+              onReport!();
+            },
+      icon: const Icon(
+        Icons.outlined_flag_rounded,
+        size: 20,
+        color: AppColors.error,
+      ),
+    );
+  }
+}
+
+/// Um passageiro numa linha: nome, estrelas pequenas, comentário (abre no ícone)
+/// e denúncia. Com 15 passageiros, a lista ainda cabe em poucas rolagens.
+class _CompactReviewRow extends StatelessWidget {
+  final ReviewTarget target;
+  final _Draft draft;
+  final bool enabled;
+  final ValueChanged<int> onRating;
+  final VoidCallback onToggleComment;
+  final VoidCallback onCommentChanged;
+  final VoidCallback? onReport;
+
+  const _CompactReviewRow({
+    required this.target,
+    required this.draft,
+    required this.enabled,
+    required this.onRating,
+    required this.onToggleComment,
+    required this.onCommentChanged,
+    required this.onReport,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    final canEdit = enabled && !draft.sent;
+    final hasComment = draft.comment.text.trim().isNotEmpty;
+    final showComment =
+        !draft.sent && (draft.commentOpen || hasComment || draft.error != null);
+    final needsStars =
+        !draft.sent && draft.error == null && draft.rating == 0 && hasComment;
+
+    return Container(
+      padding: const EdgeInsets.fromLTRB(12, 8, 4, 8),
+      decoration: BoxDecoration(
+        color: AppColors.cardBackground,
+        borderRadius: BorderRadius.circular(14),
+        border: Border.all(
+          color: draft.sent ? AppColors.successBorder : AppColors.borderSubtle,
+        ),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        children: [
+          Row(
+            children: [
+              Expanded(
+                child: Text(
+                  target.name,
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                  style: const TextStyle(
+                    fontSize: 14,
+                    fontWeight: FontWeight.w700,
+                    color: AppColors.textPrimary,
+                  ),
+                ),
+              ),
+              if (draft.sent)
+                Padding(
+                  padding: const EdgeInsets.symmetric(horizontal: 8),
+                  child: Text(
+                    'Você avaliou com ${draft.rating} de 5 estrelas',
+                    style: const TextStyle(
+                      fontSize: 12,
+                      fontWeight: FontWeight.w700,
+                      color: AppColors.success,
+                    ),
+                  ),
+                )
+              else
+                for (var star = 1; star <= 5; star++)
+                  SizedBox(
+                    width: 30,
+                    height: 34,
+                    child: IconButton(
+                      tooltip: '$star de 5',
+                      padding: EdgeInsets.zero,
+                      iconSize: 24,
+                      onPressed: canEdit ? () => onRating(star) : null,
+                      icon: Icon(
+                        Icons.star_rounded,
+                        color: star <= draft.rating
+                            ? AppColors.ratingStar
+                            : AppColors.ratingStarEmpty,
+                      ),
+                    ),
+                  ),
+              if (!draft.sent)
+                IconButton(
+                  tooltip: 'Adicionar comentário',
+                  visualDensity: VisualDensity.compact,
+                  onPressed: canEdit ? onToggleComment : null,
+                  icon: Icon(
+                    hasComment
+                        ? Icons.chat_bubble_rounded
+                        : Icons.chat_bubble_outline_rounded,
+                    size: 19,
+                    color: AppColors.textPrimary,
+                  ),
+                ),
+              _ReportButton(name: target.name, onReport: onReport),
+            ],
+          ),
+          if (showComment) ...[
+            const SizedBox(height: 4),
+            Padding(
+              padding: const EdgeInsets.only(right: 8),
+              child: TextField(
+                controller: draft.comment,
+                onChanged: (_) => onCommentChanged(),
+                enabled: canEdit,
+                autofocus: draft.commentOpen && !hasComment,
+                minLines: 1,
+                maxLines: 3,
+                maxLength: 500,
+                textCapitalization: TextCapitalization.sentences,
+                style: const TextStyle(
+                  fontSize: 13.5,
+                  color: AppColors.textPrimary,
+                ),
+                decoration: InputDecoration(
+                  hintText: 'Comentário (opcional)',
+                  hintStyle: const TextStyle(color: AppColors.textPlaceholder),
+                  isDense: true,
+                  counterText: '',
+                  filled: true,
+                  fillColor: AppColors.inputBackground,
+                  border: OutlineInputBorder(
+                    borderRadius: BorderRadius.circular(12),
+                    borderSide: const BorderSide(color: AppColors.borderSubtle),
+                  ),
+                  enabledBorder: OutlineInputBorder(
+                    borderRadius: BorderRadius.circular(12),
+                    borderSide: const BorderSide(color: AppColors.borderSubtle),
+                  ),
+                  focusedBorder: OutlineInputBorder(
+                    borderRadius: BorderRadius.circular(12),
+                    borderSide: const BorderSide(color: AppColors.primary),
+                  ),
+                ),
+              ),
+            ),
+          ],
+          if (needsStars || draft.error != null)
+            Padding(
+              padding: const EdgeInsets.only(top: 4, right: 8),
+              child: Text(
+                draft.error ??
+                    'Escolha de 1 a 5 estrelas para enviar o comentário',
+                style: const TextStyle(
+                  fontSize: 12.5,
+                  fontWeight: FontWeight.w600,
+                  color: AppColors.errorText,
+                ),
+              ),
+            ),
         ],
       ),
     );

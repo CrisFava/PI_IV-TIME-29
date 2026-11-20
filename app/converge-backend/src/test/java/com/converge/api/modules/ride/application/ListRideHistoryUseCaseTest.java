@@ -82,4 +82,14 @@ class ListRideHistoryUseCaseTest {
         // Bruno foi recusado: a viagem não aparece no histórico dele
         assertThat(historyOf("bruno", new RideHistoryQuery(UID, null, null, null))).isEmpty();
     }
+
+    @Test
+    @DisplayName("O histórico traz o início e o fim reais da viagem")
+    void shouldShowWhenTheRideReallyStartedAndEnded() {
+        RideHistoryItemDTO item = historyOf("ana", new RideHistoryQuery(UID, null, null, null)).getFirst();
+
+        assertThat(item.startedAt()).isEqualTo(completed.getStartedAt());
+        assertThat(item.completedAt()).isEqualTo(completed.getCompletedAt());
+        assertThat(item.completedAt()).isNotNull();
+    }
 }

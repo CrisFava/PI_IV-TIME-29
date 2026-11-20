@@ -17,7 +17,10 @@ import org.springframework.stereotype.Component;
 import java.time.DayOfWeek;
 import java.time.LocalDate;
 import java.time.ZoneId;
+import java.util.Collection;
+import java.util.HashMap;
 import java.util.List;
+import java.util.Map;
 import java.util.Optional;
 import java.util.Set;
 
@@ -34,6 +37,27 @@ public class RouteAccess {
     public static final ZoneId APP_ZONE = ZoneId.of("America/Sao_Paulo");
 
     private final RouteRepository routeRepository;
+
+    /**
+     * Horário de saída (HH:mm) de cada trajeto, por id. Ids inválidos ou que não existem
+     * ficam de fora. Usado para mostrar ao motorista a hora que o passageiro escolheu.
+     */
+    public Map<String, String> departureTimesOf(Collection<String> routeIds) {
+        List<ObjectId> ids = routeIds.stream()
+                .filter(id -> id != null && ObjectId.isValid(id))
+                .map(ObjectId::new)
+                .toList();
+        if (ids.isEmpty()) {
+            return Map.of();
+        }
+        Map<String, String> times = new HashMap<>();
+        routeRepository.findAllById(ids).forEach(route -> {
+            if (route.getId() != null && route.getDepartureTime() != null) {
+                times.put(route.getId().toHexString(), route.getDepartureTime());
+            }
+        });
+        return times;
+    }
 
     // Trajeto do próprio usuário, que não foi excluído (ACTIVE ou PAUSED)
     public Route getOwnedRoute(String routeId, String userId) {

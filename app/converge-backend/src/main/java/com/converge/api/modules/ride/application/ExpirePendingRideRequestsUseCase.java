@@ -32,11 +32,11 @@ public class ExpirePendingRideRequestsUseCase implements UseCase<LocalDateTime, 
     public ExpirePendingRideRequestsUseCase(
             RideRepository rideRepository,
             ApplicationEventPublisher eventPublisher,
-            @Value("${converge.ride.request-timeout:3m}") Duration requestTimeout
+            @Value("${converge.ride.request-timeout:1h}") Duration requestTimeout
     ) {
         this.rideRepository = rideRepository;
         this.eventPublisher = eventPublisher;
-        this.requestTimeout = requestTimeout != null ? requestTimeout : Duration.ofMinutes(3);
+        this.requestTimeout = requestTimeout != null ? requestTimeout : Duration.ofHours(1);
     }
 
     public int execute() {
@@ -46,7 +46,9 @@ public class ExpirePendingRideRequestsUseCase implements UseCase<LocalDateTime, 
     @Override
     public Integer execute(LocalDateTime now) {
         LocalDateTime cutoff = now.minus(this.requestTimeout);
-        List<Ride> ridesWithExpiredRequests = rideRepository.findRidesWithExpiredRequests(cutoff);
+        // Também os pedidos de viagens que saem em 5 min ou menos: não dá mais para aceitar
+        List<Ride> ridesWithExpiredRequests = rideRepository.findRidesWithExpiredRequests(
+                cutoff, now.plusMinutes(Ride.REQUEST_CUTOFF_MINUTES));
 
         int totalExpired = 0;
 

@@ -6,7 +6,6 @@ import 'package:flutter/services.dart';
 import '../../../../core/config/styles.dart';
 import '../../../../core/utils/currency_formatter.dart';
 import '../../data/models/match_model.dart';
-import '../../../security/presentation/widgets/user_safety_menu.dart';
 import 'match_date_label.dart';
 import 'match_info_chip.dart';
 
@@ -79,10 +78,6 @@ class MatchDriverCard extends StatelessWidget {
                   ],
                 ),
               ),
-              UserSafetyMenu(
-                userId: match.otherUserId,
-                userName: match.otherUserName,
-              ),
             ],
           ),
           const SizedBox(height: 10),
@@ -123,7 +118,9 @@ class MatchDriverCard extends StatelessWidget {
                       ),
                     ),
                     Text(
-                      maxAmount == null
+                      // O teto só aparece quando é maior que a estimativa (com
+                      // outros passageiros); sozinho, a estimativa já é o teto
+                      maxAmount == null || cost == null || maxAmount <= cost
                           ? 'estimativa por passageiro'
                           : 'até ${CurrencyFormatter.format(maxAmount)} se alguém desistir',
                       style: const TextStyle(

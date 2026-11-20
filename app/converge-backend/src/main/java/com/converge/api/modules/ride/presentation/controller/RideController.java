@@ -16,7 +16,10 @@ import com.converge.api.modules.ride.application.LeaveRideUseCase;
 import com.converge.api.modules.ride.application.ListMyRidesUseCase;
 import com.converge.api.modules.ride.application.ArrivePassengerUseCase;
 import com.converge.api.modules.ride.application.ListPendingPaymentsUseCase;
+import com.converge.api.modules.ride.application.BoardPassengerUseCase;
 import com.converge.api.modules.ride.application.MarkNoShowUseCase;
+import com.converge.api.modules.ride.application.PreviewPassengerRideUseCase;
+import com.converge.api.modules.ride.application.dto.RidePreviewResponseDTO;
 import com.converge.api.modules.ride.application.dto.PaymentResponseDTO;
 import com.converge.api.modules.ride.application.RejectPassengerUseCase;
 import com.converge.api.modules.ride.application.RequestRideSeatUseCase;
@@ -60,6 +63,8 @@ public class RideController {
     private final CompleteRideUseCase completeRide;
     private final MarkNoShowUseCase markNoShow;
     private final ArrivePassengerUseCase arrivePassenger;
+    private final BoardPassengerUseCase boardPassenger;
+    private final PreviewPassengerRideUseCase previewPassengerRide;
     private final ListPendingPaymentsUseCase listPendingPayments;
     private final LeaveRideUseCase leaveRide;
     private final AcceptPassengerUseCase acceptPassenger;
@@ -153,6 +158,31 @@ public class RideController {
             @PathVariable String rideId
     ) {
         Ride ride = completeRide.execute(new RideRefCommand(rideId, uid(principal)));
+
+        return ResponseEntity.ok(ApplicationResponse.success(rideView.view(ride, uid(principal))));
+    }
+
+    // Como ficaria a viagem aceitando o pedido (só o motorista): os dois caminhos e o desvio
+    @GetMapping("/{rideId}/passengers/{passengerId}/preview")
+    public ResponseEntity<ApplicationResponse<RidePreviewResponseDTO>> previewPassenger(
+            @AuthenticationPrincipal AuthenticatedUser principal,
+            @PathVariable String rideId,
+            @PathVariable String passengerId
+    ) {
+        RidePreviewResponseDTO preview = previewPassengerRide.execute(
+                new PassengerRequestCommand(rideId, passengerId, uid(principal)));
+
+        return ResponseEntity.ok(ApplicationResponse.success(preview));
+    }
+
+    // "Entrou" (só o motorista): o passageiro embarcou
+    @PostMapping("/{rideId}/passengers/{passengerId}/board")
+    public ResponseEntity<ApplicationResponse<RideResponseDTO>> boardPassenger(
+            @AuthenticationPrincipal AuthenticatedUser principal,
+            @PathVariable String rideId,
+            @PathVariable String passengerId
+    ) {
+        Ride ride = boardPassenger.execute(new PassengerRequestCommand(rideId, passengerId, uid(principal)));
 
         return ResponseEntity.ok(ApplicationResponse.success(rideView.view(ride, uid(principal))));
     }

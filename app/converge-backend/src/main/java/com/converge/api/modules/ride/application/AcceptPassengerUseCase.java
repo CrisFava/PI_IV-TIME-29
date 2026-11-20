@@ -54,7 +54,7 @@ public class AcceptPassengerUseCase implements UseCase<PassengerRequestCommand, 
             BlockAccess blockAccess
     ) {
         this(rideAccess, rideEligibility, rideCostCalculator, rideItineraryService, rideRepository, eventPublisher,
-                blockAccess, Duration.ofMinutes(3));
+                blockAccess, Duration.ofHours(1));
     }
 
     @Autowired
@@ -66,7 +66,7 @@ public class AcceptPassengerUseCase implements UseCase<PassengerRequestCommand, 
             RideRepository rideRepository,
             ApplicationEventPublisher eventPublisher,
             BlockAccess blockAccess,
-            @Value("${converge.ride.request-timeout:3m}") Duration requestTimeout
+            @Value("${converge.ride.request-timeout:1h}") Duration requestTimeout
     ) {
         this.rideAccess = rideAccess;
         this.rideEligibility = rideEligibility;
@@ -75,7 +75,7 @@ public class AcceptPassengerUseCase implements UseCase<PassengerRequestCommand, 
         this.rideRepository = rideRepository;
         this.eventPublisher = eventPublisher;
         this.blockAccess = blockAccess;
-        this.requestTimeout = requestTimeout != null ? requestTimeout : Duration.ofMinutes(3);
+        this.requestTimeout = requestTimeout != null ? requestTimeout : Duration.ofHours(1);
     }
 
     @Override

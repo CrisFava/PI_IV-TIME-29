@@ -7,5 +7,6 @@ public enum ReportReason {
     LATE_NO_SHOW,
     INAPPROPRIATE_CONDUCT,
     IMPROPER_CHARGE,
+    NON_PAYMENT,
     OTHER
 }

@@ -50,6 +50,19 @@ void main() {
       expect(targets.single.isDriver, isTrue);
     });
 
+    test(
+      'avalia o motorista assim que desce, com a viagem ainda em andamento',
+      () {
+        final targets = pendingReviewTargets(
+          ride: fakeRide(status: 'IN_PROGRESS', passengerStatus: 'COMPLETED'),
+          viewerId: fakePassengerId,
+          given: const [],
+        );
+
+        expect(targets.single.userId, fakeDriverId);
+      },
+    );
+
     test('não tem mais ninguém para avaliar depois de avaliar o motorista', () {
       final targets = pendingReviewTargets(
         ride: completedRide,

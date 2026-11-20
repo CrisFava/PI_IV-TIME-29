@@ -32,23 +32,35 @@ class RideHistoryFilterBar extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return Wrap(
-      spacing: 6,
-      runSpacing: 6,
+    // Uma linha para o papel e outra para o período: nenhum filtro fica sozinho
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        for (final (label, role) in _roles)
-          _chip(
-            label,
-            filter.role == role,
-            () => onChanged(filter.copyWith(role: role)),
-          ),
-        const SizedBox(width: 6),
-        for (final (label, days) in _periods)
-          _chip(
-            label,
-            filter.lastDays == days,
-            () => onChanged(filter.copyWith(lastDays: days)),
-          ),
+        Wrap(
+          spacing: 6,
+          runSpacing: 6,
+          children: [
+            for (final (label, role) in _roles)
+              _chip(
+                label,
+                filter.role == role,
+                () => onChanged(filter.copyWith(role: role)),
+              ),
+          ],
+        ),
+        const SizedBox(height: 6),
+        Wrap(
+          spacing: 6,
+          runSpacing: 6,
+          children: [
+            for (final (label, days) in _periods)
+              _chip(
+                label,
+                filter.lastDays == days,
+                () => onChanged(filter.copyWith(lastDays: days)),
+              ),
+          ],
+        ),
       ],
     );
   }

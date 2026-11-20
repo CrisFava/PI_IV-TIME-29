@@ -2,53 +2,32 @@
 
 import 'package:flutter/material.dart';
 
-import '../../../../core/config/styles.dart';
-import '../../../../core/widgets/action_alert_card.dart';
+import '../../../../core/widgets/in_app_notification_card.dart';
 import '../../data/models/match_model.dart';
-import 'match_date_label.dart';
 
-/// Aviso do passageiro: o motorista mais compatível com o pedido. Confirmar pede a
-/// vaga; recusar mostra o próximo motorista (a lista continua no painel).
+/// Notificação do passageiro: apareceu um motorista compatível enquanto ele estava
+/// fora da lista. Tocar volta para a lista, que é onde ele pede a vaga.
 class DriverSuggestionAlert extends StatelessWidget {
   final MatchModel match;
-  final bool isBusy;
-  final VoidCallback onConfirm;
-  final VoidCallback onDecline;
+  final VoidCallback onOpen;
+  final VoidCallback onDismiss;
 
   const DriverSuggestionAlert({
     super.key,
     required this.match,
-    required this.onConfirm,
-    required this.onDecline,
-    this.isBusy = false,
+    required this.onOpen,
+    required this.onDismiss,
   });
 
   @override
   Widget build(BuildContext context) {
-    final vehicle = match.vehicle?.description ?? '';
-    final date = match.nextRideDate;
-    final when = date == null
-        ? 'às ${match.departureTime}'
-        : '${matchDateLabel(date)} às ${match.departureTime}';
-
-    return ActionAlertCard(
+    return InAppNotificationCard(
       key: ValueKey('driver_suggestion_${match.driverRouteId}'),
       icon: Icons.directions_car_rounded,
-      accentColor: AppColors.primary,
-      accentBackground: AppColors.neutralLight,
       title: 'Motorista disponível',
-      message: vehicle.isEmpty
-          ? '${match.otherUserName} pode te dar carona.'
-          : '${match.otherUserName} pode te dar carona ($vehicle).',
-      details: [
-        (Icons.trip_origin_rounded, 'Sai de ${match.origin.address}, $when'),
-        (Icons.flag_rounded, 'Vai até ${match.destination.address}'),
-      ],
-      primaryLabel: 'Confirmar carona',
-      secondaryLabel: 'Recusar',
-      isBusy: isBusy,
-      onPrimary: onConfirm,
-      onSecondary: onDecline,
+      message: '${match.otherUserName} pode te dar carona. Toque para ver.',
+      onTap: onOpen,
+      onDismiss: onDismiss,
     );
   }
 }

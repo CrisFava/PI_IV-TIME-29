@@ -8,6 +8,7 @@ import '../../../../core/network/api_response.dart';
 import '../../../../core/network/dio_client.dart';
 import '../models/ride_model.dart';
 import '../models/ride_payment_model.dart';
+import '../models/ride_preview_model.dart';
 import 'ride_endpoints.dart';
 import 'ride_repository.dart';
 
@@ -95,6 +96,29 @@ class RideRepositoryImpl implements RideRepository {
   @override
   Future<RideModel> markNoShow(String rideId, String passengerId) =>
       _postRide(RideEndpoints.noShow(rideId, passengerId));
+
+  @override
+  Future<RidePreviewModel> previewPassenger(
+    String rideId,
+    String passengerId,
+  ) async {
+    try {
+      final response = await _dio.get<dynamic>(
+        RideEndpoints.preview(rideId, passengerId),
+      );
+      return unwrapApiResponse<RidePreviewModel>(
+        response.data,
+        RidePreviewModel.fromJson,
+        status: response.statusCode ?? 200,
+      );
+    } on DioException catch (e) {
+      throw e.toApiException();
+    }
+  }
+
+  @override
+  Future<RideModel> boardPassenger(String rideId, String passengerId) =>
+      _postRide(RideEndpoints.board(rideId, passengerId));
 
   @override
   Future<RideModel> arrivePassenger(String rideId, String passengerId) =>

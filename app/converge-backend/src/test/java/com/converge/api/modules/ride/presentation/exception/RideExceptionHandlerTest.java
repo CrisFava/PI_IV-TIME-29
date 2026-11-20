@@ -6,6 +6,8 @@ import com.converge.api.modules.ride.application.ListPendingPaymentsUseCase;
 import com.converge.api.modules.ride.application.ArrivePassengerUseCase;
 import com.converge.api.modules.ride.application.ListRideHistoryUseCase;
 import com.converge.api.modules.ride.application.AcceptPassengerUseCase;
+import com.converge.api.modules.ride.application.BoardPassengerUseCase;
+import com.converge.api.modules.ride.application.PreviewPassengerRideUseCase;
 import com.converge.api.modules.ride.application.CancelRideUseCase;
 import com.converge.api.modules.ride.application.CompleteRideUseCase;
 import com.converge.api.modules.ride.application.GetRideUseCase;
@@ -52,6 +54,8 @@ class RideExceptionHandlerTest {
     @Mock private ArrivePassengerUseCase arrivePassenger;
     @Mock private ListPendingPaymentsUseCase listPendingPayments;
     @Mock private LeaveRideUseCase leaveRide;
+    @Mock private BoardPassengerUseCase boardPassenger;
+    @Mock private PreviewPassengerRideUseCase previewPassengerRide;
     @Mock private AcceptPassengerUseCase acceptPassenger;
     @Mock private RejectPassengerUseCase rejectPassenger;
     @Mock private ListMyRidesUseCase listMyRides;
@@ -65,7 +69,7 @@ class RideExceptionHandlerTest {
     @BeforeEach
     void setUp() {
         RideController controller = new RideController(
-                requestRideSeat, startRide, completeRide, markNoShow, arrivePassenger, listPendingPayments, leaveRide,
+                requestRideSeat, startRide, completeRide, markNoShow, arrivePassenger, boardPassenger, previewPassengerRide, listPendingPayments, leaveRide,
                 acceptPassenger, rejectPassenger, listMyRides, listRideHistory, getRide, cancelRide, rideView);
 
         HandlerMethodArgumentResolver authenticatedUser = new HandlerMethodArgumentResolver() {

@@ -56,7 +56,7 @@ class SocketMatchingGatewayTest {
     }
 
     private static MatchingRoute search() {
-        return new MatchingRoute("search-1", "passenger-1", -22.9000, -47.0600, -22.8337, -47.0524, "07:10", DAYS,
+        return new MatchingRoute("search-1", "passenger-1", -22.9000, -47.0600, -22.8337, -47.0524, "06:50", DAYS,
                 null, null, null, null, null, null, null);
     }
 

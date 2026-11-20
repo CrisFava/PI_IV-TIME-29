@@ -31,9 +31,19 @@ public class RideItineraryPlanner {
     private final DistanceGateway distanceGateway;
 
     public List<RideStop> plan(Ride ride) {
+        return plan(ride, null);
+    }
+
+    /**
+     * Igual ao [plan], mas contando também [candidateId] como confirmado: é como
+     * ficaria a viagem se o motorista aceitasse o pedido dele.
+     */
+    public List<RideStop> plan(Ride ride, String candidateId) {
         List<Participant> passengers = ride.getParticipants().stream()
                 .filter(participant -> participant.getRole() == ParticipationRole.PASSENGER)
-                .filter(participant -> participant.getStatus() == ParticipantStatus.CONFIRMED)
+                .filter(participant -> participant.getStatus() == ParticipantStatus.CONFIRMED
+                        || (participant.getStatus() == ParticipantStatus.REQUESTED
+                        && participant.getUserId().equals(candidateId)))
                 .filter(participant -> participant.getBoardingLocation() != null
                         && participant.getDropOffLocation() != null)
                 .toList();

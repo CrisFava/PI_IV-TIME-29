@@ -93,6 +93,10 @@ public class Participant {
     @Nullable
     private LocalDateTime confirmedAt;
 
+    // Quando o motorista confirmou que o passageiro entrou no carro
+    @Nullable
+    private LocalDateTime boardedAt;
+
     @Nullable
     private LocalDateTime cancelledAt;
 
@@ -143,6 +147,13 @@ public class Participant {
         this.respondedAt = now;
         this.paymentStatus = ParticipantPaymentStatus.NOT_APPLICABLE;
         this.updatedAt = now;
+    }
+
+    public void board(LocalDateTime now) {
+        if (this.boardedAt == null) {
+            this.boardedAt = now;
+            this.updatedAt = now;
+        }
     }
 
     public void complete(LocalDateTime now) {

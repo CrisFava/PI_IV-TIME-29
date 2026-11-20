@@ -5,8 +5,10 @@ package com.converge.api.modules.ride.domain.model;
 import com.converge.api.modules.ride.domain.enums.ParticipantPaymentStatus;
 import com.converge.api.modules.ride.domain.enums.ParticipantStatus;
 import com.converge.api.modules.ride.domain.enums.RideStatus;
+import com.converge.api.modules.ride.domain.enums.RideStopType;
 import com.converge.api.modules.ride.domain.model.subtypes.Participant;
 import com.converge.api.modules.ride.domain.model.subtypes.RideCosts;
+import com.converge.api.modules.ride.domain.model.subtypes.RideStop;
 import com.converge.api.modules.ride.domain.model.subtypes.VehicleSnapshot;
 import com.converge.api.modules.route.domain.model.subtypes.Coordinates;
 import com.converge.api.modules.route.domain.model.subtypes.Place;
@@ -23,6 +25,7 @@ import org.springframework.test.util.ReflectionTestUtils;
 import java.math.BigDecimal;
 import java.time.DayOfWeek;
 import java.time.LocalDateTime;
+import java.util.List;
 import java.util.Map;
 import java.util.Set;
 
@@ -504,6 +507,93 @@ class RideTest {
         assertThat(passenger.getFinalAmount()).isEqualByComparingTo("0");
         assertThat(passenger.getPaymentStatus()).isEqualTo(ParticipantPaymentStatus.NOT_APPLICABLE);
         assertThat(ride.getAvailableSeats()).isEqualTo(3);
+    }
+
+    @Test
+    @DisplayName("Bloqueio: o motorista que bloqueia tira o passageiro; o passageiro que bloqueia sai, sem penalidade")
+    void shouldSeparateUsersAfterBlock() {
+        Ride byDriver = validRide();
+        byDriver.requestSeat("passenger-1", "route-1", place("Rua A"), place("Campus PUC"));
+        byDriver.acceptPassenger("passenger-1");
+
+        assertThat(byDriver.separateAfterBlock(byDriver.getDriverId(), "passenger-1", "Bloqueio")).isEqualTo("passenger-1");
+        Participant removed = byDriver.getParticipants().get(1);
+        assertThat(removed.getStatus()).isEqualTo(ParticipantStatus.CANCELLED);
+        assertThat(removed.isLateCancellation()).isFalse();
+        assertThat(byDriver.getAvailableSeats()).isEqualTo(3);
+
+        Ride byPassenger = validRide();
+        byPassenger.requestSeat("passenger-1", "route-1", place("Rua A"), place("Campus PUC"));
+        assertThat(byPassenger.separateAfterBlock("passenger-1", byPassenger.getDriverId(), "Bloqueio"))
+                .isEqualTo("passenger-1");
+        assertThat(byPassenger.getParticipants().get(1).getStatus()).isEqualTo(ParticipantStatus.REJECTED);
+    }
+
+    @Test
+    @DisplayName("A parada atual da viagem avança quando o passageiro entra")
+    void shouldAdvanceNextStopWhenPassengerBoards() {
+        Ride ride = rideInProgress();
+        ride.updateItinerary(List.of(
+                new RideStop(RideStopType.PICKUP, "passenger-1", place("Rua A")),
+                new RideStop(RideStopType.DROPOFF, "passenger-1", place("Campus PUC"))
+        ), 10.0, "inteiro");
+
+        assertThat(ride.getItineraryNextStop()).isZero();
+        ride.boardPassenger("passenger-1");
+        assertThat(ride.getItineraryNextStop()).isEqualTo(1);
+    }
+
+    @Test
+    @DisplayName("A parada atual considera a participação confirmada, mesmo com um pedido cancelado antes")
+    void shouldUseConfirmedParticipationForNextStop() {
+        Ride ride = validRide();
+        ride.requestSeat("passenger-1", "route-1", place("Rua A"), place("Campus PUC"));
+        ride.leave("passenger-1", null);
+        ride.requestSeat("passenger-1", "route-1", place("Rua A"), place("Campus PUC"));
+        ride.acceptPassenger("passenger-1");
+        ride.start();
+        ride.updateItinerary(List.of(
+                new RideStop(RideStopType.PICKUP, "passenger-1", place("Rua A")),
+                new RideStop(RideStopType.DROPOFF, "passenger-1", place("Campus PUC"))
+        ), 10.0, "inteiro");
+
+        assertThat(ride.getItineraryNextStop()).isZero();
+    }
+
+    @Test
+    @DisplayName("Bloqueio não mexe em viagem que já começou")
+    void shouldNotSeparateUsersDuringTheRide() {
+        Ride ride = rideInProgress();
+
+        assertThat(ride.separateAfterBlock(ride.getDriverId(), "passenger-1", "Bloqueio")).isNull();
+        assertThat(ride.getParticipants().get(1).getStatus()).isEqualTo(ParticipantStatus.CONFIRMED);
+    }
+
+    @Test
+    @DisplayName("Quem já entrou no carro não pode ser marcado como ausente")
+    void shouldNotMarkNoShowAfterBoarding() {
+        Ride ride = rideInProgress();
+
+        ride.boardPassenger("passenger-1");
+
+        assertThat(ride.getParticipants().get(1).getBoardedAt()).isNotNull();
+        assertThatThrownBy(() -> ride.markNoShow("passenger-1")).isInstanceOf(ApplicationException.class);
+    }
+
+    @Test
+    @DisplayName("Os trechos do caminho só valem com um trecho por parada mais o último até o destino")
+    void shouldKeepLegsOnlyWhenTheyMatchTheStops() {
+        Ride ride = rideInProgress();
+        List<RideStop> stops = List.of(
+                new RideStop(RideStopType.PICKUP, "passenger-1", place("Rua A")),
+                new RideStop(RideStopType.DROPOFF, "passenger-1", place("Campus PUC"))
+        );
+
+        ride.updateItinerary(stops, 10.0, "inteiro", 30, List.of("a", "b", "c"));
+        assertThat(ride.getItineraryLegPolylines()).containsExactly("a", "b", "c");
+
+        ride.updateItinerary(stops, 10.0, "inteiro", 30, List.of("a", "b"));
+        assertThat(ride.getItineraryLegPolylines()).isEmpty();
     }
 
     @Test

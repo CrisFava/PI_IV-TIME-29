@@ -19,6 +19,7 @@ Future<bool> showReportSheet(
   required String reportedId,
   required String reportedName,
   String? rideId,
+  bool canReportNonPayment = false,
 }) async {
   final sent = await showModalBottomSheet<bool>(
     context: context,
@@ -31,6 +32,7 @@ Future<bool> showReportSheet(
       reportedId: reportedId,
       reportedName: reportedName,
       rideId: rideId,
+      canReportNonPayment: canReportNonPayment,
     ),
   );
   return sent ?? false;
@@ -41,11 +43,15 @@ class ReportSheet extends ConsumerStatefulWidget {
   final String reportedName;
   final String? rideId;
 
+  /// O motorista denunciando um passageiro da viagem: aparece "Não pagou a carona".
+  final bool canReportNonPayment;
+
   const ReportSheet({
     super.key,
     required this.reportedId,
     required this.reportedName,
     this.rideId,
+    this.canReportNonPayment = false,
   });
 
   @override
@@ -62,7 +68,10 @@ class _ReportSheetState extends ConsumerState<ReportSheet> {
 
   List<ReportReason> get _reasons => [
     for (final reason in ReportReason.values)
-      if (reason != ReportReason.lateNoShow || _hasRide) reason,
+      if ((reason != ReportReason.lateNoShow || _hasRide) &&
+          (reason != ReportReason.nonPayment ||
+              (widget.canReportNonPayment && _hasRide)))
+        reason,
   ];
 
   /// "Outro motivo" precisa de descrição, como no backend.

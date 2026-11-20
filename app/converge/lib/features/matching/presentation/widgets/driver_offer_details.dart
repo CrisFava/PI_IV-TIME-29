@@ -1,6 +1,7 @@
 // Autor: Gustavo Alves de Siqueira Costa - RA 25001650
 
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../../../core/config/styles.dart';
@@ -10,11 +11,15 @@ import '../../../../core/widgets/details_stat_tile.dart';
 import '../../../ride/presentation/widgets/ride_place_line.dart';
 import '../../../route/data/models/route_recurrence.dart';
 import '../../data/models/driver_offer.dart';
+import '../../data/models/driver_ride_request.dart';
 import '../../state/driver_offers_provider.dart';
 import '../../state/driver_ride_actions_controller.dart';
+import '../../../../core/widgets/details_sheet.dart';
+import '../../../ride/presentation/widgets/ride_route_overview.dart';
 import 'driver_offer_title.dart';
 import 'driver_ride_card.dart';
 import 'matching_message.dart';
+import 'offer_ride_requests.dart';
 
 /// Detalhes de uma carona de "Minhas caronas": o trajeto completo, as vagas, cada
 /// viagem com os passageiros (e o chat) e "Cancelar carona". Acompanha a lista,
@@ -28,14 +33,19 @@ class DriverOfferDetails extends ConsumerStatefulWidget {
   /// Pede a confirmação e cancela; devolve se cancelou.
   final Future<bool> Function(String routeId) onCancelOffer;
 
-  /// Cancela só uma viagem (pede a confirmação antes).
-  final ValueChanged<String> onCancelRide;
-
   /// Marca um passageiro como ausente na viagem em andamento.
   final void Function(String rideId, String passengerId) onMarkNoShow;
 
+  /// Respostas aos pedidos de vaga desta carona.
+  final ValueChanged<DriverRideRequest> onAcceptRequest;
+  final ValueChanged<DriverRideRequest> onRejectRequest;
+  final ValueChanged<DriverRideRequest> onOpenRequestChat;
+
   /// Confirma a chegada de um passageiro na viagem em andamento (ele recebe a cobrança).
   final void Function(String rideId, String passengerId) onArrive;
+
+  /// Tira um passageiro confirmado da viagem (com confirmação; ele é avisado).
+  final void Function(String rideId, String passengerId) onRemovePassenger;
 
   const DriverOfferDetails({
     super.key,
@@ -44,9 +54,12 @@ class DriverOfferDetails extends ConsumerStatefulWidget {
     required this.onCompleteRide,
     required this.onOpenChat,
     required this.onCancelOffer,
-    required this.onCancelRide,
     required this.onMarkNoShow,
+    required this.onAcceptRequest,
+    required this.onRejectRequest,
+    required this.onOpenRequestChat,
     required this.onArrive,
+    required this.onRemovePassenger,
   });
 
   @override
@@ -62,11 +75,11 @@ class _DriverOfferDetailsState extends ConsumerState<DriverOfferDetails> {
   static String _km(double value) =>
       value.toStringAsFixed(1).replaceAll('.', ',');
 
-  Future<void> _cancel(String routeId) async {
+  Future<void> _cancel(String offerKey) async {
     // A folha de detalhes antes da espera: depois dela, só fecha se ainda for a da frente
     final sheet = ModalRoute.of(context);
     setState(() => _cancelling = true);
-    final cancelled = await widget.onCancelOffer(routeId);
+    final cancelled = await widget.onCancelOffer(offerKey);
     if (!mounted) return;
     if (cancelled) {
       if (sheet != null && sheet.isCurrent) Navigator.of(context).pop();
@@ -94,7 +107,12 @@ class _DriverOfferDetailsState extends ConsumerState<DriverOfferDetails> {
     final firstRide = offer.rides.isEmpty ? null : offer.rides.first;
     final distanceKm = route?.routeDistanceKm;
     final detourKm = route?.maxDetourKm;
-    final seats = route?.totalSeats;
+    final seats = route?.totalSeats ?? firstRide?.totalSeats;
+    // Ocupadas na próxima viagem (sobe a cada passageiro aceito)
+    final nextRide = offer.actionableRide ?? offer.openRides.firstOrNull;
+    final occupied = nextRide == null
+        ? 0
+        : nextRide.totalSeats - nextRide.availableSeats;
     final stats = [
       if (distanceKm != null)
         DetailsStatTile(
@@ -111,8 +129,8 @@ class _DriverOfferDetailsState extends ConsumerState<DriverOfferDetails> {
       if (seats != null)
         DetailsStatTile(
           icon: Icons.event_seat_rounded,
-          value: '$seats',
-          label: seats == 1 ? 'Vaga' : 'Vagas',
+          value: '$occupied/$seats',
+          label: 'Vagas ocupadas',
         ),
     ];
 
@@ -167,6 +185,49 @@ class _DriverOfferDetailsState extends ConsumerState<DriverOfferDetails> {
               ],
             ),
           ),
+        // O trajeto completo da próxima viagem (ou só o caminho, sem ninguém aceito)
+        if (nextRide != null || route != null)
+          Padding(
+            padding: const EdgeInsets.only(top: 12),
+            child: FilledButton.icon(
+              key: const ValueKey('offer_full_route'),
+              onPressed: () {
+                HapticFeedback.mediumImpact();
+                final ride = nextRide;
+                showDetailsSheet<void>(
+                  context,
+                  title: 'Trajeto completo',
+                  builder: (_) => ride != null
+                      ? RideRouteOverview.ofRide(
+                          ride,
+                          fallbackPolyline: route?.encodedPolyline,
+                          fallbackDistanceKm: route?.routeDistanceKm,
+                        )
+                      : RideRouteOverview.ofRoute(route!),
+                );
+              },
+              style: FilledButton.styleFrom(
+                backgroundColor: AppColors.primary,
+                foregroundColor: AppColors.textLight,
+                padding: const EdgeInsets.symmetric(vertical: 12),
+                shape: RoundedRectangleBorder(
+                  borderRadius: BorderRadius.circular(12),
+                ),
+              ),
+              icon: const Icon(Icons.route_rounded, size: 20),
+              label: const Text(
+                'Ver trajeto completo',
+                style: TextStyle(fontWeight: FontWeight.w700),
+              ),
+            ),
+          ),
+        // Pedidos esperando resposta: só aqui, dentro da carona
+        OfferRideRequests(
+          offer: offer,
+          onAccept: widget.onAcceptRequest,
+          onReject: widget.onRejectRequest,
+          onOpenChat: widget.onOpenRequestChat,
+        ),
         DetailsSection(
           title: 'Viagens',
           child: offer.rides.isEmpty
@@ -187,22 +248,24 @@ class _DriverOfferDetailsState extends ConsumerState<DriverOfferDetails> {
                           onComplete: () => widget.onCompleteRide(ride.id),
                           onOpenChat: (passengerId) =>
                               widget.onOpenChat(ride.id, passengerId),
-                          onCancel: () => widget.onCancelRide(ride.id),
                           onMarkNoShow: (passengerId) =>
                               widget.onMarkNoShow(ride.id, passengerId),
                           onArrive: (passengerId) =>
                               widget.onArrive(ride.id, passengerId),
+                          onRemovePassenger: (passengerId) =>
+                              widget.onRemovePassenger(ride.id, passengerId),
                         ),
                       ),
                   ],
                 ),
         ),
-        if (route != null)
+        // Um cancelar só: a carona e as viagens marcadas dela
+        if (route != null || offer.hasOpenRides)
           DetailsDangerButton(
-            key: ValueKey('cancel_offer_${route.id}'),
+            key: ValueKey('cancel_offer_${offer.key}'),
             label: 'Cancelar carona',
             isBusy: _cancelling,
-            onPressed: () => _cancel(route.id),
+            onPressed: () => _cancel(offer.key),
           ),
       ],
     );

@@ -32,6 +32,9 @@ class DriverRideCard extends StatelessWidget {
   /// "Chegou": confirma a chegada de um passageiro, que já recebe a cobrança.
   final ValueChanged<String>? onArrive;
 
+  /// Antes de a viagem começar: tirar um passageiro confirmado (pede confirmação).
+  final ValueChanged<String>? onRemovePassenger;
+
   const DriverRideCard({
     super.key,
     required this.ride,
@@ -41,6 +44,7 @@ class DriverRideCard extends StatelessWidget {
     this.onCancel,
     this.onMarkNoShow,
     this.onArrive,
+    this.onRemovePassenger,
     this.isBusy = false,
   });
 
@@ -126,6 +130,25 @@ class DriverRideCard extends StatelessWidget {
                       ),
                     ),
                   ),
+                  // Antes de começar: o motorista pode tirar o passageiro da viagem
+                  if (!inProgress && onRemovePassenger != null)
+                    TextButton(
+                      key: ValueKey('remove_${passenger.userId}'),
+                      onPressed: isBusy
+                          ? null
+                          : () {
+                              HapticFeedback.lightImpact();
+                              onRemovePassenger!(passenger.userId!);
+                            },
+                      style: TextButton.styleFrom(
+                        foregroundColor: AppColors.error,
+                        visualDensity: VisualDensity.compact,
+                      ),
+                      child: const Text(
+                        'Remover',
+                        style: TextStyle(fontWeight: FontWeight.w700),
+                      ),
+                    ),
                   // Durante a viagem, o motorista confirma quem desceu
                   if (inProgress && onArrive != null)
                     TextButton(

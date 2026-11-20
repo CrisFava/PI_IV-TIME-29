@@ -37,12 +37,13 @@ import java.util.Set;
 public class MatchRoutesHandler implements RequestHandler<MatchRoutesRequest, MatchRoutesResponse> {
 
     // Janela de horário em relação à saída do passageiro: o motorista pode sair até
-    // 30 min antes ou até 5 min depois (o passageiro não espera muito além do horário dele)
-    static final int MAX_DRIVER_EARLIER_MIN = 30;
-    static final int MAX_DRIVER_LATER_MIN = 5;
+    // 5 min antes ou até 30 min depois. Visto pelo motorista: entram os passageiros que
+    // querem sair de 30 min antes a 5 min depois do horário dele
+    static final int MAX_DRIVER_EARLIER_MIN = 5;
+    static final int MAX_DRIVER_LATER_MIN = 30;
 
     // Maior diferença aceita: normaliza a nota de horário do índice
-    static final int MAX_SCHEDULE_DIFFERENCE_MIN = MAX_DRIVER_EARLIER_MIN;
+    static final int MAX_SCHEDULE_DIFFERENCE_MIN = MAX_DRIVER_LATER_MIN;
 
     // Pesos do índice. Somam 1, então o índice fica entre 0 e 1.
     static final double PICKUP_WEIGHT = 0.4;

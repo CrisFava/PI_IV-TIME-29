@@ -5,6 +5,9 @@ enum ReportReason {
   lateNoShow('LATE_NO_SHOW', 'Atraso ou ausência'),
   inappropriateConduct('INAPPROPRIATE_CONDUCT', 'Conduta inadequada'),
   improperCharge('IMPROPER_CHARGE', 'Cobrança indevida'),
+
+  /// Só o motorista, sobre um passageiro da viagem que não pagou (inadimplência).
+  nonPayment('NON_PAYMENT', 'Não pagou a carona'),
   other('OTHER', 'Outro motivo');
 
   final String value;

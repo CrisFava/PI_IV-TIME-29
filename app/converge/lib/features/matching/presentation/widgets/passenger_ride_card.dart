@@ -8,7 +8,6 @@ import '../../../../core/widgets/more_info_hint.dart';
 import '../../../ride/data/models/ride_model.dart';
 import '../../../ride/data/models/ride_status.dart';
 import '../../../ride/presentation/widgets/ride_place_line.dart';
-import '../../../ride/presentation/widgets/ride_role_tag.dart';
 import 'match_date_label.dart';
 
 /// Uma viagem em que o usuário vai como passageiro, em "Minhas caronas": quando
@@ -79,7 +78,6 @@ class PassengerRideCard extends StatelessWidget {
                       ),
                     ),
                   ),
-                  const RideRoleTag(isDriver: false),
                 ],
               ),
               const SizedBox(height: 8),

@@ -52,6 +52,14 @@ class RideDockNavigation extends StatefulWidget {
   /// carro ganha o anel verde pulsante.
   final bool isOnTrip;
 
+  /// Com a viagem em andamento ([isOnShift] ou [isOnTrip]), tocar no botão verde
+  /// chama isto (o modo viagem) em vez de abrir o menu.
+  final VoidCallback? onTripTap;
+
+  /// O passageiro está procurando motorista (lista ou esperando a resposta): o
+  /// botão do carro ganha o anel azul pulsante. Para quando o pedido é aceito.
+  final bool isLookingForDriver;
+
   /// Mensagens do chat ainda não vistas: o número aparece na aba "Chat".
   final int chatUnreadCount;
 
@@ -83,6 +91,8 @@ class RideDockNavigation extends StatefulWidget {
     this.onAddVehicle,
     this.isSearchingRide = false,
     this.isOnTrip = false,
+    this.onTripTap,
+    this.isLookingForDriver = false,
     this.chatUnreadCount = 0,
     this.rideSearchTitle = 'Procurando motorista',
     this.rideSearchDestination,
@@ -324,10 +334,27 @@ class _RideDockNavigationState extends State<RideDockNavigation>
                     top: -10 + (16 * progress),
                     child: _CenterRideButton(
                       progress: progress,
-                      onPressed: _handleToggle,
-                      // Só o anel verde, na viagem em andamento (motorista ou passageiro)
+                      semanticLabel:
+                          (widget.isOnShift || widget.isOnTrip) &&
+                              widget.onTripTap != null &&
+                              !_effectiveIsOpen
+                          ? 'Abrir a viagem em andamento'
+                          : null,
+                      onPressed:
+                          (widget.isOnShift || widget.isOnTrip) &&
+                              widget.onTripTap != null &&
+                              !_effectiveIsOpen
+                          ? () {
+                              HapticFeedback.mediumImpact();
+                              widget.onTripTap!();
+                            }
+                          : _handleToggle,
+                      // Verde na viagem em andamento (motorista ou passageiro); azul
+                      // enquanto o passageiro procura motorista, até o pedido ser aceito
                       pulseColor: widget.isOnShift || widget.isOnTrip
                           ? AppColors.success
+                          : widget.isLookingForDriver
+                          ? AppColors.info
                           : null,
                     ),
                   ),
@@ -447,12 +474,16 @@ class _CenterRideButton extends StatefulWidget {
   final double progress;
   final VoidCallback onPressed;
 
+  /// Leitor de tela: o que o toque faz quando não é abrir/fechar o menu.
+  final String? semanticLabel;
+
   /// Cor do anel pulsante; null deixa o botão sem destaque.
   final Color? pulseColor;
 
   const _CenterRideButton({
     required this.progress,
     required this.onPressed,
+    this.semanticLabel,
     this.pulseColor,
   });
 
@@ -526,9 +557,9 @@ class _CenterRideButtonState extends State<_CenterRideButton>
     final isExpanded = progress > 0.5;
 
     return Semantics(
-      label: isExpanded
-          ? 'Fechar opções de Caronas'
-          : 'Abrir opções de Caronas',
+      label:
+          widget.semanticLabel ??
+          (isExpanded ? 'Fechar opções de Caronas' : 'Abrir opções de Caronas'),
       button: true,
       child: GestureDetector(
         onTapDown: (_) => setState(() => _isPressed = true),

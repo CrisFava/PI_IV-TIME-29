@@ -27,6 +27,9 @@ public record RideHistoryItemDTO(
         RideStatus rideStatus,
         ParticipantStatus participantStatus,
         LocalDateTime departureDateTime,
+        // Início e fim reais (sem início guardado, vale o horário marcado)
+        LocalDateTime startedAt,
+        LocalDateTime completedAt,
         PlaceResponseDTO origin,
         PlaceResponseDTO destination,
         VehicleSnapshot vehicle,

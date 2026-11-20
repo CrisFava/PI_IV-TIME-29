@@ -38,8 +38,9 @@ class _PendingPaymentPromptState extends ConsumerState<PendingPaymentPrompt> {
     // cobrança que acabou de ser paga, e o pagamento abriria de novo. Com erro na
     // consulta, o valor também é o antigo: espera a próxima consulta dar certo.
     final pending = payments.value;
-    if (_open || payments.isLoading || payments.hasError || pending == null)
+    if (_open || payments.isLoading || payments.hasError || pending == null) {
       return;
+    }
 
     final payment = ref
         .read(paymentPromptProvider.notifier)

@@ -18,8 +18,10 @@ import java.util.List;
 import java.util.Optional;
 
 /**
- * Porta de leitura para os outros módulos (ex.: review) saberem quem participou de uma viagem concluída.
- * Devolve vazio quando a viagem não existe ou ainda não foi concluída.
+ * Porta de leitura para os outros módulos (ex.: review) saberem quem participou de uma viagem.
+ * Vale a viagem concluída e também a em andamento: quem já desceu (a viagem dele terminou)
+ * pode avaliar e ser avaliado, sem esperar os outros. Vazio quando a viagem não existe ou
+ * ainda não começou.
  */
 @Service
 @RequiredArgsConstructor
@@ -35,7 +37,8 @@ public class GetCompletedRideParticipantsUseCase
         }
 
         return rideRepository.findById(new ObjectId(rideId))
-                .filter(ride -> ride.getStatus() == RideStatus.COMPLETED)
+                .filter(ride -> ride.getStatus() == RideStatus.COMPLETED
+                        || ride.getStatus() == RideStatus.IN_PROGRESS)
                 .map(this::toParticipants);
     }
 

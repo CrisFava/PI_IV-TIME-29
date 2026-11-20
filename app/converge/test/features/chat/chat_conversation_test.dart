@@ -2,13 +2,14 @@
 
 import 'package:converge/features/chat/data/models/chat_conversation.dart';
 import 'package:converge/features/chat/data/models/chat_thread_ref.dart';
+import 'package:converge/features/chat/state/chat_providers.dart';
 import 'package:flutter_test/flutter_test.dart';
 
 import '../ride/fakes/fake_ride.dart';
 
 void main() {
   group('ChatConversation.ofRide', () {
-    test('motorista tem uma conversa com cada passageiro aceito', () {
+    test('motorista tem uma conversa só, em grupo, com os passageiros aceitos', () {
       final ride = fakeRide(
         extraParticipants: [
           {
@@ -28,15 +29,9 @@ void main() {
 
       final conversations = ChatConversation.ofRide(ride, fakeDriverId);
 
-      expect(conversations.map((c) => c.thread.passengerId), [
-        fakePassengerId,
-        'passenger-2',
-      ]);
-      expect(conversations.map((c) => c.otherPartyName), [
-        'Ana Souza',
-        'Bruno Lima',
-      ]);
-      expect(conversations.every((c) => c.viewerIsDriver), isTrue);
+      final conversation = conversations.single;
+      expect(conversation.otherPartyName, 'Ana Souza, Bruno Lima');
+      expect(conversation.viewerIsDriver, isTrue);
     });
 
     test('passageiro aceito tem uma conversa com o motorista', () {
@@ -53,6 +48,7 @@ void main() {
         const ChatThreadRef(
           chatRoomId: 'ride_ride-1',
           rideId: fakeRideId,
+          driverId: fakeDriverId,
           passengerId: fakePassengerId,
         ),
       );
@@ -117,15 +113,33 @@ void main() {
   });
 
   group('ChatThreadRef', () {
-    test('cada passageiro tem o seu caminho dentro da sala da viagem', () {
+    test('a conversa é o grupo da viagem, a mesma para todos os passageiros', () {
       const thread = ChatThreadRef(
         chatRoomId: 'ride_abc',
         rideId: 'abc',
+        driverId: 'd1',
         passengerId: 'p1',
       );
+      const otherPassenger = ChatThreadRef(
+        chatRoomId: 'ride_abc',
+        rideId: 'abc',
+        driverId: 'd1',
+        passengerId: 'p2',
+      );
 
-      expect(thread.path, 'chats/ride_abc/p1');
+      expect(thread.path, 'chats/ride_abc/group');
+      expect(otherPassenger.path, thread.path);
       expect(thread.passenger, (rideId: 'abc', passengerId: 'p1'));
     });
+  });
+
+  test('a conversa expira uma semana depois da última viagem', () {
+    // Concluída em 16/11 às 08:12
+    final done = fakeRide(status: 'COMPLETED', passengerStatus: 'COMPLETED');
+
+    expect(isChatOpen(done, DateTime(2026, 11, 23, 8, 11)), isTrue);
+    expect(isChatOpen(done, DateTime(2026, 11, 23, 8, 13)), isFalse);
+    // Com uma viagem marcada entre os dois, continua aberta
+    expect(isChatOpen(fakeRide(), DateTime(2027)), isTrue);
   });
 }

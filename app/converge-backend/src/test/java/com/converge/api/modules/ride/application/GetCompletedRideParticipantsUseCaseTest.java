@@ -91,13 +91,26 @@ class GetCompletedRideParticipantsUseCaseTest {
     }
 
     @Test
-    @DisplayName("Viagem que ainda não foi concluída deve devolver vazio")
-    void shouldReturnEmptyWhenRideIsNotCompleted() {
+    @DisplayName("Viagem que ainda não começou deve devolver vazio")
+    void shouldReturnEmptyWhenRideHasNotStarted() {
         Ride ride = rideWithTwoConfirmedPassengers();
-        ride.start();
         when(rideRepository.findById(rideObjectId)).thenReturn(Optional.of(ride));
 
         assertThat(getCompletedRideParticipants.execute(rideObjectId.toHexString())).isEmpty();
+    }
+
+    @Test
+    @DisplayName("Viagem em andamento: só quem já desceu entra (pode avaliar sem esperar os outros)")
+    void shouldIncludeOnlyArrivedPassengersDuringTheRide() {
+        Ride ride = rideWithTwoConfirmedPassengers();
+        ride.start();
+        String arrived = ride.getParticipants().get(1).getUserId();
+        ride.arrivePassenger(arrived);
+        when(rideRepository.findById(rideObjectId)).thenReturn(Optional.of(ride));
+
+        assertThat(getCompletedRideParticipants.execute(rideObjectId.toHexString()))
+                .hasValueSatisfying(participants ->
+                        assertThat(participants.passengerIds()).containsExactly(arrived));
     }
 
     @Test

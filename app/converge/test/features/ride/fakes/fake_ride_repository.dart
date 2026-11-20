@@ -5,6 +5,7 @@ import 'package:converge/core/network/api_exception.dart';
 import 'package:converge/features/ride/data/models/payment_status.dart';
 import 'package:converge/features/ride/data/models/ride_model.dart';
 import 'package:converge/features/ride/data/models/ride_payment_model.dart';
+import 'package:converge/features/ride/data/models/ride_preview_model.dart';
 import 'package:converge/features/ride/data/repository/ride_repository.dart';
 
 import 'fake_ride.dart';
@@ -97,6 +98,17 @@ class FakeRideRepository implements RideRepository {
       amount: payment.amount,
       status: PaymentStatus.paid,
     );
+  }
+
+  @override
+  Future<RidePreviewModel> previewPassenger(String rideId, String passengerId) =>
+      throw UnimplementedError();
+
+  @override
+  Future<RideModel> boardPassenger(String rideId, String passengerId) async {
+    calls.add('boardPassenger:$passengerId');
+    _failIfRequested();
+    return ride = fakeRide(status: 'IN_PROGRESS');
   }
 
   @override

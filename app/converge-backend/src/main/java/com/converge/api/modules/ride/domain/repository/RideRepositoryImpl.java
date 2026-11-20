@@ -50,7 +50,7 @@ public class RideRepositoryImpl implements RideRepositoryCustom {
         Query query = new Query(new Criteria().andOperator(
                 where("_id").is(rideId),
                 where("status").in(RideStatus.AWAITING_CONFIRMATION, RideStatus.CONFIRMED),
-                where("departureDateTime").gte(now),
+                where("departureDateTime").gt(now.plusMinutes(Ride.REQUEST_CUTOFF_MINUTES)),
                 where("availableSeats").gt(0),
                 where("participants").elemMatch(participantCriteria)
         ));
@@ -93,7 +93,7 @@ public class RideRepositoryImpl implements RideRepositoryCustom {
         Query query = new Query(new Criteria().andOperator(
                 where("_id").is(rideId),
                 where("status").in(RideStatus.AWAITING_CONFIRMATION, RideStatus.CONFIRMED),
-                where("departureDateTime").gte(now),
+                where("departureDateTime").gt(now.plusMinutes(Ride.REQUEST_CUTOFF_MINUTES)),
                 where("driverId").ne(passengerId),
                 where("availableSeats").gt(0),
                 where("participants").not().elemMatch(
@@ -121,14 +121,32 @@ public class RideRepositoryImpl implements RideRepositoryCustom {
     }
 
     @Override
-    public List<Ride> findRidesWithExpiredRequests(LocalDateTime cutoff) {
+    public List<Ride> findRidesWithExpiredRequests(LocalDateTime cutoff, LocalDateTime departureLimit) {
         Query query = new Query(new Criteria().andOperator(
                 where("status").in(RideStatus.AWAITING_CONFIRMATION, RideStatus.CONFIRMED),
-                where("participants").elemMatch(
-                        where("role").is(ParticipationRole.PASSENGER)
-                                .and("status").is(ParticipantStatus.REQUESTED)
-                                .and("requestedAt").lte(cutoff)
+                new Criteria().orOperator(
+                        where("participants").elemMatch(
+                                where("role").is(ParticipationRole.PASSENGER)
+                                        .and("status").is(ParticipantStatus.REQUESTED)
+                                        .and("requestedAt").lte(cutoff)
+                        ),
+                        new Criteria().andOperator(
+                                where("departureDateTime").lte(departureLimit),
+                                where("participants").elemMatch(
+                                        where("role").is(ParticipationRole.PASSENGER)
+                                                .and("status").is(ParticipantStatus.REQUESTED)
+                                )
+                        )
                 )
+        ));
+        return mongoTemplate.find(query, Ride.class);
+    }
+
+    @Override
+    public List<Ride> findOpenRidesWithBoth(String userId, String otherUserId) {
+        Query query = new Query(new Criteria().andOperator(
+                where("status").in(RideStatus.AWAITING_CONFIRMATION, RideStatus.CONFIRMED),
+                where("participants.userId").all(userId, otherUserId)
         ));
         return mongoTemplate.find(query, Ride.class);
     }

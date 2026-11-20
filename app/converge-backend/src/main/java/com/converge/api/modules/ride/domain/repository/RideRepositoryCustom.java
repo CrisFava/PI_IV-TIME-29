@@ -39,9 +39,16 @@ public interface RideRepositoryCustom {
             LocalDateTime now
     );
 
-    List<Ride> findRidesWithExpiredRequests(LocalDateTime cutoff);
+    /**
+     * Viagens em aberto com pedido pendente feito até [cutoff], ou com saída até
+     * [departureLimit] (perto demais da saída para ainda aceitar).
+     */
+    List<Ride> findRidesWithExpiredRequests(LocalDateTime cutoff, LocalDateTime departureLimit);
 
     List<Ride> findOpenRidesPastDepartureWithoutConfirmedPassengers(LocalDateTime now);
+
+    // Viagens ainda não iniciadas em que os dois usuários participam (motorista ou passageiro)
+    List<Ride> findOpenRidesWithBoth(String userId, String otherUserId);
 
     // Viagens ainda não iniciadas (aguardando ou confirmadas) com saída até o limite
     List<Ride> findOpenRidesDepartedBefore(LocalDateTime limit);

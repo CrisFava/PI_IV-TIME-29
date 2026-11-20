@@ -9,6 +9,7 @@ import 'package:go_router/go_router.dart';
 
 import '../../../../app_routes.dart';
 import '../../../../core/config/styles.dart';
+import '../../../../core/widgets/confirm_dialog.dart';
 import '../../../../core/utils/currency_formatter.dart';
 import '../../../../core/widgets/details_sheet.dart';
 import '../../../../core/widgets/show_app_notice.dart';
@@ -21,8 +22,8 @@ import '../../../ride/state/ride_providers.dart';
 import '../../data/models/driver_offer.dart';
 import '../../data/models/driver_ride_request.dart';
 import '../../state/driver_ride_actions_controller.dart';
-import '../../state/driver_ride_requests_provider.dart';
 import '../../state/driver_offers_provider.dart';
+import '../../state/driver_rides_provider.dart';
 import '../../state/matching_viewer_provider.dart';
 import '../../state/passenger_ride_actions_controller.dart';
 import '../../state/passenger_rides_provider.dart';
@@ -30,11 +31,11 @@ import '../../state/ride_request_actions_controller.dart';
 import '../../../route/state/offer_route_controller.dart';
 import 'driver_offer_card.dart';
 import 'driver_offer_details.dart';
+import 'match_date_label.dart';
 import 'matching_message.dart';
+import 'matching_section_title.dart';
 import 'passenger_ride_card.dart';
 import 'passenger_ride_details.dart';
-import 'matching_section_title.dart';
-import 'ride_request_card.dart';
 
 /// Painel retrátil do motorista sobre o mapa: as caronas dele (com quem vai, o chat
 /// e "Iniciar trajeto") e os pedidos de vaga para aceitar ou recusar.
@@ -48,12 +49,19 @@ class RideRequestsSheet extends ConsumerStatefulWidget {
   /// "Oferecer carona": abre a folha para publicar uma carona nova.
   final VoidCallback? onNewOffer;
 
+  /// Carona a abrir assim que o painel tiver a lista (ex.: tocou no aviso de
+  /// pedido de vaga). [onOfferOpened] avisa que já abriu, para não abrir de novo.
+  final String? openOfferKey;
+  final VoidCallback? onOfferOpened;
+
   const RideRequestsSheet({
     super.key,
     required this.onClose,
     this.bottomSafeArea = 0,
     this.onRideStarted,
     this.onNewOffer,
+    this.openOfferKey,
+    this.onOfferOpened,
   });
 
   @override
@@ -66,13 +74,38 @@ class _RideRequestsSheetState extends ConsumerState<RideRequestsSheet> {
 
   Timer? _refreshTimer;
 
+  // Aba escolhida quando há caronas nos dois papéis (nulo: a automática)
+  bool? _showPassengerTab;
+
   @override
   void initState() {
     super.initState();
-    _refreshTimer = Timer.periodic(
-      _refreshInterval,
-      (_) => ref.invalidate(myRidesProvider),
-    );
+    // As caronas também: o backend encerra sozinho a de um dia só
+    _refreshTimer = Timer.periodic(_refreshInterval, (_) {
+      ref.invalidate(myRidesProvider);
+      ref.invalidate(myOfferRoutesProvider);
+    });
+    _openRequestedOffer();
+  }
+
+  @override
+  void didUpdateWidget(covariant RideRequestsSheet oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    if (widget.openOfferKey != oldWidget.openOfferKey) _openRequestedOffer();
+  }
+
+  /// Abre os detalhes da carona pedida em [RideRequestsSheet.openOfferKey].
+  Future<void> _openRequestedOffer() async {
+    final key = widget.openOfferKey;
+    if (key == null) return;
+    widget.onOfferOpened?.call();
+    try {
+      final offers = await ref.read(myDriverOffersProvider.future);
+      final offer = offers.where((o) => o.key == key).firstOrNull;
+      if (mounted && offer != null) _openDetails(offer);
+    } catch (_) {
+      // Sem a lista agora: o painel mostra o erro, e o motorista abre a carona por ele
+    }
   }
 
   @override
@@ -104,9 +137,12 @@ class _RideRequestsSheetState extends ConsumerState<RideRequestsSheet> {
         },
         onOpenChat: _openChatWith,
         onCancelOffer: _cancelOffer,
-        onCancelRide: _cancelRide,
         onMarkNoShow: _markNoShow,
+        onAcceptRequest: _accept,
+        onRejectRequest: _reject,
+        onOpenRequestChat: _openChat,
         onArrive: _arrivePassenger,
+        onRemovePassenger: _removePassenger,
       ),
     );
   }
@@ -116,44 +152,19 @@ class _RideRequestsSheetState extends ConsumerState<RideRequestsSheet> {
     required String title,
     required String message,
     required String confirmLabel,
+    bool destructive = true,
   }) async {
-    final confirmed = await showDialog<bool>(
-      context: context,
-      builder: (context) => AlertDialog(
-        backgroundColor: AppColors.cardBackground,
-        title: Text(title),
-        content: Text(message),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.of(context).pop(false),
-            style: TextButton.styleFrom(foregroundColor: AppColors.textPrimary),
-            child: const Text('Voltar'),
-          ),
-          TextButton(
-            onPressed: () => Navigator.of(context).pop(true),
-            style: TextButton.styleFrom(foregroundColor: AppColors.error),
-            child: Text(confirmLabel),
-          ),
-        ],
-      ),
+    final confirmed = await showConfirmDialog(
+      context,
+      title: title,
+      message: message,
+      confirmLabel: confirmLabel,
+      destructive: destructive,
     );
-    return confirmed == true && mounted;
+    return confirmed && mounted;
   }
 
   /// O motorista cancela só uma viagem (os confirmados são avisados).
-  Future<void> _cancelRide(String rideId) async {
-    final confirmed = await _confirm(
-      title: 'Cancelar esta viagem?',
-      message: 'Os passageiros confirmados serão avisados. Cancelar com passageiro confirmado conta na sua reputação.',
-      confirmLabel: 'Cancelar viagem',
-    );
-    if (!confirmed) return;
-    final error = await ref
-        .read(driverRideActionsProvider.notifier)
-        .cancel(rideId);
-    if (mounted && error != null) _showMessage(error);
-  }
-
   /// Durante a viagem, o motorista marca quem não apareceu.
   Future<void> _markNoShow(String rideId, String passengerId) async {
     final confirmed = await _confirm(
@@ -166,6 +177,39 @@ class _RideRequestsSheetState extends ConsumerState<RideRequestsSheet> {
         .read(driverRideActionsProvider.notifier)
         .markNoShow(rideId, passengerId);
     if (mounted && error != null) _showMessage(error);
+  }
+
+  /// Tira um passageiro confirmado da viagem, antes de ela começar. Pede confirmação
+  /// com o nome e a viagem; o passageiro é avisado pelo backend.
+  Future<void> _removePassenger(String rideId, String passengerId) async {
+    final ride = (ref.read(myRidesProvider).value ?? const <RideModel>[])
+        .where((r) => r.id == rideId)
+        .firstOrNull;
+    final passenger = ride?.passengerOf(passengerId);
+    if (ride == null || passenger == null) return;
+    final departure = ride.departureDateTime;
+    final confirmed = await _confirm(
+      title: 'Remover ${passenger.displayName}?',
+      message:
+          '${passenger.displayName} sai da viagem'
+          '${departure == null ? '' : ' de ${matchDateTimeLabel(departure)}'}'
+          ' e é avisado(a). Remover um passageiro confirmado conta na sua reputação.',
+      confirmLabel: 'Remover',
+    );
+    if (!confirmed) return;
+    final error = await ref
+        .read(rideRequestActionsProvider.notifier)
+        .reject(DriverRideRequest(ride: ride, passenger: passenger));
+    if (!mounted) return;
+    if (error != null) {
+      _showMessage(error);
+      return;
+    }
+    showAppNotice(
+      context,
+      '${passenger.displayName} foi removido(a) da viagem.',
+      type: AppNoticeType.success,
+    );
   }
 
   /// "Chegou": o passageiro desceu, a viagem dele termina e ele recebe a cobrança do rateio.
@@ -186,6 +230,7 @@ class _RideRequestsSheetState extends ConsumerState<RideRequestsSheet> {
       message:
           'A viagem dele termina aqui e ele recebe a cobrança do rateio pelo PIX$amountHint.',
       confirmLabel: 'Confirmar chegada',
+      destructive: false,
     );
     if (!confirmed) return;
     final error = await ref
@@ -235,38 +280,55 @@ class _RideRequestsSheetState extends ConsumerState<RideRequestsSheet> {
   }
 
   /// Pede a confirmação e cancela a carona; devolve se cancelou.
-  Future<bool> _cancelOffer(String routeId) async {
-    final confirmed = await showDialog<bool>(
-      context: context,
-      builder: (context) => AlertDialog(
-        backgroundColor: AppColors.cardBackground,
-        title: const Text('Cancelar esta carona?'),
-        content: const Text(
-          'Ela deixa de receber pedidos de vaga. Quem já foi confirmado continua na viagem.',
-        ),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.of(context).pop(false),
-            child: const Text('Voltar'),
-          ),
-          TextButton(
-            onPressed: () => Navigator.of(context).pop(true),
-            style: TextButton.styleFrom(foregroundColor: AppColors.error),
-            child: const Text('Cancelar carona'),
-          ),
-        ],
-      ),
+  /// Pede a confirmação e cancela a carona: as viagens marcadas dela (os
+  /// confirmados são avisados) e a oferta, se ainda existir. Devolve se cancelou.
+  Future<bool> _cancelOffer(String offerKey) async {
+    final offer =
+        (ref.read(myDriverOffersProvider).value ?? const <DriverOffer>[])
+            .where((o) => o.key == offerKey)
+            .firstOrNull;
+    if (offer == null) return false;
+    final hasConfirmed = offer.confirmedPassengers > 0;
+    final confirmed = await _confirm(
+      title: 'Cancelar esta carona?',
+      message: hasConfirmed
+          ? 'Ela deixa de receber pedidos, e os passageiros confirmados são avisados. Cancelar com passageiro confirmado conta na sua reputação.'
+          : 'Ela deixa de receber pedidos de vaga.',
+      confirmLabel: 'Cancelar carona',
     );
-    if (confirmed != true || !mounted) return false;
+    if (!confirmed) return false;
 
-    try {
-      await ref.read(offerRouteProvider.notifier).cancel(routeId);
-      ref.invalidate(myOfferRoutesProvider);
-      return true;
-    } catch (e) {
-      if (mounted) _showMessage(authErrorMessage(e));
-      return false;
+    // A carona primeiro: cancelar a viagem de uma carona de um dia só já a
+    // encerra no backend, e cancelar a carona depois daria "não encontrado"
+    final routeId = offer.route?.id;
+    if (routeId != null) {
+      try {
+        await ref.read(offerRouteProvider.notifier).cancel(routeId);
+      } catch (e) {
+        // Já encerrada por outro caminho: a lista recarrega e ela some
+        ref.invalidate(myOfferRoutesProvider);
+        if (mounted) _showMessage(authErrorMessage(e));
+        return false;
+      }
     }
+
+    String? rideError;
+    for (final ride in offer.openRides) {
+      final error = await ref
+          .read(driverRideActionsProvider.notifier)
+          .cancel(ride.id);
+      if (error != null) {
+        rideError ??= error;
+        // Sem a carona cancelada, nada mudou ainda: para aqui
+        if (routeId == null) break;
+      }
+    }
+
+    ref.invalidate(myOfferRoutesProvider);
+    ref.invalidate(myRidesProvider);
+    if (rideError != null && mounted) _showMessage(rideError);
+    // A carona já foi cancelada: os detalhes fecham mesmo com uma viagem pendente
+    return routeId != null || rideError == null;
   }
 
   Future<void> _accept(DriverRideRequest request) async {
@@ -280,7 +342,12 @@ class _RideRequestsSheetState extends ConsumerState<RideRequestsSheet> {
       return;
     }
 
-    _openChat(request);
+    // Fica no painel: o chat com o passageiro está a um toque, no card
+    showAppNotice(
+      context,
+      '${request.passenger.displayName} confirmado(a) na viagem.',
+      type: AppNoticeType.success,
+    );
   }
 
   Future<void> _reject(DriverRideRequest request) async {
@@ -299,7 +366,31 @@ class _RideRequestsSheetState extends ConsumerState<RideRequestsSheet> {
     context.push(AppRoutes.chatOf(rideId: rideId, passengerId: passengerId));
   }
 
+  /// Nomes dos passageiros confirmados numa viagem do motorista ("Ana e Bruno").
+  String _confirmedNames(String rideId) {
+    final ride = (ref.read(myDrivenRidesProvider).value ?? const <RideModel>[])
+        .where((r) => r.id == rideId)
+        .firstOrNull;
+    final names = [
+      for (final p in ride?.participants ?? const <RideParticipantModel>[])
+        if (p.isPassenger && p.status == ParticipantStatus.confirmed)
+          p.displayName,
+    ];
+    if (names.length <= 1) return names.join();
+    return '${names.sublist(0, names.length - 1).join(', ')} e ${names.last}';
+  }
+
   Future<void> _startRide(String rideId) async {
+    final names = _confirmedNames(rideId);
+    final confirmed = await _confirm(
+      title: 'Iniciar a viagem?',
+      message: names.isEmpty
+          ? 'Os pedidos que ainda esperam resposta serão recusados.'
+          : 'Você vai buscar $names. Os pedidos que ainda esperam resposta serão recusados.',
+      confirmLabel: 'Iniciar',
+      destructive: false,
+    );
+    if (!confirmed) return;
     final error = await ref
         .read(driverRideActionsProvider.notifier)
         .start(rideId);
@@ -312,6 +403,13 @@ class _RideRequestsSheetState extends ConsumerState<RideRequestsSheet> {
   }
 
   Future<void> _completeRide(String rideId) async {
+    final confirmed = await _confirm(
+      title: 'Concluir a viagem?',
+      message: 'Os valores finais serão calculados com quem foi. Marque antes quem não apareceu.',
+      confirmLabel: 'Concluir',
+      destructive: false,
+    );
+    if (!confirmed) return;
     final error = await ref
         .read(driverRideActionsProvider.notifier)
         .complete(rideId);
@@ -323,8 +421,6 @@ class _RideRequestsSheetState extends ConsumerState<RideRequestsSheet> {
 
   @override
   Widget build(BuildContext context) {
-    final requests = ref.watch(driverRideRequestsProvider);
-    final busy = ref.watch(rideRequestActionsProvider);
     final offers = ref.watch(myDriverOffersProvider);
     final passengerRides = ref.watch(myPassengerRidesProvider);
     final viewerId = ref.watch(matchingViewerIdProvider);
@@ -402,16 +498,6 @@ class _RideRequestsSheetState extends ConsumerState<RideRequestsSheet> {
                       ),
                     ],
                     const SizedBox(height: 18),
-                    // Pedidos de vaga primeiro: é o que pede uma resposta
-                    // skipLoadingOnReload: a recarga automática mantém a lista na tela
-                    ...requests.when(
-                      skipLoadingOnReload: true,
-                      data: (list) => _requestSections(list, busy),
-                      loading: () => const [SizedBox.shrink()],
-                      error: (error, _) => [
-                        MatchingMessage(text: authErrorMessage(error)),
-                      ],
-                    ),
                     // Uma lista só: as viagens como passageiro e as caronas oferecidas
                     ..._ridesList(
                       offers,
@@ -477,8 +563,7 @@ class _RideRequestsSheetState extends ConsumerState<RideRequestsSheet> {
       ),
     );
 
-    return [
-      for (final ride in inProgress) passengerCard(ride),
+    final driverCards = [
       for (final offer in asDriver)
         Padding(
           padding: const EdgeInsets.only(bottom: 12),
@@ -490,7 +575,60 @@ class _RideRequestsSheetState extends ConsumerState<RideRequestsSheet> {
             onCompleteRide: _completeRide,
           ),
         ),
+    ];
+    final passengerCards = [
+      for (final ride in inProgress) passengerCard(ride),
       for (final ride in upcoming) passengerCard(ride),
+    ];
+
+    // Um papel só: a lista dele, com o título. Os dois: abas lado a lado
+    if (asPassenger.isEmpty) {
+      return [
+        const MatchingSectionTitle(title: 'Como motorista'),
+        ...driverCards,
+      ];
+    }
+    if (asDriver.isEmpty) {
+      return [
+        const MatchingSectionTitle(title: 'Como passageiro'),
+        ...passengerCards,
+      ];
+    }
+
+    // Abre na aba da viagem em andamento como passageiro; senão, na de motorista
+    final showPassenger = _showPassengerTab ?? inProgress.isNotEmpty;
+    final openRequests = asDriver.fold(0, (sum, o) => sum + o.openRequests);
+    void select(bool passenger) {
+      if (passenger == showPassenger) return;
+      HapticFeedback.lightImpact();
+      setState(() => _showPassengerTab = passenger);
+    }
+
+    return [
+      Row(
+        children: [
+          Expanded(
+            child: _RoleTabButton(
+              label: 'Como motorista',
+              icon: Icons.directions_car_rounded,
+              selected: !showPassenger,
+              badgeCount: openRequests,
+              onTap: () => select(false),
+            ),
+          ),
+          const SizedBox(width: 10),
+          Expanded(
+            child: _RoleTabButton(
+              label: 'Como passageiro',
+              icon: Icons.person_rounded,
+              selected: showPassenger,
+              onTap: () => select(true),
+            ),
+          ),
+        ],
+      ),
+      const SizedBox(height: 14),
+      ...(showPassenger ? passengerCards : driverCards),
     ];
   }
 
@@ -542,32 +680,84 @@ class _RideRequestsSheetState extends ConsumerState<RideRequestsSheet> {
       ],
     );
   }
+}
 
-  List<Widget> _requestSections(
-    List<DriverRideRequest> list,
-    Set<String> busy,
-  ) {
-    final pending = [
-      for (final r in list)
-        if (r.passenger.status == ParticipantStatus.requested) r,
-    ];
+/// Aba de "Minhas caronas" (motorista ou passageiro), no mesmo estilo das abas
+/// dos indicadores. [badgeCount] mostra os pedidos de vaga esperando resposta.
+class _RoleTabButton extends StatelessWidget {
+  final String label;
+  final IconData icon;
+  final bool selected;
+  final int badgeCount;
+  final VoidCallback onTap;
 
-    if (pending.isEmpty) return const [];
+  const _RoleTabButton({
+    required this.label,
+    required this.icon,
+    required this.selected,
+    required this.onTap,
+    this.badgeCount = 0,
+  });
 
-    return [
-      const MatchingSectionTitle(title: 'Pedidos de vaga'),
-      for (final request in pending)
-        Padding(
-          padding: const EdgeInsets.only(bottom: 10),
-          child: RideRequestCard(
-            request: request,
-            isBusy: busy.contains(request.key),
-            onAccept: () => _accept(request),
-            onReject: () => _reject(request),
-            onOpenChat: () => _openChat(request),
+  @override
+  Widget build(BuildContext context) {
+    final color = selected ? AppColors.dockItemActive : AppColors.textPrimary;
+    return Material(
+      color: selected ? AppColors.primary : AppColors.cardBackground,
+      borderRadius: BorderRadius.circular(14),
+      child: InkWell(
+        key: ValueKey('my_rides_tab_$label'),
+        borderRadius: BorderRadius.circular(14),
+        onTap: onTap,
+        child: Container(
+          padding: const EdgeInsets.symmetric(vertical: 12, horizontal: 8),
+          decoration: BoxDecoration(
+            borderRadius: BorderRadius.circular(14),
+            border: Border.all(color: AppColors.primary),
+          ),
+          child: Row(
+            mainAxisAlignment: MainAxisAlignment.center,
+            children: [
+              Icon(icon, size: 18, color: color),
+              const SizedBox(width: 6),
+              Flexible(
+                child: Text(
+                  label,
+                  overflow: TextOverflow.ellipsis,
+                  style: TextStyle(
+                    fontSize: 13.5,
+                    fontWeight: FontWeight.w700,
+                    color: color,
+                  ),
+                ),
+              ),
+              if (badgeCount > 0) ...[
+                const SizedBox(width: 6),
+                Container(
+                  constraints: const BoxConstraints(minWidth: 20),
+                  padding: const EdgeInsets.symmetric(
+                    horizontal: 5,
+                    vertical: 1,
+                  ),
+                  decoration: BoxDecoration(
+                    color: AppColors.error,
+                    borderRadius: BorderRadius.circular(10),
+                  ),
+                  child: Text(
+                    badgeCount > 99 ? '99+' : '$badgeCount',
+                    textAlign: TextAlign.center,
+                    style: const TextStyle(
+                      fontSize: 11,
+                      fontWeight: FontWeight.w800,
+                      color: AppColors.textLight,
+                    ),
+                  ),
+                ),
+              ],
+            ],
           ),
         ),
-      const SizedBox(height: 14),
-    ];
+      ),
+    );
   }
 }

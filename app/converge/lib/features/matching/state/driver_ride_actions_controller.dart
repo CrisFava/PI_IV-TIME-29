@@ -5,8 +5,6 @@ import 'dart:async';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../auth/state/auth_action_controller.dart';
-import '../../../core/utils/currency_formatter.dart';
-import '../../chat/data/models/chat_message_type.dart';
 import '../../chat/state/ride_chat_announcer.dart';
 import '../../ride/data/models/ride_model.dart';
 import '../../ride/data/repository/ride_repository.dart';
@@ -54,13 +52,14 @@ class DriverRideActionsController extends Notifier<Set<String>> {
   Future<String?> markNoShow(String rideId, String passengerId) =>
       _run(rideId, () => _rides.markNoShow(rideId, passengerId));
 
+  /// "Entrou": o passageiro embarcou. Devolve a mensagem de erro, ou `null`.
+  Future<String?> board(String rideId, String passengerId) =>
+      _run(rideId, () => _rides.boardPassenger(rideId, passengerId));
+
   /// "Confirmar chegada": o passageiro desceu e já recebe a cobrança do rateio.
   /// Ele é avisado no chat com o valor. Devolve a mensagem de erro, ou `null`.
-  Future<String?> arrive(String rideId, String passengerId) => _run(
-    rideId,
-    () => _rides.arrivePassenger(rideId, passengerId),
-    afterSuccess: (ride) => _notifyCharged(ride, passengerId),
-  );
+  Future<String?> arrive(String rideId, String passengerId) =>
+      _run(rideId, () => _rides.arrivePassenger(rideId, passengerId));
 
   /// Executa a ação na API e, se [announcement] vier, avisa os passageiros no chat.
   Future<String?> _run(
@@ -87,26 +86,6 @@ class DriverRideActionsController extends Notifier<Set<String>> {
     } finally {
       state = {...state}..remove(rideId);
       keepAlive.close();
-    }
-  }
-
-  // A cobrança já foi emitida pela API; o chat só avisa o passageiro na hora, com o valor.
-  Future<void> _notifyCharged(RideModel ride, String passengerId) async {
-    final amount = ride.passengerOf(passengerId)?.finalAmount;
-    try {
-      await ref
-          .read(rideChatAnnouncerProvider)
-          .notifyPassenger(
-            ride,
-            passengerId,
-            ChatMessageType.paymentRequest,
-            amount == null
-                ? 'Você chegou. A cobrança da carona foi enviada.'
-                : 'Você chegou. A cobrança de ${CurrencyFormatter.format(amount)} foi enviada.',
-            amount: amount,
-          );
-    } catch (_) {
-      // Sem o aviso; o passageiro vê a cobrança ao abrir o app.
     }
   }
 

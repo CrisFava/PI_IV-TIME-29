@@ -19,10 +19,16 @@ class RideHistoryTile extends StatelessWidget {
 
   static String _twoDigits(int value) => value.toString().padLeft(2, '0');
 
-  static String _when(DateTime? date) {
-    if (date == null) return 'Data a definir';
-    return '${_twoDigits(date.day)}/${_twoDigits(date.month)}/${date.year} · '
-        '${_twoDigits(date.hour)}:${_twoDigits(date.minute)}';
+  static String _hhmm(DateTime time) =>
+      '${_twoDigits(time.hour)}:${_twoDigits(time.minute)}';
+
+  /// "19/11/2026 · 09:36 – 10:05": o dia e os horários reais de início e fim.
+  static String _when(RideHistoryItem item) {
+    final start = item.startedAt ?? item.departureDateTime;
+    if (start == null) return 'Data a definir';
+    final end = item.completedAt;
+    return '${_twoDigits(start.day)}/${_twoDigits(start.month)}/${start.year} · '
+        '${_hhmm(start)}${end == null ? '' : ' – ${_hhmm(end)}'}';
   }
 
   // Nome curto do lugar: o bairro, ou o começo do endereço
@@ -72,7 +78,7 @@ class RideHistoryTile extends StatelessWidget {
             runSpacing: 6,
             children: [
               Text(
-                _when(item.departureDateTime),
+                _when(item),
                 style: const TextStyle(
                   fontSize: 12.5,
                   color: AppColors.textSecondary,

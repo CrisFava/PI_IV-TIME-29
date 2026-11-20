@@ -37,7 +37,22 @@ class RideModel {
 
   /// Rota passando pelas paradas (só o motorista recebe).
   final String? itineraryPolyline;
+
+  /// O mesmo caminho em trechos: um até cada parada e o último até o destino.
+  /// Vazio sem o Google; aí o app desenha o caminho inteiro de uma vez.
+  final List<String> itineraryLegPolylines;
+
+  /// Viagem em andamento: a parada em que ela está. O trecho atual é
+  /// `itineraryLegPolylines[itineraryNextStop]` (o último leva ao destino).
+  final int? itineraryNextStop;
+
+  /// Para o passageiro: onde ficam o embarque e o desembarque dele no itinerário.
+  final int? itineraryMyPickupStop;
+  final int? itineraryMyDropOffStop;
   final double? itineraryDistanceKm;
+
+  /// Chegada estimada ao destino, já contando o tempo das paradas.
+  final DateTime? estimatedArrivalDateTime;
 
   RideModel({
     required this.id,
@@ -58,8 +73,14 @@ class RideModel {
     List<RideStopModel> itinerary = const [],
     this.itineraryPolyline,
     this.itineraryDistanceKm,
+    this.estimatedArrivalDateTime,
+    List<String> itineraryLegPolylines = const [],
+    this.itineraryNextStop,
+    this.itineraryMyPickupStop,
+    this.itineraryMyDropOffStop,
   }) : participants = List.unmodifiable(participants),
-       itinerary = List.unmodifiable(itinerary);
+       itinerary = List.unmodifiable(itinerary),
+       itineraryLegPolylines = List.unmodifiable(itineraryLegPolylines);
 
   bool isDrivenBy(String userId) => driverId == userId;
 
@@ -76,6 +97,13 @@ class RideModel {
           participant.status.hasSeat &&
           participant.userId != null)
         participant,
+  ];
+
+  /// Todos os passageiros com vaga, inclusive os que vêm sem id (para contar e
+  /// mostrar os nomes do grupo).
+  List<RideParticipantModel> get seatedPassengers => [
+    for (final participant in participants)
+      if (participant.isPassenger && participant.status.hasSeat) participant,
   ];
 
   /// A participação de um passageiro. Quem saiu e pediu vaga de novo aparece
@@ -130,6 +158,17 @@ class RideModel {
       ],
       itineraryPolyline: json['itineraryPolyline'] as String?,
       itineraryDistanceKm: (json['itineraryDistanceKm'] as num?)?.toDouble(),
+      estimatedArrivalDateTime: DateTime.tryParse(
+        json['estimatedArrivalDateTime'] as String? ?? '',
+      ),
+      itineraryNextStop: (json['itineraryNextStop'] as num?)?.toInt(),
+      itineraryMyPickupStop: (json['itineraryMyPickupStop'] as num?)?.toInt(),
+      itineraryMyDropOffStop: (json['itineraryMyDropOffStop'] as num?)?.toInt(),
+      itineraryLegPolylines: [
+        if (json['itineraryLegPolylines'] case final List legs)
+          for (final leg in legs)
+            if (leg is String) leg,
+      ],
     );
   }
 }

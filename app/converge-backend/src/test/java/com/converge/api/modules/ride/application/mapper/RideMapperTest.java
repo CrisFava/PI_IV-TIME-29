@@ -248,4 +248,24 @@ class RideMapperTest {
         assertThat(anaView.itineraryPolyline()).isNull();
         assertThat(anaView.itineraryDistanceKm()).isNull();
     }
+
+    @Test
+    @DisplayName("Com a viagem em andamento, o passageiro com vaga vê os trechos até o desembarque dele; o pendente, nada")
+    void shouldShowItineraryPathToConfirmedPassengerDuringTheRide() {
+        Ride ride = rideWithEveryKindOfPassenger();
+        ride.updateItinerary(List.of(
+                new RideStop(RideStopType.PICKUP, ANA, place("Rua da Ana, 1")),
+                new RideStop(RideStopType.DROPOFF, ANA, place("Campus PUC"))
+        ), 15.0, "polyline", 20, List.of("ate-ana", "com-ana", "depois-da-ana"));
+        ride.start();
+
+        // Nunca o caminho inteiro: só até onde ela desce
+        assertThat(mapper.toResponse(ride, ANA, names).itineraryPolyline()).isNull();
+        assertThat(mapper.toResponse(ride, ANA, names).itineraryLegPolylines()).containsExactly("ate-ana", "com-ana");
+        assertThat(mapper.toResponse(ride, ride.getDriverId(), names).itineraryLegPolylines()).hasSize(3);
+        // A Ana sabe onde ficam as paradas dela na viagem, para ver só o caminho até elas
+        assertThat(mapper.toResponse(ride, ANA, names).itineraryMyPickupStop()).isZero();
+        assertThat(mapper.toResponse(ride, ANA, names).itineraryMyDropOffStop()).isEqualTo(1);
+        assertThat(mapper.toResponse(ride, BIA, names).itineraryLegPolylines()).isEmpty();
+    }
 }
