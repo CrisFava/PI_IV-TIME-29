@@ -19,6 +19,7 @@ import org.bson.types.ObjectId;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
+import org.mockito.ArgumentCaptor;
 import org.mockito.InjectMocks;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
@@ -29,9 +30,11 @@ import java.util.Optional;
 import java.util.Set;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.assertj.core.api.Assertions.assertThatCode;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.never;
+import static org.mockito.Mockito.times;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.verifyNoInteractions;
 import static org.mockito.Mockito.when;
@@ -90,7 +93,9 @@ class RecordReviewRatingUseCaseTest {
         assertThat(user.getReputation().driver().totalReviews()).isEqualTo(3);
         assertThat(user.getReputation().driver().level()).isEqualTo(ReputationLevel.MEDIUM);
         assertThat(user.getReputation().passenger().totalReviews()).isZero();
-        verify(reputationWriter).saveDriverReputation(eq(id), eq(user.getReputation().driver()), any(LocalDateTime.class));
+        verify(reputationWriter).saveDriverRating(eq(id), eq(user.getReputation().driver()), any(LocalDateTime.class));
+        verify(reputationWriter, never()).savePassengerRating(any(), any(), any());
+        verify(reputationWriter, never()).saveDriverReputation(any(), any(), any());
         verify(reputationWriter, never()).savePassengerReputation(any(), any(), any());
         verify(userRepository, never()).save(any(User.class));
     }
@@ -107,8 +112,10 @@ class RecordReviewRatingUseCaseTest {
         assertThat(user.getReputation().passenger().averageRating()).isEqualTo(3.0);
         assertThat(user.getReputation().passenger().totalReviews()).isEqualTo(2);
         assertThat(user.getReputation().driver().totalReviews()).isZero();
-        verify(reputationWriter).savePassengerReputation(eq(id), eq(user.getReputation().passenger()), any(LocalDateTime.class));
+        verify(reputationWriter).savePassengerRating(eq(id), eq(user.getReputation().passenger()), any(LocalDateTime.class));
+        verify(reputationWriter, never()).saveDriverRating(any(), any(), any());
         verify(reputationWriter, never()).saveDriverReputation(any(), any(), any());
+        verify(reputationWriter, never()).savePassengerReputation(any(), any(), any());
         verify(userRepository, never()).save(any(User.class));
     }
 
@@ -170,7 +177,37 @@ class RecordReviewRatingUseCaseTest {
 
         assertThat(user.getReputation().driver().totalReviews()).isEqualTo(1);
         assertThat(user.getReputation().passenger()).isNotNull();
-        verify(reputationWriter).saveDriverReputation(eq(id), eq(user.getReputation().driver()), any(LocalDateTime.class));
+        verify(reputationWriter).saveDriverRating(eq(id), eq(user.getReputation().driver()), any(LocalDateTime.class));
+    }
+
+    @Test
+    @DisplayName("Não deve falhar quando o writer ignora a nota por já haver uma mais nova")
+    void shouldNotFailWhenRatingWriteIsSkipped() {
+        ObjectId id = new ObjectId();
+        User user = userWithId(id);
+        when(userRepository.findById(id)).thenReturn(Optional.of(user));
+        when(reputationWriter.saveDriverRating(any(), any(), any())).thenReturn(false);
+
+        assertThatCode(() -> useCase.execute(id.toHexString(), ParticipationRole.DRIVER, 4.0, 1))
+                .doesNotThrowAnyException();
+
+        verify(reputationWriter, times(1)).saveDriverRating(eq(id), any(DriverReputation.class), any(LocalDateTime.class));
+    }
+
+    @Test
+    @DisplayName("Deve repassar ao writer o total de cada chamada, e a decisão de pular fica no writer")
+    void shouldPassEachTotalToWriter() {
+        ObjectId id = new ObjectId();
+        User user = userWithId(id);
+        when(userRepository.findById(id)).thenReturn(Optional.of(user));
+        ArgumentCaptor<DriverReputation> saved = ArgumentCaptor.forClass(DriverReputation.class);
+
+        // O filtro que ignora o total menor é testado em MongoUserReputationWriterTest.
+        useCase.execute(id.toHexString(), ParticipationRole.DRIVER, 4.5, 2);
+        useCase.execute(id.toHexString(), ParticipationRole.DRIVER, 5.0, 1);
+
+        verify(reputationWriter, times(2)).saveDriverRating(eq(id), saved.capture(), any(LocalDateTime.class));
+        assertThat(saved.getAllValues()).extracting(DriverReputation::totalReviews).containsExactly(2, 1);
     }
 
     @Test
