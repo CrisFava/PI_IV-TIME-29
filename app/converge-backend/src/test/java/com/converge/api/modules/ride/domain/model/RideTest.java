@@ -315,6 +315,7 @@ class RideTest {
         Participant passenger = ride.getParticipants().get(1);
         assertThat(passenger.getStatus()).isEqualTo(ParticipantStatus.REJECTED);
         assertThat(passenger.getRejectionReason()).isEqualTo("Carro cheio de bagagem");
+        assertThat(passenger.isRemovedByDriver()).isFalse();
         assertThat(passenger.getRespondedAt()).isNotNull();
         assertThat(ride.getAvailableSeats()).isEqualTo(3);
         assertThat(ride.getStatus()).isEqualTo(RideStatus.AWAITING_CONFIRMATION);
@@ -773,6 +774,8 @@ class RideTest {
         assertThat(passenger.getStatus()).isEqualTo(ParticipantStatus.CANCELLED);
         assertThat(passenger.getCancellationReason()).isEqualTo("Mudança de rota");
         assertThat(passenger.isLateCancellation()).isFalse();
+        assertThat(passenger.isRemovedByDriver()).isTrue();
+        assertThat(passenger.getCancelledAt()).isNotNull();
         assertThat(passenger.getPaymentStatus()).isEqualTo(ParticipantPaymentStatus.NOT_APPLICABLE);
         assertThat(ride.getAvailableSeats()).isEqualTo(3);
         assertThat(ride.getStatus()).isEqualTo(RideStatus.AWAITING_CONFIRMATION);
@@ -796,5 +799,60 @@ class RideTest {
         ride.applyFinalAmounts(updatedCosts, Map.of("passenger-1", new BigDecimal("8.00")));
 
         assertThat(passenger.getFinalAmount()).isEqualByComparingTo("6.00");
+    }
+
+    @Test
+    @DisplayName("Cancelamento do motorista com passageiro confirmado grava a data e marca a penalidade")
+    void shouldMarkDriverCancellationPenalizedWhenPassengerWasConfirmed() {
+        Ride ride = validRide();
+        ride.requestSeat("passenger-1", "route-1", place("Rua A"), place("Campus PUC"));
+        ride.acceptPassenger("passenger-1");
+        LocalDateTime before = LocalDateTime.now();
+
+        ride.cancel("driver-123", "Imprevisto");
+
+        assertThat(ride.isDriverCancellationPenalized()).isTrue();
+        assertThat(ride.getCancelledAt()).isBetween(before, LocalDateTime.now());
+    }
+
+    @Test
+    @DisplayName("Cancelamento do motorista só com pedido pendente grava a data e não marca a penalidade")
+    void shouldNotMarkDriverCancellationPenalizedWithOnlyPendingRequest() {
+        Ride ride = validRide();
+        ride.requestSeat("passenger-1", "route-1", place("Rua A"), place("Campus PUC"));
+
+        ride.cancel("driver-123", "Imprevisto");
+
+        assertThat(ride.isDriverCancellationPenalized()).isFalse();
+        assertThat(ride.getCancelledAt()).isNotNull();
+    }
+
+    @Test
+    @DisplayName("Cancelamento automático por falta de início grava a data e não marca a penalidade")
+    void shouldNotMarkDriverCancellationPenalizedWhenNotStarted() {
+        Ride ride = validRide();
+        ride.requestSeat("passenger-1", "route-1", place("Rua A"), place("Campus PUC"));
+        ride.acceptPassenger("passenger-1");
+
+        ride.cancelNotStarted(LocalDateTime.now());
+
+        assertThat(ride.isDriverCancellationPenalized()).isFalse();
+        assertThat(ride.getCancelledAt()).isNotNull();
+    }
+
+    @Test
+    @DisplayName("Viagem concluída sem passageiro efetivo é cancelada sem marcar a penalidade do motorista")
+    void shouldNotMarkDriverCancellationPenalizedWhenEveryPassengerIsAbsent() {
+        Ride ride = validRide();
+        ride.requestSeat("passenger-1", "route-1", place("Rua A"), place("Campus PUC"));
+        ride.acceptPassenger("passenger-1");
+        ride.start();
+        ride.markNoShow("passenger-1");
+
+        ride.complete();
+
+        assertThat(ride.getStatus()).isEqualTo(RideStatus.CANCELLED);
+        assertThat(ride.isDriverCancellationPenalized()).isFalse();
+        assertThat(ride.getCancelledAt()).isNotNull();
     }
 }

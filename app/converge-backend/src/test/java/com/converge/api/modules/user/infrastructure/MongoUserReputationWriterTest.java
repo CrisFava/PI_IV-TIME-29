@@ -124,6 +124,60 @@ class MongoUserReputationWriterTest {
     }
 
     @Test
+    @DisplayName("Deve gravar só janela, level, calculatedAt e updatedAt do motorista, sem média nem avaliações")
+    void shouldSetOnlyDriverWindowFields() {
+        ObjectId id = new ObjectId();
+        ArgumentCaptor<Query> query = ArgumentCaptor.forClass(Query.class);
+        ArgumentCaptor<Update> update = ArgumentCaptor.forClass(Update.class);
+        when(mongoTemplate.updateFirst(any(Query.class), any(Update.class), eq(User.class))).thenReturn(result(1, 1));
+
+        boolean saved = writer.saveDriverWindow(id, driverReputation(), NOW);
+
+        verify(mongoTemplate).updateFirst(query.capture(), update.capture(), eq(User.class));
+        assertThat(saved).isTrue();
+        Document filter = mappedQuery(query.getValue());
+        assertThat(filter.get("_id")).isEqualTo(id);
+        assertThat(filter.get("reputation.driver")).isEqualTo(new Document("$ne", null));
+        Document mapped = mappedUpdate(update.getValue());
+        assertThat(mapped.keySet()).containsExactly("$set");
+        Document set = mapped.get("$set", Document.class);
+        assertThat(set.keySet()).containsExactlyInAnyOrder(
+                "reputation.driver.window", "reputation.driver.level", "reputation.driver.calculatedAt", "updatedAt");
+        assertThat(set.get("reputation.driver.level")).isEqualTo("MEDIUM");
+        assertThat(set.get("reputation.driver.calculatedAt")).isNotNull();
+    }
+
+    @Test
+    @DisplayName("Deve gravar só janela, level, calculatedAt e updatedAt do passageiro, sem média nem avaliações")
+    void shouldSetOnlyPassengerWindowFields() {
+        ObjectId id = new ObjectId();
+        ArgumentCaptor<Query> query = ArgumentCaptor.forClass(Query.class);
+        ArgumentCaptor<Update> update = ArgumentCaptor.forClass(Update.class);
+        when(mongoTemplate.updateFirst(any(Query.class), any(Update.class), eq(User.class))).thenReturn(result(1, 1));
+
+        boolean saved = writer.savePassengerWindow(id, passengerReputation(), NOW);
+
+        verify(mongoTemplate).updateFirst(query.capture(), update.capture(), eq(User.class));
+        assertThat(saved).isTrue();
+        Document filter = mappedQuery(query.getValue());
+        assertThat(filter.get("_id")).isEqualTo(id);
+        assertThat(filter.get("reputation.passenger")).isEqualTo(new Document("$ne", null));
+        Document set = mappedUpdate(update.getValue()).get("$set", Document.class);
+        assertThat(set.keySet()).containsExactlyInAnyOrder(
+                "reputation.passenger.window", "reputation.passenger.level",
+                "reputation.passenger.calculatedAt", "updatedAt");
+    }
+
+    @Test
+    @DisplayName("Deve devolver false quando o usuário não existe ou não tem o papel")
+    void shouldReturnFalseWhenWindowTargetNotFound() {
+        when(mongoTemplate.updateFirst(any(Query.class), any(Update.class), eq(User.class))).thenReturn(result(0, 0));
+
+        assertThat(writer.saveDriverWindow(new ObjectId(), driverReputation(), NOW)).isFalse();
+        assertThat(writer.savePassengerWindow(new ObjectId(), passengerReputation(), NOW)).isFalse();
+    }
+
+    @Test
     @DisplayName("Deve devolver false quando o usuário não existe mais")
     void shouldReturnFalseWhenUserNotFound() {
         when(mongoTemplate.updateFirst(any(Query.class), any(Update.class), eq(User.class))).thenReturn(result(0, 0));

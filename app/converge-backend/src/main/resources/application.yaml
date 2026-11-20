@@ -29,3 +29,6 @@ converge:
     overdue-check-interval: PT1M
     overdue-limit: 2
     overdue-since: ${CONVERGE_PAYMENT_OVERDUE_SINCE:2026-11-20T00:00:00}
+  # Reputação: o job semanal dos selos recalcula os contadores com as viagens dos últimos N dias.
+  user:
+    reputation-window-days: 90

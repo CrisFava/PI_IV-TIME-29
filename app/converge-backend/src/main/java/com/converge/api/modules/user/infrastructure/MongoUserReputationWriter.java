@@ -41,6 +41,18 @@ public class MongoUserReputationWriter implements UserReputationWriter {
     }
 
     @Override
+    public boolean saveDriverWindow(ObjectId userId, DriverReputation reputation, LocalDateTime now) {
+        Update update = windowUpdate("driver", reputation.window(), reputation.level(), now);
+        return matched(mongoTemplate.updateFirst(byIdWithRole(userId, "driver"), update, User.class));
+    }
+
+    @Override
+    public boolean savePassengerWindow(ObjectId userId, PassengerReputation reputation, LocalDateTime now) {
+        Update update = windowUpdate("passenger", reputation.window(), reputation.level(), now);
+        return matched(mongoTemplate.updateFirst(byIdWithRole(userId, "passenger"), update, User.class));
+    }
+
+    @Override
     public boolean grantBadge(ObjectId userId, Badge badge, LocalDateTime now) {
         Query query = byId(userId).addCriteria(Criteria.where("badges.badge").ne(badge));
         Update update = new Update().push("badges", new UserBadge(badge, now)).set("updatedAt", now);
@@ -55,6 +67,19 @@ public class MongoUserReputationWriter implements UserReputationWriter {
 
     private Query byId(ObjectId userId) {
         return Query.query(Criteria.where("_id").is(userId));
+    }
+
+    // Só grava se o papel já existe, para não criar um sub-documento de reputação pela metade.
+    private Query byIdWithRole(ObjectId userId, String role) {
+        return byId(userId).addCriteria(Criteria.where("reputation." + role).ne(null));
+    }
+
+    private Update windowUpdate(String role, Object window, Object level, LocalDateTime now) {
+        return new Update()
+                .set("reputation." + role + ".window", window)
+                .set("reputation." + role + ".level", level)
+                .set("reputation." + role + ".calculatedAt", now)
+                .set("updatedAt", now);
     }
 
     private boolean matched(UpdateResult result) {

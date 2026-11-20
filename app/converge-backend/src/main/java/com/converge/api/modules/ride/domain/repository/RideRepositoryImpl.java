@@ -22,6 +22,7 @@ import java.math.BigDecimal;
 import java.time.LocalDateTime;
 import java.util.List;
 import java.util.Optional;
+import java.util.stream.Stream;
 
 import static org.springframework.data.mongodb.core.query.Criteria.where;
 
@@ -234,6 +235,28 @@ public class RideRepositoryImpl implements RideRepositoryCustom {
                 FindAndModifyOptions.options().returnNew(true),
                 Ride.class
         );
+    }
+
+    @Override
+    public Stream<Ride> streamRidesWithReputationFactsSince(LocalDateTime since) {
+        Query query = new Query(new Criteria().orOperator(
+                new Criteria().andOperator(
+                        where("status").is(RideStatus.COMPLETED),
+                        where("completedAt").gte(since)
+                ),
+                new Criteria().andOperator(
+                        where("startedAt").gte(since),
+                        where("participants").elemMatch(where("status").is(ParticipantStatus.NO_SHOW))
+                ),
+                new Criteria().andOperator(
+                        where("driverCancellationPenalized").is(true),
+                        where("cancelledAt").gte(since)
+                ),
+                where("participants").elemMatch(where("lateCancellation").is(true).and("cancelledAt").gte(since)),
+                where("participants").elemMatch(where("overdueAt").gte(since)),
+                where("participants").elemMatch(where("removedByDriver").is(true).and("cancelledAt").gte(since))
+        ));
+        return mongoTemplate.stream(query, Ride.class);
     }
 
     @Override

@@ -11,6 +11,7 @@ import java.math.BigDecimal;
 import java.time.LocalDateTime;
 import java.util.List;
 import java.util.Optional;
+import java.util.stream.Stream;
 
 public interface RideRepositoryCustom {
 
@@ -73,4 +74,11 @@ public interface RideRepositoryCustom {
      * Vazio quando o passageiro não foi cobrado ou a cobrança já está vencida.
      */
     Optional<Ride> markNonPaymentAtomic(ObjectId rideId, String passengerId, LocalDateTime now);
+
+    /**
+     * Viagens com ao menos um fato de reputação (concluída, ausência, cancelamento do motorista,
+     * cancelamento tardio ou dívida) datado a partir de [since]. Só reduz o volume: quem chama
+     * ainda filtra cada fato pela data. Quem chama deve fechar o stream.
+     */
+    Stream<Ride> streamRidesWithReputationFactsSince(LocalDateTime since);
 }
