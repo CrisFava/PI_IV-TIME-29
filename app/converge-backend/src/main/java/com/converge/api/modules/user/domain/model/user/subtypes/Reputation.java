@@ -80,6 +80,35 @@ public record Reputation(
         return new Reputation(driver, currentPassenger.recordOverdueRide(now));
     }
 
+    // Troca os contadores da janela pelos recalculados. Só mexe nos papéis que já existem,
+    // e as denúncias e os atrasos guardados ficam como estão.
+    public Reputation withWindowCounts(ReputationWindowCounts counts, LocalDateTime now) {
+        DriverReputation newDriver = driver;
+        if (driver != null) {
+            DriverWindow current = driver.window() != null ? driver.window() : new DriverWindow(0, 0, 0, 0);
+            newDriver = driver.withWindow(new DriverWindow(
+                    counts.driverCompletedRides(),
+                    counts.driverCancellations(),
+                    current.delays(),
+                    current.substantiatedReports()
+            ), now);
+        }
+        PassengerReputation newPassenger = passenger;
+        if (passenger != null) {
+            PassengerWindow current = passenger.window() != null
+                    ? passenger.window()
+                    : new PassengerWindow(0, 0, 0, 0, 0);
+            newPassenger = passenger.withWindow(new PassengerWindow(
+                    counts.passengerCompletedRides(),
+                    counts.passengerLateCancellations(),
+                    counts.passengerNoShows(),
+                    current.substantiatedReports(),
+                    counts.passengerOverdueRides()
+            ), now);
+        }
+        return new Reputation(newDriver, newPassenger);
+    }
+
     public Reputation withPassengerNoShow(LocalDateTime now) {
         PassengerReputation currentPassenger = passenger != null
                 ? passenger

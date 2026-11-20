@@ -147,6 +147,13 @@ public class Ride {
     @Nullable
     private String cancelledBy;
 
+    // Quando a viagem foi cancelada. Nulo em viagens não canceladas e nas canceladas antes deste campo
+    @Nullable
+    private LocalDateTime cancelledAt;
+
+    // O motorista cancelou com passageiro confirmado, o que conta na reputação dele
+    private boolean driverCancellationPenalized = false;
+
     @Nullable
     private String chatRoomId;
 
@@ -299,7 +306,9 @@ public class Ride {
             );
         }
 
+        boolean hadConfirmedPassenger = !this.confirmedPassengerIds().isEmpty();
         this.markCancelled(userId, reason);
+        this.driverCancellationPenalized = hadConfirmedPassenger;
 
         LocalDateTime now = LocalDateTime.now();
         this.participants.stream()
@@ -869,6 +878,7 @@ public class Ride {
     private void markCancelled(String userId, @Nullable String reason) {
         this.status = RideStatus.CANCELLED;
         this.cancelledBy = userId;
+        this.cancelledAt = LocalDateTime.now();
         this.cancellationReason = reason;
     }
 
@@ -1013,7 +1023,7 @@ public class Ride {
         LocalDateTime now = LocalDateTime.now();
 
         if (passenger.getStatus() == ParticipantStatus.CONFIRMED) {
-            passenger.cancel(reason, false, now);
+            passenger.removeByDriver(reason, now);
             this.availableSeats++;
             downgradeToAwaitingIfNoConfirmedLeft();
             return true;

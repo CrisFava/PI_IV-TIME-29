@@ -10,6 +10,7 @@ import com.converge.api.modules.user.domain.enums.user.VerificationStatus;
 import com.converge.api.modules.user.domain.model.user.subtypes.AcademicRecord;
 import com.converge.api.modules.user.domain.model.user.subtypes.driver.DriverLicense;
 import com.converge.api.modules.user.domain.model.user.subtypes.Reputation;
+import com.converge.api.modules.user.domain.model.user.subtypes.ReputationWindowCounts;
 import com.converge.api.modules.user.domain.model.user.subtypes.UserBadge;
 import com.converge.api.shared.presentation.exception.ApplicationException;
 import com.converge.api.shared.presentation.exception.ErrorCode;
@@ -372,6 +373,11 @@ public class User {
 
     public void recordPassengerCompletedRide(LocalDateTime now) {
         this.reputation = currentReputation().withPassengerCompletedRide(now);
+    }
+
+    // Troca os contadores da janela pelos recalculados a partir das viagens. Não mexe nos selos.
+    public void refreshReputationWindow(ReputationWindowCounts counts, LocalDateTime now) {
+        this.reputation = currentReputation().withWindowCounts(counts, now);
     }
 
     public void recordDriverRating(double averageRating, int totalReviews, LocalDateTime now) {
