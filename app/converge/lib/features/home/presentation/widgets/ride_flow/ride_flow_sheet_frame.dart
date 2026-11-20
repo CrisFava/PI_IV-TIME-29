@@ -3,6 +3,7 @@
 import 'package:flutter/material.dart';
 
 import '../../../../../core/config/styles.dart';
+import 'ride_flow_progress.dart';
 
 /// Painel retrátil das etapas de criar ou pedir carona. Abre baixo, para o mapa
 /// continuar em foco, e pode ser puxado para cima ou encolhido. Só fecha
@@ -21,6 +22,9 @@ class RideFlowSheetFrame extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    // Sem o coordenador acima, não há etapa para mostrar
+    final position = RideFlowProgressScope.maybeOf(context);
+
     return DraggableScrollableSheet(
       initialChildSize: initialSize,
       // O mínimo fica abaixo do menor encaixe: arrastar um pouco só encolhe o
@@ -58,6 +62,11 @@ class RideFlowSheetFrame extends StatelessWidget {
                   ),
                 ),
               ),
+              if (position != null)
+                Padding(
+                  padding: const EdgeInsets.only(bottom: 12),
+                  child: RideFlowProgressBar(progress: position),
+                ),
               ...children,
             ],
           ),

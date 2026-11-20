@@ -9,6 +9,7 @@ import '../../../../route/state/trip_estimate_controller.dart';
 import '../passenger_ride_step.dart';
 import '../ride_departure_label.dart';
 import 'offer_details_step_sheet.dart';
+import 'ride_flow_progress.dart';
 import 'ride_map_pick_card.dart';
 import 'ride_place_step_sheet.dart';
 import 'ride_route_preview_card.dart';
@@ -94,7 +95,7 @@ class HomeRideFlowCoordinator extends ConsumerWidget {
   Widget build(BuildContext context, WidgetRef ref) {
     final tripEstimate = ref.watch(tripEstimateProvider);
 
-    return switch (step) {
+    final screen = switch (step) {
       PassengerRideStep.dragMapPickup => RideMapPickCard(
         isOrigin: true,
         address: pickupAddress,
@@ -176,5 +177,11 @@ class HomeRideFlowCoordinator extends ConsumerWidget {
         bottomSafeArea: bottomPadding,
       ),
     };
+
+    // A barra de progresso de cada painel vem da etapa em que o fluxo está
+    return RideFlowProgressScope(
+      position: rideFlowStepPosition(step, isDriver: isDriver),
+      child: screen,
+    );
   }
 }

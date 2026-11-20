@@ -302,9 +302,9 @@ class _HomePageState extends ConsumerState<HomePage> {
     ref.read(passengerMatchProvider.notifier).reset();
   }
 
-  /// X do pedido de carona ou da carona do motorista: com a partida já confirmada,
-  /// pergunta antes de descartar o que foi escolhido. Na primeira etapa ainda não
-  /// há nada a perder, então fecha direto.
+  /// X das etapas do pedido, da carona do motorista e da lista de motoristas
+  /// compatíveis: com a partida já confirmada, pergunta antes de descartar o que
+  /// foi escolhido. Na primeira etapa ainda não há nada a perder, então fecha direto.
   Future<void> _handleCloseRideFlow() async {
     if (_passengerStep.hasConfirmedPickup) {
       final discard = await showDiscardRideDialog(
@@ -1228,7 +1228,7 @@ class _HomePageState extends ConsumerState<HomePage> {
                 onSelectDriver: _handleSelectDriver,
                 onRetryMatches: _handleRetryMatches,
                 onCancelRequest: _handleCancelRequest,
-                onCancelFlow: _handleCancelFlow,
+                onCancelFlow: _handleCloseRideFlow,
                 onKeepSearching: _handleKeepSearching,
               ),
             ),
