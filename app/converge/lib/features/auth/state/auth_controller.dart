@@ -1,11 +1,14 @@
 // Autor: Cristian Eduardo Fava - RA 25000636
 // Coautor: Allan Giovanni Matias Paes - RA 25008211
 
+import 'dart:typed_data';
+
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../../core/network/api_exception.dart';
 import '../../../core/services/auth/auth_providers.dart';
 import '../../../core/services/auth/auth_service.dart';
+import '../../../core/services/storage/profile_photo_storage_service.dart';
 // ---
 import '../data/models/cpf_validation_result.dart';
 import '../data/models/driver_license_input.dart';
@@ -28,6 +31,8 @@ final authControllerProvider =
 class AuthController extends AsyncNotifier<AuthSession> {
   AuthService get _auth => ref.read(authServiceProvider);
   AuthRepository get _repository => ref.read(authRepositoryProvider);
+  ProfilePhotoStorageService get _photoStorage =>
+      ref.read(profilePhotoStorageProvider);
 
   @override
   Future<AuthSession> build() async {
@@ -63,11 +68,19 @@ class AuthController extends AsyncNotifier<AuthSession> {
   }
 
   /// Cria a conta no Firebase e o cadastro no backend.
+  ///
+  /// Se uma tentativa anterior já criou a conta no Firebase para o mesmo e-mail
+  /// mas falhou ao gravar o perfil no backend, reaproveita a conta atual em vez
+  /// de tentar criar outra (o que falharia com `email-already-in-use`).
   Future<void> register(RegisterInput input) async {
-    final user = await _auth.signUp(
-      email: input.email,
-      password: input.password,
-    );
+    final current = _auth.currentUser;
+    final sameEmail =
+        current?.email != null &&
+        current!.email!.trim().toLowerCase() ==
+            input.email.trim().toLowerCase();
+    final user = sameEmail
+        ? current
+        : await _auth.signUp(email: input.email, password: input.password);
     await _createProfile(user, input.profile);
   }
 
@@ -153,6 +166,43 @@ class AuthController extends AsyncNotifier<AuthSession> {
     return updated;
   }
 
+  /// Faz upload da nova foto para o Firebase Storage
+  /// (`profile/{firebaseUid}/pictures/{fileName}`) e atualiza o perfil (`PUT /users/me`).
+  Future<UserModel> updateProfilePhoto({
+    required Uint8List bytes,
+    required String fileName,
+  }) async {
+    final currentSession = state.value;
+    if (currentSession is! Authenticated) {
+      throw const AuthException(
+        'not-authenticated',
+        'Usuário não autenticado.',
+      );
+    }
+    final user = currentSession.user;
+    final downloadUrl = await _photoStorage.uploadProfilePhoto(
+      firebaseUid: user.firebaseUid,
+      bytes: bytes,
+      fileName: fileName,
+    );
+    final updated = await _repository.updateProfile(
+      name: user.name,
+      phone: _normalizePhone(user.phone),
+      photoUrl: downloadUrl,
+      pixKey: user.pixKey,
+      pixKeyType: user.pixKeyType,
+    );
+    final latest = state.value;
+    if (latest is! Authenticated || latest.user.id != user.id) {
+      throw const AuthException(
+        'session-changed',
+        'Sua sessão mudou enquanto a foto era salva. Confira os dados e tente de novo.',
+      );
+    }
+    state = AsyncData(Authenticated(updated));
+    return updated;
+  }
+
   static String _normalizePhone(String raw) {
     final digits = raw.replaceAll(RegExp(r'\D'), '');
     if (digits.length == 11) {
@@ -230,6 +280,9 @@ class AuthController extends AsyncNotifier<AuthSession> {
           return;
         }
       }
+      state = AsyncData(ProfileIncomplete(user));
+      rethrow;
+    } catch (_) {
       state = AsyncData(ProfileIncomplete(user));
       rethrow;
     }
