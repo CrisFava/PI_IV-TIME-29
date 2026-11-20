@@ -16,6 +16,10 @@ class RideHistoryItem {
   final bool isDriver;
   final RideStatus status;
   final DateTime? departureDateTime;
+
+  /// Início e fim reais da viagem (sem início guardado, vem o horário marcado).
+  final DateTime? startedAt;
+  final DateTime? completedAt;
   final RoutePlaceModel origin;
   final RoutePlaceModel destination;
   final String? vehicleModel;
@@ -29,6 +33,8 @@ class RideHistoryItem {
     required this.isDriver,
     required this.status,
     required this.departureDateTime,
+    this.startedAt,
+    this.completedAt,
     required this.origin,
     required this.destination,
     required this.people,
@@ -50,6 +56,8 @@ class RideHistoryItem {
       departureDateTime: DateTime.tryParse(
         json['departureDateTime'] as String? ?? '',
       ),
+      startedAt: DateTime.tryParse(json['startedAt'] as String? ?? ''),
+      completedAt: DateTime.tryParse(json['completedAt'] as String? ?? ''),
       origin: RoutePlaceModel.fromJson(
         (json['origin'] as Map<String, dynamic>?) ?? const {},
       ),

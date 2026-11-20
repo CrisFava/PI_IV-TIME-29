@@ -3,6 +3,8 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
+import '../../data/repository/review_dismissal_store.dart';
+
 import '../../../auth/state/auth_controller.dart';
 import '../../../auth/state/session/auth_session.dart';
 import '../../../ride/data/models/ride_model.dart';
@@ -20,6 +22,9 @@ Future<void> promptRideReviews(
 ) async {
   final session = ref.read(authControllerProvider).value;
   if (session is! Authenticated) return;
+  // "Não quero avaliar": a avaliação desta viagem não abre mais sozinha
+  if (await ref.read(reviewDismissalStoreProvider).isDismissed(ride.id)) return;
+  if (!context.mounted) return;
 
   // O provider é autoDispose e quem chama (a home) não o observa: sem um ouvinte, ele
   // poderia ser descartado no meio da carga e o future nunca terminar.

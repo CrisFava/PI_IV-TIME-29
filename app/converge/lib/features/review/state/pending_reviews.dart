@@ -31,13 +31,11 @@ List<ReviewTarget> pendingReviewTargets({
   required String viewerId,
   required List<ReviewModel> given,
 }) {
-  // Só viagem concluída tem avaliação.
-  if (ride.status != RideStatus.completed) return const [];
-
   final reviewed = {for (final review in given) review.reviewedId};
 
-  // Motorista: cada passageiro que viajou e que ele ainda não avaliou.
+  // Motorista: cada passageiro que viajou e que ele ainda não avaliou, ao concluir.
   if (ride.isDrivenBy(viewerId)) {
+    if (ride.status != RideStatus.completed) return const [];
     return [
       for (final passenger in ride.participants)
         if (passenger.isPassenger &&
@@ -52,7 +50,12 @@ List<ReviewTarget> pendingReviewTargets({
     ];
   }
 
-  // Passageiro: só avalia se viajou, e só o motorista, se ainda não avaliou.
+  // Passageiro: avalia o motorista assim que desce (a viagem dele terminou), mesmo
+  // com a viagem ainda em andamento para os outros.
+  if (ride.status != RideStatus.completed &&
+      ride.status != RideStatus.inProgress) {
+    return const [];
+  }
   final own = ride.passengerOf(viewerId);
   if (own == null || own.status != ParticipantStatus.completed) return const [];
   if (reviewed.contains(ride.driverId)) return const [];
@@ -91,6 +94,28 @@ List<RideModel> newlyCompletedRides({
       if (ride.status == RideStatus.completed &&
           before[ride.id] != null &&
           before[ride.id] != RideStatus.completed)
+        ride,
+  ];
+}
+
+/// Viagens em que [viewerId], como passageiro, desceu entre a lista [previous] e a
+/// [next]: a avaliação dele já pode abrir, sem esperar a viagem dos outros acabar.
+List<RideModel> newlyArrivedRides({
+  required List<RideModel>? previous,
+  required List<RideModel> next,
+  required String viewerId,
+}) {
+  if (previous == null) return const [];
+
+  final before = {
+    for (final ride in previous) ride.id: ride.passengerOf(viewerId)?.status,
+  };
+  return [
+    for (final ride in next)
+      if (!ride.isDrivenBy(viewerId) &&
+          ride.passengerOf(viewerId)?.status == ParticipantStatus.completed &&
+          before.containsKey(ride.id) &&
+          before[ride.id] != ParticipantStatus.completed)
         ride,
   ];
 }

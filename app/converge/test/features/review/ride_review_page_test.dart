@@ -4,12 +4,14 @@ import 'package:converge/core/network/api_error_code.dart';
 import 'package:converge/core/network/api_exception.dart';
 import 'package:converge/features/review/data/models/create_review_request.dart';
 import 'package:converge/features/review/data/models/review_model.dart';
+import 'package:converge/features/review/data/repository/review_dismissal_store.dart';
 import 'package:converge/features/review/data/repository/review_repository_impl.dart';
 import 'package:converge/features/review/presentation/pages/ride_review_page.dart';
 import 'package:converge/features/review/state/pending_reviews.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
+import 'package:shared_preferences/shared_preferences.dart';
 
 import '../ride/fakes/fake_ride.dart';
 import 'fakes/fake_review_repository.dart';
@@ -100,6 +102,9 @@ void main() {
       await openPage(tester, const [_ana, _bia]);
 
       await tester.tap(find.byTooltip('5 de 5').first);
+      // Linha compacta: o comentário abre no ícone
+      await tester.tap(find.byTooltip('Adicionar comentário').first);
+      await tester.pump();
       await tester.enterText(
         find.byType(TextField).first,
         'Pontual e simpática',
@@ -122,6 +127,8 @@ void main() {
     await openPage(tester, const [_ana, _bia]);
 
     await tester.tap(find.byTooltip('5 de 5').first);
+    await tester.tap(find.byTooltip('Adicionar comentário').last);
+    await tester.pump();
     await tester.enterText(find.byType(TextField).last, 'Chegou atrasada');
     await tester.pump();
     await tester.tap(find.text('Enviar avaliações'));
@@ -141,6 +148,8 @@ void main() {
       await openPage(tester, const [_ana, _bia]);
 
       await tester.tap(find.byTooltip('5 de 5').first);
+      await tester.tap(find.byTooltip('Adicionar comentário').last);
+      await tester.pump();
       await tester.enterText(find.byType(TextField).last, 'Chegou atrasada');
       await tester.pump();
       await tester.tap(find.text('Enviar avaliações'));
@@ -162,17 +171,25 @@ void main() {
     },
   );
 
-  testWidgets('"Agora não" fecha sem enviar nada', (tester) async {
-    await openPage(tester, const [_ana, _bia]);
+  testWidgets(
+    '"Não quero avaliar" fecha sem enviar e não pergunta de novo desta viagem',
+    (tester) async {
+      SharedPreferences.setMockInitialValues({});
+      await openPage(tester, const [_ana, _bia]);
 
-    await tester.tap(find.byTooltip('3 de 5').first);
-    await tester.pump();
-    await tester.tap(find.text('Agora não'));
-    await tester.pumpAndSettle();
+      await tester.tap(find.byTooltip('3 de 5').first);
+      await tester.pump();
+      await tester.tap(find.text('Não quero avaliar'));
+      await tester.pumpAndSettle();
 
-    expect(reviews.reviews, isEmpty);
-    expect(find.byType(RideReviewPage), findsNothing);
-  });
+      expect(reviews.reviews, isEmpty);
+      expect(find.byType(RideReviewPage), findsNothing);
+      expect(
+        await const ReviewDismissalStore().isDismissed(fakeRideId),
+        isTrue,
+      );
+    },
+  );
 
   testWidgets('passageiro avalia só o motorista', (tester) async {
     await openPage(tester, const [_lucas]);
