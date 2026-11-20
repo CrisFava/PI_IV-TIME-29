@@ -138,6 +138,100 @@ void main() {
         throwsA(isA<AuthException>()),
       );
     });
+
+    test(
+      'preserva nome e chave PIX alterados enquanto a foto estava sendo enviada',
+      () async {
+        final auth = FakeAuthService(
+          initialUser: const AuthUser(
+            uid: 'uid-1',
+            email: 'ana@puc.edu.br',
+            emailVerified: true,
+          ),
+        );
+        final repository = FakeAuthRepository(stored: fakeUser());
+        final uploadCompleter = Completer<String>();
+        final storage = _FakeProfilePhotoStorageService()
+          ..completer = uploadCompleter;
+
+        final container = ProviderContainer(
+          overrides: [
+            authServiceProvider.overrideWithValue(auth),
+            authRepositoryProvider.overrideWithValue(repository),
+            profilePhotoStorageProvider.overrideWithValue(storage),
+          ],
+        );
+        addTearDown(container.dispose);
+
+        await container.read(authControllerProvider.future);
+        final notifier = container.read(authControllerProvider.notifier);
+
+        // Inicia o upload da foto
+        final photoFuture = notifier.updateProfilePhoto(
+          bytes: Uint8List.fromList([1, 2, 3]),
+          fileName: 'nova.png',
+        );
+
+        // Enquanto o upload está em andamento, o usuário edita nome e telefone
+        await notifier.updateProfile(
+          name: 'Ana Atualizada',
+          phone: '19999998888',
+        );
+
+        // Upload conclui agora
+        uploadCompleter.complete('https://cdn.example.com/nova.png');
+        final updated = await photoFuture;
+
+        expect(updated.name, 'Ana Atualizada');
+        expect(updated.phone, '(19) 99999-8888');
+        expect(updated.photoUrl, 'https://cdn.example.com/nova.png');
+      },
+    );
+
+    test(
+      'aborta gravação do perfil se houver logout durante o upload da foto',
+      () async {
+        final auth = FakeAuthService(
+          initialUser: const AuthUser(
+            uid: 'uid-1',
+            email: 'ana@puc.edu.br',
+            emailVerified: true,
+          ),
+        );
+        final repository = FakeAuthRepository(stored: fakeUser());
+        final uploadCompleter = Completer<String>();
+        final storage = _FakeProfilePhotoStorageService()
+          ..completer = uploadCompleter;
+
+        final container = ProviderContainer(
+          overrides: [
+            authServiceProvider.overrideWithValue(auth),
+            authRepositoryProvider.overrideWithValue(repository),
+            profilePhotoStorageProvider.overrideWithValue(storage),
+          ],
+        );
+        addTearDown(container.dispose);
+
+        await container.read(authControllerProvider.future);
+        final notifier = container.read(authControllerProvider.notifier);
+
+        final photoFuture = notifier.updateProfilePhoto(
+          bytes: Uint8List.fromList([1, 2, 3]),
+          fileName: 'nova.png',
+        );
+
+        await notifier.signOut();
+        uploadCompleter.complete('https://cdn.example.com/nova.png');
+
+        await expectLater(
+          photoFuture,
+          throwsA(
+            isA<AuthException>().having((e) => e.code, 'code', 'session-changed'),
+          ),
+        );
+        expect(repository.stored?.photoUrl, isNull);
+      },
+    );
   });
 
   group('ProfilePhotoAvatar widget', () {
