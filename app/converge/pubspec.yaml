@@ -16,6 +16,8 @@ dependencies:
   flutter:
     sdk: flutter
   flutter_dotenv: ^6.0.1
+  flutter_localizations:
+    sdk: flutter
   flutter_riverpod: ^3.4.3
   go_router: ^18.1.0
   google_maps_flutter: ^2.19.0

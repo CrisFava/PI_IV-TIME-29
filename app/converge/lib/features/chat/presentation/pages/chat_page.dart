@@ -5,6 +5,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../../../core/config/styles.dart';
 import '../../../../core/widgets/show_app_notice.dart';
+import '../../../ride/data/models/ride_status.dart';
 import '../../../ride/state/ride_providers.dart';
 import '../../../security/presentation/widgets/blocked_chat_bar.dart';
 import '../../../security/presentation/widgets/user_safety_menu.dart';
@@ -175,8 +176,11 @@ class _ChatPageState extends ConsumerState<ChatPage> {
                 actionLabel: 'Tentar novamente',
                 onAction: () => ref.invalidate(chatMessagesProvider(thread)),
               ),
-              data: (messages) =>
-                  ChatMessageList(messages: messages, viewerUid: viewerUid),
+              data: (messages) => ChatMessageList(
+                messages: messages,
+                viewerUid: viewerUid,
+                rideFinished: conversation.ride.status == RideStatus.completed,
+              ),
             ),
           ),
           if (otherPartyBlocked)

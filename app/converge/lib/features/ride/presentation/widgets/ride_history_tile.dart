@@ -22,13 +22,22 @@ class RideHistoryTile extends StatelessWidget {
   static String _hhmm(DateTime time) =>
       '${_twoDigits(time.hour)}:${_twoDigits(time.minute)}';
 
+  static String _dayAndTime(DateTime time) =>
+      '${_twoDigits(time.day)}/${_twoDigits(time.month)}/${time.year} · '
+      '${_hhmm(time)}';
+
   /// "19/11/2026 · 09:36 – 10:05": o dia e os horários reais de início e fim.
+  /// Sem início real, o horário marcado pode vir depois do fim (a viagem começou antes
+  /// da hora): nesse caso mostra só o fim, em vez de uma faixa ao contrário.
   static String _when(RideHistoryItem item) {
     final start = item.startedAt ?? item.departureDateTime;
-    if (start == null) return 'Data a definir';
     final end = item.completedAt;
-    return '${_twoDigits(start.day)}/${_twoDigits(start.month)}/${start.year} · '
-        '${_hhmm(start)}${end == null ? '' : ' – ${_hhmm(end)}'}';
+    if (start == null && end == null) return 'Data a definir';
+    if (start == null || (end != null && end.isBefore(start))) {
+      return _dayAndTime(end!);
+    }
+    if (end == null) return _dayAndTime(start);
+    return '${_dayAndTime(start)} – ${_hhmm(end)}';
   }
 
   // Nome curto do lugar: o bairro, ou o começo do endereço
@@ -38,6 +47,8 @@ class RideHistoryTile extends StatelessWidget {
     return place.address.split(',').first.trim();
   }
 
+  /// O valor sempre vem depois de uma palavra que diz o que ele é: "pagou", "recebeu",
+  /// "a pagar", "custo" (do motorista, ainda sem pagamentos) ou "estimado".
   String _amount() {
     final paid = item.paidAmount;
     final estimated = item.estimatedAmount;
@@ -47,9 +58,12 @@ class RideHistoryTile extends StatelessWidget {
           : 'pagou ${CurrencyFormatter.format(paid)}';
     }
     if (estimated == null) return 'sem valor';
-    final pending =
-        !item.isDriver && item.paymentStatus == PaymentStatus.pending;
-    return '${CurrencyFormatter.format(estimated)}${pending ? ' · a pagar' : ''}';
+
+    final value = CurrencyFormatter.format(estimated);
+    if (item.isDriver) return 'custo $value';
+    return item.paymentStatus == PaymentStatus.pending
+        ? 'a pagar $value'
+        : 'estimado $value';
   }
 
   @override

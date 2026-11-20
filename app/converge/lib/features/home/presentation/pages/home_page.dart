@@ -828,9 +828,10 @@ class _HomePageState extends ConsumerState<HomePage> {
     return CreateRouteRequest(
       type: isDriver ? AppRouteType.offer : AppRouteType.search,
       vehicleId: vehicleId,
+      // Sem bairro: o app não o conhece, então não inventa um texto fixo. O histórico
+      // mostra o começo do endereço no lugar.
       origin: RoutePlaceModel(
         address: fromAddress,
-        neighborhood: 'Campus / Origem',
         city: 'Campinas',
         latitude: from.latitude,
         longitude: from.longitude,
@@ -839,7 +840,6 @@ class _HomePageState extends ConsumerState<HomePage> {
         address: _destinationAddress.isNotEmpty
             ? _destinationAddress
             : 'Destino Selecionado',
-        neighborhood: 'Destino',
         city: 'Campinas',
         latitude: _destinationLocation!.latitude,
         longitude: _destinationLocation!.longitude,
