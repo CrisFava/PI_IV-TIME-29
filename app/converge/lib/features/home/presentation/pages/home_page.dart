@@ -8,7 +8,6 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:google_maps_flutter/google_maps_flutter.dart';
 
 import '../../../../core/config/styles.dart';
-import '../../../../core/services/maps/google_maps_service.dart';
 import '../../../../core/widgets/confirm_dialog.dart';
 import '../../../../core/widgets/ride_dock_navigation.dart';
 import '../../../../core/widgets/sheet_drag_to_dismiss.dart';
@@ -53,17 +52,16 @@ import '../../../vehicle/state/my_vehicles_controller.dart';
 import '../widgets/become_driver_sheet.dart';
 import '../widgets/campus_spots.dart';
 import '../widgets/departure_time_sheet.dart';
+import '../widgets/home_map_viewport.dart';
 import '../widgets/home_mode_selector_header.dart';
 import '../widgets/home_passenger_sheet.dart';
 import '../widgets/home_profile_tab.dart';
-import '../widgets/home_real_map_background.dart';
 import '../widgets/home_ride_alerts_overlay.dart';
 import '../widgets/home_trip_mode_overlay.dart';
 import '../widgets/passenger_ride_step.dart';
 import '../widgets/ride_departure_label.dart';
 import '../widgets/ride_flow/home_ride_flow_coordinator.dart';
 import '../widgets/ride_flow/ride_review.dart';
-import '../widgets/trip_layers_calculator.dart';
 
 class HomePage extends ConsumerStatefulWidget {
   const HomePage({super.key});
@@ -139,57 +137,10 @@ class _HomePageState extends ConsumerState<HomePage> {
   String? _offerVehicleId;
   int? _offerSeats;
 
-  void _onCameraCenterChanged(LatLng target) async {
-    // Só na confirmação no mapa o ponto segue o centro. Se o pino continua no
-    // ponto escolhido, o nome dele (ex.: "PUC-Campinas - Portaria 2") é mantido.
-    if (_passengerStep == PassengerRideStep.dragMapPickup) {
-      if (_samePoint(target, _pickupLocation) && _pickupAddress.isNotEmpty) {
-        return;
-      }
-      // Sem endereço enquanto busca: o "Confirmar" fica desabilitado
-      setState(() {
-        _pickupLocation = target;
-        _pickupAddress = '';
-      });
-      final addr = await GoogleMapsService.getAddressFromCoordinates(target);
-      // Só vale se o pino ainda está nesse ponto (o mapa pode ter sido arrastado de novo)
-      if (mounted &&
-          _passengerStep == PassengerRideStep.dragMapPickup &&
-          _samePoint(target, _pickupLocation)) {
-        setState(() => _pickupAddress = addr);
-      }
-    } else if (_passengerStep == PassengerRideStep.dragMapDestination) {
-      final destination = _destinationLocation;
-      if (destination != null &&
-          _samePoint(target, destination) &&
-          _destinationAddress.isNotEmpty) {
-        return;
-      }
-      setState(() {
-        _destinationLocation = target;
-        _destinationAddress = '';
-      });
-      final addr = await GoogleMapsService.getAddressFromCoordinates(target);
-      final current = _destinationLocation;
-      if (mounted &&
-          _passengerStep == PassengerRideStep.dragMapDestination &&
-          current != null &&
-          _samePoint(target, current)) {
-        setState(() => _destinationAddress = addr);
-      }
-    }
-  }
-
-  // Mesmo ponto no mapa (a câmera parou onde o ponto já estava)
-  static bool _samePoint(LatLng a, LatLng b) =>
-      (a.latitude - b.latitude).abs() < 0.00002 &&
-      (a.longitude - b.longitude).abs() < 0.00002;
-
   void _handleStartDragMapPickup() {
     setState(() {
       _passengerStep = PassengerRideStep.dragMapPickup;
     });
-    _onCameraCenterChanged(_pickupLocation);
   }
 
   /// Endereço escolhido na busca ou no campus: o mapa vai até ele e pergunta
@@ -216,9 +167,6 @@ class _HomePageState extends ConsumerState<HomePage> {
         _pickupLocation.longitude + 0.0052,
       );
     });
-    if (_destinationLocation != null) {
-      _onCameraCenterChanged(_destinationLocation!);
-    }
   }
 
   void _handleDestinationChosen(String title, LatLng pos) {
@@ -818,9 +766,6 @@ class _HomePageState extends ConsumerState<HomePage> {
     }
   }
 
-  static LatLng _latLngOf(RoutePlaceModel place) =>
-      LatLng(place.latitude, place.longitude);
-
   /// Botão verde da dock: abre o modo viagem (só a viagem em andamento).
   void _openTripMode() {
     HapticFeedback.mediumImpact();
@@ -1112,106 +1057,41 @@ class _HomePageState extends ConsumerState<HomePage> {
     // a não ser que o usuário esteja montando um pedido novo
     final showShiftRoute =
         shiftRide != null && _passengerStep == PassengerRideStep.idle;
-    final viewerId = ref.watch(matchingViewerIdProvider);
-    final tripLayers = showShiftRoute
-        ? TripLayersCalculator.calculateLayers(shiftRide, viewerId)
-        : null;
-    // O passageiro termina no desembarque dele: o resto da viagem não aparece
-    final ownTrip =
-        showShiftRoute && viewerId != null && !shiftRide.isDrivenBy(viewerId)
-            ? shiftRide.passengerOf(viewerId)
-            : null;
-    final tripEnd = ownTrip == null
-        ? shiftRide?.destination
-        : (ownTrip.dropOffLocation ?? shiftRide!.destination);
-    // Antes de entrar, o início é de onde o motorista vem; depois, onde ele embarcou
-    final tripStart = ownTrip?.boardedAt == null
-        ? shiftRide?.origin
-        : (ownTrip!.boardingLocation ?? shiftRide!.origin);
-    final currentLegStart = tripLayers?.legs
-        ?.where((leg) => leg.isCurrent && leg.points.isNotEmpty)
-        .firstOrNull
-        ?.points
-        .first;
     final tripModeVisible = _tripModeOpen && showShiftRoute;
-    // Os painéis do motorista abrem em 52% da tela: o mapa enquadra só a parte de cima
-    // Escolhendo no mapa, o mapa ocupa a tela toda (só o cartão fica embaixo)
-    final pickingOnMap =
-        _passengerStep == PassengerRideStep.dragMapPickup ||
-        _passengerStep == PassengerRideStep.dragMapDestination;
-    // Na etapa do trajeto, o mapa fica em foco: só o cartão pequeno embaixo
-    final mapBottomPadding = _passengerStep == PassengerRideStep.routePreview
-        ? MediaQuery.sizeOf(context).height * 0.415
-        : _currentMode.isDriver && !pickingOnMap
-            ? MediaQuery.sizeOf(context).height * 0.52
-            : 0.0;
 
     return Stack(
       key: const ValueKey('uber_map_home_view'),
       children: [
         // 1. Camada Base: Google Maps real em tela cheia com círculo dinâmico / marcadores / rotas
         Positioned.fill(
-          child: HomeRealMapBackground(
+          child: HomeMapViewport(
             isDriverMode: _currentMode.isDriver,
-            // Esperando o motorista: o ponto dele é marcado com a pessoa
-            pickupIsPassengerSpot:
-                _currentMode.isPassenger &&
-                (_passengerStep == PassengerRideStep.driverList ||
-                    _passengerStep == PassengerRideStep.waitingDriver),
-            showDrivers:
-                _currentMode.isPassenger &&
-                _passengerStep == PassengerRideStep.driverList,
-            availableDrivers: ref.watch(passengerMatchProvider).matches,
-            acceptedDriver: _passengerStep == PassengerRideStep.driverAccepted
-                ? ref.watch(passengerMatchProvider).selected
-                : null,
-            // A bolinha de início anda com a viagem: fica no começo do trecho atual
-            // (a última parada feita); sem os trechos, no início de sempre
-            pickupLocation: showShiftRoute
-                ? (currentLegStart ?? _latLngOf(tripStart!))
-                : _pickupLocation,
-            destinationLocation: showShiftRoute
-                ? _latLngOf(tripEnd!)
-                : _destinationLocation,
-            pickupAddress: showShiftRoute
-                ? (currentLegStart != null ? 'Agora' : tripStart!.address)
-                : _pickupAddress,
-            destinationAddress: showShiftRoute
-                ? tripEnd!.address
-                : _destinationAddress,
-            bottomPadding: mapBottomPadding,
-            showTrajectory:
-                showShiftRoute ||
-                _passengerStep == PassengerRideStep.routePreview ||
-                _passengerStep == PassengerRideStep.routeConfirmation ||
-                _passengerStep == PassengerRideStep.offerDetails ||
-                (_currentMode.isPassenger &&
-                    (_passengerStep == PassengerRideStep.driverList ||
-                        _passengerStep == PassengerRideStep.waitingDriver ||
-                        _passengerStep == PassengerRideStep.driverAccepted)),
-            // Com os trechos, eles substituem o caminho inteiro
-            tripRoutePoints: showShiftRoute
-                ? (tripLayers?.legs == null
-                    ? TripLayersCalculator.itineraryPoints(shiftRide)
-                    : null)
-                : _tripRoutePoints,
+            passengerStep: _passengerStep,
+            shiftRide: shiftRide,
+            pickupLocation: _pickupLocation,
+            pickupAddress: _pickupAddress,
+            destinationLocation: _destinationLocation,
+            destinationAddress: _destinationAddress,
+            tripRoutePoints: _tripRoutePoints,
             driverApproachRoutePoints: _driverApproachRoutePoints,
-            tripLegs: tripLayers?.legs,
-            tripStops: tripLayers?.stops ?? const [],
-            isDraggingPin:
-                _passengerStep == PassengerRideStep.dragMapPickup ||
-                _passengerStep == PassengerRideStep.dragMapDestination,
-            centralPinType:
-                _passengerStep == PassengerRideStep.dragMapDestination
-                    ? CentralPinType.destination
-                    : CentralPinType.pickup,
-            onCameraCenterChanged: _onCameraCenterChanged,
             universityName: user.academicRecord.university.toString(),
             onDriverSelected: _handleSelectDriver,
             onMapTap: () {
               if (_isCarMenuOpen) {
                 setState(() => _isCarMenuOpen = false);
               }
+            },
+            onPickupLocationChanged: (location, address) {
+              setState(() {
+                _pickupLocation = location;
+                _pickupAddress = address;
+              });
+            },
+            onDestinationLocationChanged: (location, address) {
+              setState(() {
+                _destinationLocation = location;
+                _destinationAddress = address;
+              });
             },
           ),
         ),
