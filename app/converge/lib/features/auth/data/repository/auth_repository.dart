@@ -18,12 +18,16 @@ abstract class AuthRepository {
   Future<UserModel> createUser(CreateUserRequest request);
 
   /// Atualiza dados de perfil do usuário autenticado (`PUT /users/me`).
+  ///
+  /// Com [expectedFirebaseUid], a requisição só é enviada com um token dessa
+  /// conta; caso contrário lança `AuthException('session-changed')`.
   Future<UserModel> updateProfile({
     required String name,
     required String phone,
     String? photoUrl,
     String? pixKey,
     PixKeyType? pixKeyType,
+    String? expectedFirebaseUid,
   });
 
   /// Envia dados da Carteira de Motorista (`POST /users/me/driver-license`).
@@ -34,4 +38,7 @@ abstract class AuthRepository {
 
   /// Valida o CPF através do Socket Server TCP via backend (`POST /users/validate-cpf`).
   Future<CpfValidationResult> validateCpf(String cpf);
+
+  /// Verifica se o e-mail já está cadastrado antes de avançar no formulário (`GET /users/email-availability`).
+  Future<bool> isEmailAvailable(String email);
 }

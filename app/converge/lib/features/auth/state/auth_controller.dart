@@ -1,11 +1,15 @@
 // Autor: Cristian Eduardo Fava - RA 25000636
 // Coautor: Allan Giovanni Matias Paes - RA 25008211
 
+import 'dart:async';
+import 'dart:typed_data';
+
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../../core/network/api_exception.dart';
 import '../../../core/services/auth/auth_providers.dart';
 import '../../../core/services/auth/auth_service.dart';
+import '../../../core/services/storage/profile_photo_storage_service.dart';
 // ---
 import '../data/models/cpf_validation_result.dart';
 import '../data/models/driver_license_input.dart';
@@ -28,6 +32,16 @@ final authControllerProvider =
 class AuthController extends AsyncNotifier<AuthSession> {
   AuthService get _auth => ref.read(authServiceProvider);
   AuthRepository get _repository => ref.read(authRepositoryProvider);
+  ProfilePhotoStorageService get _photoStorage =>
+      ref.read(profilePhotoStorageProvider);
+
+  /// Incrementado a cada troca de sessão (login/logout) para invalidar
+  /// mutações em voo iniciadas por uma sessão anterior.
+  int _sessionEpoch = 0;
+
+  /// Fila que serializa mutações de perfil (`PUT /users/me`) para evitar que
+  /// uma atualização paralela sobrescreva campos alterados por outra.
+  Future<void> _profileMutationQueue = Future<void>.value();
 
   @override
   Future<AuthSession> build() async {
@@ -37,6 +51,7 @@ class AuthController extends AsyncNotifier<AuthSession> {
     // removida). Logins são tratados pelas próprias ações.
     final subscription = auth.authStateChanges().listen((user) {
       if (user == null && state.value is! Unauthenticated) {
+        _sessionEpoch++;
         state = const AsyncData(Unauthenticated());
       }
     });
@@ -52,6 +67,7 @@ class AuthController extends AsyncNotifier<AuthSession> {
   void retry() => ref.invalidateSelf();
 
   Future<void> signIn({required String email, required String password}) async {
+    _sessionEpoch++;
     final user = await _auth.signIn(email: email, password: password);
     try {
       state = AsyncData(await _loadSession(user));
@@ -63,11 +79,19 @@ class AuthController extends AsyncNotifier<AuthSession> {
   }
 
   /// Cria a conta no Firebase e o cadastro no backend.
+  ///
+  /// Se uma tentativa anterior já criou a conta no Firebase para o mesmo e-mail
+  /// mas falhou ao gravar o perfil no backend, reaproveita a conta atual em vez
+  /// de tentar criar outra (o que falharia com `email-already-in-use`).
   Future<void> register(RegisterInput input) async {
-    final user = await _auth.signUp(
-      email: input.email,
-      password: input.password,
-    );
+    final current = _auth.currentUser;
+    final sameEmail =
+        current?.email != null &&
+        current!.email!.trim().toLowerCase() ==
+            input.email.trim().toLowerCase();
+    final user = sameEmail
+        ? current
+        : await _auth.signUp(email: input.email, password: input.password);
     await _createProfile(user, input.profile);
   }
 
@@ -104,16 +128,19 @@ class AuthController extends AsyncNotifier<AuthSession> {
       );
     }
     final user = currentSession.user;
-    final phone = _normalizePhone(user.phone);
-    final updated = await _repository.updateProfile(
-      name: user.name,
-      phone: phone,
-      photoUrl: user.photoUrl,
-      pixKey: pixKey,
-      pixKeyType: pixKeyType,
+    return _runProfileMutation(
+      expectedUserId: user.id,
+      expectedFirebaseUid: user.firebaseUid,
+      expectedEpoch: _sessionEpoch,
+      mutate: (latestUser) => _repository.updateProfile(
+        name: latestUser.name,
+        phone: _normalizePhone(latestUser.phone),
+        photoUrl: latestUser.photoUrl,
+        pixKey: pixKey,
+        pixKeyType: pixKeyType,
+        expectedFirebaseUid: user.firebaseUid,
+      ),
     );
-    state = AsyncData(Authenticated(updated));
-    return updated;
   }
 
   /// Atualiza nome, telefone e chave PIX do usuário autenticado (`PUT /users/me`).
@@ -133,24 +160,113 @@ class AuthController extends AsyncNotifier<AuthSession> {
     }
     final user = currentSession.user;
     final hasNewPix = pixKey != null && pixKey.trim().isNotEmpty;
-    final updated = await _repository.updateProfile(
-      name: name.trim(),
-      phone: _normalizePhone(phone),
-      photoUrl: user.photoUrl,
-      pixKey: hasNewPix ? pixKey.trim() : user.pixKey,
-      pixKeyType: hasNewPix ? pixKeyType : user.pixKeyType,
+    return _runProfileMutation(
+      expectedUserId: user.id,
+      expectedFirebaseUid: user.firebaseUid,
+      expectedEpoch: _sessionEpoch,
+      mutate: (latestUser) => _repository.updateProfile(
+        name: name.trim(),
+        phone: _normalizePhone(phone),
+        photoUrl: latestUser.photoUrl,
+        pixKey: hasNewPix ? pixKey.trim() : latestUser.pixKey,
+        pixKeyType: hasNewPix ? pixKeyType : latestUser.pixKeyType,
+        expectedFirebaseUid: user.firebaseUid,
+      ),
     );
-    // A sessão pode ter mudado durante a requisição (logout, troca de conta):
-    // a resposta antiga não pode ser publicada como sessão atual
-    final latest = state.value;
-    if (latest is! Authenticated || latest.user.id != user.id) {
+  }
+
+  /// Faz upload da nova foto para o Firebase Storage
+  /// (`profile/{firebaseUid}/pictures/{fileName}`) e atualiza o perfil (`PUT /users/me`).
+  ///
+  /// O envio ao backend é serializado com outras alterações de perfil e lê os
+  /// campos mais recentes da mesma sessão antes de gravar, evitando sobrescrever
+  /// edições feitas durante o upload ou gravar dados em outra conta após troca
+  /// de sessão.
+  Future<UserModel> updateProfilePhoto({
+    required Uint8List bytes,
+    required String fileName,
+  }) async {
+    final currentSession = state.value;
+    if (currentSession is! Authenticated) {
       throw const AuthException(
-        'session-changed',
-        'Sua sessão mudou enquanto o perfil era salvo. Confira os dados e tente de novo.',
+        'not-authenticated',
+        'Usuário não autenticado.',
       );
     }
-    state = AsyncData(Authenticated(updated));
-    return updated;
+    final startedUser = currentSession.user;
+    final startedEpoch = _sessionEpoch;
+
+    final downloadUrl = await _photoStorage.uploadProfilePhoto(
+      firebaseUid: startedUser.firebaseUid,
+      bytes: bytes,
+      fileName: fileName,
+    );
+
+    return _runProfileMutation(
+      expectedUserId: startedUser.id,
+      expectedFirebaseUid: startedUser.firebaseUid,
+      expectedEpoch: startedEpoch,
+      mutate: (latestUser) => _repository.updateProfile(
+        name: latestUser.name,
+        phone: _normalizePhone(latestUser.phone),
+        photoUrl: downloadUrl,
+        pixKey: latestUser.pixKey,
+        pixKeyType: latestUser.pixKeyType,
+        expectedFirebaseUid: startedUser.firebaseUid,
+      ),
+    );
+  }
+
+  /// Executa uma mutação de perfil de forma serializada, garantindo que a
+  /// sessão ativa antes e depois da chamada pertença à mesma conta que iniciou
+  /// a operação. A própria requisição deve ser vinculada a
+  /// [expectedFirebaseUid] (o `AuthInterceptor` não a envia com token de outra
+  /// conta).
+  Future<UserModel> _runProfileMutation({
+    required String expectedUserId,
+    required String expectedFirebaseUid,
+    required int expectedEpoch,
+    required Future<UserModel> Function(UserModel latestUser) mutate,
+  }) {
+    final completer = Completer<UserModel>();
+    final previous = _profileMutationQueue;
+    _profileMutationQueue = previous.catchError((_) {}).then((_) async {
+      try {
+        final latestUser = _assertSameAuthenticatedUser(
+          expectedUserId: expectedUserId,
+          expectedFirebaseUid: expectedFirebaseUid,
+          expectedEpoch: expectedEpoch,
+        );
+        final updated = await mutate(latestUser);
+        _assertSameAuthenticatedUser(
+          expectedUserId: expectedUserId,
+          expectedFirebaseUid: expectedFirebaseUid,
+          expectedEpoch: expectedEpoch,
+        );
+        state = AsyncData(Authenticated(updated));
+        completer.complete(updated);
+      } catch (error, stackTrace) {
+        completer.completeError(error, stackTrace);
+      }
+    });
+    return completer.future;
+  }
+
+  UserModel _assertSameAuthenticatedUser({
+    required String expectedUserId,
+    required String expectedFirebaseUid,
+    required int expectedEpoch,
+  }) {
+    final latest = state.value;
+    final authUid = _auth.currentUser?.uid;
+    if (_sessionEpoch != expectedEpoch ||
+        latest is! Authenticated ||
+        latest.user.id != expectedUserId ||
+        latest.user.firebaseUid != expectedFirebaseUid ||
+        authUid != expectedFirebaseUid) {
+      throw AuthException.sessionChanged();
+    }
+    return latest.user;
   }
 
   static String _normalizePhone(String raw) {
@@ -189,10 +305,15 @@ class AuthController extends AsyncNotifier<AuthSession> {
   Future<CpfValidationResult> validateCpf(String cpf) =>
       _repository.validateCpf(cpf);
 
+  /// Verifica se o e-mail ainda está disponível para cadastro.
+  Future<bool> isEmailAvailable(String email) =>
+      _repository.isEmailAvailable(email);
+
   Future<void> sendPasswordResetEmail(String email) =>
       _auth.sendPasswordResetEmail(email);
 
   Future<void> signOut() async {
+    _sessionEpoch++;
     await _auth.signOut();
     state = const AsyncData(Unauthenticated());
   }
@@ -230,6 +351,9 @@ class AuthController extends AsyncNotifier<AuthSession> {
           return;
         }
       }
+      state = AsyncData(ProfileIncomplete(user));
+      rethrow;
+    } catch (_) {
       state = AsyncData(ProfileIncomplete(user));
       rethrow;
     }

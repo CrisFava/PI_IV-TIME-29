@@ -2,6 +2,7 @@
 
 import 'package:converge/features/auth/presentation/widgets/action_button.dart';
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 
@@ -9,6 +10,7 @@ import '../../../../app_routes.dart';
 import '../../../../core/config/styles.dart';
 import '../../../../core/utils/validators.dart';
 import '../../state/auth_action_controller.dart';
+import '../../state/auth_controller.dart';
 import '../../state/inputs/profile_input.dart';
 import '../../state/inputs/register_input.dart';
 import '../widgets/onboarding_design_tokens.dart';
@@ -58,6 +60,8 @@ class _RegisterPageState extends ConsumerState<RegisterPage> {
   int _currentStep = 1;
   bool _isMovingForward = true;
   bool _obscurePassword = true;
+  bool _isCheckingEmail = false;
+  String? _step1Error;
   String? _autoDetectedUniversity;
 
   @override
@@ -97,6 +101,7 @@ class _RegisterPageState extends ConsumerState<RegisterPage> {
   }
 
   void _onEmailChanged() {
+    _step1Error = null;
     final email = _emailController.text.trim().toLowerCase();
     String? detected;
     final atIndex = email.indexOf('@');
@@ -168,7 +173,7 @@ class _RegisterPageState extends ConsumerState<RegisterPage> {
   };
 
   void _handleBack() {
-    if (ref.read(authActionProvider).isLoading) return;
+    if (ref.read(authActionProvider).isLoading || _isCheckingEmail) return;
     if (_currentStep > 1) {
       setState(() {
         _isMovingForward = false;
@@ -180,13 +185,50 @@ class _RegisterPageState extends ConsumerState<RegisterPage> {
   }
 
   Future<void> _handleNextOrSubmit() async {
-    if (ref.read(authActionProvider).isLoading) return;
+    if (ref.read(authActionProvider).isLoading || _isCheckingEmail) return;
     if (!_isCurrentStepValid) {
       _formKey.currentState?.validate();
       return;
     }
 
+    if (_currentStep == 1) {
+      setState(() {
+        _isCheckingEmail = true;
+        _step1Error = null;
+      });
+      try {
+        final available = await ref
+            .read(authControllerProvider.notifier)
+            .isEmailAvailable(_emailController.text.trim());
+        if (!mounted) return;
+        if (!available) {
+          HapticFeedback.heavyImpact();
+          setState(() {
+            _isCheckingEmail = false;
+            _step1Error =
+                'Já existe uma conta cadastrada com este e-mail. Tente fazer login.';
+          });
+          return;
+        }
+        HapticFeedback.lightImpact();
+        setState(() {
+          _isCheckingEmail = false;
+          _isMovingForward = true;
+          _currentStep = 2;
+        });
+      } catch (error) {
+        if (!mounted) return;
+        HapticFeedback.heavyImpact();
+        setState(() {
+          _isCheckingEmail = false;
+          _step1Error = authErrorMessage(error);
+        });
+      }
+      return;
+    }
+
     if (_currentStep < 3) {
+      HapticFeedback.lightImpact();
       setState(() {
         _isMovingForward = true;
         _currentStep++;
@@ -260,7 +302,10 @@ class _RegisterPageState extends ConsumerState<RegisterPage> {
   @override
   Widget build(BuildContext context) {
     final actionState = ref.watch(authActionProvider);
-    final isLoading = actionState.isLoading;
+    final isLoading = actionState.isLoading || _isCheckingEmail;
+    final bannerError = _currentStep == 1 && _step1Error != null
+        ? _step1Error
+        : (actionState.hasError ? authErrorMessage(actionState.error!) : null);
 
     return PopScope(
       canPop: false,
@@ -290,8 +335,9 @@ class _RegisterPageState extends ConsumerState<RegisterPage> {
                         child: Column(
                           crossAxisAlignment: CrossAxisAlignment.stretch,
                           children: [
-                            if (actionState.hasError) ...[
+                            if (bannerError != null) ...[
                               Container(
+                                key: const ValueKey('register_error_banner'),
                                 padding: const EdgeInsets.all(12),
                                 decoration: BoxDecoration(
                                   color: AppColors.errorBackground,
@@ -301,7 +347,7 @@ class _RegisterPageState extends ConsumerState<RegisterPage> {
                                   ),
                                 ),
                                 child: Text(
-                                  authErrorMessage(actionState.error!),
+                                  bannerError,
                                   style: const TextStyle(
                                     color: AppColors.errorText,
                                     fontSize: 14,

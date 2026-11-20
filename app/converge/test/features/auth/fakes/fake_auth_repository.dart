@@ -52,6 +52,7 @@ class FakeAuthRepository implements AuthRepository {
     String? photoUrl,
     String? pixKey,
     PixKeyType? pixKeyType,
+    String? expectedFirebaseUid,
   }) async {
     final error = updateProfileError;
     if (error != null) throw error;
@@ -107,5 +108,15 @@ class FakeAuthRepository implements AuthRepository {
     final error = validateCpfError;
     if (error != null) throw error;
     return cpfValidationResult;
+  }
+
+  bool emailAvailable = true;
+  ApiException? emailAvailabilityError;
+
+  @override
+  Future<bool> isEmailAvailable(String email) async {
+    final error = emailAvailabilityError;
+    if (error != null) throw error;
+    return emailAvailable;
   }
 }

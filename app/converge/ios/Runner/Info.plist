@@ -32,6 +32,10 @@
 	<string>O Converge utiliza sua localização para acompanhar a viagem em tempo real entre motoristas e passageiros.</string>
 	<key>NSLocationWhenInUseUsageDescription</key>
 	<string>O Converge precisa da sua localização para definir pontos de embarque, desembarque e calcular trajetos de carona.</string>
+	<key>NSCameraUsageDescription</key>
+	<string>O Converge precisa acessar a câmera para você tirar uma foto de perfil.</string>
+	<key>NSPhotoLibraryUsageDescription</key>
+	<string>O Converge precisa acessar sua biblioteca de fotos para você escolher uma foto de perfil.</string>
 	<key>UIApplicationSceneManifest</key>
 	<dict>
 		<key>UIApplicationSupportsMultipleScenes</key>

@@ -111,4 +111,9 @@ abstract final class AppColors {
 
   // Barreira Translúcida de Dismiss
   static final Color barrier = Colors.black.withValues(alpha: 0.28);
+
+  // Shimmer e Visualizador de Foto de Perfil
+  static const Color shimmerBase = Color(0xFFE2E8F0);
+  static const Color shimmerHighlight = Color(0xFFF8FAFC);
+  static const Color photoViewerBackdrop = Color(0xF0000000);
 }

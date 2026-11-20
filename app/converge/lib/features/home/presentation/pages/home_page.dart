@@ -63,7 +63,9 @@ import '../../../indicator/presentation/widgets/my_impact_card.dart';
 import '../../../vehicle/state/driver_access.dart';
 import '../../../vehicle/state/driver_access_provider.dart';
 import '../../../vehicle/state/my_vehicles_controller.dart';
+import '../../../auth/data/models/user_model.dart';
 import '../../../auth/presentation/widgets/edit_profile_sheet.dart';
+import '../../../auth/presentation/widgets/profile_photo_avatar.dart';
 import '../widgets/campus_spots.dart';
 import '../widgets/passenger_ride_step.dart';
 import '../widgets/departure_time_sheet.dart';
@@ -1920,15 +1922,7 @@ class _HomePageState extends ConsumerState<HomePage> {
           ),
           child: Column(
             children: [
-              const CircleAvatar(
-                radius: 38,
-                backgroundColor: AppColors.neutralLight,
-                child: Icon(
-                  Icons.person_rounded,
-                  size: 42,
-                  color: AppColors.textPrimary,
-                ),
-              ),
+              ProfilePhotoAvatar(user: user as UserModel),
               const SizedBox(height: 12),
               Text(
                 user.name.toString(),
@@ -2083,7 +2077,7 @@ class _HomePageState extends ConsumerState<HomePage> {
         const SizedBox(height: 16),
         MyImpactCard(onOpen: () => context.push(AppRoutes.indicators)),
         // Motorista: carros cadastrados (sem nenhum, o acesso fica bloqueado)
-        if (user.isDriver as bool) ...[
+        if (user.isDriver) ...[
           const SizedBox(height: 16),
           const MyVehiclesSection(),
         ],

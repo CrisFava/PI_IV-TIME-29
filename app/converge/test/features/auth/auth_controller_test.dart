@@ -243,6 +243,44 @@ void main() {
         );
       },
     );
+
+    test(
+      'nova tentativa no register com mesmo e-mail após falha no backend reaproveita conta Firebase',
+      () async {
+        repository.createError = ApiException.network();
+        final container = createContainer();
+        await container.read(authControllerProvider.future);
+
+        const input = RegisterInput(
+          email: 'ana@puc.edu.br',
+          password: '123456',
+          profile: _profile,
+        );
+
+        await expectLater(
+          container.read(authControllerProvider.notifier).register(input),
+          throwsA(isA<ApiException>()),
+        );
+        expect(
+          container.read(authControllerProvider).value,
+          isA<ProfileIncomplete>(),
+        );
+
+        // Simula o Firebase recusando um segundo signUp com o mesmo e-mail
+        auth.nextError = const AuthException(
+          'email-already-in-use',
+          'Já existe uma conta com este e-mail.',
+        );
+        repository.createError = null;
+
+        await container.read(authControllerProvider.notifier).register(input);
+
+        expect(
+          container.read(authControllerProvider).value,
+          isA<Authenticated>(),
+        );
+      },
+    );
   });
 
   test('signOut externo (token revogado) derruba a sessão', () async {

@@ -3,6 +3,7 @@
 import 'dart:convert';
 
 import 'package:converge/core/network/interceptors/auth_interceptor.dart';
+import 'package:converge/core/services/auth/auth_exception.dart';
 import 'package:converge/core/services/auth/auth_service.dart';
 import 'package:converge/core/services/auth/auth_user.dart';
 import 'package:dio/dio.dart';
@@ -23,7 +24,13 @@ class _MockAuthService implements AuthService {
   AuthUser? get currentUser => user;
 
   @override
-  Future<String?> getIdToken({bool forceRefresh = false}) async {
+  Future<String?> getIdToken({
+    bool forceRefresh = false,
+    String? expectedUid,
+  }) async {
+    if (expectedUid != null && user?.uid != expectedUid) {
+      throw AuthException.sessionChanged();
+    }
     if (forceRefresh) {
       forceRefreshCalled = true;
       return refreshedToken ?? currentToken;
@@ -52,10 +59,19 @@ class _MockAuthService implements AuthService {
 
 class _TestRequestHandler extends RequestInterceptorHandler {
   RequestOptions? nextOptions;
+  DioException? rejected;
 
   @override
   void next(RequestOptions requestOptions) {
     nextOptions = requestOptions;
+  }
+
+  @override
+  void reject(
+    DioException error, [
+    bool callFollowingErrorInterceptor = false,
+  ]) {
+    rejected = error;
   }
 }
 
@@ -74,10 +90,10 @@ class _TestErrorHandler extends ErrorInterceptorHandler {
   }
 }
 
-String _createJwt(int exp) {
+String _createJwt(int exp, {String uid = 'test_user'}) {
   final header = base64Url.encode(utf8.encode(jsonEncode({'alg': 'none'})));
   final payload = base64Url.encode(
-    utf8.encode(jsonEncode({'exp': exp, 'user_id': 'test_user'})),
+    utf8.encode(jsonEncode({'exp': exp, 'user_id': uid})),
   );
   return '$header.$payload.sig';
 }
@@ -235,6 +251,78 @@ void main() {
 
       expect(auth.forceRefreshCalled, isTrue);
       expect(handler.nextError, equals(err));
+    });
+
+    group('vínculo com expectedUid', () {
+      const u1 = AuthUser(uid: 'u1', email: 'a@puc.br', emailVerified: true);
+      int nowSec() => DateTime.now().toUtc().millisecondsSinceEpoch ~/ 1000;
+
+      test('envia quando o token resolve para a conta esperada', () async {
+        final token = _createJwt(nowSec() + 3600, uid: 'u1');
+        final auth = _MockAuthService(currentToken: token, user: u1);
+        final options = RequestOptions(
+          path: '/users/me',
+          extra: {AuthInterceptor.expectedUidKey: 'u1'},
+        );
+        final handler = _TestRequestHandler();
+
+        await AuthInterceptor(auth, dio).onRequest(options, handler);
+
+        expect(handler.nextOptions, isNotNull);
+        expect(options.headers['Authorization'], 'Bearer $token');
+      });
+
+      test('não despacha quando a sessão atual é de outra conta', () async {
+        final token = _createJwt(nowSec() + 3600, uid: 'u1');
+        final auth = _MockAuthService(currentToken: token, user: u1);
+        final options = RequestOptions(
+          path: '/users/me',
+          extra: {AuthInterceptor.expectedUidKey: 'u2'},
+        );
+        final handler = _TestRequestHandler();
+
+        await AuthInterceptor(auth, dio).onRequest(options, handler);
+
+        expect(handler.nextOptions, isNull);
+        expect(handler.rejected?.error, isA<AuthException>());
+        expect(options.headers.containsKey('Authorization'), isFalse);
+      });
+
+      test('não despacha quando o token resolve para outra conta', () async {
+        final token = _createJwt(nowSec() + 3600, uid: 'u2');
+        final auth = _MockAuthService(currentToken: token, user: u1);
+        final options = RequestOptions(
+          path: '/users/me',
+          extra: {AuthInterceptor.expectedUidKey: 'u1'},
+        );
+        final handler = _TestRequestHandler();
+
+        await AuthInterceptor(auth, dio).onRequest(options, handler);
+
+        expect(handler.nextOptions, isNull);
+        expect(handler.rejected?.error, isA<AuthException>());
+      });
+
+      test('não refaz no 401 quando a sessão mudou de conta', () async {
+        final auth = _MockAuthService(
+          refreshedToken: _createJwt(nowSec() + 3600, uid: 'u1'),
+          user: u1,
+        );
+        final options = RequestOptions(
+          path: '/users/me',
+          extra: {AuthInterceptor.expectedUidKey: 'u2'},
+        );
+        final err = DioException(
+          requestOptions: options,
+          response: Response(requestOptions: options, statusCode: 401),
+        );
+        final handler = _TestErrorHandler();
+
+        await AuthInterceptor(auth, dio).onError(err, handler);
+
+        expect(handler.resolvedResponse, isNull);
+        expect(handler.nextError?.error, isA<AuthException>());
+      });
     });
   });
 }

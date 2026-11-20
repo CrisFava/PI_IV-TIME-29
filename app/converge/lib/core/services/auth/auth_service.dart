@@ -11,7 +11,10 @@ abstract class AuthService {
   AuthUser? get currentUser;
 
   /// ID token para o header `Authorization: Bearer`. Nulo se deslogado.
-  Future<String?> getIdToken({bool forceRefresh = false});
+  ///
+  /// Se [expectedUid] for informado, o token só é emitido para essa conta:
+  /// lança `AuthException('session-changed')` quando o usuário atual for outro.
+  Future<String?> getIdToken({bool forceRefresh = false, String? expectedUid});
 
   Future<AuthUser> signIn({required String email, required String password});
 
