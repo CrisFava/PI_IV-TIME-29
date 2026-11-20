@@ -10,7 +10,7 @@ import '../../../ride/data/models/ride_status.dart';
 import '../../../ride/presentation/widgets/ride_place_line.dart';
 import 'match_date_label.dart';
 
-/// Uma viagem em que o usuário vai como passageiro, em "Minhas caronas": quando
+/// Uma viagem em que o usuário vai como passageiro, em "Caronas ativas": quando
 /// sai, de onde para onde e quem dirige. Tocar abre os detalhes (com "Sair da viagem").
 class PassengerRideCard extends StatelessWidget {
   final RideModel ride;

@@ -138,6 +138,7 @@ class HomeRideFlowCoordinator extends ConsumerWidget {
           isDriver ? offerDeparture : rideDeparture,
           DateTime.now(),
         ),
+        hasDeparture: (isDriver ? offerDeparture : rideDeparture) != null,
         onChangeDeparture: onChangeDeparture,
         repeatWeekly: offerRepeatWeekly,
         onRepeatWeeklyChanged: onRepeatWeeklyChanged,

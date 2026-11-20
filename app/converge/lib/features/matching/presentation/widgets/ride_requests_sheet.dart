@@ -540,7 +540,7 @@ class _RideRequestsSheetState extends ConsumerState<RideRequestsSheet> {
     final asPassenger = passengerList ?? const <RideModel>[];
     final asDriver = offerList ?? const <DriverOffer>[];
     if (asPassenger.isEmpty && asDriver.isEmpty) {
-      return const [MatchingMessage(text: 'Você ainda não tem caronas.')];
+      return const [MatchingMessage(text: 'Você não tem caronas ativas no momento.')];
     }
 
     // A viagem em andamento como passageiro vem primeiro; as caronas oferecidas
@@ -643,7 +643,7 @@ class _RideRequestsSheetState extends ConsumerState<RideRequestsSheet> {
         const SizedBox(width: 8),
         const Expanded(
           child: Text(
-            'Minhas caronas',
+            'Caronas ativas',
             overflow: TextOverflow.ellipsis,
             style: TextStyle(
               fontSize: 16,
@@ -682,7 +682,7 @@ class _RideRequestsSheetState extends ConsumerState<RideRequestsSheet> {
   }
 }
 
-/// Aba de "Minhas caronas" (motorista ou passageiro), no mesmo estilo das abas
+/// Aba de "Caronas ativas" (motorista ou passageiro), no mesmo estilo das abas
 /// dos indicadores. [badgeCount] mostra os pedidos de vaga esperando resposta.
 class _RoleTabButton extends StatelessWidget {
   final String label;

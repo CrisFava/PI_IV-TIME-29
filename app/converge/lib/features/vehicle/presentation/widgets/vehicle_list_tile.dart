@@ -9,7 +9,7 @@ import '../../data/models/vehicle_model.dart';
 import 'license_plate_badge.dart';
 
 /// Um carro na lista do perfil. Tocar no cartão abre os detalhes, onde ficam
-/// "Editar" e "Excluir" (o mesmo padrão dos cards de "Minhas caronas").
+/// "Editar" e "Excluir" (o mesmo padrão dos cards de "Caronas ativas").
 class VehicleListTile extends StatelessWidget {
   final VehicleModel vehicle;
   final VoidCallback onOpenDetails;

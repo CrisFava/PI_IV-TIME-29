@@ -64,7 +64,7 @@ class _HomePassengerSheetState extends ConsumerState<HomePassengerSheet> {
         return _buildDriverListSheet();
       case PassengerRideStep.waitingDriver:
         return _buildWaitingDriverSheet();
-      // Aceito: o app avisa e abre "Minhas caronas" (sem a bolinha flutuante)
+      // Aceito: o app avisa e abre "Caronas ativas" (sem a bolinha flutuante)
       case PassengerRideStep.driverAccepted:
         return const SizedBox.shrink();
     }

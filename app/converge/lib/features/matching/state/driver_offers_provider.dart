@@ -22,7 +22,7 @@ final myOfferRoutesProvider =
       ];
     });
 
-/// "Minhas caronas": cada carona oferecida com as viagens dela. Viagens de uma
+/// "Caronas ativas": cada carona oferecida com as viagens dela. Viagens de uma
 /// oferta já cancelada (com passageiros) também aparecem. A viagem em andamento
 /// vem primeiro; depois, as que têm viagem marcada, da mais próxima à mais distante.
 final myDriverOffersProvider = FutureProvider.autoDispose<List<DriverOffer>>((

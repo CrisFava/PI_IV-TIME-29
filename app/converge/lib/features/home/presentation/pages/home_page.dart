@@ -60,6 +60,7 @@ import '../widgets/home_ride_alerts_overlay.dart';
 import '../widgets/home_trip_mode_overlay.dart';
 import '../widgets/passenger_ride_step.dart';
 import '../widgets/ride_departure_label.dart';
+import '../widgets/ride_flow/discard_ride_dialog.dart';
 import '../widgets/ride_flow/home_ride_flow_coordinator.dart';
 import '../widgets/ride_flow/ride_review.dart';
 
@@ -101,7 +102,7 @@ class _HomePageState extends ConsumerState<HomePage> {
   // Publicando a carona (inclui a busca do carro antes do envio)
   bool _publishingOffer = false;
 
-  // Aviso de carona confirmada (o passageiro escolhe se abre "Minhas caronas")
+  // Aviso de carona confirmada (o passageiro escolhe se abre "Caronas ativas")
   ({String key, String? driverName})? _acceptedNotice;
 
   // Carona que o painel abre assim que aparecer (tocou no aviso de pedido de vaga)
@@ -282,8 +283,8 @@ class _HomePageState extends ConsumerState<HomePage> {
   }
 
   /// O motorista aceitou: o pedido termina e a viagem passa a aparecer em
-  /// "Minhas caronas". O app não troca de tela: mostra um aviso no topo, e o
-  /// toque nele abre "Minhas caronas".
+  /// "Caronas ativas". O app não troca de tela: mostra um aviso no topo, e o
+  /// toque nele abre "Caronas ativas".
   void _handleDriverAccepted(MatchModel? driver) {
     HapticFeedback.mediumImpact();
     ref.invalidate(myRidesProvider);
@@ -299,6 +300,20 @@ class _HomePageState extends ConsumerState<HomePage> {
       );
     });
     ref.read(passengerMatchProvider.notifier).reset();
+  }
+
+  /// X do pedido de carona ou da carona do motorista: com a partida já confirmada,
+  /// pergunta antes de descartar o que foi escolhido. Na primeira etapa ainda não
+  /// há nada a perder, então fecha direto.
+  Future<void> _handleCloseRideFlow() async {
+    if (_passengerStep.hasConfirmedPickup) {
+      final discard = await showDiscardRideDialog(
+        context,
+        isDriver: _currentMode.isDriver,
+      );
+      if (!discard || !mounted) return;
+    }
+    await _handleCancelFlow();
   }
 
   Future<void> _handleCancelFlow() async {
@@ -395,7 +410,7 @@ class _HomePageState extends ConsumerState<HomePage> {
         (latestSession is Authenticated && latestSession.user.isDriver);
 
     if (isDriverNow) {
-      // "Minhas caronas": o painel com as caronas oferecidas e os pedidos
+      // "Caronas ativas": o painel com as caronas oferecidas e os pedidos
       _openRideRequests();
     } else {
       // Quem só pede carona também abre o painel, com as viagens em que vai
@@ -403,7 +418,7 @@ class _HomePageState extends ConsumerState<HomePage> {
     }
   }
 
-  /// Fechar a nova carona deixa o mapa limpo (sem voltar para "Minhas caronas").
+  /// Fechar a nova carona deixa o mapa limpo (sem voltar para "Caronas ativas").
   void _handleCloseDriverFormSheet() {
     setState(() {
       _currentMode = AppRideMode.passenger;
@@ -807,7 +822,7 @@ class _HomePageState extends ConsumerState<HomePage> {
     return false;
   }
 
-  /// Mostra "Minhas caronas" sobre o mapa. O motorista precisa de um carro
+  /// Mostra "Caronas ativas" sobre o mapa. O motorista precisa de um carro
   /// liberado; quem só pede carona ([asPassenger]) vê as viagens em que vai.
   void _openRideRequests({bool asPassenger = false, String? offerKey}) {
     if (!asPassenger && _isDriverActionBlocked()) return;
@@ -1151,7 +1166,7 @@ class _HomePageState extends ConsumerState<HomePage> {
                 onConfirmDestination: _handleConfirmDestination,
                 onBackToDestinationSearch: () =>
                     _goToStep(PassengerRideStep.searchDestination),
-                onCancelFlow: _handleCancelFlow,
+                onCancelFlow: _handleCloseRideFlow,
                 onRetryEstimate: _goToRoutePreview,
                 onConfirmRoutePreview: () =>
                     _goToStep(PassengerRideStep.routeConfirmation),

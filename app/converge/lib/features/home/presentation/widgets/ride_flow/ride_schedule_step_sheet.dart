@@ -15,6 +15,9 @@ import 'ride_flow_sheet_frame.dart';
 class RideScheduleStepSheet extends StatelessWidget {
   final bool isDriver;
   final String departureLabel;
+
+  /// O dia e o horário já foram escolhidos; sem isso o botão fica desligado.
+  final bool hasDeparture;
   final VoidCallback onChangeDeparture;
 
   // Só do motorista
@@ -31,6 +34,7 @@ class RideScheduleStepSheet extends StatelessWidget {
     super.key,
     required this.isDriver,
     required this.departureLabel,
+    required this.hasDeparture,
     required this.onChangeDeparture,
     required this.isSubmitting,
     required this.onSubmit,
@@ -80,7 +84,7 @@ class RideScheduleStepSheet extends StatelessWidget {
           height: 52,
           child: FilledButton.icon(
             key: const ValueKey('ride_flow_submit'),
-            onPressed: isSubmitting
+            onPressed: isSubmitting || !hasDeparture
                 ? null
                 : () {
                     HapticFeedback.mediumImpact();
@@ -89,7 +93,10 @@ class RideScheduleStepSheet extends StatelessWidget {
             style: FilledButton.styleFrom(
               backgroundColor: AppColors.primary,
               foregroundColor: AppColors.textLight,
-              disabledBackgroundColor: AppColors.primary,
+              // Enviando, o botão segue escuro com o progresso; sem horário, fica cinza
+              disabledBackgroundColor: isSubmitting
+                  ? AppColors.primary
+                  : AppColors.borderMedium,
               disabledForegroundColor: AppColors.textLight,
               shape: RoundedRectangleBorder(
                 borderRadius: BorderRadius.circular(16),
@@ -117,6 +124,14 @@ class RideScheduleStepSheet extends StatelessWidget {
             ),
           ),
         ),
+        if (!hasDeparture) ...[
+          const SizedBox(height: 8),
+          const Text(
+            'Escolha o dia e o horário para continuar.',
+            textAlign: TextAlign.center,
+            style: TextStyle(fontSize: 12.5, color: AppColors.textSecondary),
+          ),
+        ],
       ],
     );
   }

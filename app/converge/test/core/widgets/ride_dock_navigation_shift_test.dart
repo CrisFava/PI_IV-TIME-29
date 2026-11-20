@@ -57,7 +57,7 @@ void main() {
     await openMenu(tester);
 
     expect(find.bySemanticsLabel('Fechar opções de Caronas'), findsOneWidget);
-    expect(find.text('Minhas caronas'), findsOneWidget);
+    expect(find.text('Caronas ativas'), findsOneWidget);
     expect(find.text('Viagem em andamento'), findsNothing);
     expect(find.text('Encerrar'), findsNothing);
   });
@@ -77,7 +77,7 @@ void main() {
 
     expect(find.bySemanticsLabel('Fechar opções de Caronas'), findsOneWidget);
     expect(find.text('Viagem em andamento'), findsOneWidget);
-    expect(find.text('Minhas caronas'), findsNothing);
+    expect(find.text('Caronas ativas'), findsNothing);
 
     await tester.tap(find.text('Viagem em andamento'));
     await tester.pump();
@@ -107,7 +107,7 @@ void main() {
       find.text('Adicione um carro para ter acesso a essa função.'),
       findsOneWidget,
     );
-    expect(find.text('Minhas caronas'), findsNothing);
+    expect(find.text('Caronas ativas'), findsNothing);
 
     await tester.tap(
       find.byKey(const ValueKey('add_vehicle_from_dock_button')),

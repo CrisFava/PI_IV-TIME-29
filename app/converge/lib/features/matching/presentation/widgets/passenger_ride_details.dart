@@ -67,7 +67,7 @@ class _PassengerRideDetailsState extends ConsumerState<PassengerRideDetails> {
 
     if (ride == null) {
       return const MatchingMessage(
-        text: 'Esta viagem não está mais em "Minhas caronas".',
+        text: 'Esta viagem não está mais em "Caronas ativas".',
       );
     }
 

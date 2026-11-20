@@ -158,48 +158,6 @@ class HomeProfileTab extends ConsumerWidget {
                   ),
                 ),
               ),
-              const SizedBox(height: 24),
-              const Divider(color: AppColors.neutralLight),
-              const SizedBox(height: 16),
-
-              // Botão de Sair da Conta com Diálogo de Confirmação
-              SizedBox(
-                width: double.infinity,
-                child: OutlinedButton.icon(
-                  onPressed:
-                      isSigningOut ? null : () => _confirmSignOut(context, ref),
-                  icon: isSigningOut
-                      ? const SizedBox(
-                          width: 18,
-                          height: 18,
-                          child: CircularProgressIndicator(
-                            strokeWidth: 2,
-                            color: AppColors.error,
-                          ),
-                        )
-                      : const Icon(
-                          Icons.logout_rounded,
-                          size: 18,
-                          color: AppColors.error,
-                        ),
-                  label: Text(
-                    isSigningOut ? 'Saindo...' : 'Sair da Conta',
-                    style: const TextStyle(
-                      fontSize: 14,
-                      fontWeight: FontWeight.w700,
-                      color: AppColors.error,
-                    ),
-                  ),
-                  style: OutlinedButton.styleFrom(
-                    padding: const EdgeInsets.symmetric(vertical: 14),
-                    side: const BorderSide(color: AppColors.errorBorder),
-                    backgroundColor: AppColors.errorBackground,
-                    shape: RoundedRectangleBorder(
-                      borderRadius: BorderRadius.circular(16),
-                    ),
-                  ),
-                ),
-              ),
             ],
           ),
         ),
@@ -211,6 +169,45 @@ class HomeProfileTab extends ConsumerWidget {
           const SizedBox(height: 16),
           const MyVehiclesSection(),
         ],
+        const SizedBox(height: 24),
+        // Sair da Conta fica no fim da tela, longe do que se usa todo dia
+        SizedBox(
+          width: double.infinity,
+          child: OutlinedButton.icon(
+            onPressed:
+                isSigningOut ? null : () => _confirmSignOut(context, ref),
+            icon: isSigningOut
+                ? const SizedBox(
+                    width: 18,
+                    height: 18,
+                    child: CircularProgressIndicator(
+                      strokeWidth: 2,
+                      color: AppColors.error,
+                    ),
+                  )
+                : const Icon(
+                    Icons.logout_rounded,
+                    size: 18,
+                    color: AppColors.error,
+                  ),
+            label: Text(
+              isSigningOut ? 'Saindo...' : 'Sair da Conta',
+              style: const TextStyle(
+                fontSize: 14,
+                fontWeight: FontWeight.w700,
+                color: AppColors.error,
+              ),
+            ),
+            style: OutlinedButton.styleFrom(
+              padding: const EdgeInsets.symmetric(vertical: 14),
+              side: const BorderSide(color: AppColors.errorBorder),
+              backgroundColor: AppColors.errorBackground,
+              shape: RoundedRectangleBorder(
+                borderRadius: BorderRadius.circular(16),
+              ),
+            ),
+          ),
+        ),
       ],
     );
   }
