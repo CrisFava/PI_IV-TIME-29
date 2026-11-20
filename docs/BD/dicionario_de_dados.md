@@ -215,7 +215,7 @@ Report é o registro formal de uma ocorrência reportada por um usuário contra 
 | `reporterId` | Texto alfanumérico | Sim | Simples | `64a1f3c2...` | nulo | Referência ao User que registra a denúncia. |
 | `reportedId` | Texto alfanumérico | Sim | Simples | `64a9f8e7...` | igual ao reporterId, nulo | Referência ao User denunciado. |
 | `rideId` | Texto alfanumérico | Não | Simples | `64d4c3b2...` | `LATE_NO_SHOW` sem viagem | Referência ao Ride relacionado. **Obrigatório quando `reason = LATE_NO_SHOW`**; opcional nos demais. Quando vem, os dois usuários precisam ter participado da viagem. |
-| `reason` | Elemento de lista enumerada | Sim | Simples | `INAPPROPRIATE_CONDUCT`, `LATE_NO_SHOW` | valor fora do enum | Valores: `LATE_NO_SHOW`, `INAPPROPRIATE_CONDUCT`, `IMPROPER_CHARGE`, `OTHER`. |
+| `reason` | Elemento de lista enumerada | Sim | Simples | `INAPPROPRIATE_CONDUCT`, `LATE_NO_SHOW` | valor fora do enum | Valores: `LATE_NO_SHOW`, `INAPPROPRIATE_CONDUCT`, `IMPROPER_CHARGE`, `NON_PAYMENT`, `OTHER`. |
 | `description` | Texto | Não | Simples | `O motorista cobrou mais do combinado.` | mais de 500 caracteres, vazio com `OTHER` | Detalhamento livre, **máximo 500 caracteres** (limite definido no código). **Obrigatório quando `reason = OTHER`.** |
 | `status` | Elemento de lista enumerada | Sim | Simples | `PENDING`, `UNDER_REVIEW` | valor fora do enum | Valores: `PENDING`, `UNDER_REVIEW`, `RESOLVED`, `ARCHIVED`. Nasce `PENDING`. Hoje só `PENDING` é gravado; os demais dependem da moderação, que não existe. |
 | `resolution` | Texto | Não | Simples | `Usuário advertido.` | — | **Pendente (sem moderação):** nenhum fluxo escreve este campo e a API não o expõe. Seria preenchido pela moderação ao encerrar a análise. |

@@ -50,7 +50,7 @@ public class RideRepositoryImpl implements RideRepositoryCustom {
         Query query = new Query(new Criteria().andOperator(
                 where("_id").is(rideId),
                 where("status").in(RideStatus.AWAITING_CONFIRMATION, RideStatus.CONFIRMED),
-                where("departureDateTime").gte(now),
+                where("departureDateTime").gt(now.plusMinutes(Ride.REQUEST_CUTOFF_MINUTES)),
                 where("availableSeats").gt(0),
                 where("participants").elemMatch(participantCriteria)
         ));
@@ -93,7 +93,7 @@ public class RideRepositoryImpl implements RideRepositoryCustom {
         Query query = new Query(new Criteria().andOperator(
                 where("_id").is(rideId),
                 where("status").in(RideStatus.AWAITING_CONFIRMATION, RideStatus.CONFIRMED),
-                where("departureDateTime").gte(now),
+                where("departureDateTime").gt(now.plusMinutes(Ride.REQUEST_CUTOFF_MINUTES)),
                 where("driverId").ne(passengerId),
                 where("availableSeats").gt(0),
                 where("participants").not().elemMatch(

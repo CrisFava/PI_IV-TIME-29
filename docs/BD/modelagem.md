@@ -679,7 +679,7 @@ O backend monta o payload sob demanda (padrão BR Code do Banco Central, CRC16 i
   "reporterId": "String (ref: users._id)",
   "reportedId": "String (ref: users._id)",
   "rideId": "String | null (ref: rides._id)",
-  "reason": "LATE_NO_SHOW | INAPPROPRIATE_CONDUCT | IMPROPER_CHARGE | OTHER",
+  "reason": "LATE_NO_SHOW | INAPPROPRIATE_CONDUCT | IMPROPER_CHARGE | NON_PAYMENT | OTHER",
   "description": "String | null",
   "status": "PENDING | UNDER_REVIEW | RESOLVED | ARCHIVED",
   "resolution": "String | null",
@@ -1411,6 +1411,7 @@ Formato geoespacial padrão do MongoDB para o índice `2dsphere`.
 | `LATE_NO_SHOW` | Atraso ou ausência injustificada |
 | `INAPPROPRIATE_CONDUCT` | Comportamento inadequado |
 | `IMPROPER_CHARGE` | Cobrança incorreta ou abusiva |
+| `NON_PAYMENT` | Passageiro não pagou a carona (só o motorista denuncia) |
 | `OTHER` | Outro motivo descrito na descrição |
 
 ### `ReportStatus` (reports.status)

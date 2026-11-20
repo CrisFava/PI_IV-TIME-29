@@ -544,6 +544,23 @@ class RideTest {
     }
 
     @Test
+    @DisplayName("A parada atual considera a participação confirmada, mesmo com um pedido cancelado antes")
+    void shouldUseConfirmedParticipationForNextStop() {
+        Ride ride = validRide();
+        ride.requestSeat("passenger-1", "route-1", place("Rua A"), place("Campus PUC"));
+        ride.leave("passenger-1", null);
+        ride.requestSeat("passenger-1", "route-1", place("Rua A"), place("Campus PUC"));
+        ride.acceptPassenger("passenger-1");
+        ride.start();
+        ride.updateItinerary(List.of(
+                new RideStop(RideStopType.PICKUP, "passenger-1", place("Rua A")),
+                new RideStop(RideStopType.DROPOFF, "passenger-1", place("Campus PUC"))
+        ), 10.0, "inteiro");
+
+        assertThat(ride.getItineraryNextStop()).isZero();
+    }
+
+    @Test
     @DisplayName("Bloqueio não mexe em viagem que já começou")
     void shouldNotSeparateUsersDuringTheRide() {
         Ride ride = rideInProgress();

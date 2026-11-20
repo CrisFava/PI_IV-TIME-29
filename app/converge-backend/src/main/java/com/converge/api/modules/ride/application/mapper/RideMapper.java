@@ -77,12 +77,29 @@ public class RideMapper {
                 ride.getUpdatedAt(),
                 toItinerary(ride, viewerId),
                 ride.isOwnedBy(viewerId) ? ride.getItineraryDistanceKm() : null,
-                seesItineraryPath(ride, viewerId) ? ride.getItineraryPolyline() : null,
-                seesItineraryPath(ride, viewerId) ? ride.getItineraryLegPolylines() : List.of(),
+                ride.isOwnedBy(viewerId) ? ride.getItineraryPolyline() : null,
+                visibleLegPolylines(ride, viewerId),
                 seesItineraryPath(ride, viewerId) ? ride.getItineraryNextStop() : null,
                 ownStopIndex(ride, viewerId, RideStopType.PICKUP),
                 ownStopIndex(ride, viewerId, RideStopType.DROPOFF)
         );
+    }
+
+    // Os trechos do caminho: o motorista vê todos; o passageiro, só até o desembarque
+    // dele (o que vem depois revelaria para onde vão os outros)
+    private List<String> visibleLegPolylines(Ride ride, String viewerId) {
+        if (!seesItineraryPath(ride, viewerId)) {
+            return List.of();
+        }
+        List<String> legs = ride.getItineraryLegPolylines();
+        if (ride.isOwnedBy(viewerId)) {
+            return legs;
+        }
+        Integer dropOff = ownStopIndex(ride, viewerId, RideStopType.DROPOFF);
+        if (dropOff == null) {
+            return List.of();
+        }
+        return legs.subList(0, Math.min(legs.size(), dropOff + 1));
     }
 
     // A posição da parada do próprio passageiro no itinerário (só para quem vê o caminho)

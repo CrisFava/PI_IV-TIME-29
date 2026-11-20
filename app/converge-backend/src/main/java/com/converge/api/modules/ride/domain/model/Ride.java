@@ -343,6 +343,15 @@ public class Ride {
             return null;
         }
         String leaving = this.isOwnedBy(blockerId) ? blockedId : blockerId;
+        String staying = leaving.equals(blockerId) ? blockedId : blockerId;
+        // Só separa quem de fato está junto: o outro também precisa estar na viagem
+        boolean stayingIsActive = this.isOwnedBy(staying) || this.participants.stream()
+                .filter(participant -> participant.getRole() == ParticipationRole.PASSENGER)
+                .filter(participant -> participant.getUserId().equals(staying))
+                .anyMatch(this::isActive);
+        if (!stayingIsActive) {
+            return null;
+        }
         Participant passenger = this.participants.stream()
                 .filter(participant -> participant.getRole() == ParticipationRole.PASSENGER)
                 .filter(participant -> participant.getUserId().equals(leaving))
@@ -452,9 +461,11 @@ public class Ride {
             Participant passenger = this.participants.stream()
                     .filter(participant -> participant.getRole() == ParticipationRole.PASSENGER)
                     .filter(participant -> participant.getUserId().equals(stop.passengerId()))
+                    // A participação que vale é a confirmada (pode haver uma cancelada antes)
+                    .filter(participant -> participant.getStatus() == ParticipantStatus.CONFIRMED)
                     .findFirst()
                     .orElse(null);
-            boolean onBoard = passenger != null && passenger.getStatus() == ParticipantStatus.CONFIRMED;
+            boolean onBoard = passenger != null;
             boolean done = stop.type() == RideStopType.PICKUP
                     ? !onBoard || passenger.getBoardedAt() != null
                     : !onBoard;
