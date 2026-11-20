@@ -244,6 +244,13 @@ class _HomePageState extends ConsumerState<HomePage> {
     ref.read(passengerMatchProvider.notifier).findDrivers(routeId);
   }
 
+  /// "Continuar procurando depois": fecha o painel sem cancelar o pedido. A busca
+  /// segue ativa e volta pelo aviso "Procurando motorista" ou pelo botão do carro.
+  void _handleKeepSearching() {
+    HapticFeedback.lightImpact();
+    setState(() => _passengerSheetHidden = true);
+  }
+
   Future<void> _handleCancelRequest() async {
     await ref.read(passengerMatchProvider.notifier).cancelRequest();
     if (mounted) {
@@ -1207,6 +1214,7 @@ class _HomePageState extends ConsumerState<HomePage> {
                 onRetryMatches: _handleRetryMatches,
                 onCancelRequest: _handleCancelRequest,
                 onCancelFlow: _handleCancelFlow,
+                onKeepSearching: _handleKeepSearching,
               ),
             ),
           ),

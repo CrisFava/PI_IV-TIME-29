@@ -26,6 +26,9 @@ class HomePassengerSheet extends ConsumerStatefulWidget {
   final VoidCallback onRetryMatches;
   final VoidCallback onCancelRequest;
   final VoidCallback onCancelFlow;
+
+  /// Fecha o painel sem cancelar: o pedido segue ativo e a busca continua.
+  final VoidCallback onKeepSearching;
   final double bottomSafeArea;
 
   const HomePassengerSheet({
@@ -35,6 +38,7 @@ class HomePassengerSheet extends ConsumerStatefulWidget {
     required this.onRetryMatches,
     required this.onCancelRequest,
     required this.onCancelFlow,
+    required this.onKeepSearching,
     this.bottomSafeArea = 0,
   });
 
@@ -148,7 +152,7 @@ class _HomePassengerSheetState extends ConsumerState<HomePassengerSheet> {
                         IconButton(
                           icon: const Icon(Icons.close_rounded),
                           onPressed: widget.onCancelFlow,
-                          tooltip: 'Fechar',
+                          tooltip: 'Cancelar busca',
                         ),
                       ],
                     ),
@@ -192,7 +196,24 @@ class _HomePassengerSheetState extends ConsumerState<HomePassengerSheet> {
       return [
         _buildDriverListMessage(
           'Nenhum motorista compatível com o seu trajeto agora. '
-          'Tente outro horário ou toque em atualizar mais tarde.',
+          'Você pode continuar procurando depois, e o seu pedido fica ativo. '
+          'Para desistir, toque no X.',
+        ),
+        ElevatedButton(
+          onPressed: widget.onKeepSearching,
+          style: ElevatedButton.styleFrom(
+            backgroundColor: AppColors.primary,
+            foregroundColor: AppColors.textLight,
+            elevation: 0,
+            padding: const EdgeInsets.symmetric(vertical: 12),
+            shape: RoundedRectangleBorder(
+              borderRadius: BorderRadius.circular(14),
+            ),
+          ),
+          child: const Text(
+            'Continuar procurando depois',
+            style: TextStyle(fontSize: 13.5, fontWeight: FontWeight.w700),
+          ),
         ),
       ];
     }
