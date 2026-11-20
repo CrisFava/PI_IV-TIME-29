@@ -18,6 +18,7 @@ import com.converge.api.modules.user.application.dto.UserPixInfoDTO;
 import com.converge.api.modules.user.domain.enums.user.PixKeyType;
 import com.converge.api.modules.user.domain.enums.vehicle.VehicleType;
 import com.converge.api.modules.user.domain.model.user.User;
+import com.converge.api.modules.user.application.ResolveOverduePaymentUseCase;
 import com.converge.api.shared.application.UserUtils;
 import com.converge.api.shared.presentation.exception.ApplicationException;
 import com.converge.api.shared.presentation.exception.ErrorCode;
@@ -28,6 +29,7 @@ import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
+import org.springframework.test.util.ReflectionTestUtils;
 
 import java.math.BigDecimal;
 import java.time.DayOfWeek;
@@ -40,9 +42,12 @@ import java.util.Set;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.Mockito.doThrow;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.never;
+import static org.mockito.Mockito.times;
 import static org.mockito.Mockito.verify;
+import static org.mockito.Mockito.verifyNoInteractions;
 import static org.mockito.Mockito.when;
 
 @ExtendWith(MockitoExtension.class)
@@ -212,7 +217,78 @@ class RidePaymentUseCasesTest {
     private final RidePaymentNotifier paymentNotifier = mock(RidePaymentNotifier.class);
 
     private MarkPaymentAsPaidUseCase markPaymentAsPaid() {
-        return new MarkPaymentAsPaidUseCase(rideAccess, rideRepository, paymentView, paymentNotifier);
+        return new MarkPaymentAsPaidUseCase(
+                rideAccess, rideRepository, paymentView, paymentNotifier, resolveOverduePayment);
+    }
+
+    private final ResolveOverduePaymentUseCase resolveOverduePayment = mock(ResolveOverduePaymentUseCase.class);
+
+    private Ride rideWithChargeOverdueAt(LocalDateTime overdueAt) {
+        Ride ride = rideWithConfirmedPassenger();
+        ride.requestPayment(passengerId(), new BigDecimal("12.50"));
+        ride.getParticipants().stream()
+                .filter(participant -> passengerId().equals(participant.getUserId()))
+                .forEach(participant -> ReflectionTestUtils.setField(participant, "overdueAt", overdueAt));
+        return ride;
+    }
+
+    @Test
+    @DisplayName("'Já paguei' de cobrança vencida deve regularizar a dívida do passageiro uma vez")
+    void shouldResolveOverdueDebtWhenOverdueChargeIsPaid() {
+        currentUserIs(passengerObjectId);
+        rideIsStored(rideWithChargeOverdueAt(LocalDateTime.now().minusMinutes(1)));
+        savingReturnsTheSameRide();
+        driverHasPixKey();
+
+        PaymentResponseDTO payment = markPaymentAsPaid().execute(paymentRef(passengerId()));
+
+        assertThat(payment.status()).isEqualTo(ParticipantPaymentStatus.PAID);
+        verify(resolveOverduePayment, times(1)).execute(passengerId());
+    }
+
+    @Test
+    @DisplayName("'Já paguei' de cobrança que não venceu não deve mexer na dívida")
+    void shouldNotResolveDebtWhenChargeIsNotOverdue() {
+        Ride ride = rideWithConfirmedPassenger();
+        ride.requestPayment(passengerId(), new BigDecimal("12.50"));
+        currentUserIs(passengerObjectId);
+        rideIsStored(ride);
+        savingReturnsTheSameRide();
+        driverHasPixKey();
+
+        markPaymentAsPaid().execute(paymentRef(passengerId()));
+
+        verifyNoInteractions(resolveOverduePayment);
+    }
+
+    @Test
+    @DisplayName("Repetir o 'Já paguei' com tudo pago não deve regularizar de novo")
+    void shouldNotResolveAgainWhenAlreadyPaid() {
+        Ride ride = rideWithChargeOverdueAt(LocalDateTime.now().minusMinutes(1));
+        ride.markPaymentAsPaid(passengerId());
+        currentUserIs(passengerObjectId);
+        rideIsStored(ride);
+        savingReturnsTheSameRide();
+        driverHasPixKey();
+
+        markPaymentAsPaid().execute(paymentRef(passengerId()));
+
+        verifyNoInteractions(resolveOverduePayment);
+    }
+
+    @Test
+    @DisplayName("Se a regularização da dívida falhar, o pagamento continua valendo")
+    void shouldKeepPaymentWhenResolvingDebtFails() {
+        currentUserIs(passengerObjectId);
+        rideIsStored(rideWithChargeOverdueAt(LocalDateTime.now().minusMinutes(1)));
+        savingReturnsTheSameRide();
+        driverHasPixKey();
+        doThrow(new IllegalStateException("falhou")).when(resolveOverduePayment).execute(passengerId());
+
+        PaymentResponseDTO payment = markPaymentAsPaid().execute(paymentRef(passengerId()));
+
+        assertThat(payment.status()).isEqualTo(ParticipantPaymentStatus.PAID);
+        verify(rideRepository).save(any(Ride.class));
     }
 
     @Test

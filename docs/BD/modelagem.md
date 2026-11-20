@@ -140,7 +140,8 @@ A reputação é separada por papel (`reputation.driver` e `reputation.passenger
 | `window.completedRides` | `RideCompletedReputationListener` (módulo `user`), pelo caso de uso `RecordCompletedRideUseCase` | Quando uma viagem é concluída: +1 para o motorista (`driver.window`) e +1 para cada passageiro efetivo (`passenger.window`) |
 | `window.driverInitiatedCancellations`, `window.lateCancellations`, `window.noShows` | `RecordReputationPenaltyUseCase` | Cancelamento do motorista, cancelamento tardio do passageiro e ausência |
 | `level`, `calculatedAt` | Os mesmos casos de uso acima | A cada gravação de média, de viagem concluída ou de penalidade |
-| `window.delays`, `window.substantiatedReports`, `window.overdueRides` | **Nenhum código grava** | Ficam em 0 (ver "Ainda não implementado") |
+| `window.overdueRides` | `RecordReputationPenaltyUseCase` (chamado por `RecordOverduePaymentUseCase`) | +1 a cada dívida de pagamento registrada. **Nunca diminui**, nem quando a dívida é paga |
+| `window.delays`, `window.substantiatedReports` | **Nenhum código grava** | Ficam em 0 (ver "Ainda não implementado") |
 
 **Média de avaliação (`averageRating`, `totalReviews`):**
 - A média e o total são **recalculados a partir de todas as avaliações recebidas no papel** (índice `reviewedId + reviewedRole` de `reviews`), nunca somados de forma incremental. Duas avaliações salvas ao mesmo tempo não se perdem: cada recálculo roda depois do próprio `save` e relê a coleção.
@@ -169,7 +170,7 @@ A reputação é separada por papel (`reputation.driver` e `reputation.passenger
 
 **Ainda não implementado:**
 - Moderação das denúncias: `window.substantiatedReports` continua em 0 porque nenhuma denúncia chega a `RESOLVED` (ver coleção `reports`).
-- `window.delays` e `window.overdueRides` não são incrementados por nenhum fluxo.
+- `window.delays` não é incrementado por nenhum fluxo.
 - Janela deslizante de 90 dias.
 
 ### Regras de Negócio — Selo de Confiança
@@ -233,20 +234,42 @@ O pagamento é **por viagem**. Ao fim da viagem de cada passageiro (chegada conf
 - **Pago (`PAID`):** o passageiro informou o pagamento ("Já paguei", RF41). Libera na hora. **Não há confirmação de recebimento pelo motorista**; se ele não recebeu, o caminho é a denúncia.
 - **Não aplicável (`NOT_APPLICABLE`):** sem valor a cobrar (viagem sem custo calculado), ausente ou cancelado sem penalidade.
 
-**Limite decrescente de tolerância (planejado, ainda não implementado — hoje vale o bloqueio imediato acima)** — quanto mais dívidas vencidas acumuladas, menor o prazo até o bloqueio. `overdueRidesCount` guarda a quantidade de viagens vencidas:
+**Dívida vencida (implementado, RF67).** Além do bloqueio imediato acima (que continua valendo, `PendingPaymentGuard`), o passageiro acumula **dívidas vencidas** em `overdueRidesCount`. Uma dívida nasce de duas formas:
 
-| Dívidas vencidas (`overdueRidesCount`) | Prazo para regularizar antes de bloquear | `paymentStanding` |
-|---|---|---|
-| 0 | — (tudo em dia) | `UP_TO_DATE` |
-| 1 | 15 dias | `HAS_OVERDUE` |
-| 2 | 7 dias | `HAS_OVERDUE` |
-| 3 ou mais | bloqueio imediato | `BLOCKED` |
+1. **Prazo:** a cobrança (`PENDING` com `paymentRequestedAt` e `requestedAmount`, passageiro `PASSENGER` com status `COMPLETED`, viagem `COMPLETED`) não foi marcada como paga em até `converge.payment.due-after` (padrão 5 minutos) depois de `paymentRequestedAt`. A cobrança continua `PENDING` (não há novo valor de enum); o campo `overdueAt` da participação guarda quando ela venceu (nulo = não vencida).
+2. **Denúncia `NON_PAYMENT`:** quando uma denúncia de falta de pagamento é criada, conta como uma dívida do passageiro denunciado (ver coleção `reports`). A participação recebe `overdueAt` e `nonPaymentReportedAt`.
 
-- `isDefaulter = true` e `paymentStanding = BLOCKED` quando atinge 3 dívidas vencidas **ou** estoura o prazo decrescente.
-- Pendências dentro do prazo **não bloqueiam** — o passageiro continua pedindo e reservando caronas normalmente.
-- Com **qualquer dívida vencida** (`HAS_OVERDUE`), o passageiro recebe aviso e é incentivado a quitar, mas só é efetivamente bloqueado ao atingir o limite da tabela acima.
+As duas formas não se misturam: enquanto a cobrança está em aberto, só o prazo cria dívida; a denúncia `NON_PAYMENT` só é aceita depois do "Já paguei". Assim, se o passageiro deixou vencer, marcou "Já paguei" (o que tira a dívida por prazo) e não pagou, a denúncia conta uma dívida nova. Cada participação recebe no máximo uma denúncia.
+
+| Dívidas vencidas (`overdueRidesCount`) | `paymentStanding` |
+|---|---|
+| 0 | `UP_TO_DATE` |
+| 1 até limite − 1 | `HAS_OVERDUE` |
+| limite (`converge.payment.overdue-limit`, padrão 2) ou mais | `BLOCKED` |
+
+- Ao bloquear: `isDefaulter = true` e `defaulterSince` recebe a data (só se ainda estava vazio).
+- Cada dívida também soma 1 em `reputation.passenger.window.overdueRides` (`level` vira `LOW` e o selo `TRUST` é revogado). Esse contador **nunca diminui**.
 - Enquanto `BLOCKED`, o usuário não aparece em combinações, não confirma novas caronas e não reserva vaga em vínculos recorrentes.
-- **Regularização só ocorre quando TODAS as viagens vencidas estão pagas.** Pagar uma só não libera se ainda houver outra vencida. Quando `overdueRidesCount` volta a 0: `isDefaulter = false`, `defaulterSince = null`, `paymentStanding = UP_TO_DATE`.
+- **Regularização só ocorre quando TODAS as dívidas por prazo estão pagas.** "Já paguei" de uma cobrança vencida tira 1 de `overdueRidesCount`; só quando chega a 0 voltam `isDefaulter = false`, `defaulterSince = null` e `paymentStanding = UP_TO_DATE`. Se o passo de regularização falhar, o pagamento continua valendo e o erro vai para o log.
+
+**Denúncia `NON_PAYMENT`:** só o motorista da viagem denuncia, contra um passageiro que terminou a viagem e foi cobrado (`paymentRequestedAt` preenchido). A denúncia só é aceita depois que o passageiro marcou a cobrança como paga ("Já paguei"), mesmo que ela tenha vencido antes; cobrança ainda em aberto é recusada, dentro ou fora do prazo, porque nesse caso a dívida por prazo já cobre a falta de pagamento. O `rideId` é obrigatório e vale uma denúncia por passageiro em cada viagem, em qualquer status.
+
+**Job `PaymentOverdueScheduler`** (módulo `ride`, `MarkOverduePaymentsUseCase`): roda a cada `converge.payment.overdue-check-interval` (padrão 1 minuto), e **só se `converge.payment.overdue-enabled` for `true`**. A marcação usa `findAndModify` condicional (cobrança ainda `PENDING`, `overdueAt` nulo, dentro do prazo e do corte) e soma `version`, então um "Já paguei" salvo ao mesmo tempo não é sobrescrito. A dívida só é registrada no usuário quando a marcação de fato aconteceu; um erro em uma cobrança não para as outras.
+
+| Propriedade (`converge.payment.*`) | Padrão | Função |
+|---|---|---|
+| `overdue-enabled` (env `CONVERGE_PAYMENT_OVERDUE_ENABLED`) | `false` | Liga o job. Fica desligado porque o banco `converge-dev` é compartilhado |
+| `due-after` | `PT5M` | Prazo para o passageiro informar o pagamento |
+| `overdue-check-interval` | `PT1M` | Intervalo do job |
+| `overdue-limit` | `2` | Dívidas para bloquear |
+| `overdue-since` (env `CONVERGE_PAYMENT_OVERDUE_SINCE`) | `2026-11-20T00:00:00` | Cobranças emitidas antes dessa data e hora nunca viram vencidas. Valor inválido impede a subida da API |
+
+**Limitações conhecidas:**
+- A dívida de denúncia `NON_PAYMENT` não é desfeita pelo "Já paguei"; só a moderação das denúncias (fora do MVP) poderá removê-la.
+- O job fica desligado por padrão por causa do banco compartilhado.
+- Se o "Já paguei" salvar e a regularização falhar, a dívida fica até correção manual (não há reconciliação automática).
+- Só vence a cobrança de viagem já `COMPLETED`.
+- O passageiro não recebe notificação quando a cobrança vence.
 
 ### Regras de Negócio — Verificação Acadêmica
 
@@ -506,6 +529,8 @@ Quando `active = false` (conta suspensa ou excluída):
       "paymentRequestedAt": "ISODate | null",
       "paidAt": "ISODate | null",
       "confirmedAt": "ISODate",
+      "overdueAt": "ISODate | null (quando a cobrança virou dívida vencida)",
+      "nonPaymentReportedAt": "ISODate | null (dívida veio de denúncia NON_PAYMENT)",
       "boardedAt": "ISODate | null (o motorista confirmou que o passageiro entrou)",
       "cancelledAt": "ISODate | null",
       "updatedAt": "ISODate"
@@ -582,7 +607,7 @@ O motorista vai até cada passageiro: `itinerary` guarda as paradas na ordem em 
 
 - Todo pagamento no Converge é **por viagem**, via PIX, incluindo as viagens de passageiros com vínculo recorrente. Não há cobrança mensal consolidada nem valor fixo pré-combinado.
 - A chave PIX do motorista (`users.pixKey`) e o valor de cada participante são exibidos ao fim da viagem. O passageiro paga e informa o pagamento ("Já paguei"); o motorista não confirma o recebimento.
-- O prazo para pagar cada viagem é de **3 dias**; depois disso a cobrança vira dívida vencida (ver regra de inadimplência na coleção `users`).
+- O prazo para informar o pagamento de cada viagem é de **5 minutos** (`converge.payment.due-after`, configurável); depois disso a cobrança vira dívida vencida, mas só com o job ligado (ver "Inadimplência" na coleção `users`).
 
 ### Cobrança automática
 
@@ -1291,8 +1316,8 @@ referência / infraestrutura (sem vínculo direto com um usuário):
 | Valor | Descrição |
 |---|---|
 | `UP_TO_DATE` | Sem dívidas vencidas (`overdueRidesCount = 0`) |
-| `HAS_OVERDUE` | Tem 1 ou 2 viagens vencidas; recebe aviso mas ainda não bloqueado |
-| `BLOCKED` | Bloqueado do matching — atingiu 3 dívidas vencidas ou estourou o prazo decrescente |
+| `HAS_OVERDUE` | Tem dívidas vencidas, mas menos que o limite (1, com o limite padrão); ainda não bloqueado |
+| `BLOCKED` | Bloqueado do matching: atingiu o limite de dívidas vencidas (`converge.payment.overdue-limit`, padrão 2) |
 
 ### `ReputationLevel` (users.reputation.*.level)
 | Valor | Descrição |
@@ -1411,7 +1436,7 @@ Formato geoespacial padrão do MongoDB para o índice `2dsphere`.
 | `LATE_NO_SHOW` | Atraso ou ausência injustificada |
 | `INAPPROPRIATE_CONDUCT` | Comportamento inadequado |
 | `IMPROPER_CHARGE` | Cobrança incorreta ou abusiva |
-| `NON_PAYMENT` | Passageiro não pagou a carona (só o motorista denuncia) |
+| `NON_PAYMENT` | Passageiro não pagou a carona. Exige a viagem; só o motorista da viagem denuncia, contra passageiro cobrado que já marcou "Já paguei"; conta como uma dívida (RF67) |
 | `OTHER` | Outro motivo descrito na descrição |
 
 ### `ReportStatus` (reports.status)

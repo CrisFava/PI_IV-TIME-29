@@ -53,6 +53,16 @@ public class RecordReputationPenaltyUseCase {
         });
     }
 
+    public void recordPassengerOverduePayment(String userId) {
+        findUser(userId).ifPresent(user -> {
+            LocalDateTime now = LocalDateTime.now();
+            boolean hadTrust = hasTrust(user);
+            user.recordPassengerOverdueRide(now);
+            reputationWriter.savePassengerReputation(user.getId(), user.getReputation().passenger(), now);
+            revokeTrustIfLost(user, hadTrust);
+        });
+    }
+
     private boolean hasTrust(User user) {
         return user.getBadges().stream().anyMatch(b -> b.badge() == Badge.TRUST);
     }

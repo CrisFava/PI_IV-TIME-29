@@ -361,6 +361,11 @@ public class User {
         revokeTrustBadgeIfThresholdExceeded();
     }
 
+    public void recordPassengerOverdueRide(LocalDateTime now) {
+        this.reputation = currentReputation().withPassengerOverdueRide(now);
+        revokeTrustBadgeIfThresholdExceeded();
+    }
+
     public void recordDriverCompletedRide(LocalDateTime now) {
         this.reputation = currentReputation().withDriverCompletedRide(now);
     }
@@ -400,7 +405,9 @@ public class User {
                 && ((current.passenger().window().lateCancellations() != null
                 && current.passenger().window().lateCancellations() > 2)
                 || (current.passenger().window().noShows() != null
-                && current.passenger().window().noShows() > 1));
+                && current.passenger().window().noShows() > 1)
+                || (current.passenger().window().overdueRides() != null
+                && current.passenger().window().overdueRides() > 0));
 
         return driverViolated || passengerViolated || (!driverEligible && !passengerEligible);
     }

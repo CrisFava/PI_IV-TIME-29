@@ -123,6 +123,34 @@ class RecordReputationPenaltyUseCaseTest {
     }
 
     @Test
+    @DisplayName("Deve registrar dívida de pagamento do passageiro, baixar o nível e gravar só o papel de passageiro")
+    void shouldRecordPassengerOverduePaymentAndWritePassengerOnly() {
+        ObjectId id = new ObjectId();
+        User user = userWithId(id);
+        when(userRepository.findById(id)).thenReturn(Optional.of(user));
+
+        recordPenalty.recordPassengerOverduePayment(id.toHexString());
+
+        assertThat(user.getReputation().passenger().window().overdueRides()).isEqualTo(1);
+        assertThat(user.getReputation().passenger().level()).isEqualTo(com.converge.api.modules.user.domain.enums.user.ReputationLevel.LOW);
+        verify(reputationWriter).savePassengerReputation(eq(id), eq(user.getReputation().passenger()), any(LocalDateTime.class));
+        verify(reputationWriter, never()).saveDriverReputation(any(), any(), any());
+    }
+
+    @Test
+    @DisplayName("Dívida de pagamento deve revogar o selo TRUST")
+    void shouldRevokeTrustBadgeOnOverduePayment() {
+        ObjectId id = new ObjectId();
+        User user = userWithId(id);
+        user.addBadge(new UserBadge(Badge.TRUST));
+        when(userRepository.findById(id)).thenReturn(Optional.of(user));
+
+        recordPenalty.recordPassengerOverduePayment(id.toHexString());
+
+        verify(reputationWriter).revokeBadge(id, Badge.TRUST);
+    }
+
+    @Test
     @DisplayName("Deve revogar o selo TRUST no banco quando a penalidade o remove do usuário")
     void shouldRevokeTrustBadgeWhenPenaltyRemovesIt() {
         ObjectId id = new ObjectId();
