@@ -89,7 +89,7 @@ class MongoUserReputationWriterTest {
     }
 
     @Test
-    @DisplayName("Deve gravar só reputation.driver e updatedAt, filtrando pelo id")
+    @DisplayName("Penalidade do motorista deve gravar só janela, level e data, sem tocar na média e no total")
     void shouldSetOnlyDriverReputation() {
         ObjectId id = new ObjectId();
         ArgumentCaptor<Query> query = ArgumentCaptor.forClass(Query.class);
@@ -102,12 +102,13 @@ class MongoUserReputationWriterTest {
         assertThat(saved).isTrue();
         assertThat(mappedQuery(query.getValue())).isEqualTo(new Document("_id", id));
         Document set = mappedUpdate(update.getValue()).get("$set", Document.class);
-        assertThat(set.keySet()).containsExactlyInAnyOrder("reputation.driver", "updatedAt");
+        assertThat(set.keySet()).containsExactlyInAnyOrder(
+                "reputation.driver.window", "reputation.driver.level", "reputation.driver.calculatedAt", "updatedAt");
         assertThat(mappedUpdate(update.getValue()).keySet()).containsExactly("$set");
     }
 
     @Test
-    @DisplayName("Deve gravar só reputation.passenger e updatedAt, filtrando pelo id")
+    @DisplayName("Penalidade do passageiro deve gravar só janela, level e data, sem tocar na média e no total")
     void shouldSetOnlyPassengerReputation() {
         ObjectId id = new ObjectId();
         ArgumentCaptor<Query> query = ArgumentCaptor.forClass(Query.class);
@@ -120,7 +121,90 @@ class MongoUserReputationWriterTest {
         assertThat(saved).isTrue();
         assertThat(mappedQuery(query.getValue())).isEqualTo(new Document("_id", id));
         Document set = mappedUpdate(update.getValue()).get("$set", Document.class);
-        assertThat(set.keySet()).containsExactlyInAnyOrder("reputation.passenger", "updatedAt");
+        assertThat(set.keySet()).containsExactlyInAnyOrder(
+                "reputation.passenger.window", "reputation.passenger.level", "reputation.passenger.calculatedAt", "updatedAt");
+    }
+
+    private void assertRatingFilter(Document filter, ObjectId id, String prefix, int total) {
+        assertThat(filter.get("_id")).isEqualTo(id);
+        List<?> or = filter.get("$or", List.class);
+        assertThat(or).hasSize(2);
+        // Total ausente ou nulo (documento antigo) ou menor que o novo.
+        assertThat(or.get(0)).isEqualTo(new Document(prefix + ".totalReviews", null));
+        assertThat(or.get(1)).isEqualTo(new Document(prefix + ".totalReviews", new Document("$lt", total)));
+    }
+
+    @Test
+    @DisplayName("Deve gravar só os campos de nota do motorista quando o total é mais novo")
+    void shouldSetOnlyDriverRatingFieldsWhenTotalIsNewer() {
+        ObjectId id = new ObjectId();
+        ArgumentCaptor<Query> query = ArgumentCaptor.forClass(Query.class);
+        ArgumentCaptor<Update> update = ArgumentCaptor.forClass(Update.class);
+        when(mongoTemplate.updateFirst(any(Query.class), any(Update.class), eq(User.class))).thenReturn(result(1, 1));
+
+        boolean saved = writer.saveDriverRating(id, driverReputation(), NOW);
+
+        verify(mongoTemplate).updateFirst(query.capture(), update.capture(), eq(User.class));
+        assertThat(saved).isTrue();
+        assertRatingFilter(mappedQuery(query.getValue()), id, "reputation.driver", 3);
+        Document mapped = mappedUpdate(update.getValue());
+        assertThat(mapped.keySet()).containsExactly("$set");
+        Document set = mapped.get("$set", Document.class);
+        assertThat(set.keySet()).containsExactlyInAnyOrder(
+                "reputation.driver.averageRating", "reputation.driver.totalReviews",
+                "reputation.driver.level", "reputation.driver.calculatedAt", "updatedAt");
+        assertThat(set.get("reputation.driver.averageRating")).isEqualTo(4.5);
+        assertThat(set.get("reputation.driver.totalReviews")).isEqualTo(3);
+        assertThat(set.get("reputation.driver.level")).isEqualTo("MEDIUM");
+    }
+
+    @Test
+    @DisplayName("Deve gravar só os campos de nota do passageiro quando o total é mais novo")
+    void shouldSetOnlyPassengerRatingFieldsWhenTotalIsNewer() {
+        ObjectId id = new ObjectId();
+        ArgumentCaptor<Query> query = ArgumentCaptor.forClass(Query.class);
+        ArgumentCaptor<Update> update = ArgumentCaptor.forClass(Update.class);
+        when(mongoTemplate.updateFirst(any(Query.class), any(Update.class), eq(User.class))).thenReturn(result(1, 1));
+
+        boolean saved = writer.savePassengerRating(id, passengerReputation(), NOW);
+
+        verify(mongoTemplate).updateFirst(query.capture(), update.capture(), eq(User.class));
+        assertThat(saved).isTrue();
+        assertRatingFilter(mappedQuery(query.getValue()), id, "reputation.passenger", 2);
+        Document set = mappedUpdate(update.getValue()).get("$set", Document.class);
+        assertThat(set.keySet()).containsExactlyInAnyOrder(
+                "reputation.passenger.averageRating", "reputation.passenger.totalReviews",
+                "reputation.passenger.level", "reputation.passenger.calculatedAt", "updatedAt");
+    }
+
+    @Test
+    @DisplayName("Não deve gravar a janela nem o subdocumento inteiro ao gravar a nota")
+    void shouldNotTouchWindowWhenSavingRating() {
+        ArgumentCaptor<Update> update = ArgumentCaptor.forClass(Update.class);
+        when(mongoTemplate.updateFirst(any(Query.class), any(Update.class), eq(User.class))).thenReturn(result(1, 1));
+
+        writer.saveDriverRating(new ObjectId(), driverReputation(), NOW);
+
+        verify(mongoTemplate).updateFirst(any(Query.class), update.capture(), eq(User.class));
+        Document set = mappedUpdate(update.getValue()).get("$set", Document.class);
+        assertThat(set.keySet()).doesNotContain("reputation.driver", "reputation.driver.window");
+    }
+
+    @Test
+    @DisplayName("Deve devolver false, sem erro, quando a nota é mais antiga que a gravada")
+    void shouldReturnFalseWhenSnapshotIsOlder() {
+        when(mongoTemplate.updateFirst(any(Query.class), any(Update.class), eq(User.class))).thenReturn(result(0, 0));
+
+        assertThat(writer.saveDriverRating(new ObjectId(), driverReputation(), NOW)).isFalse();
+        assertThat(writer.savePassengerRating(new ObjectId(), passengerReputation(), NOW)).isFalse();
+    }
+
+    @Test
+    @DisplayName("Deve devolver false quando o update não altera nada")
+    void shouldReturnFalseWhenNothingModified() {
+        when(mongoTemplate.updateFirst(any(Query.class), any(Update.class), eq(User.class))).thenReturn(result(1, 0));
+
+        assertThat(writer.saveDriverRating(new ObjectId(), driverReputation(), NOW)).isFalse();
     }
 
     @Test

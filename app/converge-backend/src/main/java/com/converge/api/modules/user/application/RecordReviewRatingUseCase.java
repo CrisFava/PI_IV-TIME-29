@@ -7,6 +7,7 @@ import com.converge.api.modules.user.domain.enums.user.ParticipationRole;
 import com.converge.api.modules.user.domain.model.user.User;
 import com.converge.api.modules.user.domain.repository.UserRepository;
 import lombok.RequiredArgsConstructor;
+import lombok.extern.slf4j.Slf4j;
 import org.bson.types.ObjectId;
 import org.springframework.stereotype.Service;
 
@@ -14,6 +15,7 @@ import java.time.LocalDateTime;
 
 // Grava no usuário avaliado a média e o total de avaliações do papel e recalcula o level.
 // Os valores chegam já calculados pelo módulo review (nunca se soma de forma incremental).
+@Slf4j
 @Service
 @RequiredArgsConstructor
 public class RecordReviewRatingUseCase {
@@ -31,16 +33,18 @@ public class RecordReviewRatingUseCase {
 
         userRepository.findById(new ObjectId(userId)).ifPresent(user -> {
             apply(user, role, roundedAverage, totalReviews, now);
-            save(user, role, now);
+            if (!save(user, role, now)) {
+                log.debug("Nota de {} ignorada: já há gravação com mais avaliações (usuário {})", role, userId);
+            }
         });
     }
 
-    // Grava só a reputação do papel avaliado, sem regravar o usuário inteiro.
-    private void save(User user, ParticipationRole role, LocalDateTime now) {
-        switch (role) {
-            case DRIVER -> reputationWriter.saveDriverReputation(user.getId(), user.getReputation().driver(), now);
-            case PASSENGER -> reputationWriter.savePassengerReputation(user.getId(), user.getReputation().passenger(), now);
-        }
+    // Grava só a nota do papel avaliado. Devolve false se já havia uma nota mais nova.
+    private boolean save(User user, ParticipationRole role, LocalDateTime now) {
+        return switch (role) {
+            case DRIVER -> reputationWriter.saveDriverRating(user.getId(), user.getReputation().driver(), now);
+            case PASSENGER -> reputationWriter.savePassengerRating(user.getId(), user.getReputation().passenger(), now);
+        };
     }
 
     private void apply(User user, ParticipationRole role, double average, int total, LocalDateTime now) {
