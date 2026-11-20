@@ -89,6 +89,9 @@ MONGODB_DATABASE_NAME_TESTS=converge-tests
 MONGODB_DATABASE_NAME_PROD=converge-prod
 
 ENV_CHECK=true
+# Job de cobranças vencidas (RF67). Deixe desligado no banco compartilhado converge-dev
+# CONVERGE_PAYMENT_OVERDUE_ENABLED=false
+# CONVERGE_PAYMENT_OVERDUE_SINCE=2026-11-20T00:00:00
 ```
 
 > [!NOTE]

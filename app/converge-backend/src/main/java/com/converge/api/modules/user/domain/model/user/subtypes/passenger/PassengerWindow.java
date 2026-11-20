@@ -34,6 +34,12 @@ public record PassengerWindow(
         return new PassengerWindow(completedRides, current + 1, noShows, substantiatedReports, overdueRides);
     }
 
+    // Só sobe: pagar depois não apaga a dívida da reputação
+    public PassengerWindow withIncrementedOverdueRides() {
+        int current = overdueRides != null ? overdueRides : 0;
+        return new PassengerWindow(completedRides, lateCancellations, noShows, substantiatedReports, current + 1);
+    }
+
     public PassengerWindow withIncrementedNoShows() {
         int current = noShows != null ? noShows : 0;
         return new PassengerWindow(completedRides, lateCancellations, current + 1, substantiatedReports, overdueRides);

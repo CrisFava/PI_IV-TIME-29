@@ -102,6 +102,60 @@ class GetRideParticipantsUseCaseTest {
     }
 
     @Test
+    @DisplayName("Deve listar como cobrados só os passageiros que terminaram a viagem e receberam cobrança")
+    void shouldListOnlyChargedCompletedPassengers() {
+        Ride ride = rideWithFourRequests();
+        ride.start();
+        ride.markNoShow("passenger-2");
+        ride.complete();
+        ride.requestPayment("passenger-1", new java.math.BigDecimal("10.00"));
+        when(rideRepository.findById(rideObjectId)).thenReturn(Optional.of(ride));
+
+        Optional<RideParticipantsDTO> result = getRideParticipants.execute(rideObjectId.toHexString());
+
+        assertThat(result.get().chargedPassengerIds()).containsExactly("passenger-1");
+        assertThat(result.get().reportableNonPaymentIds()).isEmpty();
+    }
+
+    @Test
+    @DisplayName("Só cobrança paga pode ser denunciada; pendente não, nem depois de vencer")
+    void shouldListAsReportableOnlyPaidCharges() {
+        Ride ride = rideWithFourRequests();
+        ride.start();
+        ride.complete();
+        ride.requestPayment("passenger-1", new java.math.BigDecimal("10.00"));
+        ride.requestPayment("passenger-2", new java.math.BigDecimal("10.00"));
+        ride.markPaymentAsPaid("passenger-1");
+        when(rideRepository.findById(rideObjectId)).thenReturn(Optional.of(ride));
+
+        RideParticipantsDTO paidOnly = getRideParticipants.execute(rideObjectId.toHexString()).get();
+        assertThat(paidOnly.chargedPassengerIds()).containsExactly("passenger-1", "passenger-2");
+        assertThat(paidOnly.reportableNonPaymentIds()).containsExactly("passenger-1");
+
+        ride.getParticipants().stream()
+                .filter(participant -> "passenger-2".equals(participant.getUserId()))
+                .forEach(participant -> ReflectionTestUtils.setField(participant, "overdueAt", LocalDateTime.now()));
+
+        RideParticipantsDTO withOverdue = getRideParticipants.execute(rideObjectId.toHexString()).get();
+        assertThat(withOverdue.reportableNonPaymentIds()).containsExactly("passenger-1");
+
+        // Venceu e depois marcou "Já paguei": aí pode ser denunciada
+        ride.markPaymentAsPaid("passenger-2");
+        RideParticipantsDTO paidAfterOverdue = getRideParticipants.execute(rideObjectId.toHexString()).get();
+        assertThat(paidAfterOverdue.reportableNonPaymentIds()).containsExactly("passenger-1", "passenger-2");
+    }
+
+    @Test
+    @DisplayName("Sem cobrança emitida, ninguém aparece como cobrado")
+    void shouldListNobodyWhenNoChargeWasRequested() {
+        when(rideRepository.findById(rideObjectId)).thenReturn(Optional.of(rideWithFourRequests()));
+
+        Optional<RideParticipantsDTO> result = getRideParticipants.execute(rideObjectId.toHexString());
+
+        assertThat(result.get().chargedPassengerIds()).isEmpty();
+    }
+
+    @Test
     @DisplayName("Viagem inexistente deve devolver vazio")
     void shouldReturnEmptyWhenRideDoesNotExist() {
         when(rideRepository.findById(rideObjectId)).thenReturn(Optional.empty());

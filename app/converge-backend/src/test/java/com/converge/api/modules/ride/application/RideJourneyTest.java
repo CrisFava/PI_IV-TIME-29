@@ -183,7 +183,8 @@ class RideJourneyTest {
                 rideAccess, rideCostCalculator, rideRepository, completionPublisher, mock(RouteAccess.class),
                 new RidePaymentNotifier(eventPublisher));
         requestPayment = new RequestPaymentUseCase(rideAccess, rideRepository, paymentView);
-        markPaymentAsPaid = new MarkPaymentAsPaidUseCase(rideAccess, rideRepository, paymentView, new RidePaymentNotifier(eventPublisher));
+        markPaymentAsPaid = new MarkPaymentAsPaidUseCase(rideAccess, rideRepository, paymentView, new RidePaymentNotifier(eventPublisher),
+                mock(com.converge.api.modules.user.application.ResolveOverduePaymentUseCase.class));
         arrivePassenger = new ArrivePassengerUseCase(
                 rideAccess, rideCostCalculator, rideRepository, routeAccess, new RidePaymentNotifier(eventPublisher));
         listPendingPayments = new ListPendingPaymentsUseCase(rideAccess, rideRepository, paymentView);

@@ -26,6 +26,9 @@
 | 13/11/2026 | Daniela Mikie Kikuchi Gonçalves | 1.5.1 | Avaliação: quem pode avaliar (participante que concluiu a viagem), avaliação imutável e sem prazo no MVP, média calculada a partir das avaliações; índice de duplicidade corrigido para `rideId + reviewerId + reviewedId` |
 | 15/11/2026 | Allan Giovanni Matias Paes | 1.6.0 | Alinhamento com as entidades Java: `toll` e `parking` no Trajeto; `EXPIRED` e `version` na Viagem; `appliedRideIds` nos Indicadores e Plataforma; `IdempotencyKey` completo com replay e fingerprint; `REQUEST_EXPIRED` em Notificação; complementação dos schemas JSON 4.11 a 4.15 e índices de integridade |
 | 18/11/2026 | Daniela Mikie Kikuchi Gonçalves | 1.7.0 | Itinerário da Viagem (`itinerary`, `itineraryDistanceKm`, `itineraryPolyline`, `RideStop`, `RideStopType`); `IndicatorRideRegistration` documentada; reputação gravada a partir das avaliações e regra de `level`; selos automáticos (job semanal) e `completedRides` contado ao concluir a viagem; denúncias e bloqueios implementados (endpoints, onde valem, moderação fora); campo do selo `badge`; `appliedRideIds` ausente em `ALL_TIME`; indicadores na versão enxuta; atualização por viagem com reconciliação a cada 15 min; TTL de idempotência de 24 h; avisos de "sem código" para `reserved_seats` e `universities`; cálculos migrados para o servidor de sockets (sustentabilidade, referência de período, distância, RENAVAM); registro de `completedRides` e dos indicadores depois do commit da conclusão da viagem; reputação e selos gravados por update parcial atômico |
+| 20/11/2026 | Daniela Mikie Kikuchi Gonçalves | 1.8.0 | Inadimplência implementada (RF67): `overdueAt` e `nonPaymentReportedAt` na Participação; prazo de 5 minutos e limite de 2 dívidas; denúncia `NON_PAYMENT` aceita só depois do "Já paguei" e contada como dívida; `overdueRides` passa a ser incrementado |
+| 20/11/2026 | Daniela Mikie Kikuchi Gonçalves | 1.9.0 | Janela de 90 dias da reputação recalculada a partir das viagens (job semanal); campos `cancelledAt` e `driverCancellationPenalized` na Viagem e `removedByDriver` na Participação |
+| 20/11/2026 | Daniela Mikie Kikuchi Gonçalves | 1.9.1 | Reputação: a nota da avaliação só é gravada se o total for maior que o já gravado, e penalidade e viagem concluída deixam de regravar a média e o total (avaliações simultâneas não se sobrescrevem) |
 
 ---
 
@@ -62,11 +65,11 @@ Usuário é toda pessoa que se cadastra na plataforma Converge. Pode assumir um 
 | `driverLicense` | Dados de habilitação (CNH) | Não | Composto (C) | ver tipo especial 3.13 | — | Obrigatório apenas para quem atua como motorista. Deve estar `VERIFIED` para oferecer carona. Nulo para passageiros. |
 | `pixKey` | Texto | Não | Simples | `+5519912345678` (PHONE), `ana@email.com` (EMAIL) | vazio para quem oferece carona | Chave PIX do motorista, normalizada ao salvar conforme o `pixKeyType`. Obrigatória para criar trajetos `OFFER` (senão o passageiro não tem para quem pagar). Usada para gerar o QR Code "Pix Copia e Cola". |
 | `pixKeyType` | Elemento de lista enumerada | Não | Simples | `CPF`, `PHONE`, `EMAIL`, `RANDOM` | tipo que não corresponde à chave | Tipo da chave PIX. Necessário porque o formato no payload depende dele (uma chave de 11 dígitos pode ser CPF ou celular). Nulo se não houver chave. |
-| `paymentStanding` | Elemento de lista enumerada | Sim | Simples | `UP_TO_DATE`, `HAS_OVERDUE`, `BLOCKED` | valor fora do enum | Situação de pagamento do passageiro. `UP_TO_DATE` sem dívidas vencidas; `HAS_OVERDUE` com 1-2 viagens vencidas; `BLOCKED` ao atingir o limite. Ver regra de inadimplência decrescente. |
-| `overdueRidesCount` | Número inteiro | Sim | Simples | `0`, `1`, `2`, `3` | negativo | Quantidade de viagens vencidas (não pagas após o prazo de 3 dias). Define o prazo decrescente até o bloqueio. |
-| `isDefaulter` | Booleano | Sim | Simples | `true`, `false` | nulo | `false` por padrão. Muda para `true` quando o passageiro é bloqueado (3 dívidas vencidas ou prazo estourado). Só volta a `false` quando **todas** as viagens vencidas forem pagas. |
+| `paymentStanding` | Elemento de lista enumerada | Sim | Simples | `UP_TO_DATE`, `HAS_OVERDUE`, `BLOCKED` | valor fora do enum | Situação de pagamento do passageiro. `UP_TO_DATE` sem dívidas vencidas; `HAS_OVERDUE` com dívidas vencidas abaixo do limite; `BLOCKED` ao atingir o limite (padrão 2). Ver "Inadimplência" na modelagem. |
+| `overdueRidesCount` | Número inteiro | Sim | Simples | `0`, `1`, `2` | negativo | Quantidade de dívidas vencidas: cobranças não marcadas como pagas em 5 minutos (`converge.payment.due-after`) e denúncias `NON_PAYMENT`. Soma 1 a cada dívida e tira 1 quando uma cobrança vencida é paga. Ao chegar em `converge.payment.overdue-limit` (padrão 2), o passageiro é bloqueado. |
+| `isDefaulter` | Booleano | Sim | Simples | `true`, `false` | nulo | `false` por padrão. Muda para `true` quando o passageiro é bloqueado (atingiu o limite de dívidas vencidas, padrão 2). Só volta a `false` quando `overdueRidesCount` chega a 0, ou seja, quando **todas** as dívidas por prazo forem pagas. A dívida de denúncia `NON_PAYMENT` só sai pela moderação (fora do MVP). |
 | `defaulterSince` | Data e hora | Não | Simples | `2025-05-20T00:00:00Z` | data futura | Preenchido quando `isDefaulter = true`. Nulo quando em dia. |
-| `reputation` | Dados de reputação por papel | Sim | Composto (C) | ver tipo especial 3.2 | nulo | Separada por papel (driver e passenger). A média e o `level` são gravados quando uma avaliação é salva; `completedRides` quando a viagem é concluída; cancelamentos e ausências quando ocorrem. A janela de 90 dias **não é deslizante** (os contadores acumulam). Ver tipo especial 3.2. |
+| `reputation` | Dados de reputação por papel | Sim | Composto (C) | ver tipo especial 3.2 | nulo | Separada por papel (driver e passenger). A média e o `level` são gravados quando uma avaliação é salva; `completedRides` quando a viagem é concluída; cancelamentos e ausências quando ocorrem. A janela de 90 dias é **recalculada semanalmente** pelo job dos selos a partir das viagens. Ver tipo especial 3.2. |
 | `badges` | Selos de reconhecimento | Não | Multivalorado e Composto (MC) | ver tipo especial 3.3 | — | Concedidos e removidos automaticamente por um job semanal (segunda-feira, 03h, America/Sao_Paulo) quando o usuário atinge ou deixa de atender os critérios. Cada item grava o selo no campo `badge` (não `type`). Ver tipo especial 3.3. |
 | `active` | Booleano | Sim | Simples | `true`, `false` | nulo | `true` por padrão. `false` para contas suspensas ou excluídas. |
 | `createdAt` | Data e hora | Sim | Simples | `2025-05-01T10:00:00Z` | data futura | Gerado automaticamente no cadastro. |
@@ -157,6 +160,8 @@ Ride é o evento central do sistema. Representa uma viagem concreta com data, ho
 | `status` | Elemento de lista enumerada | Sim | Simples | `CONFIRMED`, `COMPLETED` | valor fora do enum | Valores: `AWAITING_CONFIRMATION`, `CONFIRMED`, `IN_PROGRESS`, `COMPLETED`, `CANCELLED`. |
 | `cancellationReason` | Texto | Não | Simples | `Imprevisto pessoal` | — | Presente somente quando `status = CANCELLED`. |
 | `cancelledBy` | Texto alfanumérico | Não | Simples | `64a1f3c2...` | — | Referência ao User que cancelou. |
+| `cancelledAt` | Data e hora | Não | Simples | `2025-05-12T09:00:00Z` | — | Armazenado em UTC. Momento em que a viagem foi cancelada (pelo motorista, pelo job de não iniciada, por falta de participantes ou por todos os passageiros ausentes). Nulo em viagens não canceladas e nas canceladas antes da versão 1.9.0. Usado para datar o cancelamento do motorista na janela de reputação. |
+| `driverCancellationPenalized` | Booleano | Sim | Simples | `false`, `true` | — | `false` por padrão. `true` só quando o motorista cancelou a viagem com passageiro confirmado, o mesmo caso que soma em `driverInitiatedCancellations`. Cancelamentos automáticos ficam `false`. |
 | `chatRoomId` | Texto | Não | Simples | `ride_64d4c3b2` | — | Identificador da sala de chat no **Firebase Realtime Database**. As mensagens não ficam no MongoDB — só a referência da sala. |
 | `costs` | Detalhamento de custos | Sim | Composto (C) | ver tipo especial 3.7 | nulo | Calculado ao concluir a viagem. Todos os valores monetários em `Decimal128`. |
 | `participants` | Participação na viagem | Sim | Multivalorado e Composto (MC) | ver tipo especial 3.8 | lista vazia | Mínimo 1 elemento (o motorista). |
@@ -215,7 +220,7 @@ Report é o registro formal de uma ocorrência reportada por um usuário contra 
 | `reporterId` | Texto alfanumérico | Sim | Simples | `64a1f3c2...` | nulo | Referência ao User que registra a denúncia. |
 | `reportedId` | Texto alfanumérico | Sim | Simples | `64a9f8e7...` | igual ao reporterId, nulo | Referência ao User denunciado. |
 | `rideId` | Texto alfanumérico | Não | Simples | `64d4c3b2...` | `LATE_NO_SHOW` sem viagem | Referência ao Ride relacionado. **Obrigatório quando `reason = LATE_NO_SHOW`**; opcional nos demais. Quando vem, os dois usuários precisam ter participado da viagem. |
-| `reason` | Elemento de lista enumerada | Sim | Simples | `INAPPROPRIATE_CONDUCT`, `LATE_NO_SHOW` | valor fora do enum | Valores: `LATE_NO_SHOW`, `INAPPROPRIATE_CONDUCT`, `IMPROPER_CHARGE`, `NON_PAYMENT`, `OTHER`. |
+| `reason` | Elemento de lista enumerada | Sim | Simples | `INAPPROPRIATE_CONDUCT`, `LATE_NO_SHOW` | valor fora do enum | Valores: `LATE_NO_SHOW`, `INAPPROPRIATE_CONDUCT`, `IMPROPER_CHARGE`, `NON_PAYMENT`, `OTHER`. `NON_PAYMENT` exige `rideId`, só o motorista da viagem denuncia, o passageiro precisa ter sido cobrado e já ter marcado "Já paguei"; vale uma por passageiro em cada viagem e conta como uma dívida (RF67). |
 | `description` | Texto | Não | Simples | `O motorista cobrou mais do combinado.` | mais de 500 caracteres, vazio com `OTHER` | Detalhamento livre, **máximo 500 caracteres** (limite definido no código). **Obrigatório quando `reason = OTHER`.** |
 | `status` | Elemento de lista enumerada | Sim | Simples | `PENDING`, `UNDER_REVIEW` | valor fora do enum | Valores: `PENDING`, `UNDER_REVIEW`, `RESOLVED`, `ARCHIVED`. Nasce `PENDING`. Hoje só `PENDING` é gravado; os demais dependem da moderação, que não existe. |
 | `resolution` | Texto | Não | Simples | `Usuário advertido.` | — | **Pendente (sem moderação):** nenhum fluxo escreve este campo e a API não o expõe. Seria preenchido pela moderação ao encerrar a análise. |
@@ -459,19 +464,25 @@ Estrutura composta que representa os dados universitários do usuário e o statu
 Estrutura composta que representa os indicadores de comportamento do usuário separados por papel.
 
 **Como cada campo é gravado hoje:**
-- `averageRating` e `totalReviews`: recalculados a partir de **todas** as avaliações recebidas no papel, logo depois de salvar uma avaliação (só o papel avaliado). A média é gravada com 2 casas decimais, e esse valor entra nas regras de `level` e de selo. Se a gravação falhar, a avaliação continua salva (só log).
+- `averageRating` e `totalReviews`: recalculados a partir de **todas** as avaliações recebidas no papel, logo depois de salvar uma avaliação (só o papel avaliado), e só são gravados se o total for maior que o já gravado. A média é gravada com 2 casas decimais, e esse valor entra nas regras de `level` e de selo. Se a gravação falhar, a avaliação continua salva (só log).
 - `window.completedRides`: +1 para o motorista e +1 para cada passageiro efetivo quando a viagem é concluída. O registro roda **depois do commit** da conclusão da viagem (`@TransactionalEventListener` com `AFTER_COMMIT`, fora da transação); uma falha nele é capturada e só vai para o log, então não desfaz nem impede a conclusão. Cada conclusão conta uma vez (o evento é publicado uma vez por viagem). Viagem sem passageiro efetivo não gera evento e não conta.
 - `window.driverInitiatedCancellations`, `window.lateCancellations` e `window.noShows`: incrementados pelas penalidades.
 - `level` e `calculatedAt`: recalculados a cada gravação acima.
-- Gravação: a reputação é gravada por **update parcial atômico** (`$set`), só em `reputation.driver` ou `reputation.passenger` (mais `updatedAt`), com filtro por `_id`. O documento inteiro do usuário não é regravado. Os selos são gravados por `$push`/`$pull` em `badges`. Assim, avaliação, penalidade, viagem concluída e job dos selos não sobrescrevem os outros campos do usuário nem o outro papel.
-- Limite da gravação: dentro do mesmo papel, duas gravações simultâneas ainda partem de uma leitura anterior e a última vence.
+- Gravação: a reputação é gravada por **update parcial atômico** (`$set`), com filtro por `_id`. O documento inteiro do usuário não é regravado. Os selos são gravados por `$push`/`$pull` em `badges`. Assim, avaliação, penalidade, viagem concluída e job dos selos não sobrescrevem os outros campos do usuário nem o outro papel.
+- Gravação da nota (avaliação): `$set` só em `reputation.<papel>.averageRating`, `totalReviews`, `level` e `calculatedAt` (mais `updatedAt`), sem tocar em `window`. Só aplica se o `totalReviews` gravado estiver ausente ou for menor que o novo. Penalidade e viagem concluída gravam só `reputation.<papel>.window`, `level` e `calculatedAt` (mais `updatedAt`), sem tocar em `averageRating` e `totalReviews`. Assim uma não desfaz a outra.
+- Avaliações simultâneas no mesmo papel: uma nota calculada com menos avaliações que a já gravada é ignorada (só log), então a mais antiga não sobrescreve a mais nova. Limite: o `level` usa a janela lida antes da gravação, então uma penalidade simultânea pode deixar o `level` defasado até a próxima gravação de reputação.
 
 **Regra de `level` (igual nos dois papéis):** `LOW` quando algum limite de penalidade é estourado; `HIGH` quando cumpre os critérios de confiança do papel (tabelas abaixo); `MEDIUM` no resto. A regra roda de novo a cada média, viagem concluída ou penalidade, então uma penalidade pode rebaixar `HIGH` para `MEDIUM`.
 
 **Limitações conhecidas:**
-- A janela de 90 dias **não é deslizante**: os contadores acumulam desde o início e nunca são descontados por data. Os limites "nos últimos 90 dias" abaixo valem, na prática, sobre o total acumulado.
 - `HIGH` só é alcançável com a gravação da média e a contagem de `completedRides` funcionando juntas.
-- Nenhum fluxo grava `window.delays`, `window.substantiatedReports` (depende da moderação de denúncias, que não existe) nem `window.overdueRides`; ficam em 0.
+- Nenhum fluxo grava `window.delays` nem `window.substantiatedReports` (depende da moderação de denúncias, que não existe); ficam em 0. O job semanal não os recalcula.
+- `noShows` é datado pelo `startedAt` da viagem, porque a participação não guarda a data da ausência.
+- Cancelamentos do motorista e remoções de passageiro confirmado gravados antes da versão 1.9.0 não têm `cancelledAt`, `driverCancellationPenalized` nem `removedByDriver` e **não entram** na janela: no primeiro job, o contador de quem tinha essas penalidades antigas volta a 0.
+- Entre duas execuções do job os contadores seguem somando em tempo real; o job reescreve os valores uma vez por semana.
+- O job lê as contagens uma vez, no início. Um incremento em tempo real entre essa leitura e a gravação do usuário é sobrescrito e só volta a ficar certo no job seguinte.
+
+**Janela deslizante de 90 dias:** toda segunda-feira, antes de avaliar os selos, o job semanal recalcula `completedRides`, `driverInitiatedCancellations`, `lateCancellations`, `noShows` e `overdueRides` de cada usuário a partir dos fatos datados das viagens (coleção `rides`), em `[agora − N dias, agora]`. `N` é a propriedade `converge.user.reputation-window-days` (padrão 90; menor que 1 volta para 90). Um fato com exatamente `N` dias ainda conta. Quem não tem fato na janela volta a 0. Depois o job recalcula o `level` e grava só `window`, `level` e `calculatedAt` do papel, sem tocar em `averageRating` e `totalReviews`. Datas usadas: `Ride.completedAt` (viagens concluídas), `Participant.cancelledAt` (cancelamento tardio), `Ride.startedAt` (ausência), `Ride.cancelledAt` (cancelamento da viagem pelo motorista), `Participant.cancelledAt` com `removedByDriver` (remoção de passageiro confirmado, que também soma em `driverInitiatedCancellations`) e `Participant.overdueAt` (dívida).
 
 **Critérios para ganhar o selo `TRUST` — Driver:**
 
@@ -520,7 +531,7 @@ A estrutura `reputation` tem dois blocos: `reputation.driver` e `reputation.pass
 | `lateCancellations` | Número inteiro | Sim | Cancelamentos com menos de 2h de antecedência nos últimos 90 dias. |
 | `noShows` | Número inteiro | Sim | Vezes marcado como ausente nos últimos 90 dias. |
 | `substantiatedReports` | Número inteiro | Sim | Denúncias marcadas como `RESOLVED` contra o passageiro nos últimos 90 dias. |
-| `overdueRides` | Número inteiro | Sim | Viagens vencidas (não pagas no prazo) nos últimos 90 dias. Critério do selo de confiança: deve ser 0. |
+| `overdueRides` | Número inteiro | Sim | Dívidas vencidas registradas (cobrança não paga no prazo ou denúncia `NON_PAYMENT`). Soma 1 a cada dívida. Pagar não diminui: só sai da janela depois de 90 dias, quando o job semanal recalcula. Critério do selo de confiança: deve ser 0. |
 
 ---
 
@@ -532,10 +543,10 @@ Estrutura composta que representa um selo concedido ao usuário. Concedido e rem
 
 | Selo | Critério |
 | :--- | :--- |
-| `TRUST` | Não estourou nenhum limite de penalidade **e** cumpre os critérios de confiança (ver tipo 3.2 Reputation) em **pelo menos um** dos papéis, motorista ou passageiro. A janela "90 dias" não é deslizante: os contadores acumulam. |
+| `TRUST` | Não estourou nenhum limite de penalidade **e** cumpre os critérios de confiança (ver tipo 3.2 Reputation) em **pelo menos um** dos papéis, motorista ou passageiro. A janela de 90 dias é recalculada pelo job a partir das viagens antes de o selo ser avaliado. |
 | `SUSTAINABILITY` | CO₂ evitado acumulado **≥ 50 kg** (soma dos `indicators` `MONTHLY` do usuário, lida pelo caso de uso de leitura do módulo `indicator`, período `ALL_TIME`). Considera apenas viagens concluídas com ao menos um passageiro efetivo — impacto real de compartilhamento, não motorista rodando sozinho. |
 
-**Como o job funciona:** percorre os usuários em páginas de 100 (ordenadas por `_id`), concede ou revoga os dois selos e só grava quando algo muda, relendo o usuário antes. A data `grantedAt` original é preservada em um selo que continua válido. Um erro em um usuário é contado e logado, os selos dele não são revogados e o job segue. Uma penalidade que estoura o limite revoga o `TRUST` na hora; ele só volta no próximo job. Não há auditoria de concessão ou revogação (não existe ação de selo em `AuditAction`).
+**Como o job funciona:** pede ao módulo `ride`, uma vez, os fatos da janela de todos os usuários (se isso falhar, o job inteiro para). Depois percorre os usuários em páginas de 100 (ordenadas por `_id`), recalcula a janela e o `level` de cada um (grava só se mudaram), concede ou revoga os dois selos e só grava quando algo muda, relendo o usuário antes. A data `grantedAt` original é preservada em um selo que continua válido. Um erro em um usuário é contado e logado, os selos dele não são revogados e o job segue. Uma penalidade que estoura o limite revoga o `TRUST` na hora; ele só volta no próximo job. Não há auditoria de concessão ou revogação (não existe ação de selo em `AuditAction`).
 
 | Atributo / Dado | Tipo conceitual | Obrigatório | Comentários |
 | :---: | :--- | :---: | :--- |
@@ -621,6 +632,7 @@ Estrutura composta e multivalorada que representa cada participante de uma viage
 | `rejectionReason` | Texto | Não | Motivo da recusa pelo motorista. Presente somente quando `status = REJECTED`. |
 | `cancellationReason` | Texto | Não | Preenchido pelo participante ao cancelar. |
 | `lateCancellation` | Booleano | Sim | `false` por padrão. `true` quando cancela com menos de 2h de antecedência. |
+| `removedByDriver` | Booleano | Sim | `false` por padrão. `true` só quando o motorista remove um passageiro já `CONFIRMED` (o status vai para `CANCELLED` e `cancelledAt` é gravado), o mesmo caso que soma em `driverInitiatedCancellations`. Recusar pedido pendente (`REJECTED`) não marca. Remoções anteriores à versão 1.9.0 ficam `false`. |
 | `estimatedAmount` | Número decimal monetário | Sim | `Decimal128`. Valor estimado atual (RF34/RF36). Recalculado a cada entrada, cancelamento ou ausência de participantes. Nunca ultrapassa o `maxAmount`. |
 | `maxAmount` | Número decimal monetário | Sim | `Decimal128`. Teto de proteção do passageiro (RF35/RF37): custo inteiro da rota com o desvio do passageiro, gravado na confirmação. Nunca pode ser superado pelo `finalAmount`. |
 | `finalAmount` | Número decimal monetário | Não | `Decimal128`. Calculado somente ao concluir a viagem. Nulo até a conclusão. |
@@ -629,6 +641,8 @@ Estrutura composta e multivalorada que representa cada participante de uma viage
 | `paymentRequestedAt` | Data e hora | Não | Momento da última cobrança. Nulo até a primeira cobrança. |
 | `paidAt` | Data e hora | Não | Momento em que o passageiro informou o pagamento ("Já paguei"). |
 | `confirmedAt` | Data e hora | Sim | Timestamp de entrada do participante na viagem. |
+| `overdueAt` | Data e hora | Não | Quando a cobrança virou dívida vencida (prazo de 5 minutos sem "Já paguei", ou denúncia `NON_PAYMENT`). Nulo = não vencida. A cobrança continua `PENDING`. Só é marcado de novo quando o passageiro deixou vencer, marcou "Já paguei" e depois chega uma denúncia `NON_PAYMENT` da mesma viagem. |
+| `nonPaymentReportedAt` | Data e hora | Não | Quando a dívida veio de uma denúncia `NON_PAYMENT`. Nulo para dívida por prazo. "Já paguei" não desfaz essa dívida. |
 | `boardedAt` | Data e hora | Não | Quando o motorista confirmou que o passageiro entrou no carro (`POST /rides/{id}/passengers/{passengerId}/board`, só com a viagem em andamento). Nulo até o embarque. Quem já embarcou não pode ser marcado como ausente. |
 | `cancelledAt` | Data e hora | Não | Nulo enquanto não cancelar. |
 | `updatedAt` | Data e hora | Sim | Atualizado a cada mudança no subdocumento. |
@@ -928,6 +942,8 @@ Estrutura composta e multivalorada usada no array `itinerary` da Ride. Cada item
   "status": "COMPLETED",
   "cancellationReason": null,
   "cancelledBy": null,
+  "cancelledAt": null,
+  "driverCancellationPenalized": false,
   "chatRoomId": "ride_64d4c3b2f7e3d4c5b6a7f8e9",
   "itinerary": [
     {

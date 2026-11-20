@@ -10,6 +10,7 @@ import com.converge.api.modules.user.domain.enums.user.VerificationStatus;
 import com.converge.api.modules.user.domain.model.user.subtypes.AcademicRecord;
 import com.converge.api.modules.user.domain.model.user.subtypes.driver.DriverLicense;
 import com.converge.api.modules.user.domain.model.user.subtypes.Reputation;
+import com.converge.api.modules.user.domain.model.user.subtypes.ReputationWindowCounts;
 import com.converge.api.modules.user.domain.model.user.subtypes.UserBadge;
 import com.converge.api.shared.presentation.exception.ApplicationException;
 import com.converge.api.shared.presentation.exception.ErrorCode;
@@ -361,12 +362,22 @@ public class User {
         revokeTrustBadgeIfThresholdExceeded();
     }
 
+    public void recordPassengerOverdueRide(LocalDateTime now) {
+        this.reputation = currentReputation().withPassengerOverdueRide(now);
+        revokeTrustBadgeIfThresholdExceeded();
+    }
+
     public void recordDriverCompletedRide(LocalDateTime now) {
         this.reputation = currentReputation().withDriverCompletedRide(now);
     }
 
     public void recordPassengerCompletedRide(LocalDateTime now) {
         this.reputation = currentReputation().withPassengerCompletedRide(now);
+    }
+
+    // Troca os contadores da janela pelos recalculados a partir das viagens. Não mexe nos selos.
+    public void refreshReputationWindow(ReputationWindowCounts counts, LocalDateTime now) {
+        this.reputation = currentReputation().withWindowCounts(counts, now);
     }
 
     public void recordDriverRating(double averageRating, int totalReviews, LocalDateTime now) {
@@ -400,7 +411,9 @@ public class User {
                 && ((current.passenger().window().lateCancellations() != null
                 && current.passenger().window().lateCancellations() > 2)
                 || (current.passenger().window().noShows() != null
-                && current.passenger().window().noShows() > 1));
+                && current.passenger().window().noShows() > 1)
+                || (current.passenger().window().overdueRides() != null
+                && current.passenger().window().overdueRides() > 0));
 
         return driverViolated || passengerViolated || (!driverEligible && !passengerEligible);
     }

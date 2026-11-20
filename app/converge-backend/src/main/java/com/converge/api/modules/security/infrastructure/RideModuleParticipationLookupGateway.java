@@ -20,6 +20,11 @@ public class RideModuleParticipationLookupGateway implements RideParticipationLo
     @Override
     public Optional<RideParticipants> findParticipants(String rideId) {
         return getRideParticipants.execute(rideId)
-                .map(ride -> new RideParticipants(ride.rideId(), ride.driverId(), Set.copyOf(ride.passengerIds())));
+                .map(ride -> new RideParticipants(
+                        ride.rideId(),
+                        ride.driverId(),
+                        Set.copyOf(ride.passengerIds()),
+                        Set.copyOf(ride.chargedPassengerIds()),
+                        Set.copyOf(ride.reportableNonPaymentIds())));
     }
 }

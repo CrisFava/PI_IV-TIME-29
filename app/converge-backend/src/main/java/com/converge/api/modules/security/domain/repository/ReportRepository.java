@@ -20,4 +20,7 @@ public interface ReportRepository extends MongoRepository<Report, ObjectId> {
     // Já existe denúncia igual ainda aberta (mesmo autor, denunciado, viagem e motivo)?
     boolean existsByReporterIdAndReportedIdAndRideIdAndReasonAndStatus(
             String reporterId, String reportedId, String rideId, ReportReason reason, ReportStatus status);
+
+    // Já existe denúncia desse motivo contra o usuário nessa viagem, em qualquer status?
+    boolean existsByReportedIdAndRideIdAndReason(String reportedId, String rideId, ReportReason reason);
 }

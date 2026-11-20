@@ -20,6 +20,24 @@ public interface UserReputationWriter {
 
     boolean savePassengerReputation(ObjectId userId, PassengerReputation reputation, LocalDateTime now);
 
+    /**
+     * Grava só a janela, o level e a data de cálculo do motorista, sem tocar na média nem nas avaliações.
+     * Devolve false se o usuário não existe ou não tem reputação de motorista.
+     */
+    boolean saveDriverWindow(ObjectId userId, DriverReputation reputation, LocalDateTime now);
+
+    /** Igual a saveDriverWindow, para o papel de passageiro. */
+    boolean savePassengerWindow(ObjectId userId, PassengerReputation reputation, LocalDateTime now);
+
+    /**
+     * Grava só a nota do motorista (média, total, level e calculatedAt), sem tocar na janela.
+     * Só aplica se o total novo for maior que o gravado. Devolve true quando aplicou.
+     */
+    boolean saveDriverRating(ObjectId userId, DriverReputation reputation, LocalDateTime now);
+
+    /** Igual a {@link #saveDriverRating}, para o papel de passageiro. */
+    boolean savePassengerRating(ObjectId userId, PassengerReputation reputation, LocalDateTime now);
+
     /** Concede o selo só se o usuário ainda não o tem. Devolve true quando concedeu. */
     boolean grantBadge(ObjectId userId, Badge badge, LocalDateTime now);
 

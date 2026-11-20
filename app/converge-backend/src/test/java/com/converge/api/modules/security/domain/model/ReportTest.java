@@ -70,6 +70,17 @@ class ReportTest {
     }
 
     @Test
+    @DisplayName("Falta de pagamento exige a viagem (RF67)")
+    void shouldRequireRideForNonPayment() {
+        assertBadRequest(() -> new Report("reporter", "reported", null, ReportReason.NON_PAYMENT, null), "rideId");
+        assertBadRequest(() -> new Report("reporter", "reported", "  ", ReportReason.NON_PAYMENT, null), "rideId");
+
+        Report report = new Report("reporter", "reported", "ride-1", ReportReason.NON_PAYMENT, null);
+
+        assertThat(report.getRideId()).isEqualTo("ride-1");
+    }
+
+    @Test
     @DisplayName("Motivo OUTRO exige descrição")
     void shouldRequireDescriptionForOther() {
         assertBadRequest(() -> new Report("reporter", "reported", null, ReportReason.OTHER, null), "description");
