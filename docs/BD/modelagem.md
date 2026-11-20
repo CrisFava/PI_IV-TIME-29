@@ -8,7 +8,7 @@
 > **Datas e horas:** todos os campos `ISODate` são armazenados em **UTC**. Campos de hora recorrente (`departureTime`, `estimatedArrivalTime`) são `String "HH:mm"` interpretados no fuso oficial da aplicação (**America/Sao_Paulo**). Ao combinar uma data concreta com um horário recorrente para gerar `departureDateTime`, a conversão para UTC deve usar explicitamente America/Sao_Paulo — nunca o fuso do servidor.
 > **Chat:** as mensagens entre participantes **não ficam no MongoDB** — vivem no **Firebase Realtime Database**, conforme a arquitetura do projeto (comunicação em tempo real). O MongoDB guarda apenas o identificador da sala de conversa quando necessário (ex.: um `chatRoomId` na viagem para localizar o histórico no Firebase). Por isso não há coleção `messages`/`chat` nesta modelagem.
 >
-> Estrutura no Realtime Database: `chats/pair_{idMenor}/{idMaior}/messages/{pushId}`, em que os dois ids são os dos usuários da conversa, em ordem alfabética, com os campos `senderId`, `senderName`, `senderUid` (uid do Firebase, conferido pelas regras; é ele que diz de quem é a mensagem), `type` (`TEXT`, `PAYMENT_REQUEST`, `PAYMENT_CONFIRMED`, `SYSTEM`), `text`, `amount` e `sentAt` (horário do servidor). A conversa é **do par de pessoas, não da viagem**: duas pessoas têm uma só conversa, em todas as caronas que fizerem juntas, seja quem for o motorista em cada uma. O `chatRoomId` da viagem continua sendo preenchido no aceite e serve para liberar a conversa (só quem foi aceito numa viagem conversa). As mensagens de pagamento e de viagem são só avisos: a fonte de verdade continua sendo a API. As regras de acesso ficam em `app/converge/database.rules.json`.
+> Estrutura no Realtime Database: `chats/{chatRoomId}/group/messages/{pushId}`: **um grupo por viagem**, com o motorista e os passageiros confirmados, com os campos `senderId`, `senderName`, `senderUid` (uid do Firebase, conferido pelas regras; é ele que diz de quem é a mensagem), `type` (`TEXT`, `PAYMENT_REQUEST`, `PAYMENT_CONFIRMED`, `SYSTEM`), `text`, `amount` e `sentAt` (horário do servidor). O `chatRoomId` é preenchido no aceite e libera o grupo (só quem foi aceito na viagem conversa). Os avisos de início e fim da viagem vão no grupo; as **cobranças não**: cada passageiro vê a própria na tela de pagamento. O grupo some da lista uma semana depois do fim da viagem. As mensagens de pagamento e de viagem são só avisos: a fonte de verdade continua sendo a API. As regras de acesso ficam em `app/converge/database.rules.json`.
 > **Pagamento PIX:** no MVP o pagamento usa **QR Code PIX estático** ("Pix Copia e Cola"), gerado pelo próprio backend, sem gateway e sem API externa. O valor da cobrança vai travado dentro do payload e o dinheiro vai direto da conta do passageiro para a do motorista — o Converge nunca toca no dinheiro. Como o banco não devolve nenhuma confirmação ao servidor, o pagamento é **informado pelo próprio passageiro** ("Já paguei"); o motorista não confirma o recebimento. A verificação automática via gateway (QR Code dinâmico + webhook) fica como evolução futura.
 
 ---
@@ -506,6 +506,7 @@ Quando `active = false` (conta suspensa ou excluída):
       "paymentRequestedAt": "ISODate | null",
       "paidAt": "ISODate | null",
       "confirmedAt": "ISODate",
+      "boardedAt": "ISODate | null (o motorista confirmou que o passageiro entrou)",
       "cancelledAt": "ISODate | null",
       "updatedAt": "ISODate"
     }
@@ -519,6 +520,7 @@ Quando `active = false` (conta suspensa ou excluída):
   ],
   "itineraryDistanceKm": "Double | null",
   "itineraryPolyline": "String | null",
+  "itineraryLegPolylines": ["String (um trecho até cada parada e o último até o destino; vazio sem o Google)"],
   "createdAt": "ISODate",
   "updatedAt": "ISODate"
 }

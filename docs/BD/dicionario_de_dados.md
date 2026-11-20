@@ -162,7 +162,8 @@ Ride é o evento central do sistema. Representa uma viagem concreta com data, ho
 | `participants` | Participação na viagem | Sim | Multivalorado e Composto (MC) | ver tipo especial 3.8 | lista vazia | Mínimo 1 elemento (o motorista). |
 | `itinerary` | Parada do itinerário | Não | Multivalorado e Composto (MC) | ver tipo especial 3.14 | — | Paradas na ordem em que o motorista busca (`PICKUP`) e deixa (`DROPOFF`) os passageiros confirmados. Lista vazia quando não há passageiro confirmado. Recalculada ao aceitar um passageiro, quando um confirmado sai e quando o motorista remove um confirmado. Não muda depois de `IN_PROGRESS`. |
 | `itineraryDistanceKm` | Número decimal | Não | Simples | `15.8`, `null` | negativo | Distância da rota passando pelas paradas. Vem da Routes API (Google); sem o Google, é a soma das linhas retas entre os pontos (calculada pelo servidor de sockets). Nulo quando não há paradas. `Double`. |
-| `itineraryPolyline` | Texto | Não | Simples | `x~ijCzbe_HnAkBtCwE`, `null` | `""` | Desenho da rota com as paradas, em *encoded polyline* do Google. Nulo sem o Google ou sem paradas. Só o motorista a recebe na API. |
+| `itineraryPolyline` | Texto | Não | Simples | `x~ijCzbe_HnAkBtCwE`, `null` | `""` | Desenho da rota com as paradas, em *encoded polyline* do Google. Nulo sem o Google ou sem paradas. O motorista sempre a recebe na API; o passageiro com vaga, só com a viagem em andamento. |
+| `itineraryLegPolylines` | Lista de textos | Não | Multivalorado | `["a~b", "c~d", "e~f"]`, `[]` | quantidade diferente de paradas + 1 | O mesmo caminho em trechos (*encoded polyline* do Google): um até cada parada e o último até o destino. O app desenha forte o trecho atual e apagados os próximos. Vazio sem o Google, sem paradas ou se a quantidade não bater. Mesma visibilidade de `itineraryPolyline`. |
 | `createdAt` | Data e hora | Sim | Simples | `2025-05-10T20:00:00Z` | data futura | Gerado automaticamente. |
 | `updatedAt` | Data e hora | Sim | Simples | `2025-05-12T08:15:00Z` | anterior à criação | Atualizado a cada mudança de status ou participante. |
 
@@ -628,6 +629,7 @@ Estrutura composta e multivalorada que representa cada participante de uma viage
 | `paymentRequestedAt` | Data e hora | Não | Momento da última cobrança. Nulo até a primeira cobrança. |
 | `paidAt` | Data e hora | Não | Momento em que o passageiro informou o pagamento ("Já paguei"). |
 | `confirmedAt` | Data e hora | Sim | Timestamp de entrada do participante na viagem. |
+| `boardedAt` | Data e hora | Não | Quando o motorista confirmou que o passageiro entrou no carro (`POST /rides/{id}/passengers/{passengerId}/board`, só com a viagem em andamento). Nulo até o embarque. Quem já embarcou não pode ser marcado como ausente. |
 | `cancelledAt` | Data e hora | Não | Nulo enquanto não cancelar. |
 | `updatedAt` | Data e hora | Sim | Atualizado a cada mudança no subdocumento. |
 
