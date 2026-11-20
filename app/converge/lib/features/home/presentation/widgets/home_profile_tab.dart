@@ -28,6 +28,8 @@ class HomeProfileTab extends ConsumerWidget {
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
+    final isSigningOut = ref.watch(authActionProvider).isLoading;
+
     return ListView(
       padding: EdgeInsets.fromLTRB(16, 16, 16, 120 + bottomPadding),
       children: [
@@ -164,15 +166,25 @@ class HomeProfileTab extends ConsumerWidget {
               SizedBox(
                 width: double.infinity,
                 child: OutlinedButton.icon(
-                  onPressed: () => _confirmSignOut(context, ref),
-                  icon: const Icon(
-                    Icons.logout_rounded,
-                    size: 18,
-                    color: AppColors.error,
-                  ),
-                  label: const Text(
-                    'Sair da Conta',
-                    style: TextStyle(
+                  onPressed:
+                      isSigningOut ? null : () => _confirmSignOut(context, ref),
+                  icon: isSigningOut
+                      ? const SizedBox(
+                          width: 18,
+                          height: 18,
+                          child: CircularProgressIndicator(
+                            strokeWidth: 2,
+                            color: AppColors.error,
+                          ),
+                        )
+                      : const Icon(
+                          Icons.logout_rounded,
+                          size: 18,
+                          color: AppColors.error,
+                        ),
+                  label: Text(
+                    isSigningOut ? 'Saindo...' : 'Sair da Conta',
+                    style: const TextStyle(
                       fontSize: 14,
                       fontWeight: FontWeight.w700,
                       color: AppColors.error,
@@ -210,6 +222,8 @@ class HomeProfileTab extends ConsumerWidget {
   }
 
   Future<void> _confirmSignOut(BuildContext context, WidgetRef ref) async {
+    if (ref.read(authActionProvider).isLoading) return;
+
     final confirmed = await showDialog<bool>(
       context: context,
       builder: (context) => AlertDialog(
@@ -266,7 +280,19 @@ class HomeProfileTab extends ConsumerWidget {
     );
 
     if (confirmed == true && context.mounted) {
-      ref.read(authActionProvider.notifier).signOut();
+      final success = await ref.read(authActionProvider.notifier).signOut();
+      if (!success && context.mounted) {
+        final error = ref.read(authActionProvider).error;
+        final message = error != null
+            ? authErrorMessage(error)
+            : 'Erro ao sair da conta. Tente novamente.';
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text(message),
+            backgroundColor: AppColors.error,
+          ),
+        );
+      }
     }
   }
 

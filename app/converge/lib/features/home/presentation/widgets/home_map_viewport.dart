@@ -61,47 +61,69 @@ class _HomeMapViewportState extends ConsumerState<HomeMapViewport> {
   static LatLng _latLngOf(RoutePlaceModel place) =>
       LatLng(place.latitude, place.longitude);
 
+  int _geocodeToken = 0;
+
   @override
   void didUpdateWidget(covariant HomeMapViewport oldWidget) {
     super.didUpdateWidget(oldWidget);
     if (widget.passengerStep != oldWidget.passengerStep) {
-      if (widget.passengerStep == PassengerRideStep.dragMapPickup) {
-        _onCameraCenterChanged(widget.pickupLocation);
-      } else if (widget.passengerStep == PassengerRideStep.dragMapDestination &&
+      _geocodeToken++;
+      final step = widget.passengerStep;
+      if (step == PassengerRideStep.dragMapPickup) {
+        if (widget.pickupAddress.isEmpty) {
+          WidgetsBinding.instance.addPostFrameCallback((_) {
+            if (mounted &&
+                widget.passengerStep == PassengerRideStep.dragMapPickup) {
+              _onCameraCenterChanged(widget.pickupLocation);
+            }
+          });
+        }
+      } else if (step == PassengerRideStep.dragMapDestination &&
           widget.destinationLocation != null) {
-        _onCameraCenterChanged(widget.destinationLocation!);
+        if (widget.destinationAddress.isEmpty) {
+          WidgetsBinding.instance.addPostFrameCallback((_) {
+            if (mounted &&
+                widget.passengerStep == PassengerRideStep.dragMapDestination &&
+                widget.destinationLocation != null) {
+              _onCameraCenterChanged(widget.destinationLocation!);
+            }
+          });
+        }
       }
     }
   }
 
   void _onCameraCenterChanged(LatLng target) async {
+    final token = ++_geocodeToken;
+    final activeTarget = target;
+
     if (widget.passengerStep == PassengerRideStep.dragMapPickup) {
-      if (_samePoint(target, widget.pickupLocation) &&
+      if (_samePoint(activeTarget, widget.pickupLocation) &&
           widget.pickupAddress.isNotEmpty) {
         return;
       }
-      widget.onPickupLocationChanged(target, '');
-      final addr = await GoogleMapsService.getAddressFromCoordinates(target);
+      widget.onPickupLocationChanged(activeTarget, '');
+      final addr =
+          await GoogleMapsService.getAddressFromCoordinates(activeTarget);
       if (mounted &&
-          widget.passengerStep == PassengerRideStep.dragMapPickup &&
-          _samePoint(target, widget.pickupLocation)) {
-        widget.onPickupLocationChanged(target, addr);
+          token == _geocodeToken &&
+          widget.passengerStep == PassengerRideStep.dragMapPickup) {
+        widget.onPickupLocationChanged(activeTarget, addr);
       }
     } else if (widget.passengerStep == PassengerRideStep.dragMapDestination) {
       final destination = widget.destinationLocation;
       if (destination != null &&
-          _samePoint(target, destination) &&
+          _samePoint(activeTarget, destination) &&
           widget.destinationAddress.isNotEmpty) {
         return;
       }
-      widget.onDestinationLocationChanged(target, '');
-      final addr = await GoogleMapsService.getAddressFromCoordinates(target);
-      final current = widget.destinationLocation;
+      widget.onDestinationLocationChanged(activeTarget, '');
+      final addr =
+          await GoogleMapsService.getAddressFromCoordinates(activeTarget);
       if (mounted &&
-          widget.passengerStep == PassengerRideStep.dragMapDestination &&
-          current != null &&
-          _samePoint(target, current)) {
-        widget.onDestinationLocationChanged(target, addr);
+          token == _geocodeToken &&
+          widget.passengerStep == PassengerRideStep.dragMapDestination) {
+        widget.onDestinationLocationChanged(activeTarget, addr);
       }
     }
   }

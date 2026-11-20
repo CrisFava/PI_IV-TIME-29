@@ -46,9 +46,8 @@ class HomeTripModeOverlay extends ConsumerWidget {
       final error = type == RideStopType.pickup
           ? await actions.board(ride.id, passengerId)
           : await actions.arrive(ride.id, passengerId);
-      if (!context.mounted) return;
       if (error != null) {
-        onError(error);
+        if (context.mounted) onError(error);
         return;
       }
     }

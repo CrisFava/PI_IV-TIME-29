@@ -22,8 +22,9 @@ class TripLayersCalculator {
     final polyline = ride.itineraryPolyline;
     if (polyline == null || polyline.isEmpty) return null;
     if (_itineraryPolylineCache != polyline) {
+      final points = GoogleMapsService.decodePolyline(polyline);
       _itineraryPolylineCache = polyline;
-      _itineraryPointsCache = GoogleMapsService.decodePolyline(polyline);
+      _itineraryPointsCache = points;
     }
     return _itineraryPointsCache;
   }
