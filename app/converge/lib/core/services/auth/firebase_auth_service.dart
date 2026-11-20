@@ -18,10 +18,24 @@ class FirebaseAuthService implements AuthService {
   AuthUser? get currentUser => _map(_auth.currentUser);
 
   @override
-  Future<String?> getIdToken({bool forceRefresh = false}) async {
+  Future<String?> getIdToken({
+    bool forceRefresh = false,
+    String? expectedUid,
+  }) async {
     final user = _auth.currentUser;
-    if (user == null) return null;
-    return _guard(() => user.getIdToken(forceRefresh));
+    if (user == null) {
+      if (expectedUid != null) throw AuthException.sessionChanged();
+      return null;
+    }
+    if (expectedUid != null && user.uid != expectedUid) {
+      throw AuthException.sessionChanged();
+    }
+    final token = await _guard(() => user.getIdToken(forceRefresh));
+    // A conta pode ter mudado enquanto o token era obtido.
+    if (expectedUid != null && _auth.currentUser?.uid != expectedUid) {
+      throw AuthException.sessionChanged();
+    }
+    return token;
   }
 
   @override

@@ -2,6 +2,7 @@
 
 import 'package:dio/dio.dart';
 
+import '../../services/auth/auth_exception.dart';
 import '../api_exception.dart';
 
 /// Converte qualquer falha HTTP em [ApiException], disponível em
@@ -9,6 +10,8 @@ import '../api_exception.dart';
 class ErrorInterceptor extends Interceptor {
   @override
   void onError(DioException err, ErrorInterceptorHandler handler) {
+    // Falhas de identidade (ex.: sessão trocada) seguem como AuthException.
+    if (err.error is AuthException) return handler.next(err);
     handler.next(err.copyWith(error: _toApiException(err)));
   }
 

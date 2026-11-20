@@ -138,6 +138,7 @@ class AuthController extends AsyncNotifier<AuthSession> {
         photoUrl: latestUser.photoUrl,
         pixKey: pixKey,
         pixKeyType: pixKeyType,
+        expectedFirebaseUid: user.firebaseUid,
       ),
     );
   }
@@ -169,6 +170,7 @@ class AuthController extends AsyncNotifier<AuthSession> {
         photoUrl: latestUser.photoUrl,
         pixKey: hasNewPix ? pixKey.trim() : latestUser.pixKey,
         pixKeyType: hasNewPix ? pixKeyType : latestUser.pixKeyType,
+        expectedFirebaseUid: user.firebaseUid,
       ),
     );
   }
@@ -210,13 +212,16 @@ class AuthController extends AsyncNotifier<AuthSession> {
         photoUrl: downloadUrl,
         pixKey: latestUser.pixKey,
         pixKeyType: latestUser.pixKeyType,
+        expectedFirebaseUid: startedUser.firebaseUid,
       ),
     );
   }
 
   /// Executa uma mutação de perfil de forma serializada, garantindo que a
   /// sessão ativa antes e depois da chamada pertença à mesma conta que iniciou
-  /// a operação.
+  /// a operação. A própria requisição deve ser vinculada a
+  /// [expectedFirebaseUid] (o `AuthInterceptor` não a envia com token de outra
+  /// conta).
   Future<UserModel> _runProfileMutation({
     required String expectedUserId,
     required String expectedFirebaseUid,
@@ -259,10 +264,7 @@ class AuthController extends AsyncNotifier<AuthSession> {
         latest.user.id != expectedUserId ||
         latest.user.firebaseUid != expectedFirebaseUid ||
         authUid != expectedFirebaseUid) {
-      throw const AuthException(
-        'session-changed',
-        'Sua sessão mudou enquanto o perfil era salvo. Confira os dados e tente de novo.',
-      );
+      throw AuthException.sessionChanged();
     }
     return latest.user;
   }

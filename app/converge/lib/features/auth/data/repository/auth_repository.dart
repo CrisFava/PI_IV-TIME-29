@@ -18,12 +18,16 @@ abstract class AuthRepository {
   Future<UserModel> createUser(CreateUserRequest request);
 
   /// Atualiza dados de perfil do usuário autenticado (`PUT /users/me`).
+  ///
+  /// Com [expectedFirebaseUid], a requisição só é enviada com um token dessa
+  /// conta; caso contrário lança `AuthException('session-changed')`.
   Future<UserModel> updateProfile({
     required String name,
     required String phone,
     String? photoUrl,
     String? pixKey,
     PixKeyType? pixKeyType,
+    String? expectedFirebaseUid,
   });
 
   /// Envia dados da Carteira de Motorista (`POST /users/me/driver-license`).

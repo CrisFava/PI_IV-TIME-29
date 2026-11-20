@@ -52,6 +52,7 @@ class FakeAuthRepository implements AuthRepository {
     String? photoUrl,
     String? pixKey,
     PixKeyType? pixKeyType,
+    String? expectedFirebaseUid,
   }) async {
     final error = updateProfileError;
     if (error != null) throw error;

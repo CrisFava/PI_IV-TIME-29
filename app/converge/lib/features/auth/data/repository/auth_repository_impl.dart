@@ -6,6 +6,8 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../../../../core/network/api_response.dart';
 import '../../../../core/network/dio_client.dart';
 import '../../../../core/network/api_exception_x.dart';
+import '../../../../core/network/interceptors/auth_interceptor.dart';
+import '../../../../core/services/auth/auth_exception.dart';
 import '../models/cpf_validation_result.dart';
 import '../models/create_user_request.dart';
 import '../models/driver_license_input.dart';
@@ -61,6 +63,7 @@ class AuthRepositoryImpl implements AuthRepository {
     String? photoUrl,
     String? pixKey,
     PixKeyType? pixKeyType,
+    String? expectedFirebaseUid,
   }) async {
     try {
       final response = await _dio.put<dynamic>(
@@ -72,6 +75,9 @@ class AuthRepositoryImpl implements AuthRepository {
           'pixKey': ?pixKey,
           'pixKeyType': ?pixKeyType?.toJson(),
         },
+        options: Options(
+          extra: {AuthInterceptor.expectedUidKey: ?expectedFirebaseUid},
+        ),
       );
       return unwrapApiResponse<UserModel>(
         response.data,
@@ -79,6 +85,8 @@ class AuthRepositoryImpl implements AuthRepository {
         status: response.statusCode ?? 200,
       );
     } on DioException catch (e) {
+      final cause = e.error;
+      if (cause is AuthException) throw cause;
       throw e.toApiException();
     }
   }

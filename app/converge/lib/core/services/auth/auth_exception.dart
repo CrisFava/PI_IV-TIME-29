@@ -7,6 +7,12 @@ class AuthException implements Exception {
 
   const AuthException(this.code, this.message);
 
+  /// A conta autenticada mudou durante uma operação vinculada a outra conta.
+  factory AuthException.sessionChanged() => const AuthException(
+    'session-changed',
+    'Sua sessão mudou enquanto o perfil era salvo. Confira os dados e tente de novo.',
+  );
+
   @override
   String toString() => 'AuthException($code): $message';
 }

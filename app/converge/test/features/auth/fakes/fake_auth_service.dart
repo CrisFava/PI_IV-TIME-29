@@ -31,8 +31,16 @@ class FakeAuthService implements AuthService {
   AuthUser? get currentUser => _current;
 
   @override
-  Future<String?> getIdToken({bool forceRefresh = false}) async =>
-      _current == null ? null : 'token';
+  Future<String?> getIdToken({
+    bool forceRefresh = false,
+    String? expectedUid,
+  }) async {
+    final current = _current;
+    if (expectedUid != null && current?.uid != expectedUid) {
+      throw AuthException.sessionChanged();
+    }
+    return current == null ? null : 'token';
+  }
 
   @override
   Future<AuthUser> signIn({
