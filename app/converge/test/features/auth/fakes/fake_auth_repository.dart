@@ -108,4 +108,14 @@ class FakeAuthRepository implements AuthRepository {
     if (error != null) throw error;
     return cpfValidationResult;
   }
+
+  bool emailAvailable = true;
+  ApiException? emailAvailabilityError;
+
+  @override
+  Future<bool> isEmailAvailable(String email) async {
+    final error = emailAvailabilityError;
+    if (error != null) throw error;
+    return emailAvailable;
+  }
 }

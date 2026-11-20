@@ -140,4 +140,21 @@ class AuthRepositoryImpl implements AuthRepository {
       throw e.toApiException();
     }
   }
+
+  @override
+  Future<bool> isEmailAvailable(String email) async {
+    try {
+      final response = await _dio.get<dynamic>(
+        AuthEndpoints.emailAvailability,
+        queryParameters: {'email': email.trim()},
+      );
+      return unwrapApiResponse<bool>(
+        response.data,
+        (json) => json['available'] as bool? ?? false,
+        status: response.statusCode ?? 200,
+      );
+    } on DioException catch (e) {
+      throw e.toApiException();
+    }
+  }
 }

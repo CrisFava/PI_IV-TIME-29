@@ -12,4 +12,5 @@ abstract class AuthEndpoints {
   static const String becomeDriver = '/users/me/driver';
   static const String submitDriverLicense = '/users/me/driver-license';
   static const String validateCpf = '/users/validate-cpf';
+  static const String emailAvailability = '/users/email-availability';
 }

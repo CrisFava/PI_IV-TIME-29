@@ -34,4 +34,7 @@ abstract class AuthRepository {
 
   /// Valida o CPF através do Socket Server TCP via backend (`POST /users/validate-cpf`).
   Future<CpfValidationResult> validateCpf(String cpf);
+
+  /// Verifica se o e-mail já está cadastrado antes de avançar no formulário (`GET /users/email-availability`).
+  Future<bool> isEmailAvailable(String email);
 }

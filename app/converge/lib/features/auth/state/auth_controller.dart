@@ -239,6 +239,10 @@ class AuthController extends AsyncNotifier<AuthSession> {
   Future<CpfValidationResult> validateCpf(String cpf) =>
       _repository.validateCpf(cpf);
 
+  /// Verifica se o e-mail ainda está disponível para cadastro.
+  Future<bool> isEmailAvailable(String email) =>
+      _repository.isEmailAvailable(email);
+
   Future<void> sendPasswordResetEmail(String email) =>
       _auth.sendPasswordResetEmail(email);
 
