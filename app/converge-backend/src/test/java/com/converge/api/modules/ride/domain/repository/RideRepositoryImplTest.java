@@ -27,6 +27,7 @@ import java.time.DayOfWeek;
 import java.time.LocalDateTime;
 import java.util.Optional;
 import java.util.Set;
+import java.util.stream.Stream;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.mockito.ArgumentMatchers.any;
@@ -276,5 +277,28 @@ class RideRepositoryImplTest {
         assertThat(queryStr).contains("overdueAt=null");
         assertThat(queryStr).contains("$gte").contains("$lte");
         assertThat(queryStr).contains("role=PASSENGER");
+    }
+
+    @Test
+    @DisplayName("streamRidesWithReputationFactsSince deve cobrir com $or cada data usada pela janela")
+    void shouldBuildOrQueryCoveringEveryReputationFactDate() {
+        LocalDateTime since = LocalDateTime.of(2026, 8, 22, 12, 0);
+        Stream<Ride> expected = Stream.of(sampleRide());
+        when(mongoTemplate.stream(any(Query.class), eq(Ride.class))).thenReturn(expected);
+
+        Stream<Ride> result = repository.streamRidesWithReputationFactsSince(since);
+
+        assertThat(result).isSameAs(expected);
+        ArgumentCaptor<Query> queryCaptor = ArgumentCaptor.forClass(Query.class);
+        verify(mongoTemplate).stream(queryCaptor.capture(), eq(Ride.class));
+        Document query = queryCaptor.getValue().getQueryObject();
+        assertThat(query.keySet()).containsExactly("$or");
+        assertThat(query.getList("$or", Document.class)).hasSize(6);
+        String queryStr = query.toString();
+        assertThat(queryStr).contains("completedAt=", "startedAt=", "cancelledAt=", "overdueAt=");
+        assertThat(queryStr).contains("status=COMPLETED", "status=NO_SHOW");
+        assertThat(queryStr).contains("driverCancellationPenalized=true", "lateCancellation=true",
+                "removedByDriver=true");
+        assertThat(queryStr).contains("$gte");
     }
 }

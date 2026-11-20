@@ -137,11 +137,11 @@ A reputação é separada por papel (`reputation.driver` e `reputation.passenger
 | Campo | Quem grava | Quando |
 |---|---|---|
 | `averageRating`, `totalReviews` | `CreateReviewUseCase` (módulo `review`), pelo caso de uso `RecordReviewRatingUseCase` (módulo `user`) | Logo depois de salvar uma avaliação. Só o papel avaliado (`reviewedRole`: `DRIVER` grava em `reputation.driver`, `PASSENGER` em `reputation.passenger`) |
-| `window.completedRides` | `RideCompletedReputationListener` (módulo `user`), pelo caso de uso `RecordCompletedRideUseCase` | Quando uma viagem é concluída: +1 para o motorista (`driver.window`) e +1 para cada passageiro efetivo (`passenger.window`) |
-| `window.driverInitiatedCancellations`, `window.lateCancellations`, `window.noShows` | `RecordReputationPenaltyUseCase` | Cancelamento do motorista, cancelamento tardio do passageiro e ausência |
-| `level`, `calculatedAt` | Os mesmos casos de uso acima | A cada gravação de média, de viagem concluída ou de penalidade |
-| `window.overdueRides` | `RecordReputationPenaltyUseCase` (chamado por `RecordOverduePaymentUseCase`) | +1 a cada dívida de pagamento registrada. **Nunca diminui**, nem quando a dívida é paga |
-| `window.delays`, `window.substantiatedReports` | **Nenhum código grava** | Ficam em 0 (ver "Ainda não implementado") |
+| `window.completedRides` | `RideCompletedReputationListener` (módulo `user`), pelo caso de uso `RecordCompletedRideUseCase`. Reconstruído pelo job semanal | Quando uma viagem é concluída: +1 para o motorista (`driver.window`) e +1 para cada passageiro efetivo (`passenger.window`). Toda semana o job recalcula o valor pelas viagens da janela |
+| `window.driverInitiatedCancellations`, `window.lateCancellations`, `window.noShows` | `RecordReputationPenaltyUseCase`. Reconstruídos pelo job semanal | Cancelamento do motorista, cancelamento tardio do passageiro e ausência. Toda semana o job recalcula os valores pelas viagens da janela |
+| `level`, `calculatedAt` | Os mesmos casos de uso acima e o job semanal | A cada gravação de média, de viagem concluída ou de penalidade, e quando o job muda a janela |
+| `window.overdueRides` | `RecordReputationPenaltyUseCase` (chamado por `RecordOverduePaymentUseCase`). Reconstruído pelo job semanal | +1 a cada dívida de pagamento registrada. Não diminui com o pagamento: só sai da janela depois de 90 dias |
+| `window.delays`, `window.substantiatedReports` | **Nenhum código grava** | Ficam em 0 (ver "Ainda não implementado"). O job semanal **não** mexe neles |
 
 **Média de avaliação (`averageRating`, `totalReviews`):**
 - A média e o total são **recalculados a partir de todas as avaliações recebidas no papel** (índice `reviewedId + reviewedRole` de `reviews`), nunca somados de forma incremental. Duas avaliações salvas ao mesmo tempo não se perdem: cada recálculo roda depois do próprio `save` e relê a coleção.
@@ -164,18 +164,41 @@ A reputação é separada por papel (`reputation.driver` e `reputation.passenger
 - Idempotência: não há lista de `rideId` aplicados. O listener ouve só o `RideCompletedEvent`, que o `RideCompletionPublisher` publica uma vez por viagem (só o `CompleteRideUseCase` o chama, e uma viagem só conclui uma vez). O reconciliador de indicadores **não** republica o evento, então não há recontagem.
 - Limitação: se o registro falhar, aquela viagem fica sem contagem (não há reprocessamento). Viagem sem passageiro efetivo não gera evento e não conta (RF49).
 
-**Gravação da reputação e dos selos:** os casos de uso de avaliação (`RecordReviewRatingUseCase`), de viagem concluída (`RecordCompletedRideUseCase`), de penalidade (`RecordReputationPenaltyUseCase`) e o job dos selos (`RecalculateBadgesUseCase`) gravam por **update parcial atômico**, pela porta `UserReputationWriter` (implementada por `MongoUserReputationWriter`, com `MongoTemplate.updateFirst` e filtro por `_id`). O `$set` grava só `reputation.driver` ou `reputation.passenger`, junto com `updatedAt`. Os selos usam `$push` (só se o selo ainda não existe) e `$pull` em `badges`. O documento inteiro do usuário não é regravado, então uma avaliação, uma penalidade e o job dos selos simultâneos não sobrescrevem o outro papel, os selos nem os demais campos do usuário. Limite: dentro do mesmo papel, duas gravações simultâneas ainda partem de uma leitura anterior e a última vence.
+**Gravação da reputação e dos selos:** os casos de uso de avaliação (`RecordReviewRatingUseCase`), de viagem concluída (`RecordCompletedRideUseCase`), de penalidade (`RecordReputationPenaltyUseCase`) e o job dos selos (`RecalculateBadgesUseCase`) gravam por **update parcial atômico**, pela porta `UserReputationWriter` (implementada por `MongoUserReputationWriter`, com `MongoTemplate.updateFirst` e filtro por `_id`). Penalidade e viagem concluída gravam só `window`, `level` e `calculatedAt` do papel (mais `updatedAt`), sem tocar em `averageRating` e `totalReviews`, para não desfazer uma avaliação gravada ao mesmo tempo. O job da janela de 90 dias faz o mesmo com `saveDriverWindow` e `savePassengerWindow`, com filtro exigindo que `reputation.<papel>` já exista. A avaliação usa `saveDriverRating`/`savePassengerRating`: `$set` só em `averageRating`, `totalReviews`, `level` e `calculatedAt` do papel, e só se o `totalReviews` gravado estiver ausente ou for menor que o novo. Os selos usam `$push` (só se o selo ainda não existe) e `$pull` em `badges`. O documento inteiro do usuário não é regravado, então uma avaliação, uma penalidade e o job dos selos simultâneos não sobrescrevem o outro papel, os selos nem os demais campos do usuário. Duas avaliações simultâneas no mesmo papel não se sobrescrevem: a nota calculada com menos avaliações que a já gravada é ignorada. Limites: o `level` usa a janela lida antes da gravação, então uma penalidade simultânea pode deixá-lo defasado até a próxima gravação de reputação; e duas gravações de janela no mesmo papel (por exemplo, uma penalidade e o job) partem de uma leitura anterior, e a última vence até o próximo job.
 
-**Janela de 90 dias não é deslizante.** Os contadores de `window` **acumulam desde o início** e nunca são zerados nem descontados por data. Os limites "nos últimos 90 dias" das tabelas abaixo valem, na prática, sobre o total acumulado. A janela deslizante fica como evolução.
+**Janela deslizante de 90 dias (implementado).** Uma vez por semana, antes de avaliar os selos, o job (`RecalculateBadgesUseCase`) **recalcula os contadores de `window` de cada usuário** a partir dos fatos datados das viagens (`rides`) em `[agora − N dias, agora]`. O `N` vem da propriedade `converge.user.reputation-window-days` (padrão **90**; valor menor que 1 volta para 90). Um fato com exatamente `N` dias ainda conta. Depois o job recalcula o `level` e grava só `window`, `level` e `calculatedAt` do papel (ver "Gravação da reputação e dos selos"). Quem não tem nenhum fato na janela volta a 0, então penalidades antigas deixam de pesar e o selo `TRUST` pode voltar.
+
+A contagem fica no módulo `ride` (`CountReputationFactsUseCase`). O módulo `user` a consulta pela porta `ReputationWindowGateway` (implementada por `RideModuleReputationWindowGateway`) e não lê `rides` diretamente. Uma única consulta lê as viagens com algum fato dentro da janela (`stream`, sem carregar tudo na memória) e a contagem por usuário é feita em Java (`ReputationFactsCounter`), com as mesmas regras dos incrementos em tempo real:
+
+| Contador | Fato nas viagens | Data usada |
+|---|---|---|
+| `driver.window.completedRides` | Viagem `COMPLETED` com ao menos um passageiro `COMPLETED` (RF49). 1 por viagem | `completedAt` |
+| `passenger.window.completedRides` | Participação `PASSENGER` com status `COMPLETED` em viagem `COMPLETED`. 1 por participação | `completedAt` |
+| `passenger.window.lateCancellations` | Participação `PASSENGER` `CANCELLED` com `lateCancellation = true` | `cancelledAt` da participação |
+| `passenger.window.noShows` | Participação `PASSENGER` com status `NO_SHOW` | `startedAt` da viagem |
+| `driver.window.driverInitiatedCancellations` | Viagem com `driverCancellationPenalized = true` (1 por viagem) e participação com `removedByDriver = true`, quando o motorista remove um passageiro já confirmado (1 por participação). Recusar um pedido pendente não conta | `cancelledAt` da viagem e `cancelledAt` da participação |
+| `passenger.window.overdueRides` | Participação `PASSENGER` com `overdueAt` preenchido (dívida por prazo ou denúncia `NON_PAYMENT`, mesmo depois de paga) | `overdueAt` |
+
+**Contadores que continuam acumulados:** `window.substantiatedReports` e `window.delays` não são recalculados (nenhum código os grava, ver abaixo). O job copia o valor guardado.
+
+**Os incrementos em tempo real continuam.** Entre uma execução e outra do job os contadores seguem somando como antes, então servem de prévia até a próxima segunda-feira, quando o job reescreve os valores. Se o job gravar a janela no mesmo instante de um incremento em tempo real, a última gravação vence e o job seguinte corrige.
+
+**Falhas:** se a consulta das viagens falhar, o job inteiro para (o `BadgeRecalculationScheduler` registra o erro), porque avaliar selos com a janela velha, ou zerar todo mundo por engano, seria pior que pular a semana. Falha em um único usuário não para os demais.
+
+**Custo:** uma passada por semana nas viagens dos últimos N dias. Nenhum índice novo foi criado.
+
+**Limitações conhecidas da janela:**
+- `noShows` usa o `startedAt` da viagem como data, porque a participação não guarda a data da ausência. A diferença para a hora real é de poucas horas.
+- Os campos `cancelledAt` e `driverCancellationPenalized` da viagem e `removedByDriver` da participação só existem a partir da versão 1.9.0. **Cancelamentos do motorista e remoções de passageiro confirmado gravados antes dessa mudança não entram na janela**: no primeiro job, quem tinha essas penalidades antigas volta a 0 em `driverInitiatedCancellations`.
+- Se um incremento em tempo real acontecer entre a leitura das contagens (feita uma vez, no início do job) e a gravação do usuário, o `$set` da janela o sobrescreve. O valor volta a ficar certo no job da semana seguinte.
 
 **Ainda não implementado:**
 - Moderação das denúncias: `window.substantiatedReports` continua em 0 porque nenhuma denúncia chega a `RESOLVED` (ver coleção `reports`).
 - `window.delays` não é incrementado por nenhum fluxo.
-- Janela deslizante de 90 dias.
 
 ### Regras de Negócio — Selo de Confiança
 
-O selo é recalculado **uma vez por semana** por um job (ver "Job semanal dos selos" abaixo). A tabela abaixo usa o texto "90 dias", mas a janela **não é deslizante**: os contadores acumulam (ver "Reputação").
+O selo é recalculado **uma vez por semana** por um job (ver "Job semanal dos selos" abaixo). Antes de avaliar o selo, o job recalcula a janela de 90 dias de cada usuário a partir das viagens (ver "Reputação"). Os limites "nos últimos 90 dias" valem sobre essa janela; `substantiatedReports` continua acumulado.
 
 **Motorista — critérios para ganhar `TRUST`:**
 
@@ -218,8 +241,8 @@ O selo `SUSTAINABILITY` reconhece o impacto ambiental acumulado do usuário. É 
 ### Job semanal dos selos (RF69)
 
 - **Agendamento:** `BadgeRecalculationScheduler`, toda **segunda-feira às 03h**, fuso `America/Sao_Paulo`. A expressão cron pode ser trocada pela propriedade `converge.user.badge-recalculation-cron`.
-- **Caso de uso:** `RecalculateBadgesUseCase` percorre os usuários **em páginas de 100**, ordenadas por `_id`, e para cada um concede ou revoga `TRUST` e `SUSTAINABILITY`.
-- **Gravação:** só grava quando algum selo muda. Antes de gravar, relê o usuário (a página pode ter ficado velha) e altera só o selo que mudou, por `$push`/`$pull` em `badges`, sem regravar o usuário inteiro. A data `grantedAt` original é preservada em um selo que continua válido.
+- **Caso de uso:** `RecalculateBadgesUseCase` primeiro pede ao módulo `ride`, uma vez, os fatos da janela de todos os usuários (propriedade `converge.user.reputation-window-days`, padrão 90). Depois percorre os usuários **em páginas de 100**, ordenadas por `_id`. Para cada um, recalcula `window` e `level` (grava só se mudaram) e só então concede ou revoga `TRUST` e `SUSTAINABILITY`.
+- **Gravação:** a janela só é regravada quando ela ou o `level` mudam. Os selos só são gravados quando algum selo muda. Antes de gravar, relê o usuário (a página pode ter ficado velha) e altera só o selo que mudou, por `$push`/`$pull` em `badges`, sem regravar o usuário inteiro. A data `grantedAt` original é preservada em um selo que continua válido.
 - **Falha por usuário:** um erro em um usuário (por exemplo, ao ler o CO₂) é contado e logado, os selos dele **não** são revogados e o job segue com os demais.
 - **Custo:** uma consulta de indicadores por usuário. Aceitável no volume atual do MVP.
 - **Sem auditoria:** `AuditAction` não tem ação de selo e nenhuma foi criada. Concessão e revogação não geram linha em `audit_logs`.
@@ -248,7 +271,7 @@ As duas formas não se misturam: enquanto a cobrança está em aberto, só o pra
 | limite (`converge.payment.overdue-limit`, padrão 2) ou mais | `BLOCKED` |
 
 - Ao bloquear: `isDefaulter = true` e `defaulterSince` recebe a data (só se ainda estava vazio).
-- Cada dívida também soma 1 em `reputation.passenger.window.overdueRides` (`level` vira `LOW` e o selo `TRUST` é revogado). Esse contador **nunca diminui**.
+- Cada dívida também soma 1 em `reputation.passenger.window.overdueRides` (`level` vira `LOW` e o selo `TRUST` é revogado). Pagar a dívida não diminui esse contador: ele só sai da janela depois de 90 dias, quando o job semanal o recalcula.
 - Enquanto `BLOCKED`, o usuário não aparece em combinações, não confirma novas caronas e não reserva vaga em vínculos recorrentes.
 - **Regularização só ocorre quando TODAS as dívidas por prazo estão pagas.** "Já paguei" de uma cobrança vencida tira 1 de `overdueRidesCount`; só quando chega a 0 voltam `isDefaulter = false`, `defaulterSince = null` e `paymentStanding = UP_TO_DATE`. Se o passo de regularização falhar, o pagamento continua valendo e o erro vai para o log.
 
@@ -482,6 +505,8 @@ Quando `active = false` (conta suspensa ou excluída):
   "status": "AWAITING_CONFIRMATION | CONFIRMED | IN_PROGRESS | COMPLETED | CANCELLED",
   "cancellationReason": "String | null",
   "cancelledBy": "String | null (ref: users._id)",
+  "cancelledAt": "ISODate | null (nulo em viagens não canceladas e nas canceladas antes da versão 1.9.0)",
+  "driverCancellationPenalized": "Boolean (default: false; true só quando o motorista cancelou com passageiro confirmado)",
   "chatRoomId": "String | null (ref. sala no Firebase Realtime Database)",
   "costs": {
     "routeDistanceKm": "Double",
@@ -521,6 +546,7 @@ Quando `active = false` (conta suspensa ou excluída):
       "rejectionReason": "String | null",
       "cancellationReason": "String | null",
       "lateCancellation": "Boolean (default: false)",
+      "removedByDriver": "Boolean (default: false)",
       "estimatedAmount": "Decimal128",
       "maxAmount": "Decimal128",
       "finalAmount": "Decimal128 | null",

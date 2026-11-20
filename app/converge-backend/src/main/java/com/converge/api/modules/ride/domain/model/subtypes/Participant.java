@@ -64,6 +64,9 @@ public class Participant {
 
     private boolean lateCancellation = false;
 
+    // O motorista removeu este passageiro já confirmado, o que conta na reputação dele
+    private boolean removedByDriver = false;
+
     @NotNull
     @PositiveOrZero
     private BigDecimal estimatedAmount;
@@ -245,6 +248,11 @@ public class Participant {
         if (!late) {
             this.paymentStatus = ParticipantPaymentStatus.NOT_APPLICABLE;
         }
+    }
+
+    public void removeByDriver(@Nullable String reason, LocalDateTime now) {
+        cancel(reason, false, now);
+        this.removedByDriver = true;
     }
 
     public void updateEstimatedAmount(BigDecimal candidateAmount, LocalDateTime now) {

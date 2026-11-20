@@ -49,6 +49,11 @@ public record PassengerReputation(
         return new PassengerReputation(computeLevel(updatedWindow, averageRating), averageRating, totalReviews, updatedWindow, now);
     }
 
+    // Troca a janela pela recalculada, mantém a média e as avaliações e recalcula o level.
+    public PassengerReputation withWindow(PassengerWindow newWindow, LocalDateTime now) {
+        return new PassengerReputation(computeLevel(newWindow, averageRating), averageRating, totalReviews, newWindow, now);
+    }
+
     // Grava a média e a quantidade de avaliações já calculadas e recalcula o level.
     public PassengerReputation withRating(double newAverage, int newTotal, LocalDateTime now) {
         PassengerWindow currentWindow = baseWindow();
