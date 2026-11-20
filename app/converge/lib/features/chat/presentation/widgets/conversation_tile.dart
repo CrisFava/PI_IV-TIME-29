@@ -62,8 +62,10 @@ class ConversationTile extends StatelessWidget {
                       children: [
                         Expanded(
                           child: Text(
-                            '${conversation.otherPartyName} '
-                            '(${conversation.viewerIsDriver ? 'Passageiro' : 'Motorista'})',
+                            // Grupo da viagem: o motorista vê os passageiros; o passageiro, o motorista
+                            conversation.viewerIsDriver
+                                ? 'Grupo: ${conversation.otherPartyName}'
+                                : 'Carona com ${conversation.otherPartyName}',
                             maxLines: 1,
                             overflow: TextOverflow.ellipsis,
                             style: const TextStyle(

@@ -20,10 +20,11 @@ import '../widgets/chat_payment_panel.dart';
 import '../widgets/chat_ride_panel.dart';
 import '../widgets/chat_scaffold.dart';
 
-/// Conversa em tempo real entre o motorista e um passageiro de uma viagem (RF27).
+/// Conversa em grupo da viagem (RF27): o motorista e os passageiros confirmados.
 ///
 /// A conversa só abre depois que o motorista aceita o passageiro. Além das
-/// mensagens, a tela concentra o pagamento e o encerramento da viagem.
+/// mensagens, a tela mostra a viagem e, para o passageiro, o próprio pagamento
+/// (as cobranças não vão para o grupo).
 class ChatPage extends ConsumerStatefulWidget {
   final String rideId;
   final String passengerId;
@@ -66,9 +67,8 @@ class _ChatPageState extends ConsumerState<ChatPage> {
       data: (ride) {
         final conversation = viewer == null
             ? null
-            : ChatConversation.ofRide(ride, viewer.id)
-                  .where((c) => c.thread.passengerId == widget.passengerId)
-                  .firstOrNull;
+            // Uma conversa por viagem: o grupo, seja quem for o passageiro do link
+            : ChatConversation.ofRide(ride, viewer.id).firstOrNull;
 
         if (viewer == null || conversation == null) {
           return const ChatScaffold(
@@ -103,12 +103,13 @@ class _ChatPageState extends ConsumerState<ChatPage> {
       markRead();
     }
     final busy = ref.watch(chatActionsProvider(thread)).isLoading;
-    final otherPartyId = conversation.viewerIsDriver
-        ? thread.passengerId
-        : conversation.ride.driverId;
-    final otherPartyBlocked = ref
-        .watch(blockedUserIdsProvider)
-        .contains(otherPartyId);
+    // O passageiro pode bloquear ou denunciar o motorista por aqui; o motorista faz
+    // isso com cada passageiro na carona
+    final driverId = conversation.ride.driverId;
+    final otherPartyBlocked =
+        !conversation.viewerIsDriver &&
+        ref.watch(blockedUserIdsProvider).contains(driverId);
+    final members = conversation.ride.passengersWithSeat.length + 1;
 
     // Um aviso do outro participante (cobrança, pagamento, início ou fim da
     // viagem) significa que o estado mudou na API: recarrega o que a tela mostra.
@@ -140,19 +141,25 @@ class _ChatPageState extends ConsumerState<ChatPage> {
     });
 
     return ChatScaffold(
-      title: conversation.otherPartyName,
-      subtitle: conversation.viewerIsDriver ? 'Passageiro' : 'Motorista',
+      title: conversation.viewerIsDriver
+          ? 'Grupo da carona'
+          : 'Carona com ${conversation.ride.driverName}',
+      subtitle:
+          '$members pessoas: ${[conversation.ride.driverName, for (final p in conversation.ride.passengersWithSeat) p.displayName].join(', ')}',
       actions: [
-        UserSafetyMenu(
-          userId: otherPartyId,
-          userName: conversation.otherPartyName,
-          rideId: thread.rideId,
-        ),
+        if (!conversation.viewerIsDriver)
+          UserSafetyMenu(
+            userId: driverId,
+            userName: conversation.ride.driverName,
+            rideId: thread.rideId,
+          ),
       ],
       body: Column(
         children: [
           ChatRidePanel(conversation: conversation),
-          ChatPaymentPanel(conversation: conversation),
+          // O pagamento é de cada passageiro: só ele vê o dele
+          if (!conversation.viewerIsDriver)
+            ChatPaymentPanel(conversation: conversation),
           Expanded(
             child: messages.when(
               loading: () => const Center(

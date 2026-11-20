@@ -3,7 +3,6 @@
 import 'dart:async';
 
 import 'package:converge/features/chat/data/models/chat_message_type.dart';
-import 'package:converge/core/utils/currency_formatter.dart';
 import 'package:converge/features/chat/data/models/chat_thread_ref.dart';
 import 'package:converge/features/chat/data/repository/firebase_chat_repository.dart';
 import 'package:converge/features/chat/state/chat_providers.dart';
@@ -101,7 +100,7 @@ void main() {
     },
   );
 
-  test('"Chegou" confirma a chegada e avisa só aquele passageiro da cobrança no chat', () async {
+  test('"Chegou" confirma a chegada sem mandar a cobrança para o grupo', () async {
     final rides = FakeSeatRideRepository(
       myRides: [fakeRide(status: 'IN_PROGRESS')],
     );
@@ -118,9 +117,8 @@ void main() {
 
     expect(error, isNull);
     expect(rides.calls, contains('arrive:$fakeRideId:$fakePassengerId'));
-    final notice = chat.messagesOf(thread).single;
-    expect(notice.type, ChatMessageType.paymentRequest);
-    expect(notice.text, startsWith('Você chegou.'));
+    // Cada passageiro vê a própria cobrança na tela de pagamento, não no grupo
+    expect(chat.messagesOf(thread), isEmpty);
   });
 
   test(
@@ -151,7 +149,7 @@ void main() {
     },
   );
 
-  test('chegada recusada não envia cobrança e permite tentar novamente', () async {
+  test('chegada recusada permite tentar novamente', () async {
     final rides = FakeSeatRideRepository()
       ..failNextWith = 'Passageiro não confirmado.';
     final container = containerWith(rides);
@@ -164,7 +162,6 @@ void main() {
     expect(chat.messagesOf(thread), isEmpty);
     expect(container.read(driverRideActionsProvider), isEmpty);
     expect(await actions.arrive(fakeRideId, fakePassengerId), isNull);
-    expect(chat.messagesOf(thread), hasLength(1));
   });
 
   test('falha no chat não transforma chegada gravada em erro', () async {
@@ -177,37 +174,6 @@ void main() {
     expect(rides.calls.where((call) => call.startsWith('arrive:')), hasLength(1));
     expect(container.read(driverRideActionsProvider), isEmpty);
   });
-
-  for (final amount in <double?>[12.5, null]) {
-    test('aviso de chegada usa valor final $amount devolvido pela API', () async {
-      final rides = _ControlledArrivalRepository();
-      final container = containerWith(rides);
-      final result = container.read(driverRideActionsProvider.notifier)
-          .arrive(fakeRideId, fakePassengerId);
-      rides.arrival.complete(fakeRide(
-        status: 'IN_PROGRESS',
-        passengerStatus: 'CANCELLED',
-        extraParticipants: [
-          {
-            'userId': fakePassengerId,
-            'role': 'PASSENGER',
-            'status': 'COMPLETED',
-            'estimatedAmount': 20,
-            'finalAmount': amount,
-          },
-        ],
-      ));
-
-      expect(await result, isNull);
-      final notice = chat.messagesOf(const ChatThreadRef(
-        chatRoomId: 'ride_ride-1', rideId: fakeRideId, driverId: fakeDriverId, passengerId: fakePassengerId,
-      )).single;
-      expect(notice.amount, amount);
-      expect(notice.text, amount == null
-          ? 'Você chegou. A cobrança da carona foi enviada.'
-          : 'Você chegou. A cobrança de ${CurrencyFormatter.format(amount)} foi enviada.');
-    });
-  }
 
   test('duplo toque em Chegou não cobra duas vezes', () async {
     final rides = _ControlledArrivalRepository();

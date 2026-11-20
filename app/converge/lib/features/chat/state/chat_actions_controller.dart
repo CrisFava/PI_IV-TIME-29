@@ -72,15 +72,10 @@ class ChatActionsController extends Notifier<AsyncValue<void>> {
     ref.invalidate(myRidesProvider);
   }
 
-  /// Avisa todos os passageiros com vaga, cada um na sua conversa com o motorista.
+  /// Avisa todos no grupo da viagem.
   Future<void> _announce(RideModel ride, String text) => ref
       .read(rideChatAnnouncerProvider)
-      .announce(
-        ride,
-        text,
-        chatRoomId: thread.chatRoomId,
-        alsoTo: thread.passengerId,
-      );
+      .announce(ride, text, chatRoomId: thread.chatRoomId);
 
   Future<void> _send(
     ChatThreadRef target,

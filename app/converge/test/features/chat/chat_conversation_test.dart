@@ -9,7 +9,7 @@ import '../ride/fakes/fake_ride.dart';
 
 void main() {
   group('ChatConversation.ofRide', () {
-    test('motorista tem uma conversa com cada passageiro aceito', () {
+    test('motorista tem uma conversa só, em grupo, com os passageiros aceitos', () {
       final ride = fakeRide(
         extraParticipants: [
           {
@@ -29,15 +29,9 @@ void main() {
 
       final conversations = ChatConversation.ofRide(ride, fakeDriverId);
 
-      expect(conversations.map((c) => c.thread.passengerId), [
-        fakePassengerId,
-        'passenger-2',
-      ]);
-      expect(conversations.map((c) => c.otherPartyName), [
-        'Ana Souza',
-        'Bruno Lima',
-      ]);
-      expect(conversations.every((c) => c.viewerIsDriver), isTrue);
+      final conversation = conversations.single;
+      expect(conversation.otherPartyName, 'Ana Souza, Bruno Lima');
+      expect(conversation.viewerIsDriver, isTrue);
     });
 
     test('passageiro aceito tem uma conversa com o motorista', () {
@@ -119,23 +113,22 @@ void main() {
   });
 
   group('ChatThreadRef', () {
-    test('a conversa é do par de pessoas, a mesma em todas as viagens', () {
+    test('a conversa é o grupo da viagem, a mesma para todos os passageiros', () {
       const thread = ChatThreadRef(
         chatRoomId: 'ride_abc',
         rideId: 'abc',
         driverId: 'd1',
         passengerId: 'p1',
       );
-      // Outra viagem, com os papéis trocados: continua a mesma conversa
-      const otherRide = ChatThreadRef(
-        chatRoomId: 'ride_xyz',
-        rideId: 'xyz',
-        driverId: 'p1',
-        passengerId: 'd1',
+      const otherPassenger = ChatThreadRef(
+        chatRoomId: 'ride_abc',
+        rideId: 'abc',
+        driverId: 'd1',
+        passengerId: 'p2',
       );
 
-      expect(thread.path, 'chats/pair_d1/p1');
-      expect(otherRide.path, thread.path);
+      expect(thread.path, 'chats/ride_abc/group');
+      expect(otherPassenger.path, thread.path);
       expect(thread.passenger, (rideId: 'abc', passengerId: 'p1'));
     });
   });

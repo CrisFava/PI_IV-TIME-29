@@ -33,44 +33,14 @@ class RideChatAnnouncer {
 
   RideChatAnnouncer({required this._chat, required this._viewer});
 
-  /// Manda [text] para todos os passageiros com vaga e também para [alsoTo], se houver.
+  /// Manda [text] no grupo da viagem (início e fim da viagem). As cobranças não vão
+  /// para o chat: cada passageiro vê a dele na tela de pagamento.
   Future<void> announce(
     RideModel ride,
     String text, {
     String? chatRoomId,
-    String? alsoTo,
   }) async {
     final room = chatRoomId ?? ride.chatRoomId;
-    final viewer = _viewer();
-    if (room == null || viewer == null) return;
-
-    final passengerIds = {
-      ?alsoTo,
-      for (final passenger in ride.passengersWithSeat) passenger.userId!,
-    };
-
-    for (final passengerId in passengerIds) {
-      await _send(
-        room,
-        ride.id,
-        ride.driverId,
-        passengerId,
-        viewer,
-        ChatMessageType.system,
-        text,
-      );
-    }
-  }
-
-  /// Manda [text] só para um passageiro (ex.: a cobrança de quem acabou de chegar).
-  Future<void> notifyPassenger(
-    RideModel ride,
-    String passengerId,
-    ChatMessageType type,
-    String text, {
-    double? amount,
-  }) async {
-    final room = ride.chatRoomId;
     final viewer = _viewer();
     if (room == null || viewer == null) return;
 
@@ -78,11 +48,10 @@ class RideChatAnnouncer {
       room,
       ride.id,
       ride.driverId,
-      passengerId,
+      viewer.id,
       viewer,
-      type,
+      ChatMessageType.system,
       text,
-      amount: amount,
     );
   }
 

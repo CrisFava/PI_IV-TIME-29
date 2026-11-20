@@ -4,11 +4,11 @@ import 'package:flutter/foundation.dart';
 
 import '../../../ride/data/models/ride_passenger_ref.dart';
 
-/// Identifica uma conversa entre o motorista e um passageiro.
+/// Identifica a conversa de uma viagem.
 ///
-/// A conversa é do **par de pessoas**, não da viagem: as mensagens ficam no
-/// mesmo lugar em todas as caronas entre os dois. A viagem ([rideId]) é só o
-/// contexto da tela (pagamento, início e fim da viagem).
+/// A conversa é **um grupo por viagem**: o motorista e todos os passageiros
+/// confirmados falam no mesmo lugar. [passengerId] é só o contexto de quem olha
+/// (o passageiro vê o próprio pagamento no painel); não muda o caminho.
 @immutable
 class ChatThreadRef {
   final String chatRoomId;
@@ -25,12 +25,8 @@ class ChatThreadRef {
 
   RidePassengerRef get passenger => (rideId: rideId, passengerId: passengerId);
 
-  /// Caminho da conversa no Realtime Database: o par de pessoas, em ordem
-  /// (o mesmo para os dois, seja quem for o motorista em cada viagem).
-  String get path {
-    final pair = [driverId, passengerId]..sort();
-    return 'chats/pair_${pair.first}/${pair.last}';
-  }
+  /// Caminho da conversa no Realtime Database: o grupo da sala da viagem.
+  String get path => 'chats/$chatRoomId/group';
 
   @override
   bool operator ==(Object other) =>

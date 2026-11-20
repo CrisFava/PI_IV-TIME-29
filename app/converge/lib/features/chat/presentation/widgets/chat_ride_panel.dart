@@ -69,6 +69,14 @@ class ChatRidePanel extends ConsumerWidget {
   }
 
   Widget _completed(BuildContext context, WidgetRef ref, String route) {
+    // No grupo, o motorista avalia cada passageiro na tela de avaliação da viagem
+    if (conversation.viewerIsDriver) {
+      return ChatPanelCard(
+        icon: Icons.flag_rounded,
+        title: 'Viagem concluída',
+        subtitle: route,
+      );
+    }
     final reviewedId = conversation.viewerIsDriver
         ? conversation.thread.passengerId
         : conversation.ride.driverId;
