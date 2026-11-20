@@ -86,6 +86,15 @@ abstract final class AppColors {
   static const Color driverApproachRoute = Color(
     0xFF94A3B8,
   ); // Cinza suave para trajeto do motorista
+  static const Color routeUpcoming = Color(
+    0xFF94A3B8,
+  ); // Trechos da viagem que ainda vão ser feitos (o atual é o primary)
+  static const Color stopMarkerLater = Color(
+    0xFF64748B,
+  ); // Bandeira das paradas depois da próxima
+  static const Color mapMarkerShadow = Color(
+    0x47000000,
+  ); // Sombra dos marcadores desenhados no mapa
 
   // Chat e Avaliações
   static const Color chatBubbleMine = Color(0xFF111111);

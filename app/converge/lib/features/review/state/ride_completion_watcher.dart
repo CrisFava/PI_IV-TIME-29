@@ -44,11 +44,12 @@ final rideCompletionWatcherProvider = Provider.autoDispose<void>((ref) {
 bool rideStatusesChanged(List<RideModel> before, List<RideModel> after) {
   // Inclui o status e o pagamento de cada participante: na chegada de um passageiro, a
   // viagem continua em andamento e só o status dele muda (é aí que a cobrança dele é
-  // emitida); depois, o "Já paguei" dele só muda o pagamento
+  // emitida); depois, o "Já paguei" dele só muda o pagamento. O embarque também conta:
+  // o passageiro vê na hora quando o motorista confirma que ele entrou
   String signature(List<RideModel> rides) => ([
     for (final ride in rides)
       '${ride.id}:${ride.status.name}:'
-          '${[for (final participant in ride.participants) '${participant.status.name}:${participant.paymentStatus?.name}'].join(',')}',
+          '${[for (final participant in ride.participants) '${participant.status.name}:${participant.paymentStatus?.name}:${participant.boardedAt}'].join(',')}',
   ]..sort()).join('|');
 
   return signature(before) != signature(after);

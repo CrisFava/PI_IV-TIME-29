@@ -52,6 +52,10 @@ class RideDockNavigation extends StatefulWidget {
   /// carro ganha o anel verde pulsante.
   final bool isOnTrip;
 
+  /// Com a viagem em andamento ([isOnShift] ou [isOnTrip]), tocar no botão verde
+  /// chama isto (o modo viagem) em vez de abrir o menu.
+  final VoidCallback? onTripTap;
+
   /// O passageiro está procurando motorista (lista ou esperando a resposta): o
   /// botão do carro ganha o anel azul pulsante. Para quando o pedido é aceito.
   final bool isLookingForDriver;
@@ -87,6 +91,7 @@ class RideDockNavigation extends StatefulWidget {
     this.onAddVehicle,
     this.isSearchingRide = false,
     this.isOnTrip = false,
+    this.onTripTap,
     this.isLookingForDriver = false,
     this.chatUnreadCount = 0,
     this.rideSearchTitle = 'Procurando motorista',
@@ -329,7 +334,15 @@ class _RideDockNavigationState extends State<RideDockNavigation>
                     top: -10 + (16 * progress),
                     child: _CenterRideButton(
                       progress: progress,
-                      onPressed: _handleToggle,
+                      onPressed:
+                          (widget.isOnShift || widget.isOnTrip) &&
+                              widget.onTripTap != null &&
+                              !_effectiveIsOpen
+                          ? () {
+                              HapticFeedback.mediumImpact();
+                              widget.onTripTap!();
+                            }
+                          : _handleToggle,
                       // Verde na viagem em andamento (motorista ou passageiro); azul
                       // enquanto o passageiro procura motorista, até o pedido ser aceito
                       pulseColor: widget.isOnShift || widget.isOnTrip

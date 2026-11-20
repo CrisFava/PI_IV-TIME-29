@@ -22,6 +22,12 @@ abstract final class RideEndpoints {
       '${_passenger(rideId, passengerId)}/reject';
   static String noShow(String rideId, String passengerId) =>
       '${_passenger(rideId, passengerId)}/no-show';
+  static String preview(String rideId, String passengerId) =>
+      '${_passenger(rideId, passengerId)}/preview';
+
+  static String board(String rideId, String passengerId) =>
+      '${_passenger(rideId, passengerId)}/board';
+
   static String arrive(String rideId, String passengerId) =>
       '${_passenger(rideId, passengerId)}/arrive';
 

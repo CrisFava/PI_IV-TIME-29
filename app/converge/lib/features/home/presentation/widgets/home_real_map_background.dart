@@ -10,122 +10,14 @@ import 'package:flutter/services.dart';
 import 'package:google_maps_flutter/google_maps_flutter.dart';
 
 import '../../../../core/config/styles.dart';
+import '../../../../core/services/maps/map_marker_icons.dart';
+import '../../../../core/services/maps/map_styles.dart';
 import '../../../../core/utils/currency_formatter.dart';
 import '../../../matching/data/models/match_model.dart';
 import 'campus_spots.dart';
 
 /// Tipo de pino central para o modo de arrasto estilo Uber
 enum CentralPinType { destination, pickup }
-
-/// Estilo JSON Monocromático de Alto Contraste (Prédios e áreas não-viárias mais escuras)
-const String _monochromeMapStyle = '''[
-  {
-    "elementType": "geometry",
-    "stylers": [{"color": "#e2e4e8"}]
-  },
-  {
-    "elementType": "labels.icon",
-    "stylers": [{"visibility": "off"}]
-  },
-  {
-    "elementType": "labels.text.fill",
-    "stylers": [{"color": "#4b5563"}]
-  },
-  {
-    "elementType": "labels.text.stroke",
-    "stylers": [{"color": "#e2e4e8"}]
-  },
-  {
-    "featureType": "administrative.land_parcel",
-    "elementType": "labels.text.fill",
-    "stylers": [{"color": "#9ca3af"}]
-  },
-  {
-    "featureType": "landscape.man_made",
-    "elementType": "geometry",
-    "stylers": [{"color": "#cbcfd6"}]
-  },
-  {
-    "featureType": "landscape.natural",
-    "elementType": "geometry",
-    "stylers": [{"color": "#d5d9df"}]
-  },
-  {
-    "featureType": "poi",
-    "elementType": "geometry",
-    "stylers": [{"color": "#cbcfd6"}]
-  },
-  {
-    "featureType": "poi",
-    "elementType": "labels.text.fill",
-    "stylers": [{"color": "#4b5563"}]
-  },
-  {
-    "featureType": "poi.park",
-    "elementType": "geometry",
-    "stylers": [{"color": "#c5cad2"}]
-  },
-  {
-    "featureType": "poi.park",
-    "elementType": "labels.text.fill",
-    "stylers": [{"color": "#6b7280"}]
-  },
-  {
-    "featureType": "road",
-    "elementType": "geometry",
-    "stylers": [{"color": "#ffffff"}]
-  },
-  {
-    "featureType": "road",
-    "elementType": "geometry.stroke",
-    "stylers": [{"color": "#b8bec8"}]
-  },
-  {
-    "featureType": "road.arterial",
-    "elementType": "labels.text.fill",
-    "stylers": [{"color": "#374151"}]
-  },
-  {
-    "featureType": "road.highway",
-    "elementType": "geometry",
-    "stylers": [{"color": "#ffffff"}]
-  },
-  {
-    "featureType": "road.highway",
-    "elementType": "geometry.stroke",
-    "stylers": [{"color": "#9ca3af"}]
-  },
-  {
-    "featureType": "road.highway",
-    "elementType": "labels.text.fill",
-    "stylers": [{"color": "#1f2937"}]
-  },
-  {
-    "featureType": "road.local",
-    "elementType": "labels.text.fill",
-    "stylers": [{"color": "#4b5563"}]
-  },
-  {
-    "featureType": "transit.line",
-    "elementType": "geometry",
-    "stylers": [{"color": "#c0c5cd"}]
-  },
-  {
-    "featureType": "transit.station",
-    "elementType": "geometry",
-    "stylers": [{"color": "#cbcfd6"}]
-  },
-  {
-    "featureType": "water",
-    "elementType": "geometry",
-    "stylers": [{"color": "#b4bac4"}]
-  },
-  {
-    "featureType": "water",
-    "elementType": "labels.text.fill",
-    "stylers": [{"color": "#4b5563"}]
-  }
-]''';
 
 /// ============================================================================
 /// COMPONENTE: HomeRealMapBackground (Google Maps Monocromático & Elegante)
@@ -138,6 +30,10 @@ const String _monochromeMapStyle = '''[
 /// ============================================================================
 class HomeRealMapBackground extends StatefulWidget {
   final bool isDriverMode;
+
+  /// O ponto de partida é onde o passageiro espera o motorista: ícone de pessoa
+  /// (o mesmo dos embarques), em vez da bolinha de partida.
+  final bool pickupIsPassengerSpot;
   final bool showDrivers;
 
   /// Motoristas compatíveis (matching), marcados no ponto de partida de cada um.
@@ -150,6 +46,13 @@ class HomeRealMapBackground extends StatefulWidget {
   final bool showTrajectory;
   final List<LatLng>? tripRoutePoints;
   final List<LatLng>? driverApproachRoutePoints;
+
+  /// Viagem em andamento em trechos: o atual forte, os próximos apagados.
+  /// Quando vem, substitui o [tripRoutePoints].
+  final List<TripMapLeg>? tripLegs;
+
+  /// As paradas da viagem em andamento (cada uma com a bandeira de fim).
+  final List<TripMapStop> tripStops;
 
   // Modo arrasto de mapa estilo Uber com pino fixo
   final bool isDraggingPin;
@@ -166,6 +69,7 @@ class HomeRealMapBackground extends StatefulWidget {
   const HomeRealMapBackground({
     super.key,
     required this.isDriverMode,
+    this.pickupIsPassengerSpot = false,
     this.showDrivers = false,
     this.availableDrivers = const [],
     this.acceptedDriver,
@@ -183,6 +87,8 @@ class HomeRealMapBackground extends StatefulWidget {
     this.onMapTap,
     this.universityName = 'PUC-Campinas',
     this.bottomPadding = 0,
+    this.tripLegs,
+    this.tripStops = const [],
   });
 
   @override
@@ -198,6 +104,10 @@ class _HomeRealMapBackgroundState extends State<HomeRealMapBackground> {
   static BitmapDescriptor? _originDotIcon;
   static BitmapDescriptor? _destinationDotIcon;
   static BitmapDescriptor? _blackCarIcon;
+  static BitmapDescriptor? _nextStopIcon;
+  static BitmapDescriptor? _laterStopIcon;
+  static BitmapDescriptor? _nextPickupIcon;
+  static BitmapDescriptor? _laterPickupIcon;
 
   @override
   void initState() {
@@ -211,6 +121,10 @@ class _HomeRealMapBackgroundState extends State<HomeRealMapBackground> {
       final dest =
           _destinationDotIcon ?? await _generateDestinationDotDescriptor();
       final car = _blackCarIcon ?? await _generateBlackCarDescriptor();
+      _nextStopIcon ??= await MapMarkerIcons.flag();
+      _laterStopIcon ??= await MapMarkerIcons.flag(highlighted: false);
+      _nextPickupIcon ??= await MapMarkerIcons.pickup();
+      _laterPickupIcon ??= await MapMarkerIcons.pickup(highlighted: false);
       _originDotIcon = origin;
       _destinationDotIcon = dest;
       _blackCarIcon = car;
@@ -243,15 +157,30 @@ class _HomeRealMapBackgroundState extends State<HomeRealMapBackground> {
       }
       return;
     }
-    if (widget.pickupLocation != oldWidget.pickupLocation ||
-        widget.destinationLocation != oldWidget.destinationLocation ||
-        widget.acceptedDriver != oldWidget.acceptedDriver ||
-        widget.tripRoutePoints != oldWidget.tripRoutePoints ||
-        widget.driverApproachRoutePoints !=
-            oldWidget.driverApproachRoutePoints ||
-        widget.showTrajectory != oldWidget.showTrajectory ||
-        widget.bottomPadding != oldWidget.bottomPadding) {
+    // A câmera só se move quando aparece algo novo (um ponto, um caminho, o próximo
+    // trecho). Fechar um painel ou limpar o rascunho não mexe no mapa
+    bool appeared(Object? now, Object? before) => now != null && now != before;
+    if (appeared(widget.pickupLocation, oldWidget.pickupLocation) ||
+        appeared(widget.destinationLocation, oldWidget.destinationLocation) ||
+        appeared(widget.acceptedDriver, oldWidget.acceptedDriver) ||
+        appeared(widget.tripRoutePoints, oldWidget.tripRoutePoints) ||
+        appeared(
+          widget.driverApproachRoutePoints,
+          oldWidget.driverApproachRoutePoints,
+        ) ||
+        (widget.showTrajectory && !oldWidget.showTrajectory) ||
+        appeared(_currentLegKey(widget), _currentLegKey(oldWidget))) {
       _adjustCameraForCurrentState();
+      return;
+    }
+
+    // Só a margem de baixo mudou (um painel abriu ou fechou): o centro do mapa
+    // anda metade da diferença; compensa para a imagem ficar onde estava
+    final paddingDelta = oldWidget.bottomPadding - widget.bottomPadding;
+    if (paddingDelta != 0) {
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        _mapController?.moveCamera(CameraUpdate.scrollBy(0, paddingDelta / 2));
+      });
     }
   }
 
@@ -259,8 +188,27 @@ class _HomeRealMapBackgroundState extends State<HomeRealMapBackground> {
   static LatLng _driverPosition(MatchModel driver) =>
       LatLng(driver.origin.latitude, driver.origin.longitude);
 
+  // Muda quando a viagem passa para o próximo trecho
+  static String? _currentLegKey(HomeRealMapBackground map) {
+    final legs = map.tripLegs;
+    if (legs == null) return null;
+    final current = legs.where((leg) => leg.isCurrent).firstOrNull;
+    return current == null || current.points.isEmpty
+        ? null
+        : '${current.points.first}-${current.points.last}';
+  }
+
   void _adjustCameraForCurrentState() {
     if (_mapController == null) return;
+
+    // Viagem em andamento: enquadra o trecho atual (até a próxima parada)
+    final currentLeg = widget.tripLegs
+        ?.where((leg) => leg.isCurrent && leg.points.isNotEmpty)
+        .firstOrNull;
+    if (widget.showTrajectory && currentLeg != null) {
+      _animateToBounds(currentLeg.points);
+      return;
+    }
 
     // Se o motorista aceitou, enquadra motorista, embarque e destino
     if (widget.acceptedDriver != null && widget.pickupLocation != null) {
@@ -344,6 +292,7 @@ class _HomeRealMapBackgroundState extends State<HomeRealMapBackground> {
           markerId: const MarkerId('pickup_marker'),
           position: pickupPos,
           icon:
+              (widget.pickupIsPassengerSpot ? _nextPickupIcon : null) ??
               _originDotIcon ??
               BitmapDescriptor.defaultMarkerWithHue(BitmapDescriptor.hueViolet),
           anchor: const Offset(0.5, 0.5),
@@ -368,7 +317,9 @@ class _HomeRealMapBackgroundState extends State<HomeRealMapBackground> {
         Marker(
           markerId: const MarkerId('destination_marker'),
           position: widget.destinationLocation!,
+          // Bandeira de chegada, o mesmo padrão em todos os mapas com percurso
           icon:
+              _nextStopIcon ??
               _destinationDotIcon ??
               BitmapDescriptor.defaultMarkerWithHue(BitmapDescriptor.hueRed),
           anchor: const Offset(0.5, 0.5),
@@ -426,6 +377,27 @@ class _HomeRealMapBackgroundState extends State<HomeRealMapBackground> {
       }
     }
 
+    // Paradas da viagem em andamento: a próxima em destaque, as outras apagadas
+    for (var i = 0; i < widget.tripStops.length; i++) {
+      final stop = widget.tripStops[i];
+      markers.add(
+        Marker(
+          markerId: MarkerId('trip_stop_$i'),
+          position: stop.position,
+          anchor: const Offset(0.5, 0.5),
+          zIndexInt: stop.isNext ? 3 : 2,
+          // Embarque com a pessoa; desembarque com a bandeira de chegada
+          icon:
+              (stop.isPickup
+                  ? (stop.isNext ? _nextPickupIcon : _laterPickupIcon)
+                  : stop.isNext
+                  ? _nextStopIcon
+                  : _laterStopIcon) ??
+              BitmapDescriptor.defaultMarker,
+          infoWindow: InfoWindow(title: stop.title),
+        ),
+      );
+    }
     return markers;
   }
 
@@ -450,7 +422,29 @@ class _HomeRealMapBackgroundState extends State<HomeRealMapBackground> {
       }
     }
 
-    // 2. Rota Principal da Viagem (Origem → Destino) em Preto Monocromático
+    // 2. Viagem em andamento em trechos: o atual forte; os próximos, ligados e apagados
+    final legs = widget.tripLegs;
+    if (widget.showTrajectory && legs != null && legs.isNotEmpty) {
+      for (var i = 0; i < legs.length; i++) {
+        final leg = legs[i];
+        if (leg.points.isEmpty) continue;
+        polylines.add(
+          Polyline(
+            polylineId: PolylineId('trip_leg_$i'),
+            points: leg.points,
+            color: leg.isCurrent ? AppColors.primary : AppColors.routeUpcoming,
+            width: leg.isCurrent ? 6 : 4,
+            zIndex: leg.isCurrent ? 2 : 1,
+            startCap: Cap.roundCap,
+            endCap: Cap.roundCap,
+            jointType: JointType.round,
+          ),
+        );
+      }
+      return polylines;
+    }
+
+    // 3. Rota Principal da Viagem (Origem → Destino) em Preto Monocromático
     if (widget.showTrajectory &&
         widget.pickupLocation != null &&
         widget.destinationLocation != null) {
@@ -498,7 +492,7 @@ class _HomeRealMapBackgroundState extends State<HomeRealMapBackground> {
       children: [
         Positioned.fill(
           child: GoogleMap(
-            style: _monochromeMapStyle,
+            style: monochromeMapStyle,
             initialCameraPosition: CameraPosition(
               target: widget.pickupLocation ?? campusCoordinates,
               zoom: 15.0,
@@ -884,4 +878,35 @@ class _HollowPinPainter extends CustomPainter {
 
   @override
   bool shouldRepaint(covariant CustomPainter oldDelegate) => false;
+}
+
+/// Um trecho do caminho da viagem em andamento.
+@immutable
+class TripMapLeg {
+  final List<LatLng> points;
+
+  /// O trecho que está sendo feito agora (até a próxima parada).
+  final bool isCurrent;
+
+  const TripMapLeg({required this.points, required this.isCurrent});
+}
+
+/// Uma parada da viagem em andamento no mapa.
+@immutable
+class TripMapStop {
+  final LatLng position;
+  final String title;
+
+  /// É a próxima parada (fica em destaque).
+  final bool isNext;
+
+  /// Embarque: pessoa. Desembarque: bandeira de chegada.
+  final bool isPickup;
+
+  const TripMapStop({
+    required this.position,
+    required this.title,
+    required this.isNext,
+    this.isPickup = false,
+  });
 }

@@ -2,6 +2,7 @@
 
 import '../models/ride_model.dart';
 import '../models/ride_payment_model.dart';
+import '../models/ride_preview_model.dart';
 
 /// Contrato com a API de viagens (`/rides`).
 abstract class RideRepository {
@@ -31,6 +32,12 @@ abstract class RideRepository {
   Future<RideModel> cancelRide(String rideId, {String? reason});
   Future<RideModel> leaveRide(String rideId, {String? reason});
   Future<RideModel> markNoShow(String rideId, String passengerId);
+
+  /// Como a viagem ficaria aceitando o pedido do passageiro (nada é gravado).
+  Future<RidePreviewModel> previewPassenger(String rideId, String passengerId);
+
+  /// "Entrou": o motorista confirma que o passageiro embarcou.
+  Future<RideModel> boardPassenger(String rideId, String passengerId);
 
   /// "Confirmar chegada": o passageiro desceu e já recebe a cobrança.
   Future<RideModel> arrivePassenger(String rideId, String passengerId);
