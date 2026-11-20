@@ -47,7 +47,7 @@ class HomeTripModeOverlay extends ConsumerWidget {
           ? await actions.board(ride.id, passengerId)
           : await actions.arrive(ride.id, passengerId);
       if (error != null) {
-        if (context.mounted) onError(error);
+        onError(error);
         return;
       }
     }

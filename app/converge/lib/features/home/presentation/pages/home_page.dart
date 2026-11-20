@@ -878,6 +878,7 @@ class _HomePageState extends ConsumerState<HomePage> {
   /// Só erros viram aviso (no topo, com botão de fechar): os informativos
   /// atrapalhavam o fluxo de pedir carona.
   void _showError(String message) {
+    if (!mounted) return;
     showAppNotice(context, message, type: AppNoticeType.error);
   }
 
