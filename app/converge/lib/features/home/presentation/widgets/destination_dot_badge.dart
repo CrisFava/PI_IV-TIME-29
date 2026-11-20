@@ -4,8 +4,8 @@ import 'package:flutter/material.dart';
 
 import '../../../../core/config/styles.dart';
 
-/// Marca o destino: o inverso da partida (bolinha branca, borda e centro pretos),
-/// igual ao marcador de destino no mapa.
+/// Marca o destino com a bandeira de chegada, igual ao marcador de destino no
+/// mapa (o mesmo padrão em todas as telas com percurso).
 class DestinationDotBadge extends StatelessWidget {
   final double size;
 
@@ -13,32 +13,18 @@ class DestinationDotBadge extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    // SizedBox fixo: em espaços maiores a bolinha não estica
+    // SizedBox fixo: em espaços maiores o ícone não estica
     return SizedBox.square(
       dimension: size,
       child: DecoratedBox(
-        decoration: BoxDecoration(
-          color: AppColors.cardBackground,
+        decoration: const BoxDecoration(
+          color: AppColors.primary,
           shape: BoxShape.circle,
-          border: Border.all(color: AppColors.primary, width: size * 0.18),
-          boxShadow: [
-            BoxShadow(
-              color: AppColors.primary.withValues(alpha: 0.18),
-              blurRadius: 3,
-              offset: const Offset(0, 1),
-            ),
-          ],
         ),
-        child: Center(
-          child: SizedBox.square(
-            dimension: size * 0.3,
-            child: const DecoratedBox(
-              decoration: BoxDecoration(
-                color: AppColors.primary,
-                shape: BoxShape.circle,
-              ),
-            ),
-          ),
+        child: Icon(
+          Icons.flag_rounded,
+          size: size * 0.62,
+          color: AppColors.textLight,
         ),
       ),
     );

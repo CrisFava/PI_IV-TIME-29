@@ -52,7 +52,9 @@ class _HomePassengerSheetState extends ConsumerState<HomePassengerSheet> {
       case PassengerRideStep.dragMapPickup:
       case PassengerRideStep.searchDestination:
       case PassengerRideStep.dragMapDestination:
+      case PassengerRideStep.routePreview:
       case PassengerRideStep.routeConfirmation:
+      case PassengerRideStep.offerDetails:
         return const SizedBox.shrink();
       case PassengerRideStep.driverList:
         return _buildDriverListSheet();
