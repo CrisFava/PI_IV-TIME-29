@@ -119,6 +119,8 @@ class _SlideToConfirmState extends State<SlideToConfirm>
                               ),
                             );
                           },
+                    // Gesto interrompido (ex.: outro toque): o botão volta
+                    onHorizontalDragCancel: widget.isBusy ? null : _goBack,
                     onHorizontalDragEnd: widget.isBusy
                         ? null
                         : (_) {

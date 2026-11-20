@@ -109,7 +109,7 @@ class _ChatPageState extends ConsumerState<ChatPage> {
     final otherPartyBlocked =
         !conversation.viewerIsDriver &&
         ref.watch(blockedUserIdsProvider).contains(driverId);
-    final members = conversation.ride.passengersWithSeat.length + 1;
+    final members = conversation.ride.seatedPassengers.length + 1;
 
     // Um aviso do outro participante (cobrança, pagamento, início ou fim da
     // viagem) significa que o estado mudou na API: recarrega o que a tela mostra.
@@ -145,7 +145,7 @@ class _ChatPageState extends ConsumerState<ChatPage> {
           ? 'Grupo da carona'
           : 'Carona com ${conversation.ride.driverName}',
       subtitle:
-          '$members pessoas: ${[conversation.ride.driverName, for (final p in conversation.ride.passengersWithSeat) p.displayName].join(', ')}',
+          '$members pessoas: ${[conversation.ride.driverName, for (final p in conversation.ride.seatedPassengers) p.displayName].join(', ')}',
       actions: [
         if (!conversation.viewerIsDriver)
           UserSafetyMenu(

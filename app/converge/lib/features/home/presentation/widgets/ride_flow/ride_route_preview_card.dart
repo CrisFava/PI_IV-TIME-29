@@ -20,6 +20,9 @@ class RideRoutePreviewCard extends StatelessWidget {
   final bool isEstimating;
   final VoidCallback onConfirm;
 
+  /// O cálculo falhou: tenta de novo (o trajeto só é confirmado com ele pronto).
+  final VoidCallback? onRetry;
+
   /// "Alterar": volta para escolher o destino.
   final VoidCallback onEdit;
   final double bottomSafeArea;
@@ -32,6 +35,7 @@ class RideRoutePreviewCard extends StatelessWidget {
     required this.isEstimating,
     required this.onConfirm,
     required this.onEdit,
+    this.onRetry,
     this.bottomSafeArea = 0,
   });
 
@@ -47,6 +51,7 @@ class RideRoutePreviewCard extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final failed = estimate == null && !isEstimating;
     return RideFlowSheetFrame(
       initialSize: 0.415,
       bottomSafeArea: bottomSafeArea,
@@ -84,12 +89,29 @@ class RideRoutePreviewCard extends StatelessWidget {
           ],
         ),
         const SizedBox(height: 14),
+        if (failed && onRetry != null)
+          TextButton.icon(
+            key: const ValueKey('retry_route'),
+            onPressed: () {
+              HapticFeedback.lightImpact();
+              onRetry!();
+            },
+            style: TextButton.styleFrom(foregroundColor: AppColors.textPrimary),
+            icon: const Icon(Icons.refresh_rounded, size: 18),
+            label: const Text(
+              'Tentar de novo',
+              style: TextStyle(fontWeight: FontWeight.w700),
+            ),
+          ),
         FilledButton.icon(
           key: const ValueKey('confirm_route'),
-          onPressed: () {
-            HapticFeedback.mediumImpact();
-            onConfirm();
-          },
+          // Só com o caminho calculado
+          onPressed: estimate == null
+              ? null
+              : () {
+                  HapticFeedback.mediumImpact();
+                  onConfirm();
+                },
           style: FilledButton.styleFrom(
             backgroundColor: AppColors.primary,
             foregroundColor: AppColors.textLight,

@@ -323,10 +323,23 @@ class _DetourMapState extends State<_DetourMap> {
     });
   }
 
-  late final List<LatLng> _current = _decode(widget.preview.currentPolyline);
-  late final List<LatLng> _withPassenger = _decode(
+  late List<LatLng> _current = _decode(widget.preview.currentPolyline);
+  late List<LatLng> _withPassenger = _decode(
     widget.preview.withPassengerPolyline,
   );
+
+  // Simulação recarregada (outro passageiro aceito, por exemplo): redesenha
+  @override
+  void didUpdateWidget(covariant _DetourMap oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    if (oldWidget.preview.currentPolyline != widget.preview.currentPolyline) {
+      _current = _decode(widget.preview.currentPolyline);
+    }
+    if (oldWidget.preview.withPassengerPolyline !=
+        widget.preview.withPassengerPolyline) {
+      _withPassenger = _decode(widget.preview.withPassengerPolyline);
+    }
+  }
 
   static List<LatLng> _decode(String? polyline) =>
       polyline == null || polyline.isEmpty

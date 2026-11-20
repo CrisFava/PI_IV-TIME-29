@@ -99,6 +99,13 @@ class RideModel {
         participant,
   ];
 
+  /// Todos os passageiros com vaga, inclusive os que vêm sem id (para contar e
+  /// mostrar os nomes do grupo).
+  List<RideParticipantModel> get seatedPassengers => [
+    for (final participant in participants)
+      if (participant.isPassenger && participant.status.hasSeat) participant,
+  ];
+
   /// A participação de um passageiro. Quem saiu e pediu vaga de novo aparece
   /// mais de uma vez: vale a participação que está com a vaga.
   RideParticipantModel? passengerOf(String userId) {

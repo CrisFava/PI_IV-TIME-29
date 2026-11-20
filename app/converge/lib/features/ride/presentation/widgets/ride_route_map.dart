@@ -54,10 +54,22 @@ class _RideRouteMapState extends State<RideRouteMap> {
   BitmapDescriptor? _pickup;
   BitmapDescriptor? _flag;
 
-  late final List<LatLng> _path =
-      widget.polyline == null || widget.polyline!.isEmpty
+  late List<LatLng> _path = _decode();
+
+  List<LatLng> _decode() => widget.polyline == null || widget.polyline!.isEmpty
       ? [widget.origin, widget.destination]
       : GoogleMapsService.decodePolyline(widget.polyline!);
+
+  // Caminho novo (a viagem ganhou ou perdeu passageiro): redesenha
+  @override
+  void didUpdateWidget(covariant RideRouteMap oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    if (oldWidget.polyline != widget.polyline ||
+        oldWidget.origin != widget.origin ||
+        oldWidget.destination != widget.destination) {
+      _path = _decode();
+    }
+  }
 
   @override
   void initState() {

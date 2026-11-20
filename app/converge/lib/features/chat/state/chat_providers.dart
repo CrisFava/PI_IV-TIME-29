@@ -1,5 +1,7 @@
 // Autor: Cristian Eduardo Fava - RA 25000636
 
+import 'dart:async';
+
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../auth/data/models/user_model.dart';
@@ -60,11 +62,37 @@ final conversationsProvider =
         byPair.putIfAbsent(conversation.thread.path, () => conversation);
       }
       final now = DateTime.now();
-      return [
+      final open = [
         for (final conversation in byPair.values)
           if (isChatOpen(conversation.ride, now)) conversation,
       ];
+
+      // Com a tela aberta, a conversa que expira primeiro some na hora certa
+      DateTime? nextExpiry;
+      for (final conversation in open) {
+        final expiry = _expiryOf(conversation.ride);
+        if (expiry != null &&
+            (nextExpiry == null || expiry.isBefore(nextExpiry))) {
+          nextExpiry = expiry;
+        }
+      }
+      if (nextExpiry != null) {
+        final timer = Timer(
+          nextExpiry.difference(now) + const Duration(seconds: 1),
+          ref.invalidateSelf,
+        );
+        ref.onDispose(timer.cancel);
+      }
+      return open;
     });
+
+// Quando a conversa expira; nulo enquanto a viagem não terminou
+DateTime? _expiryOf(RideModel ride) => switch (ride.status) {
+  RideStatus.inProgress ||
+  RideStatus.awaitingConfirmation ||
+  RideStatus.confirmed => null,
+  _ => (ride.completedAt ?? ride.departureDateTime)?.add(chatLifetime),
+};
 
 // Em andamento primeiro; depois as próximas (da mais perto); depois as que já
 // terminaram (da mais recente)

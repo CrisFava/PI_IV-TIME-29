@@ -225,7 +225,7 @@ class _RideReviewPageState extends ConsumerState<RideReviewPage> {
                           () => draft.commentOpen = !draft.commentOpen,
                         ),
                         onCommentChanged: () => setState(() {}),
-                        onReport: report,
+                        onReport: _submitting ? null : report,
                       );
                     }
                     return _ReviewCard(
@@ -236,7 +236,7 @@ class _RideReviewPageState extends ConsumerState<RideReviewPage> {
                       onRating: (rating) =>
                           _selectRating(target.userId, rating),
                       onCommentChanged: () => setState(() {}),
-                      onReport: report,
+                      onReport: _submitting ? null : report,
                     );
                   },
                 ),
@@ -290,9 +290,16 @@ class _RideReviewPageState extends ConsumerState<RideReviewPage> {
                           : () async {
                               // Fechar depois de enviar, ou dispensar de vez
                               if (!anySent) {
-                                await ref
-                                    .read(reviewDismissalStoreProvider)
-                                    .dismiss(widget.rideId);
+                                setState(() => _submitting = true);
+                                try {
+                                  await ref
+                                      .read(reviewDismissalStoreProvider)
+                                      .dismiss(widget.rideId);
+                                } finally {
+                                  if (mounted) {
+                                    setState(() => _submitting = false);
+                                  }
+                                }
                               }
                               if (context.mounted) {
                                 Navigator.of(context).pop(anySent);
@@ -325,7 +332,7 @@ class _ReviewCard extends StatelessWidget {
   final bool enabled;
   final ValueChanged<int> onRating;
   final VoidCallback onCommentChanged;
-  final VoidCallback onReport;
+  final VoidCallback? onReport;
 
   const _ReviewCard({
     required this.target,
@@ -510,7 +517,7 @@ class _ReviewCard extends StatelessWidget {
 /// Denunciar quem está sendo avaliado.
 class _ReportButton extends StatelessWidget {
   final String name;
-  final VoidCallback onReport;
+  final VoidCallback? onReport;
 
   const _ReportButton({required this.name, required this.onReport});
 
@@ -519,10 +526,13 @@ class _ReportButton extends StatelessWidget {
     return IconButton(
       tooltip: 'Denunciar $name',
       visualDensity: VisualDensity.compact,
-      onPressed: () {
-        HapticFeedback.lightImpact();
-        onReport();
-      },
+      // Desligado enquanto as avaliações são enviadas
+      onPressed: onReport == null
+          ? null
+          : () {
+              HapticFeedback.lightImpact();
+              onReport!();
+            },
       icon: const Icon(
         Icons.outlined_flag_rounded,
         size: 20,
@@ -541,7 +551,7 @@ class _CompactReviewRow extends StatelessWidget {
   final ValueChanged<int> onRating;
   final VoidCallback onToggleComment;
   final VoidCallback onCommentChanged;
-  final VoidCallback onReport;
+  final VoidCallback? onReport;
 
   const _CompactReviewRow({
     required this.target,

@@ -278,7 +278,11 @@ class _HomePageState extends ConsumerState<HomePage> {
     }
 
     HapticFeedback.mediumImpact();
-    setState(() => _passengerStep = PassengerRideStep.driverList);
+    setState(() {
+      _passengerStep = PassengerRideStep.driverList;
+      // Busca nova: os motoristas desta busca podem ser avisados de novo
+      _notifiedAt.removeWhere((key, _) => key.startsWith('driver_'));
+    });
 
     final controller = ref.read(passengerMatchProvider.notifier);
     // Limpa a busca anterior: a lista mostra o carregamento até os novos motoristas chegarem
@@ -617,25 +621,34 @@ class _HomePageState extends ConsumerState<HomePage> {
     // carro, nada é publicado
     final generation = _draftGeneration;
     setState(() => _publishingOffer = true);
-    final vehicle = await _findDriverVehicle();
+    // O carro escolhido na etapa "Sua carona", conferido na lista atual
+    final preferredId = _offerVehicles().selected?.id;
+    final vehicle = await _findDriverVehicle(preferredId: preferredId);
     if (!mounted) return;
     if (generation != _draftGeneration) {
       setState(() => _publishingOffer = false);
       return;
     }
-    if (vehicle == null) {
+    if (vehicle == null && preferredId == null) {
       setState(() => _publishingOffer = false);
       _showError('Cadastre um veículo antes de publicar a carona.');
       return;
     }
+    if (vehicle == null) {
+      setState(() {
+        _publishingOffer = false;
+        _offerVehicleId = null;
+      });
+      ref.invalidate(myVehiclesProvider);
+      _goToStep(PassengerRideStep.offerDetails);
+      _showError('Esse carro não está mais disponível. Escolha outro.');
+      return;
+    }
 
-    // O carro e as vagas escolhidos na etapa "Sua carona" (ou o primeiro carro, cheio)
-    final chosen = _offerVehicles().selected;
-    final vehicleId = chosen?.id ?? vehicle.id;
-    final maxSeats = chosen?.passengerSeats ?? vehicle.seats;
+    final maxSeats = vehicle.seats;
     final request = _buildRouteRequest(
       isDriver: true,
-      vehicleId: vehicleId,
+      vehicleId: vehicle.id,
       totalSeats: (_offerSeats ?? maxSeats).clamp(1, maxSeats),
       schedule: RouteSchedule.startingAt(
         _offerDeparture!,
@@ -935,7 +948,10 @@ class _HomePageState extends ConsumerState<HomePage> {
     ];
 
     final legPolylines = ride.itineraryLegPolylines;
-    if (legPolylines.isEmpty) return (legs: null, stops: stops);
+    // O passageiro nunca recebe o caminho inteiro: sem trechos, nada de linha
+    if (legPolylines.isEmpty) {
+      return (legs: isDriver ? null : const <TripMapLeg>[], stops: stops);
+    }
 
     // Passageiro: antes de entrar, o caminho do motorista até ele (o trecho atual
     // forte, o resto apagado); depois, o caminho até o desembarque numa linha forte
@@ -945,9 +961,10 @@ class _HomePageState extends ConsumerState<HomePage> {
       final pickup = ride.itineraryMyPickupStop;
       final dropOff = ride.itineraryMyDropOffStop;
       if (next == null || pickup == null || dropOff == null) {
-        return (legs: null, stops: stops);
+        return (legs: const <TripMapLeg>[], stops: stops);
       }
-      final boarded = next > pickup;
+      final boarded =
+          ride.passengerOf(viewerId ?? '')?.boardedAt != null || next > pickup;
       final target = boarded ? dropOff : pickup;
       if (next > target || target >= legPolylines.length) {
         return (legs: const <TripMapLeg>[], stops: stops);
@@ -1030,6 +1047,7 @@ class _HomePageState extends ConsumerState<HomePage> {
   void _openRideRequests({bool asPassenger = false, String? offerKey}) {
     if (!asPassenger && _isDriverActionBlocked()) return;
     setState(() {
+      _tripModeOpen = false;
       _openOfferKey = offerKey;
       _isCarMenuOpen = false;
       _currentMode = AppRideMode.driver;
@@ -1078,14 +1096,18 @@ class _HomePageState extends ConsumerState<HomePage> {
     );
   }
 
-  /// Veículo ativo do motorista, exigido em todo trajeto de oferta.
-  Future<({String id, int seats})?> _findDriverVehicle() async {
+  /// Veículo ativo do motorista, exigido em todo trajeto de oferta. Com
+  /// [preferredId], só serve esse carro (sem trocar por outro).
+  Future<({String id, int seats})?> _findDriverVehicle({
+    String? preferredId,
+  }) async {
     try {
       final vehicles = await ref
           .read(vehicleRepositoryProvider)
           .listMyVehicles();
       for (final vehicle in vehicles) {
-        if (vehicle.active) {
+        if (vehicle.active &&
+            (preferredId == null || vehicle.id == preferredId)) {
           return (id: vehicle.id, seats: vehicle.passengerSeats);
         }
       }
@@ -1646,6 +1668,21 @@ class _HomePageState extends ConsumerState<HomePage> {
       searchRadiusKm: _driverSearchRadiusKm,
     );
     if (!confirmed || !mounted) return;
+    // O tempo passou durante a revisão: o horário precisa continuar valendo (o
+    // motorista, com pelo menos 5 min de antecedência para receber pedidos)
+    final departure = isDriver ? _offerDeparture : _rideDeparture;
+    final earliest = isDriver
+        ? DateTime.now().add(const Duration(minutes: 5))
+        : DateTime.now();
+    if (departure == null || !departure.isAfter(earliest)) {
+      _goToStep(PassengerRideStep.routeConfirmation);
+      _showError(
+        isDriver
+            ? 'Esse horário está muito perto ou já passou. Escolha outro.'
+            : 'Esse horário já passou. Escolha outro.',
+      );
+      return;
+    }
     if (isDriver) {
       await _handlePublishOffer();
     } else {
@@ -1756,6 +1793,7 @@ class _HomePageState extends ConsumerState<HomePage> {
         estimate: tripEstimate.estimate,
         isEstimating: tripEstimate.isLoading,
         onConfirm: () => _goToStep(PassengerRideStep.routeConfirmation),
+        onRetry: _goToRoutePreview,
         onEdit: () => _goToStep(PassengerRideStep.searchDestination),
         bottomSafeArea: bottomPadding,
       ),

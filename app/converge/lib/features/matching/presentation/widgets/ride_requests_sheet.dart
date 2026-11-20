@@ -312,20 +312,23 @@ class _RideRequestsSheetState extends ConsumerState<RideRequestsSheet> {
       }
     }
 
+    String? rideError;
     for (final ride in offer.openRides) {
       final error = await ref
           .read(driverRideActionsProvider.notifier)
           .cancel(ride.id);
       if (error != null) {
-        ref.invalidate(myOfferRoutesProvider);
-        if (mounted) _showMessage(error);
-        return false;
+        rideError ??= error;
+        // Sem a carona cancelada, nada mudou ainda: para aqui
+        if (routeId == null) break;
       }
     }
 
     ref.invalidate(myOfferRoutesProvider);
     ref.invalidate(myRidesProvider);
-    return true;
+    if (rideError != null && mounted) _showMessage(rideError);
+    // A carona já foi cancelada: os detalhes fecham mesmo com uma viagem pendente
+    return routeId != null || rideError == null;
   }
 
   Future<void> _accept(DriverRideRequest request) async {

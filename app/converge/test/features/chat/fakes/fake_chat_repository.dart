@@ -11,8 +11,7 @@ import 'package:converge/features/chat/data/repository/chat_repository.dart';
 class FakeChatRepository implements ChatRepository {
   // Pelo caminho, como no Realtime Database: o grupo da viagem é um lugar só
   final Map<String, List<ChatMessageModel>> _messages = {};
-  final Map<ChatThreadRef, StreamController<List<ChatMessageModel>>>
-  _controllers = {};
+  final Map<String, StreamController<List<ChatMessageModel>>> _controllers = {};
 
   /// Quando `true`, todo envio falha como se o Realtime Database estivesse fora do ar.
   bool failOnSend = false;
@@ -24,7 +23,7 @@ class FakeChatRepository implements ChatRepository {
   StreamController<List<ChatMessageModel>> _controllerOf(
     ChatThreadRef thread,
   ) => _controllers.putIfAbsent(
-    thread,
+    thread.path,
     () => StreamController<List<ChatMessageModel>>.broadcast(),
   );
 

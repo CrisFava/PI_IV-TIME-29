@@ -334,6 +334,12 @@ class _RideDockNavigationState extends State<RideDockNavigation>
                     top: -10 + (16 * progress),
                     child: _CenterRideButton(
                       progress: progress,
+                      semanticLabel:
+                          (widget.isOnShift || widget.isOnTrip) &&
+                              widget.onTripTap != null &&
+                              !_effectiveIsOpen
+                          ? 'Abrir a viagem em andamento'
+                          : null,
                       onPressed:
                           (widget.isOnShift || widget.isOnTrip) &&
                               widget.onTripTap != null &&
@@ -468,12 +474,16 @@ class _CenterRideButton extends StatefulWidget {
   final double progress;
   final VoidCallback onPressed;
 
+  /// Leitor de tela: o que o toque faz quando não é abrir/fechar o menu.
+  final String? semanticLabel;
+
   /// Cor do anel pulsante; null deixa o botão sem destaque.
   final Color? pulseColor;
 
   const _CenterRideButton({
     required this.progress,
     required this.onPressed,
+    this.semanticLabel,
     this.pulseColor,
   });
 
@@ -547,9 +557,9 @@ class _CenterRideButtonState extends State<_CenterRideButton>
     final isExpanded = progress > 0.5;
 
     return Semantics(
-      label: isExpanded
-          ? 'Fechar opções de Caronas'
-          : 'Abrir opções de Caronas',
+      label:
+          widget.semanticLabel ??
+          (isExpanded ? 'Fechar opções de Caronas' : 'Abrir opções de Caronas'),
       button: true,
       child: GestureDetector(
         onTapDown: (_) => setState(() => _isPressed = true),
