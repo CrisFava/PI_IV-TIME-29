@@ -97,6 +97,14 @@ public class Participant {
     @Nullable
     private LocalDateTime boardedAt;
 
+    // Quando a cobrança virou dívida vencida. Nulo = não vencida
+    @Nullable
+    private LocalDateTime overdueAt;
+
+    // Quando a dívida veio de denúncia de falta de pagamento. "Já paguei" não a desfaz
+    @Nullable
+    private LocalDateTime nonPaymentReportedAt;
+
     @Nullable
     private LocalDateTime cancelledAt;
 
@@ -201,6 +209,30 @@ public class Participant {
 
     public boolean isCharged() {
         return this.paymentRequestedAt != null;
+    }
+
+    public boolean isOverdue() {
+        return this.overdueAt != null;
+    }
+
+    // Dívida por prazo ainda em aberto. A dívida de denúncia não entra: só a moderação a desfaz
+    public boolean isOverdueOpenCharge() {
+        return hasOpenCharge() && isOverdue() && this.nonPaymentReportedAt == null;
+    }
+
+    /**
+     * Cobrança de passageiro que já terminou a viagem, não foi paga e passou do prazo.
+     * Cobranças emitidas antes de [since] nunca vencem.
+     */
+    public boolean isDueForOverdue(LocalDateTime dueLimit, LocalDateTime since) {
+        return this.role == ParticipationRole.PASSENGER
+                && this.status == ParticipantStatus.COMPLETED
+                && this.paymentStatus == ParticipantPaymentStatus.PENDING
+                && this.paymentRequestedAt != null
+                && this.requestedAmount != null
+                && this.overdueAt == null
+                && !this.paymentRequestedAt.isAfter(dueLimit)
+                && !this.paymentRequestedAt.isBefore(since);
     }
 
     public void cancel(@Nullable String reason, boolean late, LocalDateTime now) {

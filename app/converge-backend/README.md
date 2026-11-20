@@ -22,6 +22,9 @@ ENV_CHECK=true
 
 SOCKET_SERVER_HOST=localhost
 SOCKET_SERVER_PORT=3000
+# Job de cobranças vencidas (RF67). Deixe desligado no banco compartilhado converge-dev
+# CONVERGE_PAYMENT_OVERDUE_ENABLED=false
+# CONVERGE_PAYMENT_OVERDUE_SINCE=2026-11-20T00:00:00
 ```
 
 ---

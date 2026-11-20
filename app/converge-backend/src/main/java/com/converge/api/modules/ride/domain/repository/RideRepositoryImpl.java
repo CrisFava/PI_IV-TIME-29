@@ -2,6 +2,7 @@
 
 package com.converge.api.modules.ride.domain.repository;
 
+import com.converge.api.modules.ride.domain.enums.ParticipantPaymentStatus;
 import com.converge.api.modules.ride.domain.enums.ParticipantStatus;
 import com.converge.api.modules.ride.domain.enums.RideStatus;
 import com.converge.api.modules.ride.domain.model.Ride;
@@ -162,6 +163,77 @@ public class RideRepositoryImpl implements RideRepositoryCustom {
                 )
         ));
         return mongoTemplate.find(query, Ride.class);
+    }
+
+    @Override
+    public List<Ride> findRidesWithDueCharges(LocalDateTime dueLimit, LocalDateTime since) {
+        Query query = new Query(new Criteria().andOperator(
+                where("status").is(RideStatus.COMPLETED),
+                where("participants").elemMatch(dueChargeCriteria(dueLimit, since))
+        ));
+        return mongoTemplate.find(query, Ride.class);
+    }
+
+    @Override
+    public Optional<Ride> markPaymentOverdueAtomic(
+            ObjectId rideId,
+            String passengerId,
+            LocalDateTime dueLimit,
+            LocalDateTime since,
+            LocalDateTime now
+    ) {
+        Query query = new Query(new Criteria().andOperator(
+                where("_id").is(rideId),
+                where("status").is(RideStatus.COMPLETED),
+                where("participants").elemMatch(dueChargeCriteria(dueLimit, since).and("userId").is(passengerId))
+        ));
+
+        return Optional.ofNullable(markOverdue(query, new Update(), now));
+    }
+
+    @Override
+    public Optional<Ride> markNonPaymentAtomic(ObjectId rideId, String passengerId, LocalDateTime now) {
+        Query query = new Query(new Criteria().andOperator(
+                where("_id").is(rideId),
+                where("status").in(RideStatus.IN_PROGRESS, RideStatus.COMPLETED),
+                where("participants").elemMatch(
+                        where("userId").is(passengerId)
+                                .and("role").is(ParticipationRole.PASSENGER)
+                                .and("status").is(ParticipantStatus.COMPLETED)
+                                .and("paymentRequestedAt").ne(null)
+                                .and("nonPaymentReportedAt").is(null)
+                                // Só depois do "Já paguei", mesmo que a cobrança tenha vencido antes
+                                .and("paymentStatus").is(ParticipantPaymentStatus.PAID)
+                )
+        ));
+
+        Update reported = new Update().set("participants.$.nonPaymentReportedAt", now);
+        return Optional.ofNullable(markOverdue(query, reported, now));
+    }
+
+    private Criteria dueChargeCriteria(LocalDateTime dueLimit, LocalDateTime since) {
+        return where("role").is(ParticipationRole.PASSENGER)
+                .and("status").is(ParticipantStatus.COMPLETED)
+                .and("paymentStatus").is(ParticipantPaymentStatus.PENDING)
+                .and("requestedAmount").ne(null)
+                .and("overdueAt").is(null)
+                .and("paymentRequestedAt").gte(since).lte(dueLimit);
+    }
+
+    // O inc em version faz um "Já paguei" salvo em paralelo (com @Version) falhar em vez de sobrescrever.
+    private Ride markOverdue(Query query, Update update, LocalDateTime now) {
+        update
+                .set("participants.$.overdueAt", now)
+                .set("participants.$.updatedAt", now)
+                .set("updatedAt", now)
+                .inc("version", 1);
+
+        return mongoTemplate.findAndModify(
+                query,
+                update,
+                FindAndModifyOptions.options().returnNew(true),
+                Ride.class
+        );
     }
 
     @Override

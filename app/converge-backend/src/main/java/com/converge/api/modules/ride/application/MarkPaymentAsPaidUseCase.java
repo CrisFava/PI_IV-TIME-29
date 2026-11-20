@@ -6,10 +6,13 @@ import com.converge.api.modules.ride.application.dto.PassengerRequestCommand;
 import com.converge.api.modules.ride.application.dto.PaymentResponseDTO;
 import com.converge.api.modules.ride.domain.model.Ride;
 import com.converge.api.modules.ride.domain.repository.RideRepository;
+import com.converge.api.modules.user.application.ResolveOverduePaymentUseCase;
+import com.converge.api.shared.application.SafeActionHandler;
 import com.converge.api.shared.application.UseCase;
 import com.converge.api.shared.presentation.exception.ApplicationException;
 import com.converge.api.shared.presentation.exception.ErrorCode;
 import lombok.RequiredArgsConstructor;
+import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
 
 import java.util.Set;
@@ -18,6 +21,7 @@ import java.util.Set;
  * "Já paguei": o passageiro informa que pagou a própria cobrança (RF41), que fica paga.
  * Isso libera o passageiro para pedir ou oferecer outra carona.
  */
+@Slf4j
 @Service
 @RequiredArgsConstructor
 public class MarkPaymentAsPaidUseCase implements UseCase<PassengerRequestCommand, PaymentResponseDTO> {
@@ -26,6 +30,7 @@ public class MarkPaymentAsPaidUseCase implements UseCase<PassengerRequestCommand
     private final RideRepository rideRepository;
     private final RidePaymentViewService paymentView;
     private final RidePaymentNotifier paymentNotifier;
+    private final ResolveOverduePaymentUseCase resolveOverduePayment;
 
     @Override
     public PaymentResponseDTO execute(PassengerRequestCommand command) {
@@ -40,9 +45,14 @@ public class MarkPaymentAsPaidUseCase implements UseCase<PassengerRequestCommand
 
         Ride ride = rideAccess.getParticipatingRide(command.rideId(), command.firebaseUid());
         boolean wasOpen = ride.hasOpenChargeFor(userId);
+        int overdueCharges = ride.countOverdueOpenChargesFor(userId);
         ride.markPaymentAsPaid(userId);
 
         Ride saved = rideRepository.save(ride);
+        for (int i = 0; i < overdueCharges; i++) {
+            SafeActionHandler.run(log, "regularizar a dívida vencida do passageiro " + userId,
+                    () -> resolveOverduePayment.execute(userId));
+        }
         if (wasOpen) {
             paymentNotifier.notifyMarkedAsPaid(saved);
         }

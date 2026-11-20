@@ -745,6 +745,15 @@ public class Ride {
                 .forEach(participant -> participant.markPaidByPassenger(now));
     }
 
+    // Cobranças em aberto desse passageiro que já viraram dívida vencida
+    public int countOverdueOpenChargesFor(String passengerId) {
+        return (int) this.participants.stream()
+                .filter(participant -> participant.getRole() == ParticipationRole.PASSENGER)
+                .filter(participant -> participant.getUserId().equals(passengerId))
+                .filter(Participant::isOverdueOpenCharge)
+                .count();
+    }
+
     public boolean hasOpenChargeFor(String passengerId) {
         return this.participants.stream()
                 .filter(participant -> participant.getRole() == ParticipationRole.PASSENGER)

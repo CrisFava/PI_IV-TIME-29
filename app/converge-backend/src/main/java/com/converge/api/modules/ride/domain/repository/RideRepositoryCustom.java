@@ -52,4 +52,25 @@ public interface RideRepositoryCustom {
 
     // Viagens ainda não iniciadas (aguardando ou confirmadas) com saída até o limite
     List<Ride> findOpenRidesDepartedBefore(LocalDateTime limit);
+
+    // Viagens concluídas com cobrança não paga, emitida entre [since] e [dueLimit], ainda não vencida
+    List<Ride> findRidesWithDueCharges(LocalDateTime dueLimit, LocalDateTime since);
+
+    /**
+     * Marca a cobrança do passageiro como vencida, só se ela ainda estiver nas condições do prazo.
+     * Vazio quando nada foi marcado (já paga, já vencida ou fora do prazo).
+     */
+    Optional<Ride> markPaymentOverdueAtomic(
+            ObjectId rideId,
+            String passengerId,
+            LocalDateTime dueLimit,
+            LocalDateTime since,
+            LocalDateTime now
+    );
+
+    /**
+     * Marca como vencida a cobrança denunciada por falta de pagamento, mesmo já paga.
+     * Vazio quando o passageiro não foi cobrado ou a cobrança já está vencida.
+     */
+    Optional<Ride> markNonPaymentAtomic(ObjectId rideId, String passengerId, LocalDateTime now);
 }

@@ -73,6 +73,13 @@ public record Reputation(
         return new Reputation(driver, currentPassenger.withRating(averageRating, totalReviews, now));
     }
 
+    public Reputation withPassengerOverdueRide(LocalDateTime now) {
+        PassengerReputation currentPassenger = passenger != null
+                ? passenger
+                : defaultInitial().passenger();
+        return new Reputation(driver, currentPassenger.recordOverdueRide(now));
+    }
+
     public Reputation withPassengerNoShow(LocalDateTime now) {
         PassengerReputation currentPassenger = passenger != null
                 ? passenger

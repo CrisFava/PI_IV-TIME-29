@@ -38,6 +38,11 @@ public record PassengerReputation(
         return new PassengerReputation(computeLevel(updatedWindow, averageRating), averageRating, totalReviews, updatedWindow, now);
     }
 
+    public PassengerReputation recordOverdueRide(LocalDateTime now) {
+        PassengerWindow updatedWindow = baseWindow().withIncrementedOverdueRides();
+        return new PassengerReputation(computeLevel(updatedWindow, averageRating), averageRating, totalReviews, updatedWindow, now);
+    }
+
     // Conta mais uma viagem concluída na janela e recalcula o level.
     public PassengerReputation recordCompletedRide(LocalDateTime now) {
         PassengerWindow updatedWindow = baseWindow().withIncrementedCompletedRides();

@@ -173,4 +173,108 @@ class RideRepositoryImplTest {
         String queryStr = queryDoc.toString();
         assertThat(queryStr).contains("requestedAt");
     }
+
+    @Test
+    @DisplayName("markPaymentOverdueAtomic deve exigir cobrança PENDING, sem overdueAt, dentro do prazo e do corte, e somar version")
+    void shouldBuildConditionalQueryAndUpdateToMarkPaymentOverdue() {
+        ObjectId rideId = new ObjectId();
+        LocalDateTime now = LocalDateTime.of(2026, 11, 20, 12, 0);
+        LocalDateTime dueLimit = now.minusMinutes(5);
+        LocalDateTime since = LocalDateTime.of(2026, 11, 20, 0, 0);
+        Ride expected = sampleRide();
+        when(mongoTemplate.findAndModify(any(Query.class), any(Update.class), any(FindAndModifyOptions.class), eq(Ride.class)))
+                .thenReturn(expected);
+
+        Optional<Ride> result = repository.markPaymentOverdueAtomic(rideId, "passenger-1", dueLimit, since, now);
+
+        assertThat(result).contains(expected);
+        ArgumentCaptor<Query> queryCaptor = ArgumentCaptor.forClass(Query.class);
+        ArgumentCaptor<Update> updateCaptor = ArgumentCaptor.forClass(Update.class);
+        ArgumentCaptor<FindAndModifyOptions> optionsCaptor = ArgumentCaptor.forClass(FindAndModifyOptions.class);
+        verify(mongoTemplate).findAndModify(
+                queryCaptor.capture(), updateCaptor.capture(), optionsCaptor.capture(), eq(Ride.class));
+
+        String queryStr = queryCaptor.getValue().getQueryObject().toString();
+        assertThat(queryStr).contains("_id=" + rideId);
+        assertThat(queryStr).contains("status=COMPLETED");
+        assertThat(queryStr).contains("$elemMatch");
+        assertThat(queryStr).contains("userId=passenger-1");
+        assertThat(queryStr).contains("role=PASSENGER");
+        assertThat(queryStr).contains("paymentStatus=PENDING");
+        assertThat(queryStr).contains("overdueAt=null");
+        assertThat(queryStr).contains("$gte").contains("$lte");
+
+        Document updateDoc = updateCaptor.getValue().getUpdateObject();
+        Document setDoc = updateDoc.get("$set", Document.class);
+        assertThat(setDoc.get("participants.$.overdueAt")).isEqualTo(now);
+        assertThat(setDoc.get("participants.$.updatedAt")).isEqualTo(now);
+        assertThat(setDoc.get("updatedAt")).isEqualTo(now);
+        assertThat(setDoc).doesNotContainKey("participants.$.nonPaymentReportedAt");
+        assertThat(updateDoc.get("$inc", Document.class).getInteger("version")).isEqualTo(1);
+        assertThat(optionsCaptor.getValue().isReturnNew()).isTrue();
+    }
+
+    @Test
+    @DisplayName("markPaymentOverdueAtomic deve devolver vazio quando nada casou com o filtro")
+    void shouldReturnEmptyWhenNoPaymentWasMarkedOverdue() {
+        when(mongoTemplate.findAndModify(any(Query.class), any(Update.class), any(FindAndModifyOptions.class), eq(Ride.class)))
+                .thenReturn(null);
+
+        Optional<Ride> result = repository.markPaymentOverdueAtomic(
+                new ObjectId(), "passenger-1", LocalDateTime.now(), LocalDateTime.now().minusDays(1), LocalDateTime.now());
+
+        assertThat(result).isEmpty();
+    }
+
+    @Test
+    @DisplayName("markNonPaymentAtomic deve exigir cobrança paga, vencida antes ou não, uma denúncia só, e registrar a denúncia")
+    void shouldBuildQueryAndUpdateToMarkNonPayment() {
+        ObjectId rideId = new ObjectId();
+        LocalDateTime now = LocalDateTime.of(2026, 11, 20, 12, 0);
+        Ride expected = sampleRide();
+        when(mongoTemplate.findAndModify(any(Query.class), any(Update.class), any(FindAndModifyOptions.class), eq(Ride.class)))
+                .thenReturn(expected);
+
+        Optional<Ride> result = repository.markNonPaymentAtomic(rideId, "passenger-1", now);
+
+        assertThat(result).contains(expected);
+        ArgumentCaptor<Query> queryCaptor = ArgumentCaptor.forClass(Query.class);
+        ArgumentCaptor<Update> updateCaptor = ArgumentCaptor.forClass(Update.class);
+        verify(mongoTemplate).findAndModify(
+                queryCaptor.capture(), updateCaptor.capture(), any(FindAndModifyOptions.class), eq(Ride.class));
+
+        String queryStr = queryCaptor.getValue().getQueryObject().toString();
+        assertThat(queryStr).contains("userId=passenger-1");
+        assertThat(queryStr).contains("paymentRequestedAt=Document{{$ne=null}}");
+        assertThat(queryStr).contains("nonPaymentReportedAt=null");
+        assertThat(queryStr).contains("paymentStatus=PAID");
+        assertThat(queryStr).doesNotContain("overdueAt");
+
+        Document updateDoc = updateCaptor.getValue().getUpdateObject();
+        Document setDoc = updateDoc.get("$set", Document.class);
+        assertThat(setDoc.get("participants.$.overdueAt")).isEqualTo(now);
+        assertThat(setDoc.get("participants.$.nonPaymentReportedAt")).isEqualTo(now);
+        assertThat(updateDoc.get("$inc", Document.class).getInteger("version")).isEqualTo(1);
+    }
+
+    @Test
+    @DisplayName("findRidesWithDueCharges deve buscar só viagens concluídas com cobrança PENDING, sem overdueAt, no intervalo")
+    void shouldBuildQueryToFindRidesWithDueCharges() {
+        LocalDateTime dueLimit = LocalDateTime.of(2026, 11, 20, 11, 55);
+        LocalDateTime since = LocalDateTime.of(2026, 11, 20, 0, 0);
+        Ride ride = sampleRide();
+        when(mongoTemplate.find(any(Query.class), eq(Ride.class))).thenReturn(java.util.List.of(ride));
+
+        java.util.List<Ride> rides = repository.findRidesWithDueCharges(dueLimit, since);
+
+        assertThat(rides).containsExactly(ride);
+        ArgumentCaptor<Query> queryCaptor = ArgumentCaptor.forClass(Query.class);
+        verify(mongoTemplate).find(queryCaptor.capture(), eq(Ride.class));
+        String queryStr = queryCaptor.getValue().getQueryObject().toString();
+        assertThat(queryStr).contains("status=COMPLETED");
+        assertThat(queryStr).contains("paymentStatus=PENDING");
+        assertThat(queryStr).contains("overdueAt=null");
+        assertThat(queryStr).contains("$gte").contains("$lte");
+        assertThat(queryStr).contains("role=PASSENGER");
+    }
 }

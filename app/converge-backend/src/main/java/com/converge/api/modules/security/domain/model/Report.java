@@ -98,6 +98,11 @@ public class Report {
             throw new ApplicationException(
                     ErrorCode.BAD_REQUEST, "Informe a viagem em que houve atraso ou ausência.", Set.of("rideId"));
         }
+        // Falta de pagamento também é sobre uma viagem específica
+        if (reason == ReportReason.NON_PAYMENT && isBlank(rideId)) {
+            throw new ApplicationException(
+                    ErrorCode.BAD_REQUEST, "Informe a viagem em que o passageiro não pagou.", Set.of("rideId"));
+        }
         // "Outro" não diz nada sozinho: precisa de descrição
         if (reason == ReportReason.OTHER && isBlank(description)) {
             throw new ApplicationException(

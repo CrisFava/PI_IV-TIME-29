@@ -3,6 +3,7 @@
 package com.converge.api.modules.security.application;
 
 import com.converge.api.modules.security.application.dto.CreateReportRequestDTO;
+import com.converge.api.modules.security.application.gateway.PaymentDebtGateway;
 import com.converge.api.modules.security.application.gateway.RideParticipationLookupGateway;
 import com.converge.api.modules.security.application.gateway.RideParticipationLookupGateway.RideParticipants;
 import com.converge.api.modules.security.application.gateway.UserLookupGateway;
@@ -26,6 +27,7 @@ import static org.assertj.core.api.Assertions.assertThat;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.Mockito.never;
+import static org.mockito.Mockito.times;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.verifyNoInteractions;
 import static org.mockito.Mockito.when;
@@ -47,11 +49,14 @@ class CreateReportUseCaseTest {
     @Mock
     private RideParticipationLookupGateway rideLookup;
 
+    @Mock
+    private PaymentDebtGateway paymentDebt;
+
     private CreateReportUseCase useCase;
 
     @BeforeEach
     void setUp() {
-        useCase = new CreateReportUseCase(reportRepository, userLookup, rideLookup);
+        useCase = new CreateReportUseCase(reportRepository, userLookup, rideLookup, paymentDebt);
     }
 
     private static CreateReportRequestDTO request(String reportedId, ReportReason reason, String description, String rideId) {
@@ -152,6 +157,120 @@ class CreateReportUseCaseTest {
 
         assertFails(ErrorCode.NOT_ALLOWED, new CreateReportUseCase.Command(
                 DRIVER, request(STRANGER, ReportReason.LATE_NO_SHOW, null, RIDE_ID)));
+    }
+
+    private void rideWithChargedPassenger() {
+        when(rideLookup.findParticipants(RIDE_ID)).thenReturn(Optional.of(
+                new RideParticipants(RIDE_ID, DRIVER, Set.of(PASSENGER), Set.of(PASSENGER), Set.of(PASSENGER))));
+    }
+
+    @Test
+    @DisplayName("Cobrança sem \"Já paguei\" não pode ser denunciada, nem dentro nem fora do prazo")
+    void shouldRejectNonPaymentWhileChargeIsPendingWithinDeadline() {
+        when(userLookup.exists(PASSENGER)).thenReturn(true);
+        when(rideLookup.findParticipants(RIDE_ID)).thenReturn(Optional.of(
+                new RideParticipants(RIDE_ID, DRIVER, Set.of(PASSENGER), Set.of(PASSENGER), Set.of())));
+
+        assertFails(ErrorCode.BAD_REQUEST, nonPaymentBy(DRIVER, PASSENGER));
+
+        verifyNoInteractions(paymentDebt);
+    }
+
+    @Test
+    @DisplayName("Denúncia aceita continua salva mesmo quando a viagem não registra outra dívida")
+    void shouldKeepReportWhenNoNewDebtIsRegistered() {
+        when(userLookup.exists(PASSENGER)).thenReturn(true);
+        rideWithChargedPassenger();
+        when(reportRepository.save(any(Report.class))).thenAnswer(invocation -> invocation.getArgument(0));
+        when(paymentDebt.registerNonPayment(RIDE_ID, PASSENGER)).thenReturn(false);
+
+        Report report = useCase.execute(nonPaymentBy(DRIVER, PASSENGER));
+
+        assertThat(report.getReason()).isEqualTo(ReportReason.NON_PAYMENT);
+        verify(paymentDebt, times(1)).registerNonPayment(RIDE_ID, PASSENGER);
+    }
+
+    private CreateReportUseCase.Command nonPaymentBy(String reporter, String reported) {
+        return new CreateReportUseCase.Command(reporter, request(reported, ReportReason.NON_PAYMENT, null, RIDE_ID));
+    }
+
+    @Test
+    @DisplayName("Falta de pagamento do motorista contra passageiro cobrado deve ser salva e registrar a dívida uma vez")
+    void shouldCreateNonPaymentReportAndRegisterDebt() {
+        when(userLookup.exists(PASSENGER)).thenReturn(true);
+        rideWithChargedPassenger();
+        when(reportRepository.save(any(Report.class))).thenAnswer(invocation -> invocation.getArgument(0));
+
+        Report report = useCase.execute(nonPaymentBy(DRIVER, PASSENGER));
+
+        assertThat(report.getReason()).isEqualTo(ReportReason.NON_PAYMENT);
+        verify(paymentDebt, times(1)).registerNonPayment(RIDE_ID, PASSENGER);
+    }
+
+    @Test
+    @DisplayName("Só o motorista da viagem pode denunciar falta de pagamento")
+    void shouldRejectNonPaymentWhenReporterIsNotTheDriver() {
+        when(userLookup.exists(PASSENGER)).thenReturn(true);
+        when(rideLookup.findParticipants(RIDE_ID)).thenReturn(Optional.of(
+                new RideParticipants(RIDE_ID, DRIVER, Set.of(PASSENGER, STRANGER),
+                        Set.of(PASSENGER, STRANGER), Set.of(PASSENGER, STRANGER))));
+
+        assertFails(ErrorCode.NOT_ALLOWED, nonPaymentBy(STRANGER, PASSENGER));
+
+        verifyNoInteractions(paymentDebt);
+    }
+
+    @Test
+    @DisplayName("Falta de pagamento contra passageiro que não foi cobrado deve ser recusada")
+    void shouldRejectNonPaymentWhenPassengerWasNotCharged() {
+        when(userLookup.exists(PASSENGER)).thenReturn(true);
+        rideWithDriverAndPassenger();
+
+        assertFails(ErrorCode.NOT_ALLOWED, nonPaymentBy(DRIVER, PASSENGER));
+
+        verifyNoInteractions(paymentDebt);
+    }
+
+    @Test
+    @DisplayName("Segunda denúncia de falta de pagamento do mesmo passageiro na viagem deve ser recusada")
+    void shouldRejectSecondNonPaymentForSamePassengerAndRide() {
+        when(userLookup.exists(PASSENGER)).thenReturn(true);
+        rideWithChargedPassenger();
+        when(reportRepository.existsByReportedIdAndRideIdAndReason(PASSENGER, RIDE_ID, ReportReason.NON_PAYMENT))
+                .thenReturn(true);
+
+        assertFails(ErrorCode.BAD_REQUEST, nonPaymentBy(DRIVER, PASSENGER));
+
+        verifyNoInteractions(paymentDebt);
+    }
+
+    @Test
+    @DisplayName("Se a dívida não puder ser registrada, a denúncia continua salva")
+    void shouldKeepReportWhenDebtRegistrationFails() {
+        when(userLookup.exists(PASSENGER)).thenReturn(true);
+        rideWithChargedPassenger();
+        when(reportRepository.save(any(Report.class))).thenAnswer(invocation -> invocation.getArgument(0));
+        when(paymentDebt.registerNonPayment(RIDE_ID, PASSENGER)).thenThrow(new IllegalStateException("falhou"));
+
+        Report report = useCase.execute(nonPaymentBy(DRIVER, PASSENGER));
+
+        assertThat(report.getReason()).isEqualTo(ReportReason.NON_PAYMENT);
+        verify(reportRepository).save(any(Report.class));
+    }
+
+    @Test
+    @DisplayName("Outros motivos nunca registram dívida")
+    void shouldNotRegisterDebtForOtherReasons() {
+        when(userLookup.exists(PASSENGER)).thenReturn(true);
+        rideWithChargedPassenger();
+        when(reportRepository.save(any(Report.class))).thenAnswer(invocation -> invocation.getArgument(0));
+
+        useCase.execute(new CreateReportUseCase.Command(
+                DRIVER, request(PASSENGER, ReportReason.LATE_NO_SHOW, null, RIDE_ID)));
+        useCase.execute(new CreateReportUseCase.Command(
+                DRIVER, request(PASSENGER, ReportReason.INAPPROPRIATE_CONDUCT, null, RIDE_ID)));
+
+        verifyNoInteractions(paymentDebt);
     }
 
     @Test

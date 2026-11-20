@@ -3,6 +3,7 @@
 package com.converge.api.modules.ride.application;
 
 import com.converge.api.modules.ride.application.dto.RideParticipantsDTO;
+import com.converge.api.modules.ride.domain.enums.ParticipantPaymentStatus;
 import com.converge.api.modules.ride.domain.enums.ParticipantStatus;
 import com.converge.api.modules.ride.domain.model.Ride;
 import com.converge.api.modules.ride.domain.model.subtypes.Participant;
@@ -44,6 +45,25 @@ public class GetRideParticipantsUseCase implements UseCase<String, Optional<Ride
                 .filter(participant -> !NEVER_HAD_SEAT.contains(participant.getStatus()))
                 .map(Participant::getUserId)
                 .toList();
-        return new RideParticipantsDTO(ride.getId().toHexString(), ride.getDriverId(), passengerIds);
+        List<String> chargedPassengerIds = ride.getParticipants().stream()
+                .filter(participant -> participant.getRole() == ParticipationRole.PASSENGER)
+                .filter(participant -> participant.getStatus() == ParticipantStatus.COMPLETED)
+                .filter(Participant::isCharged)
+                .map(Participant::getUserId)
+                .distinct()
+                .toList();
+
+        // Só depois do "Já paguei" dá para denunciar falta de pagamento. Antes disso, quem cobre é o prazo
+        List<String> reportableIds = ride.getParticipants().stream()
+                .filter(participant -> participant.getRole() == ParticipationRole.PASSENGER)
+                .filter(participant -> participant.getStatus() == ParticipantStatus.COMPLETED)
+                .filter(Participant::isCharged)
+                .filter(participant -> participant.getPaymentStatus() == ParticipantPaymentStatus.PAID)
+                .map(Participant::getUserId)
+                .distinct()
+                .toList();
+
+        return new RideParticipantsDTO(
+                ride.getId().toHexString(), ride.getDriverId(), passengerIds, chargedPassengerIds, reportableIds);
     }
 }
