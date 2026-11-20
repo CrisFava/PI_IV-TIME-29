@@ -4,10 +4,10 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 
 import '../../../../core/config/styles.dart';
+import '../../../../core/widgets/more_info_hint.dart';
 import '../../../ride/data/models/participant_status.dart';
 import '../../data/models/driver_ride_request.dart';
 import '../../../ride/presentation/widgets/ride_place_line.dart';
-import '../../../security/presentation/widgets/user_safety_menu.dart';
 import 'match_date_label.dart';
 import 'match_info_chip.dart';
 
@@ -20,12 +20,16 @@ class RideRequestCard extends StatelessWidget {
   final VoidCallback onReject;
   final VoidCallback onOpenChat;
 
+  /// Toque no card: os detalhes do pedido, com o mapa do desvio.
+  final VoidCallback? onOpenDetails;
+
   const RideRequestCard({
     super.key,
     required this.request,
     required this.onAccept,
     required this.onReject,
     required this.onOpenChat,
+    this.onOpenDetails,
     this.isBusy = false,
   });
 
@@ -34,10 +38,20 @@ class RideRequestCard extends StatelessWidget {
     final ride = request.ride;
     final departure = ride.departureDateTime;
     final pending = request.passenger.status == ParticipantStatus.requested;
+    // Sem vaga livre, só dá para recusar (o painel nem mostra esses pedidos)
     final isFull = ride.availableSeats <= 0;
     final boarding = request.passenger.boardingLocation?.address ?? '';
+    final dropOff = request.passenger.dropOffLocation?.address ?? '';
+    // O horário que o passageiro escolheu na busca; igual ao da carona, não precisa
+    final rideTime = departure == null
+        ? null
+        : '${departure.hour.toString().padLeft(2, '0')}:'
+              '${departure.minute.toString().padLeft(2, '0')}';
+    final wantedTime = request.passenger.requestedDepartureTime == rideTime
+        ? null
+        : request.passenger.requestedDepartureTime;
 
-    return Container(
+    final card = Container(
       padding: const EdgeInsets.all(14),
       decoration: BoxDecoration(
         color: AppColors.cardBackground,
@@ -82,12 +96,6 @@ class RideRequestCard extends StatelessWidget {
                   ],
                 ),
               ),
-              if (request.passenger.userId != null)
-                UserSafetyMenu(
-                  userId: request.passenger.userId!,
-                  userName: request.passenger.displayName,
-                  rideId: ride.id,
-                ),
             ],
           ),
           const SizedBox(height: 10),
@@ -100,13 +108,11 @@ class RideRequestCard extends StatelessWidget {
                   icon: Icons.event_rounded,
                   label: matchDateTimeLabel(departure),
                 ),
-              MatchInfoChip(
-                icon: Icons.event_seat_rounded,
-                label: isFull
-                    ? 'Carona lotada (${ride.totalSeats}/${ride.totalSeats})'
-                    : '${ride.availableSeats}/${ride.totalSeats} vagas livres',
-                alert: isFull,
-              ),
+              if (wantedTime != null)
+                MatchInfoChip(
+                  icon: Icons.schedule_rounded,
+                  label: 'Quer sair às $wantedTime',
+                ),
             ],
           ),
           if (boarding.isNotEmpty) ...[
@@ -114,6 +120,18 @@ class RideRequestCard extends StatelessWidget {
             RidePlaceLine(
               icon: Icons.trip_origin_rounded,
               text: 'Embarca em $boarding',
+            ),
+          ],
+          if (dropOff.isNotEmpty) ...[
+            const SizedBox(height: 4),
+            RidePlaceLine(icon: Icons.flag_rounded, text: 'Desce em $dropOff'),
+          ],
+          // Tocar no card abre o mapa do desvio e os detalhes do pedido
+          if (this.onOpenDetails != null) ...[
+            const SizedBox(height: 6),
+            const Align(
+              alignment: Alignment.centerRight,
+              child: MoreInfoHint(),
             ),
           ],
           const SizedBox(height: 12),
@@ -202,6 +220,22 @@ class RideRequestCard extends StatelessWidget {
               ),
             ),
         ],
+      ),
+    );
+
+    final onOpenDetails = this.onOpenDetails;
+    if (onOpenDetails == null) return card;
+    return Material(
+      color: AppColors.cardBackground,
+      borderRadius: BorderRadius.circular(18),
+      child: InkWell(
+        key: ValueKey('request_card_${request.key}'),
+        borderRadius: BorderRadius.circular(18),
+        onTap: () {
+          HapticFeedback.lightImpact();
+          onOpenDetails();
+        },
+        child: card,
       ),
     );
   }

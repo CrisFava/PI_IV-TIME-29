@@ -39,20 +39,16 @@ void main() {
   ElevatedButton acceptButton(WidgetTester tester) =>
       tester.widget<ElevatedButton>(find.byType(ElevatedButton));
 
-  testWidgets('mostra as vagas livres sobre o total e deixa aceitar', (
-    tester,
-  ) async {
+  testWidgets('com vaga livre, deixa aceitar', (tester) async {
     await pumpCard(tester, pendingRequest(availableSeats: 2));
 
-    expect(find.text('2/3 vagas livres'), findsOneWidget);
     expect(find.text('Aceitar'), findsOneWidget);
     expect(acceptButton(tester).onPressed, isNotNull);
   });
 
-  testWidgets('carona lotada: avisa e bloqueia o aceite', (tester) async {
+  testWidgets('carona lotada: bloqueia o aceite', (tester) async {
     await pumpCard(tester, pendingRequest(availableSeats: 0));
 
-    expect(find.text('Carona lotada (3/3)'), findsOneWidget);
     expect(find.text('Lotada'), findsOneWidget);
     expect(acceptButton(tester).onPressed, isNull);
   });

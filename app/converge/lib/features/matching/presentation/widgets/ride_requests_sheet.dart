@@ -31,6 +31,7 @@ import '../../state/ride_request_actions_controller.dart';
 import '../../../route/state/offer_route_controller.dart';
 import 'driver_offer_card.dart';
 import 'driver_offer_details.dart';
+import 'match_date_label.dart';
 import 'matching_message.dart';
 import 'matching_section_title.dart';
 import 'passenger_ride_card.dart';
@@ -141,6 +142,7 @@ class _RideRequestsSheetState extends ConsumerState<RideRequestsSheet> {
         onRejectRequest: _reject,
         onOpenRequestChat: _openChat,
         onArrive: _arrivePassenger,
+        onRemovePassenger: _removePassenger,
       ),
     );
   }
@@ -175,6 +177,39 @@ class _RideRequestsSheetState extends ConsumerState<RideRequestsSheet> {
         .read(driverRideActionsProvider.notifier)
         .markNoShow(rideId, passengerId);
     if (mounted && error != null) _showMessage(error);
+  }
+
+  /// Tira um passageiro confirmado da viagem, antes de ela começar. Pede confirmação
+  /// com o nome e a viagem; o passageiro é avisado pelo backend.
+  Future<void> _removePassenger(String rideId, String passengerId) async {
+    final ride = (ref.read(myRidesProvider).value ?? const <RideModel>[])
+        .where((r) => r.id == rideId)
+        .firstOrNull;
+    final passenger = ride?.passengerOf(passengerId);
+    if (ride == null || passenger == null) return;
+    final departure = ride.departureDateTime;
+    final confirmed = await _confirm(
+      title: 'Remover ${passenger.displayName}?',
+      message:
+          '${passenger.displayName} sai da viagem'
+          '${departure == null ? '' : ' de ${matchDateTimeLabel(departure)}'}'
+          ' e é avisado(a). Remover um passageiro confirmado conta na sua reputação.',
+      confirmLabel: 'Remover',
+    );
+    if (!confirmed) return;
+    final error = await ref
+        .read(rideRequestActionsProvider.notifier)
+        .reject(DriverRideRequest(ride: ride, passenger: passenger));
+    if (!mounted) return;
+    if (error != null) {
+      _showMessage(error);
+      return;
+    }
+    showAppNotice(
+      context,
+      '${passenger.displayName} foi removido(a) da viagem.',
+      type: AppNoticeType.success,
+    );
   }
 
   /// "Chegou": o passageiro desceu, a viagem dele termina e ele recebe a cobrança do rateio.

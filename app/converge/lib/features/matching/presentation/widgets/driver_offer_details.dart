@@ -1,6 +1,7 @@
 // Autor: Gustavo Alves de Siqueira Costa - RA 25001650
 
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../../../core/config/styles.dart';
@@ -13,6 +14,8 @@ import '../../data/models/driver_offer.dart';
 import '../../data/models/driver_ride_request.dart';
 import '../../state/driver_offers_provider.dart';
 import '../../state/driver_ride_actions_controller.dart';
+import '../../../../core/widgets/details_sheet.dart';
+import '../../../ride/presentation/widgets/ride_route_overview.dart';
 import 'driver_offer_title.dart';
 import 'driver_ride_card.dart';
 import 'matching_message.dart';
@@ -41,6 +44,9 @@ class DriverOfferDetails extends ConsumerStatefulWidget {
   /// Confirma a chegada de um passageiro na viagem em andamento (ele recebe a cobrança).
   final void Function(String rideId, String passengerId) onArrive;
 
+  /// Tira um passageiro confirmado da viagem (com confirmação; ele é avisado).
+  final void Function(String rideId, String passengerId) onRemovePassenger;
+
   const DriverOfferDetails({
     super.key,
     required this.offerKey,
@@ -53,6 +59,7 @@ class DriverOfferDetails extends ConsumerStatefulWidget {
     required this.onRejectRequest,
     required this.onOpenRequestChat,
     required this.onArrive,
+    required this.onRemovePassenger,
   });
 
   @override
@@ -100,7 +107,12 @@ class _DriverOfferDetailsState extends ConsumerState<DriverOfferDetails> {
     final firstRide = offer.rides.isEmpty ? null : offer.rides.first;
     final distanceKm = route?.routeDistanceKm;
     final detourKm = route?.maxDetourKm;
-    final seats = route?.totalSeats;
+    final seats = route?.totalSeats ?? firstRide?.totalSeats;
+    // Ocupadas na próxima viagem (sobe a cada passageiro aceito)
+    final nextRide = offer.actionableRide ?? offer.openRides.firstOrNull;
+    final occupied = nextRide == null
+        ? 0
+        : nextRide.totalSeats - nextRide.availableSeats;
     final stats = [
       if (distanceKm != null)
         DetailsStatTile(
@@ -117,8 +129,8 @@ class _DriverOfferDetailsState extends ConsumerState<DriverOfferDetails> {
       if (seats != null)
         DetailsStatTile(
           icon: Icons.event_seat_rounded,
-          value: '$seats',
-          label: seats == 1 ? 'Vaga' : 'Vagas',
+          value: '$occupied/$seats',
+          label: 'Vagas ocupadas',
         ),
     ];
 
@@ -173,6 +185,42 @@ class _DriverOfferDetailsState extends ConsumerState<DriverOfferDetails> {
               ],
             ),
           ),
+        // O trajeto completo da próxima viagem (ou só o caminho, sem ninguém aceito)
+        if (nextRide != null || route != null)
+          Padding(
+            padding: const EdgeInsets.only(top: 12),
+            child: FilledButton.icon(
+              key: const ValueKey('offer_full_route'),
+              onPressed: () {
+                HapticFeedback.mediumImpact();
+                final ride = nextRide;
+                showDetailsSheet<void>(
+                  context,
+                  title: 'Trajeto completo',
+                  builder: (_) => ride != null
+                      ? RideRouteOverview.ofRide(
+                          ride,
+                          fallbackPolyline: route?.encodedPolyline,
+                          fallbackDistanceKm: route?.routeDistanceKm,
+                        )
+                      : RideRouteOverview.ofRoute(route!),
+                );
+              },
+              style: FilledButton.styleFrom(
+                backgroundColor: AppColors.primary,
+                foregroundColor: AppColors.textLight,
+                padding: const EdgeInsets.symmetric(vertical: 12),
+                shape: RoundedRectangleBorder(
+                  borderRadius: BorderRadius.circular(12),
+                ),
+              ),
+              icon: const Icon(Icons.route_rounded, size: 20),
+              label: const Text(
+                'Ver trajeto completo',
+                style: TextStyle(fontWeight: FontWeight.w700),
+              ),
+            ),
+          ),
         // Pedidos esperando resposta: só aqui, dentro da carona
         OfferRideRequests(
           offer: offer,
@@ -204,6 +252,8 @@ class _DriverOfferDetailsState extends ConsumerState<DriverOfferDetails> {
                               widget.onMarkNoShow(ride.id, passengerId),
                           onArrive: (passengerId) =>
                               widget.onArrive(ride.id, passengerId),
+                          onRemovePassenger: (passengerId) =>
+                              widget.onRemovePassenger(ride.id, passengerId),
                         ),
                       ),
                   ],

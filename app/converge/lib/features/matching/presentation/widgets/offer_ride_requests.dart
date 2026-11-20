@@ -5,6 +5,7 @@ import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../../../core/config/styles.dart';
+import '../../../../core/widgets/details_sheet.dart';
 import '../../data/models/driver_offer.dart';
 import '../../data/models/driver_ride_request.dart';
 import '../../state/driver_ride_requests_provider.dart';
@@ -12,9 +13,10 @@ import '../../state/ride_request_actions_controller.dart';
 import 'matching_message.dart';
 import 'matching_section_title.dart';
 import 'ride_request_card.dart';
+import 'ride_request_details.dart';
 
 /// Os pedidos de vaga de uma carona, dentro dos detalhes dela: do mais antigo ao
-/// mais novo, 10 por página, com busca pelo nome (para dar carona a um amigo).
+/// mais novo, 5 por página, com busca pelo nome (para dar carona a um amigo).
 /// Com o carro cheio, a lista some e só volta se alguém sair.
 class OfferRideRequests extends ConsumerStatefulWidget {
   final DriverOffer offer;
@@ -35,7 +37,7 @@ class OfferRideRequests extends ConsumerStatefulWidget {
 }
 
 class _OfferRideRequestsState extends ConsumerState<OfferRideRequests> {
-  static const _perPage = 10;
+  static const _perPage = 5;
   final _search = TextEditingController();
   int _page = 0;
 
@@ -43,6 +45,29 @@ class _OfferRideRequestsState extends ConsumerState<OfferRideRequests> {
   void dispose() {
     _search.dispose();
     super.dispose();
+  }
+
+  /// Detalhes do pedido: de onde sai, para onde vai, a hora e o mapa do desvio.
+  void _openDetails(DriverRideRequest request) {
+    showDetailsSheet<void>(
+      context,
+      title: 'Pedido de vaga',
+      builder: (sheetContext) => RideRequestDetails(
+        request: request,
+        onAccept: () {
+          Navigator.of(sheetContext).pop();
+          widget.onAccept(request);
+        },
+        onReject: () {
+          Navigator.of(sheetContext).pop();
+          widget.onReject(request);
+        },
+        onOpenChat: () {
+          Navigator.of(sheetContext).pop();
+          widget.onOpenChat(request);
+        },
+      ),
+    );
   }
 
   @override
@@ -86,6 +111,7 @@ class _OfferRideRequestsState extends ConsumerState<OfferRideRequests> {
                 onAccept: () => widget.onAccept(request),
                 onReject: () => widget.onReject(request),
                 onOpenChat: () => widget.onOpenChat(request),
+                onOpenDetails: () => _openDetails(request),
               ),
             ),
           if (pages > 1)
