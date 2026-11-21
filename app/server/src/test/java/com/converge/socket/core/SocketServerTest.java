@@ -56,10 +56,16 @@ class SocketServerTest {
         }
     }
 
-    private static int findFreePort() throws Exception {
-        try (ServerSocket socket = new ServerSocket(0)) {
-            return socket.getLocalPort();
+    private static boolean waitUntil(java.util.function.BooleanSupplier condition, long timeoutMs)
+            throws InterruptedException {
+        long deadline = System.nanoTime() + timeoutMs * 1_000_000L;
+        while (!condition.getAsBoolean()) {
+            if (System.nanoTime() >= deadline) {
+                return false;
+            }
+            Thread.sleep(10);
         }
+        return true;
     }
 
     @Test
@@ -97,8 +103,7 @@ class SocketServerTest {
     @Test
     @DisplayName("start e stop devem ser idempotentes")
     void shouldMakeStartAndStopIdempotent() throws Exception {
-        int port = findFreePort();
-        SocketServer server = new SocketServer(port);
+        SocketServer server = new SocketServer(0);
 
         // stop antes de start não deve falhar
         server.stop();
@@ -107,6 +112,7 @@ class SocketServerTest {
         try {
             server.start();
             assertTrue(server.isRunning());
+            assertTrue(server.getPort() > 0);
 
             // segundo start não deve falhar nem rebindar
             server.start();
@@ -137,11 +143,11 @@ class SocketServerTest {
     @Test
     @DisplayName("Servidor deve atender requisições TCP, devolver ErrorResponse para não registradas e notificar clientes no stop")
     void shouldHandleClientRequestsAndNotifyClientsOnStop() throws Exception {
-        int port = findFreePort();
-        SocketServer server = new SocketServer(port);
+        SocketServer server = new SocketServer(0);
         server.registerHandler(UppercaseRequest.class, req -> new UppercaseResponse(req.getInput().toUpperCase()));
 
         server.start();
+        int port = server.getPort();
         try (Socket client = new Socket(InetAddress.getLoopbackAddress(), port)) {
             client.setSoTimeout(3000);
             ObjectOutputStream out = new ObjectOutputStream(client.getOutputStream());
@@ -174,11 +180,11 @@ class SocketServerTest {
     @Test
     @DisplayName("Desconexão graciosa do cliente deve removê-lo do ClientRegistry mantendo o servidor ativo")
     void shouldKeepServerRunningAfterClientDisconnectsGracefully() throws Exception {
-        int port = findFreePort();
-        SocketServer server = new SocketServer(port);
+        SocketServer server = new SocketServer(0);
         server.registerHandler(UppercaseRequest.class, req -> new UppercaseResponse(req.getInput().toUpperCase()));
 
         server.start();
+        int port = server.getPort();
         try {
             try (Socket client = new Socket(InetAddress.getLoopbackAddress(), port)) {
                 client.setSoTimeout(3000);
@@ -193,6 +199,11 @@ class SocketServerTest {
                 out.writeObject(new DisconnectRequest());
                 out.flush();
             }
+
+            assertTrue(
+                    waitUntil(() -> server.getClientRegistry().getActiveCount() == 0, 3000),
+                    "ClientRegistry deveria ficar vazio após a desconexão graciosa"
+            );
 
             // Servidor continua ativo e aceita nova conexão
             try (Socket secondClient = new Socket(InetAddress.getLoopbackAddress(), port)) {

@@ -18,6 +18,7 @@ import java.io.ObjectOutputStream;
 import java.io.OutputStream;
 import java.net.Socket;
 import java.util.concurrent.atomic.AtomicBoolean;
+import java.util.concurrent.atomic.AtomicInteger;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
@@ -229,21 +230,45 @@ class ClientConnectionTest {
     @DisplayName("close deve fechar recursos, atualizar isClosed e ser idempotente")
     void shouldCloseResourcesAndBeIdempotent() throws Exception {
         DummySocket socket = new DummySocket();
-        ClientConnection connection = new ClientConnection(
-                socket,
-                createObjectInputStream(),
-                new ObjectOutputStream(new ByteArrayOutputStream())
-        );
+        AtomicInteger receiverCloses = new AtomicInteger(0);
+        AtomicInteger transmitterCloses = new AtomicInteger(0);
+
+        ByteArrayOutputStream serializedEmpty = new ByteArrayOutputStream();
+        try (ObjectOutputStream oos = new ObjectOutputStream(serializedEmpty)) {
+            oos.flush();
+        }
+        ObjectInputStream trackingReceiver = new ObjectInputStream(
+                new ByteArrayInputStream(serializedEmpty.toByteArray())
+        ) {
+            @Override
+            public void close() throws IOException {
+                receiverCloses.incrementAndGet();
+                super.close();
+            }
+        };
+        ObjectOutputStream trackingTransmitter = new ObjectOutputStream(new ByteArrayOutputStream()) {
+            @Override
+            public void close() throws IOException {
+                transmitterCloses.incrementAndGet();
+                super.close();
+            }
+        };
+
+        ClientConnection connection = new ClientConnection(socket, trackingReceiver, trackingTransmitter);
 
         assertFalse(connection.isClosed());
 
         connection.close();
         assertTrue(connection.isClosed());
         assertTrue(socket.isClosed());
+        assertEquals(1, receiverCloses.get());
+        assertEquals(1, transmitterCloses.get());
 
-        // Segunda chamada não deve lançar exceção
+        // Segunda chamada não deve fechar os streams novamente nem lançar exceção
         connection.close();
         assertTrue(connection.isClosed());
+        assertEquals(1, receiverCloses.get());
+        assertEquals(1, transmitterCloses.get());
     }
 
     @Test

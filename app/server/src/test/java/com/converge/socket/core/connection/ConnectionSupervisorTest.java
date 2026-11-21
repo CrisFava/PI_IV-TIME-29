@@ -118,6 +118,18 @@ class ConnectionSupervisorTest {
         }
     }
 
+    private static boolean waitUntil(java.util.function.BooleanSupplier condition, long timeoutMs)
+            throws InterruptedException {
+        long deadline = System.nanoTime() + timeoutMs * 1_000_000L;
+        while (!condition.getAsBoolean()) {
+            if (System.nanoTime() >= deadline) {
+                return false;
+            }
+            Thread.sleep(10);
+        }
+        return true;
+    }
+
     @Test
     @DisplayName("Deve encerrar e remover cliente do registro quando receber mensagem nula")
     void shouldDisconnectWhenReceivingNullMessage() throws Exception {
@@ -126,6 +138,7 @@ class ConnectionSupervisorTest {
 
         try (ServerSocket serverSocket = new ServerSocket(0, 1, InetAddress.getLoopbackAddress())) {
             try (Socket clientSocket = new Socket(InetAddress.getLoopbackAddress(), serverSocket.getLocalPort())) {
+                clientSocket.setSoTimeout(3000);
                 Socket accepted = serverSocket.accept();
 
                 ConnectionSupervisor supervisor = new ConnectionSupervisor(accepted, clientRegistry, handlerRegistry);
@@ -152,21 +165,28 @@ class ConnectionSupervisorTest {
         HandlerRegistry handlerRegistry = new HandlerRegistry();
 
         try (ServerSocket serverSocket = new ServerSocket(0, 1, InetAddress.getLoopbackAddress())) {
-            Socket clientSocket = new Socket(InetAddress.getLoopbackAddress(), serverSocket.getLocalPort());
-            Socket accepted = serverSocket.accept();
+            try (Socket clientSocket = new Socket(InetAddress.getLoopbackAddress(), serverSocket.getLocalPort())) {
+                clientSocket.setSoTimeout(3000);
+                Socket accepted = serverSocket.accept();
 
-            ConnectionSupervisor supervisor = new ConnectionSupervisor(accepted, clientRegistry, handlerRegistry);
-            supervisor.start();
+                ConnectionSupervisor supervisor = new ConnectionSupervisor(accepted, clientRegistry, handlerRegistry);
+                supervisor.start();
 
-            ObjectOutputStream out = new ObjectOutputStream(clientSocket.getOutputStream());
-            out.flush();
-            new ObjectInputStream(clientSocket.getInputStream());
+                ObjectOutputStream out = new ObjectOutputStream(clientSocket.getOutputStream());
+                out.flush();
+                new ObjectInputStream(clientSocket.getInputStream());
 
-            clientSocket.close();
+                assertTrue(
+                        waitUntil(() -> clientRegistry.getActiveCount() == 1, 3000),
+                        "Cliente deveria estar registrado antes do fechamento abrupto"
+                );
 
-            supervisor.join(3000);
-            assertTrue(!supervisor.isAlive());
-            assertEquals(0, clientRegistry.getActiveCount());
+                clientSocket.close();
+
+                supervisor.join(3000);
+                assertTrue(!supervisor.isAlive());
+                assertEquals(0, clientRegistry.getActiveCount());
+            }
         }
     }
 
