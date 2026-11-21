@@ -3,6 +3,8 @@
 package com.converge.api.modules.user.application.service;
 
 import com.converge.api.modules.user.application.CreateUserUseCase;
+import com.converge.api.modules.user.application.ValidatePixCpfUseCase;
+import com.converge.api.modules.user.domain.enums.user.PixKeyType;
 import com.converge.api.modules.user.domain.enums.user.ParticipationRole;
 import com.converge.api.modules.user.domain.model.user.User;
 import com.converge.api.modules.user.application.dto.AcademicRecordRequestDTO;
@@ -25,6 +27,9 @@ import java.util.Set;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.Mockito.never;
+import static org.mockito.Mockito.verify;
+import static org.mockito.Mockito.verifyNoInteractions;
 import static org.mockito.Mockito.when;
 
 @ExtendWith(MockitoExtension.class)
@@ -33,13 +38,16 @@ class UserServiceTest {
     @Mock
     private UserRepository userRepository;
 
+    @Mock
+    private ValidatePixCpfUseCase validatePixCpf;
+
     private CreateUserUseCase createUserUseCase;
     private UserUtils userUtils;
 
     @BeforeEach
     void setUp() {
         UserMapper mapper = new UserMapper();
-        createUserUseCase = new CreateUserUseCase(userRepository, mapper);
+        createUserUseCase = new CreateUserUseCase(userRepository, mapper, validatePixCpf);
         userUtils = new UserUtils(userRepository);
     }
 
@@ -118,5 +126,45 @@ class UserServiceTest {
                 () -> userUtils.getCurrentUser("uid-inexistente")
         );
         assertThat(ex.getError().code()).isEqualTo(ErrorCode.USER_NOT_FOUND);
+    }
+
+    private CreateUserRequestDTO requestWithPix(String pixKey, PixKeyType pixKeyType) {
+        CreateUserRequestDTO base = validRequest();
+        return new CreateUserRequestDTO(
+                base.firebaseUid(), base.name(), base.email(), base.phone(), base.photoUrl(),
+                base.participationRoles(), base.academicRecord(), base.driverLicense(), pixKey, pixKeyType
+        );
+    }
+
+    @Test
+    @DisplayName("Deve conferir o CPF da chave PIX no servidor ao cadastrar")
+    void shouldValidateCpfPixKeyOnSignup() {
+        when(userRepository.save(any(User.class))).thenAnswer(invocation -> invocation.getArgument(0));
+
+        createUserUseCase.execute(requestWithPix("529.982.247-25", PixKeyType.CPF));
+
+        verify(validatePixCpf).execute("529.982.247-25");
+    }
+
+    @Test
+    @DisplayName("Não deve conferir CPF quando a chave PIX é de outro tipo")
+    void shouldNotValidateCpfForOtherPixKeyTypes() {
+        when(userRepository.save(any(User.class))).thenAnswer(invocation -> invocation.getArgument(0));
+
+        createUserUseCase.execute(requestWithPix("ana@email.com", PixKeyType.EMAIL));
+
+        verifyNoInteractions(validatePixCpf);
+    }
+
+    @Test
+    @DisplayName("CPF recusado pelo servidor impede o cadastro")
+    void shouldNotCreateUserWhenCpfIsRefused() {
+        when(validatePixCpf.execute("529.982.247-26")).thenThrow(new ApplicationException(
+                ErrorCode.BAD_REQUEST, "CPF inválido.", Set.of("pixKey")));
+
+        assertThrows(ApplicationException.class,
+                () -> createUserUseCase.execute(requestWithPix("529.982.247-26", PixKeyType.CPF)));
+
+        verify(userRepository, never()).save(any(User.class));
     }
 }

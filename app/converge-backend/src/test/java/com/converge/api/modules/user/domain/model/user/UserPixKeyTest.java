@@ -72,7 +72,7 @@ class UserPixKeyTest {
         user.updateProfile("Ana Souza", "(19) 91234-5678", null, "ana@email.com", PixKeyType.EMAIL);
 
         assertThrows(ApplicationException.class,
-                () -> user.updateProfile("Ana Souza", "(19) 91234-5678", null, "529.982.247-26", PixKeyType.CPF));
+                () -> user.updateProfile("Ana Souza", "(19) 91234-5678", null, "123", PixKeyType.CPF));
 
         assertThat(user.getPixKey()).isEqualTo("ana@email.com");
         assertThat(user.getPixKeyType()).isEqualTo(PixKeyType.EMAIL);

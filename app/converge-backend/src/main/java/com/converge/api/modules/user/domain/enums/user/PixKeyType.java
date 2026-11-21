@@ -1,4 +1,4 @@
-// Autor: Allan Giovanni Matias Paes - RA 25008211
+// Autor: Sara Fernandes Monteiro - RA 25024107
 
 package com.converge.api.modules.user.domain.enums.user;
 
@@ -13,9 +13,8 @@ import java.util.Set;
  * normalize: valida a chave conforme o tipo e devolve no formato padrão do PIX.
  * normalizeEmail: e-mail em minúsculas e com formato válido.
  * normalizePhone: celular com DDD, devolvido como +55DDDNÚMERO.
- * normalizeCpf: CPF só com dígitos, conferindo os dígitos verificadores.
- * hasValidCpfCheckDigits: confere se os 2 últimos dígitos do CPF batem com a conta.
- * cpfCheckDigits: calcula um dígito verificador do CPF (módulo 11).
+ * normalizeCpf: CPF só com dígitos (11 números). Os dígitos verificadores são conferidos
+ * no servidor, pelo ValidatePixCpfUseCase, antes de a chave ser salva.
  * normalizeRandom: chave aleatória (UUID) em minúsculas.
  * invalid: cria o erro 400 apontando o campo pixKey.
  */
@@ -58,25 +57,10 @@ public enum PixKeyType {
 
     private static String normalizeCpf(String key) {
         String digits = key.replaceAll("[.\\-\\s]", "");
-        if (!digits.matches("\\d{11}") || digits.chars().distinct().count() == 1 || !hasValidCpfCheckDigits(digits)) {
+        if (!digits.matches("\\d{11}")) {
             throw invalid("CPF da chave PIX inválido.");
         }
         return digits;
-    }
-
-    private static boolean hasValidCpfCheckDigits(String digits) {
-        return digits.charAt(9) - '0' == cpfCheckDigits(digits, 9)
-                && digits.charAt(10) - '0' == cpfCheckDigits(digits, 10);
-    }
-
-    private static int cpfCheckDigits(String digits, int length) {
-        int sum = 0;
-        for (int i = 0; i < length; i++) {
-            sum += (digits.charAt(i) - '0') * (length + 1 - i);
-        }
-        int rest = (sum * 10) % 11;
-
-        return rest == 10 ? 0 : rest;
     }
 
     private static String normalizeRandom(String key) {

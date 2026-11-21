@@ -30,12 +30,8 @@ class PixKeyTypeTest {
     }
 
     @ParameterizedTest(name = "CPF inválido: \"{0}\"")
-    @DisplayName("CPF com dígito verificador errado, repetido, curto ou com letras é recusado")
+    @DisplayName("CPF curto, longo, com letras ou vazio é recusado (os dígitos verificadores ficam com o servidor)")
     @ValueSource(strings = {
-            "529.982.247-26",
-            "529.982.248-25",
-            "111.111.111-11",
-            "000.000.000-00",
             "5299822472",
             "529.982.247-255",
             "abc.def.ghi-jk",
