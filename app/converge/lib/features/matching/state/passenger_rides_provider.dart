@@ -15,7 +15,7 @@ const _upcomingStatuses = {
 };
 
 /// Viagens em que o usuário logado vai como passageiro, já aceito pelo motorista,
-/// e que ainda não terminaram. Aparecem em "Minhas caronas" com a etiqueta
+/// e que ainda não terminaram. Aparecem em "Caronas ativas" com a etiqueta
 /// "Passageiro". Recarregue com `ref.invalidate(myRidesProvider)`.
 final myPassengerRidesProvider = FutureProvider.autoDispose<List<RideModel>>((
   ref,

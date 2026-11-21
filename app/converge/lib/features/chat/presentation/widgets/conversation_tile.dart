@@ -66,7 +66,7 @@ class ConversationTile extends StatelessWidget {
                             conversation.viewerIsDriver
                                 ? 'Grupo: ${conversation.otherPartyName}'
                                 : 'Carona com ${conversation.otherPartyName}',
-                            maxLines: 1,
+                            maxLines: 2,
                             overflow: TextOverflow.ellipsis,
                             style: const TextStyle(
                               fontWeight: FontWeight.w700,
@@ -88,7 +88,7 @@ class ConversationTile extends StatelessWidget {
                     const SizedBox(height: 4),
                     Text(
                       '${ride.origin.address} → ${ride.destination.address}',
-                      maxLines: 1,
+                      maxLines: 2,
                       overflow: TextOverflow.ellipsis,
                       style: const TextStyle(
                         fontSize: 12.5,
