@@ -22,7 +22,7 @@ void main() {
 
     expect(find.text('Conversa liberada'), findsOneWidget);
     expect(
-      find.text('Combinem por aqui o ponto de encontro e o valor da carona.'),
+      find.text('Combinem por aqui o ponto de encontro da carona.'),
       findsOneWidget,
     );
   });

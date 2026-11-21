@@ -37,7 +37,7 @@ class ChatMessageList extends StatelessWidget {
           : const ChatNotice(
               icon: Icons.forum_rounded,
               title: 'Conversa liberada',
-              message: 'Combinem por aqui o ponto de encontro e o valor da carona.',
+              message: 'Combinem por aqui o ponto de encontro da carona.',
             );
     }
 
