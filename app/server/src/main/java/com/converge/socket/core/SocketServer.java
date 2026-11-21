@@ -96,7 +96,7 @@ public class SocketServer {
     }
 
     public int getPort() {
-        return port;
+        return serverSocket != null ? serverSocket.getLocalPort() : port;
     }
 
     public ClientRegistry getClientRegistry() {
