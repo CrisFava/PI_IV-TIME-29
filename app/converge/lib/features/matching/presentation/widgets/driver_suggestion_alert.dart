@@ -24,8 +24,10 @@ class DriverSuggestionAlert extends StatelessWidget {
     return InAppNotificationCard(
       key: ValueKey('driver_suggestion_${match.driverRouteId}'),
       icon: Icons.directions_car_rounded,
-      title: 'Motorista disponível',
-      message: '${match.otherUserName} pode te dar carona. Toque para ver.',
+      title: 'Encontramos um motorista',
+      message:
+          '${match.otherUserName} tem uma carona compatível com a sua. '
+          'Toque para ver e pedir a vaga.',
       onTap: onOpen,
       onDismiss: onDismiss,
     );
