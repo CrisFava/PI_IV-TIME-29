@@ -1,5 +1,7 @@
 // Autor: Sara Fernandes Monteiro - RA 25024107
 
+import 'dart:io';
+
 import 'package:converge/features/chat/data/models/chat_message_model.dart';
 import 'package:converge/features/chat/data/models/chat_message_type.dart';
 import 'package:converge/features/chat/presentation/widgets/chat_time.dart';
@@ -33,6 +35,27 @@ void main() {
         'Ontem',
       );
     });
+
+    test(
+      'ontem continua sendo Ontem após o início do horário de verão',
+      () {
+        final now = DateTime(2026, 3, 9);
+        final yesterday = DateTime(2026, 3, 8);
+        final sentAt = DateTime(2026, 3, 8, 23, 59).toUtc();
+
+        expect(now.difference(yesterday), const Duration(hours: 23));
+        expect(
+          [
+            formatChatDay(sentAt, now: now),
+            formatConversationTime(sentAt, now: now),
+          ],
+          ['Ontem', 'Ontem'],
+        );
+      },
+      skip: Platform.environment['TZ'] != 'America/New_York'
+          ? 'Execute com TZ=America/New_York.'
+          : null,
+    );
 
     test('antes disso mostra o dia e o mês', () {
       expect(
