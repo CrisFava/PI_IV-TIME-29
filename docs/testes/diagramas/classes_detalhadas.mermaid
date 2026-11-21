@@ -1,0 +1,192 @@
+%%{init: {'theme': 'base', 'themeVariables': { 'primaryColor': '#F8FAFC', 'primaryBorderColor': '#334155', 'primaryTextColor': '#0F172A', 'lineColor': '#475569', 'fontFamily': 'Segoe UI, Arial, sans-serif', 'fontSize': '13px' }}}%%
+classDiagram
+    direction TB
+
+    %% Protocolo de Mensagens
+    class Message {
+        -long serialVersionUID$
+        +clone() Object
+    }
+
+    class DisconnectRequest {
+        -long serialVersionUID$
+        -String reason
+        +DisconnectRequest()
+        +DisconnectRequest(String reason)
+        +getReason() String
+        +toString() String
+    }
+
+    class ServerShutdownNotification {
+        -long serialVersionUID$
+        -String reason
+        +ServerShutdownNotification()
+        +ServerShutdownNotification(String reason)
+        +getReason() String
+        +toString() String
+    }
+
+    class ErrorResponse {
+        -long serialVersionUID$
+        -String errorCode
+        -String errorMessage
+        +ErrorResponse(ServerErrorCode errorCode)
+        +ErrorResponse(ServerErrorCode errorCode, String errorMessage)
+        +ErrorResponse(String errorCode, String errorMessage)
+        +getErrorCode() String
+        +getErrorMessage() String
+        +toString() String
+    }
+
+    %% Exceções do Servidor
+    class ServerErrorCode {
+        <<enumeration>>
+        PORT_IN_USE
+        CONNECTION_ERROR
+        DISCONNECTION_ERROR
+        TRANSMISSION_ERROR
+        RECEPTION_ERROR
+        CLIENT_DISCONNECTED
+        INVALID_MESSAGE
+        STREAM_INITIALIZATION_ERROR
+        INTERNAL_SERVER_ERROR
+        SERVER_SHUTDOWN
+        -String code
+        -String defaultMessage
+        +getCode() String
+        +getDefaultMessage() String
+        +toString() String
+    }
+
+    class ServerException {
+        -ServerErrorCode errorCode
+        +ServerException(ServerErrorCode errorCode)
+        +ServerException(ServerErrorCode errorCode, String message)
+        +ServerException(ServerErrorCode errorCode, String message, Throwable cause)
+        +ServerException(ServerErrorCode errorCode, Throwable cause)
+        +getErrorCode() ServerErrorCode
+        +getErrorCodeString() String
+        +getMessage() String
+    }
+
+    %% Núcleo e Despacho de Handlers
+    class RequestHandler~T, R~ {
+        <<interface>>
+        +execute(T request)* R
+    }
+
+    class HandlerRegistry {
+        -Map~Class, RequestHandler~ handlers
+        +register(Class requestClass, RequestHandler handler) void
+        +dispatch(Message request) Message
+    }
+
+    %% Conexões e Clientes
+    class ClientConnection {
+        -Socket socket
+        -ObjectInputStream receiver
+        -ObjectOutputStream transmitter
+        -Message nextMessage
+        -Semaphore mutex
+        -boolean closed
+        +ClientConnection(Socket socket, ObjectInputStream receiver, ObjectOutputStream transmitter)
+        +send(Message message) void
+        +peek() Message
+        +receive() Message
+        +close() void
+        +isClosed() boolean
+    }
+
+    class ClientRegistry {
+        -List~ClientConnection~ clients
+        +add(ClientConnection client) void
+        +remove(ClientConnection client) void
+        +getAll() List~ClientConnection~
+        +getActiveCount() int
+        +broadcast(Message message) void
+        +closeAll(Message notification) void
+    }
+
+    %% Threads e Orquestrador
+    class ConnectionAcceptor {
+        -ServerSocket serverSocket
+        -ClientRegistry clientRegistry
+        -HandlerRegistry handlerRegistry
+        +ConnectionAcceptor(ServerSocket serverSocket, ClientRegistry clientRegistry, HandlerRegistry handlerRegistry)
+        +run() void
+    }
+
+    class ConnectionSupervisor {
+        -Socket socket
+        -ClientRegistry clientRegistry
+        -HandlerRegistry handlerRegistry
+        -ClientConnection clientConnection
+        +ConnectionSupervisor(Socket socket, ClientRegistry clientRegistry, HandlerRegistry handlerRegistry)
+        +run() void
+    }
+
+    class SocketServer {
+        +int DEFAULT_PORT$
+        -int port
+        -ClientRegistry clientRegistry
+        -HandlerRegistry handlerRegistry
+        -ServerSocket serverSocket
+        -ConnectionAcceptor connectionAcceptor
+        -boolean running
+        +SocketServer()
+        +SocketServer(int port)
+        +registerHandler(Class requestClass, RequestHandler handler) SocketServer
+        +start() void
+        +stop() void
+        +isRunning() boolean
+        +getPort() int
+        +getClientRegistry() ClientRegistry
+        +getHandlerRegistry() HandlerRegistry
+    }
+
+    %% Domínio de Negócio: Custos e Rateio de Carona
+    class RideCostHandler {
+        +execute(RideCostRequest request) RideCostResponse
+        -confirmationQuote(RideCostRequest request) RideCostResponse
+        -costSharing(RideCostRequest request) RideCostResponse
+        -detourKm(RideCostRequest request) double
+        -routeCost(double distanceKm, RideCostRequest request) BigDecimal
+        -energyCost(double distanceKm, RideCostRequest request) BigDecimal
+        -validateRequest(RideCostRequest request) void
+    }
+
+    class RideCostRequest {
+        -long serialVersionUID$
+        -Operation operation
+        -double baseDistanceKm
+        -Double legOriginToBoardingKm
+        -Double legBoardingToDropOffKm
+        -Double legDropOffToDestinationKm
+        -double averageConsumption
+        -BigDecimal energyPrice
+        -BigDecimal toll
+        -BigDecimal parking
+        -List~PassengerCostInput~ passengers
+        +forConfirmationQuote(...) RideCostRequest$
+        +forCostSharing(...) RideCostRequest$
+        +getOperation() Operation
+        +getBaseDistanceKm() double
+        +getPassengers() List~PassengerCostInput~
+    }
+
+    class RideCostResponse {
+        -long serialVersionUID$
+        -Double detourGeneratedKm
+        -BigDecimal maxAmount
+        -Double totalDistanceWithDetoursKm
+        -BigDecimal energyCost
+        -BigDecimal totalCost
+        -BigDecimal totalShared
+        -Map~String, BigDecimal~ sharesByPassenger
+        +forConfirmationQuote(...) RideCostResponse$
+        +forCostSharing(...) RideCostResponse$
+        +getDetourGeneratedKm() Double
+        +getMaxAmount() BigDecimal
+        +getTotalCost() BigDecimal
+        +getSharesByPassenger() Map~String, BigDecimal~
+    }
