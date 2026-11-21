@@ -35,5 +35,18 @@ enum PassengerRideStep {
   waitingDriver,
 
   /// Passageiro: Motorista aceitou! Exibe o ponto de partida dele e o atalho para o chat.
-  driverAccepted,
+  driverAccepted;
+
+  /// A partida já foi confirmada: sair daqui joga fora o que a pessoa escolheu.
+  bool get hasConfirmedPickup => switch (this) {
+    idle || selectPickup || dragMapPickup => false,
+    searchDestination ||
+    dragMapDestination ||
+    routePreview ||
+    routeConfirmation ||
+    offerDetails ||
+    driverList ||
+    waitingDriver ||
+    driverAccepted => true,
+  };
 }

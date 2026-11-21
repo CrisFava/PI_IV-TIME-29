@@ -127,8 +127,8 @@ class _HomeRideAlertsOverlayState extends ConsumerState<HomeRideAlertsOverlay> {
               icon: Icons.check_circle_rounded,
               title: 'Carona confirmada',
               message: accepted.driverName == null
-                  ? 'Seu pedido foi aceito. Toque para ver em "Minhas caronas".'
-                  : '${accepted.driverName} aceitou seu pedido. Toque para ver em "Minhas caronas".',
+                  ? 'Seu pedido foi aceito. Toque para ver em "Caronas ativas".'
+                  : '${accepted.driverName} aceitou seu pedido. Toque para ver em "Caronas ativas".',
               onTap: () {
                 _dismissNotification(accepted.key);
                 widget.onDismissAcceptedNotice?.call();

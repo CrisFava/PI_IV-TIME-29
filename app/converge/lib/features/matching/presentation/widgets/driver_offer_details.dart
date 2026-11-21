@@ -21,7 +21,7 @@ import 'driver_ride_card.dart';
 import 'matching_message.dart';
 import 'offer_ride_requests.dart';
 
-/// Detalhes de uma carona de "Minhas caronas": o trajeto completo, as vagas, cada
+/// Detalhes de uma carona de "Caronas ativas": o trajeto completo, as vagas, cada
 /// viagem com os passageiros (e o chat) e "Cancelar carona". Acompanha a lista,
 /// então reflete na hora um passageiro aceito ou uma viagem iniciada.
 class DriverOfferDetails extends ConsumerStatefulWidget {
@@ -99,7 +99,7 @@ class _DriverOfferDetailsState extends ConsumerState<DriverOfferDetails> {
 
     if (offer == null) {
       return const MatchingMessage(
-        text: 'Esta carona não está mais em "Minhas caronas".',
+        text: 'Esta carona não está mais em "Caronas ativas".',
       );
     }
 

@@ -11,7 +11,7 @@ import '../../data/models/driver_offer.dart';
 import 'driver_offer_title.dart';
 import 'driver_ride_action_button.dart';
 
-/// Uma carona em "Minhas caronas", resumida: quando sai, de onde para onde e como
+/// Uma carona em "Caronas ativas", resumida: quando sai, de onde para onde e como
 /// estão os pedidos. Tocar abre os detalhes (passageiros, chat e cancelar).
 /// "Iniciar trajeto" e "Concluir viagem" ficam à mão aqui mesmo.
 class DriverOfferCard extends StatelessWidget {

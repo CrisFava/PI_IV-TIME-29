@@ -15,7 +15,7 @@ class RideDockNavigation extends StatefulWidget {
   /// Callback disparado quando o usuário seleciona "Pedir ride".
   final VoidCallback onRequestRide;
 
-  /// Callback disparado quando o usuário seleciona "Minhas caronas" (ou, com a viagem em andamento, as paradas).
+  /// Callback disparado quando o usuário seleciona "Caronas ativas" (ou, com a viagem em andamento, as paradas).
   final VoidCallback onStartDriverShift;
 
   /// Estado de abertura opcional controlado externamente.
@@ -214,7 +214,7 @@ class _RideDockNavigationState extends State<RideDockNavigation>
                             widget.onStartDriverShift();
                           }
                         },
-                        // "Minhas caronas" abre para todos: o passageiro vê as viagens em que vai
+                        // "Caronas ativas" abre para todos: o passageiro vê as viagens em que vai
                         onStartDriverShift: () {
                           _handleToggle();
                           widget.onStartDriverShift();
@@ -739,7 +739,7 @@ class _RidesPopoverCard extends StatelessWidget {
             _buildVehicleBlockedRow()
           else
             _CompactActionRow(
-              title: 'Minhas caronas',
+              title: 'Caronas ativas',
               subtitle: canDrive
                   ? 'Ofereça uma carona ou veja as suas.'
                   : 'Veja as caronas em que você vai.',
