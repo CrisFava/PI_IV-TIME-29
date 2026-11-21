@@ -1,0 +1,102 @@
+%%{init: {
+  'theme': 'base',
+  'themeVariables': {
+    'background': '#FFFFFF',
+    'mainBkg': '#FFFFFF',
+    'primaryColor': '#F0F9FF',
+    'primaryBorderColor': '#0284C7',
+    'primaryTextColor': '#0F172A',
+    'actorBkg': '#E0F2FE',
+    'actorBorder': '#0284C7',
+    'actorTextColor': '#0369A1',
+    'actorLineColor': '#64748B',
+    'signalColor': '#0284C7',
+    'signalTextColor': '#0F172A',
+    'signalLabelBkgColor': '#E0F2FE',
+    'signalLabelColor': '#0F172A',
+    'activationBkgColor': '#DCFCE7',
+    'activationBorderColor': '#16A34A',
+    'noteBkgColor': '#FEF3C7',
+    'noteBorderColor': '#D97706',
+    'noteTextColor': '#78350F',
+    'labelBoxBkgColor': '#E0F2FE',
+    'labelBoxBorderColor': '#0284C7',
+    'labelTextColor': '#0F172A',
+    'loopTextColor': '#0F172A',
+    'altSectionBkgColor': '#F0F9FF',
+    'altSectionBkgColor2': '#DCFCE7',
+    'sequenceNumberColor': '#FFFFFF',
+    'fontFamily': 'Segoe UI, Arial, sans-serif',
+    'fontSize': '13px'
+  },
+  'themeCSS': '
+    .messageText {
+      paint-order: stroke fill;
+      stroke: #FFFFFF;
+      stroke-width: 3px;
+      stroke-linejoin: round;
+    }
+    text.actor > tspan {
+      paint-order: stroke fill;
+      stroke: #FFFFFF;
+      stroke-width: 2.5px;
+      stroke-linejoin: round;
+    }
+    .noteText > tspan {
+      paint-order: stroke fill;
+      stroke: #FEF3C7;
+      stroke-width: 2.5px;
+      stroke-linejoin: round;
+    }
+  '
+}}%%
+sequenceDiagram
+    autonumber
+    actor Cliente as Cliente (SocketClient)
+    participant Server as SocketServer
+    participant Acceptor as ConnectionAcceptor
+    participant Supervisor as ConnectionSupervisor
+    participant Conn as ClientConnection
+    participant Registry as ClientRegistry
+    participant HandlerReg as HandlerRegistry
+    participant Handler as RideCostHandler
+
+    Note over Server, Acceptor: Inicialização do Servidor TCP (Porta efêmera ou 3000)
+    Server->>Acceptor: start()
+    activate Acceptor
+
+    Note over Cliente, Acceptor: Conexão e Handshake de Object Streams
+    Cliente->>Acceptor: TCP Connect (SYN / ACK)
+    Acceptor->>Supervisor: new ConnectionSupervisor(socket, clientRegistry, handlerRegistry)
+    Acceptor->>Supervisor: start()
+    activate Supervisor
+    
+    Supervisor->>Conn: new ClientConnection(socket, in, out)
+    activate Conn
+    Supervisor->>Registry: add(clientConnection)
+    
+    Note over Cliente, Handler: Transmissão da Requisição de Negócio
+    Cliente->>Conn: writeObject(RideCostRequest)
+    Conn->>Supervisor: receive() -> RideCostRequest
+    
+    Supervisor->>HandlerReg: dispatch(RideCostRequest)
+    activate HandlerReg
+    HandlerReg->>Handler: execute(RideCostRequest)
+    activate Handler
+    Handler-->>HandlerReg: RideCostResponse (custos e rateio calculados)
+    deactivate Handler
+    HandlerReg-->>Supervisor: RideCostResponse
+    deactivate HandlerReg
+
+    Supervisor->>Conn: send(RideCostResponse)
+    Conn->>Cliente: writeObject(RideCostResponse)
+    
+    Note over Cliente, Supervisor:Desconexão Graciosa do Cliente
+    Cliente->>Conn: writeObject(DisconnectRequest)
+    Conn->>Supervisor: receive() -> DisconnectRequest
+    Supervisor->>Registry: remove(clientConnection)
+    Supervisor->>Conn: close()
+    deactivate Conn
+    Supervisor-->>Acceptor: Thread finalizada com sucesso
+    deactivate Supervisor
+    deactivate Acceptor
