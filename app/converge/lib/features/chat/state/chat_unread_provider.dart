@@ -2,6 +2,8 @@
 
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
+import '../data/models/chat_message_model.dart';
+import '../data/models/chat_thread_ref.dart';
 import '../data/repository/chat_read_store.dart';
 import 'chat_providers.dart';
 
@@ -29,25 +31,46 @@ class ChatReadController extends AsyncNotifier<Map<String, DateTime>> {
   }
 }
 
+/// Quantas mensagens dos outros o usuário ainda não viu: as que chegaram depois da
+/// última vez que ele abriu a conversa ([lastRead]), ou todas, se nunca abriu.
+int unreadMessages(
+  List<ChatMessageModel> messages, {
+  required DateTime? lastRead,
+  required String viewerUid,
+}) {
+  var unread = 0;
+  for (final message in messages) {
+    final sentAt = message.sentAt;
+    final isNew =
+        lastRead == null || (sentAt != null && sentAt.isAfter(lastRead));
+    if (isNew && !message.isSentBy(viewerUid)) unread++;
+  }
+  return unread;
+}
+
+/// Mensagens dos outros que o usuário ainda não viu em uma conversa. É o número
+/// na linha da conversa, na aba "Mensagens".
+final conversationUnreadProvider = Provider.autoDispose
+    .family<int, ChatThreadRef>((ref, thread) {
+      final viewer = ref.watch(chatViewerProvider);
+      final reads = ref.watch(chatReadProvider).value;
+      if (viewer == null || reads == null) return 0;
+
+      final messages = ref.watch(chatMessagesProvider(thread)).value ?? const [];
+      return unreadMessages(
+        messages,
+        lastRead: reads[thread.path],
+        viewerUid: viewer.firebaseUid,
+      );
+    });
+
 /// Mensagens dos outros participantes que o usuário ainda não viu, somando todas
 /// as conversas. É o número na aba "Chat" da navbar.
 final chatUnreadCountProvider = Provider.autoDispose<int>((ref) {
-  final viewer = ref.watch(chatViewerProvider);
-  final reads = ref.watch(chatReadProvider).value;
-  if (viewer == null || reads == null) return 0;
-
   final conversations = ref.watch(conversationsProvider).value ?? const [];
-  var unread = 0;
-  for (final conversation in conversations) {
-    final messages =
-        ref.watch(chatMessagesProvider(conversation.thread)).value ?? const [];
-    final lastRead = reads[conversation.thread.path];
-    for (final message in messages) {
-      final sentAt = message.sentAt;
-      final isNew =
-          lastRead == null || (sentAt != null && sentAt.isAfter(lastRead));
-      if (isNew && !message.isSentBy(viewer.firebaseUid)) unread++;
-    }
-  }
-  return unread;
+  return conversations.fold(
+    0,
+    (total, conversation) =>
+        total + ref.watch(conversationUnreadProvider(conversation.thread)),
+  );
 });

@@ -7,6 +7,7 @@ import '../../../../core/config/styles.dart';
 import '../../../ride/state/ride_providers.dart';
 import '../../data/models/chat_conversation.dart';
 import '../../state/chat_providers.dart';
+import '../../state/conversation_order.dart';
 import 'conversation_tile.dart';
 import 'conversations_empty_state.dart';
 
@@ -18,7 +19,7 @@ class ConversationsTab extends ConsumerWidget {
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
-    final conversations = ref.watch(conversationsProvider);
+    final conversations = ref.watch(orderedConversationsProvider);
     final padding = EdgeInsets.fromLTRB(16, 16, 16, 120 + bottomPadding);
 
     return RefreshIndicator(
