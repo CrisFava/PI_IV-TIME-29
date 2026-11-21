@@ -92,6 +92,11 @@ jobs:
       - name: Executar testes
         run: flutter test
 
+      - name: Testar etiquetas do chat na mudança de horário de verão
+        env:
+          TZ: America/New_York
+        run: flutter test test/features/chat/conversation_list_info_test.dart
+
   aprovado:
     name: Testes aprovados
     runs-on: ubuntu-latest
