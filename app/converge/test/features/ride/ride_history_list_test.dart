@@ -124,6 +124,19 @@ void main() {
       expect(find.text('12/11/2026 · 07:40 – 08:15'), findsOneWidget);
     });
 
+    testWidgets('com início e fim iguais, mostra o horário uma vez', (
+      tester,
+    ) async {
+      await _pumpHistory(tester, [
+        _ride(
+          startedAt: '2026-11-12T07:40:00',
+          completedAt: '2026-11-12T07:40:00',
+        ),
+      ]);
+
+      expect(find.text('12/11/2026 · 07:40'), findsOneWidget);
+    });
+
     testWidgets('fim antes do horário marcado não vira uma faixa ao contrário', (
       tester,
     ) async {

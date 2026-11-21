@@ -33,7 +33,7 @@ class RideHistoryTile extends StatelessWidget {
     final start = item.startedAt ?? item.departureDateTime;
     final end = item.completedAt;
     if (start == null && end == null) return 'Data a definir';
-    if (start == null || (end != null && end.isBefore(start))) {
+    if (start == null || (end != null && !end.isAfter(start))) {
       return _dayAndTime(end!);
     }
     if (end == null) return _dayAndTime(start);
