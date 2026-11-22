@@ -459,31 +459,37 @@ class ServerInterClassIntegrationTest {
 
 ### g) Diagrama de sequência equivalente ao item (f), cenário NORMAL
 
-> **Arquivo do Diagrama Mermaid:** [sequencia_cenario_normal.mermaid](file:///E:/PIs/PI_IV_ES_TIME_29/docs/testes/diagramas/sequencia_cenario_normal.mermaid)
+> **Arquivo do Diagrama no Astah:** [sequencia_cenario_normal.asta](../entrega_teste_oo/astah/sequencia_cenario_normal.asta)
+
+![Diagrama de sequência do cenário normal](../entrega_teste_oo/astah/imagens/atualizado/converge_teste_oo/Diagramas/07_Sequencia_cenario_normal.png)
 
 #### Rastreamento Passo a Passo do Cenário Interclasse Normal
 
-O fluxo do cenário de integração normal executado no teste [ServerInterClassIntegrationTest.java](file:///E:/PIs/PI_IV_ES_TIME_29/app/server/src/test/java/com/converge/socket/core/ServerInterClassIntegrationTest.java) organiza-se em 4 fases sequenciais:
+O fluxo do cenário de integração normal executado no teste [ServerInterClassIntegrationTest.java](../../app/server/src/test/java/com/converge/socket/core/ServerInterClassIntegrationTest.java) (método `testNormalExecutionFlow`) organiza-se em 5 fases sequenciais. O "Teste" é o próprio método de teste, que faz o papel de cliente usando um `java.net.Socket` com `ObjectOutputStream` e `ObjectInputStream`. No diagrama, as setas de ponta aberta são assíncronas: a conexão TCP, os objetos que viajam pelo socket (`RideCostRequest`, `RideCostResponse` e `DisconnectRequest`) e o `start()` que dispara as threads do `ConnectionAcceptor` e do `ConnectionSupervisor`.
 
 | Passo | Origem $\rightarrow$ Destino | Ação / Mensagem Trocada | Descrição Técnica |
 | :---- | :--------------------------- | :---------------------- | :---------------- |
 | **Fase 1** | **Inicialização do Servidor TCP** | | |
-| 1 | `SocketServer` $\rightarrow$ `ConnectionAcceptor` | `start()` | Inicializa `ServerSocket` vinculando à porta configurada (porta 0 efêmera nos testes para evitar condições de corrida) e inicia a thread `ConnectionAcceptor`. |
+| 1 | `Teste` $\rightarrow$ `SocketServer` | `new SocketServer(0)` | Cria o servidor com `ClientRegistry` e `HandlerRegistry` vazios. A porta 0 faz o sistema escolher uma porta livre, o que evita conflito entre testes. |
+| 2 | `Teste` $\rightarrow$ `SocketServer` | `registerHandler(RideCostRequest.class, new RideCostHandler())` | O servidor repassa o cadastro ao `HandlerRegistry.register`, que associa a classe da mensagem ao handler. |
+| 3 | `Teste` $\rightarrow$ `SocketServer` | `start()` | Abre o `ServerSocket` na porta, cria o `ConnectionAcceptor` com os dois registros e inicia a thread dele. |
+| 4 | `Teste` $\rightarrow$ `SocketServer` | `getPort()` | Devolve a porta realmente atribuída ao `ServerSocket`, usada pelo cliente para conectar. |
 | **Fase 2** | **Conexão e Handshake** | | |
-| 2 | `Cliente` $\rightarrow$ `ConnectionAcceptor` | `TCP Connect (SYN / ACK)` | Cliente abre socket TCP em `localhost:port`. `serverSocket.accept()` desbloqueia retornando o socket cliente conectado. |
-| 3 | `ConnectionAcceptor` $\rightarrow$ `ConnectionSupervisor` | `new ConnectionSupervisor(...)` & `start()` | Instancia supervisor passando socket, `ClientRegistry` e `HandlerRegistry`, disparando a thread dedicada de atendimento. |
-| 4 | `ConnectionSupervisor` $\rightarrow$ `ClientConnection` | `new ClientConnection(socket, in, out)` | Cria wrapper encapsulando os Object Streams com controle de concorrência e buffer `peek()`. |
-| 5 | `ConnectionSupervisor` $\rightarrow$ `ClientRegistry` | `add(clientConnection)` | Adiciona a conexão à lista thread-safe de clientes ativos do servidor. |
+| 5 | `Teste` $\rightarrow$ `ConnectionAcceptor` | conexão TCP (`new Socket(loopback, porta)`) | O cliente abre a conexão TCP. No servidor, `serverSocket.accept()` desbloqueia e devolve o socket do cliente. |
+| 6 | `ConnectionAcceptor` $\rightarrow$ `ConnectionSupervisor` | `new ConnectionSupervisor(...)` e `start()` | Cria o supervisor com o socket, o `ClientRegistry` e o `HandlerRegistry`, e inicia uma thread dedicada a esse cliente. |
+| 7 | `ConnectionSupervisor` $\rightarrow$ `ConnectionSupervisor` | `new ObjectOutputStream(...)`, `flush()` e `new ObjectInputStream(...)` | Cria os streams de objetos, sempre a saída com `flush()` antes da entrada. O cliente faz o mesmo, para os dois lados não ficarem esperando o cabeçalho um do outro. |
+| 8 | `ConnectionSupervisor` $\rightarrow$ `ClientConnection` | `new ClientConnection(socket, receiver, transmitter)` | Cria o objeto que encapsula o socket e os streams, com `send()`, `receive()` e `close()`. |
+| 9 | `ConnectionSupervisor` $\rightarrow$ `ClientRegistry` | `add(clientConnection)` | Adiciona a conexão à lista de clientes ativos do servidor. |
 | **Fase 3** | **Transmissão e Execução da Regra de Negócio** | | |
-| 6 | `Cliente` $\rightarrow$ `ClientConnection` | `out.writeObject(RideCostRequest)` | Cliente serializa `RideCostRequest.forCostSharing(...)` com os dados da rota e passageiros. |
-| 7 | `ClientConnection` $\rightarrow$ `ConnectionSupervisor` | `receive() -> RideCostRequest` | Supervisor consome o objeto desserializado do stream de entrada. |
-| 8 | `ConnectionSupervisor` $\rightarrow$ `HandlerRegistry` | `dispatch(RideCostRequest)` | Supervisor despacha a requisição para o registro de handlers. |
-| 9 | `HandlerRegistry` $\rightarrow$ `RideCostHandler` | `execute(RideCostRequest)` | Localiza o handler cadastrado para a classe e invoca a computação das regras de rateio. |
-| 10 | `RideCostHandler` $\rightarrow$ `HandlerRegistry` | `return RideCostResponse` | Retorna resposta com `totalCost`, `detourGeneratedKm` e `sharesByPassenger` calculados. |
-| 11 | `HandlerRegistry` $\rightarrow$ `ConnectionSupervisor` | `return RideCostResponse` | Devolve a resposta ao supervisor. |
-| 12 | `ConnectionSupervisor` $\rightarrow$ `ClientConnection` | `send(RideCostResponse)` | Supervisor aciona envio na conexão do cliente. |
-| 13 | `ClientConnection` $\rightarrow$ `Cliente` | `out.writeObject(RideCostResponse)` | Escreve e descarrega (`flush()`) o objeto de resposta no socket TCP. O cliente lê via `in.readObject()` e valida as cotas. |
+| 10 | `Teste` $\rightarrow$ `ClientConnection` | `RideCostRequest` (enviado com `writeObject` e `flush()`) | O cliente envia o `RideCostRequest.forCostSharing(...)` com os dados da rota e o passageiro `aluno_puc`. |
+| 11 | `ConnectionSupervisor` $\rightarrow$ `ClientConnection` | `receive()` retorna `RideCostRequest` | O supervisor lê o objeto desserializado do stream de entrada. |
+| 12 | `ConnectionSupervisor` $\rightarrow$ `HandlerRegistry` | `dispatch(RideCostRequest)` | Pede ao registro que localize o handler pela classe da mensagem. |
+| 13 | `HandlerRegistry` $\rightarrow$ `RideCostHandler` | `execute(RideCostRequest)` | O handler calcula o rateio e devolve o `RideCostResponse` (`totalCost` e cota de `aluno_puc` de 30.00). Se algo desse errado, o `dispatch` converteria o erro em `ErrorResponse`, que é o cenário alternativo. |
+| 14 | `HandlerRegistry` $\rightarrow$ `ConnectionSupervisor` | retorna `RideCostResponse` | A resposta volta ao supervisor. |
+| 15 | `ConnectionSupervisor` $\rightarrow$ `ClientConnection` | `send(RideCostResponse)` | A resposta é escrita no socket. O teste lê com `readObject()` e confere o tipo da resposta, o `totalCost` e a cota do passageiro. |
 | **Fase 4** | **Desconexão Graciosa** | | |
-| 14 | `Cliente` $\rightarrow$ `ClientConnection` | `out.writeObject(DisconnectRequest)` | Cliente sinaliza término voluntário de sessão enviando `DisconnectRequest`. |
-| 15 | `ClientConnection` $\rightarrow$ `ConnectionSupervisor` | `receive() -> DisconnectRequest` | Supervisor detecta mensagem de encerramento. |
-| 16 | `ConnectionSupervisor` $\rightarrow$ `ClientRegistry` & `ClientConnection` | `remove(clientConnection)` & `close()` | Remove o cliente do registro de ativos, fecha streams/socket e encerra a thread sem erros. |
+| 16 | `Teste` $\rightarrow$ `ClientConnection` | `DisconnectRequest` (enviado com `writeObject` e `flush()`) | O cliente avisa que vai encerrar a sessão. |
+| 17 | `ConnectionSupervisor` $\rightarrow$ `ClientConnection` | `receive()` retorna `DisconnectRequest` | O supervisor reconhece a mensagem de encerramento e sai do laço de atendimento. O servidor não envia resposta a esse pedido. |
+| 18 | `ConnectionSupervisor` $\rightarrow$ `ClientRegistry` e `ClientConnection` | `remove(clientConnection)` e `close()` | No bloco `finally`, remove o cliente do registro e fecha os streams e o socket. A thread do supervisor termina. O `try-with-resources` do teste fecha o socket do cliente. |
+| **Fase 5** | **Encerramento do Servidor** | | |
+| 19 | `Teste` $\rightarrow$ `SocketServer` | `stop()` | Executado no `finally` do teste: fecha o `ServerSocket`, chama `clientRegistry.closeAll(ServerShutdownNotification)` (envia o aviso e fecha as conexões que ainda estiverem no registro) e espera a thread do `ConnectionAcceptor` terminar (`join(1000)`). Com o `ServerSocket` fechado, o `accept()` lança `SocketException` e o laço do `ConnectionAcceptor` acaba. |
