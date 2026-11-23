@@ -8,7 +8,7 @@
 > **Datas e horas:** todos os campos `ISODate` são armazenados em **UTC** no Mongo. Campos de hora recorrente (`departureTime`, `estimatedArrivalTime`) são `String "HH:mm"` interpretados no fuso oficial da aplicação (**America/Sao_Paulo**). No código, as datas são `LocalDateTime` (sem fuso) no horário de Brasília, e a conversão para UTC usa o **fuso da máquina** onde o backend roda. Por isso o backend precisa rodar com o fuso America/Sao_Paulo. Numa máquina em UTC (nuvem, Docker), os horários e os prazos (corte de 5 min, expiração dos pedidos, cancelamento de viagem não iniciada) ficam 3 horas errados. Fixar o fuso na subida do backend fica como evolução.
 > **Chat:** as mensagens entre participantes **não ficam no MongoDB** — vivem no **Firebase Realtime Database**, conforme a arquitetura do projeto (comunicação em tempo real). O MongoDB guarda apenas o identificador da sala de conversa quando necessário (ex.: um `chatRoomId` na viagem para localizar o histórico no Firebase). Por isso não há coleção `messages`/`chat` nesta modelagem.
 >
-> Estrutura no Realtime Database: `chats/{chatRoomId}/group/messages/{pushId}`: **um grupo por viagem**, com o motorista e os passageiros confirmados, com os campos `senderId`, `senderName`, `senderUid` (uid do Firebase, conferido pelas regras; é ele que diz de quem é a mensagem), `type` (`TEXT`, `PAYMENT_REQUEST`, `PAYMENT_CONFIRMED`, `SYSTEM`), `text`, `amount` e `sentAt` (horário do servidor). O `chatRoomId` é preenchido no aceite e libera o grupo (só quem foi aceito na viagem conversa). Os avisos de início e fim da viagem vão no grupo; as **cobranças não**: cada passageiro vê a própria na tela de pagamento. O grupo some da lista uma semana depois do fim da viagem. As mensagens de pagamento e de viagem são só avisos: a fonte de verdade continua sendo a API. As regras de acesso ficam em `app/converge/database.rules.json`.
+> Estrutura no Realtime Database: `chats/{chatRoomId}/group/messages/{pushId}`: **um grupo por viagem**, com o motorista e os passageiros confirmados, com os campos `senderId`, `senderName`, `senderUid` (uid do Firebase, conferido pelas regras; é ele que diz de quem é a mensagem), `type` (`TEXT`, `PAYMENT_REQUEST`, `PAYMENT_CONFIRMED`, `SYSTEM`), `text`, `amount` e `sentAt` (horário do servidor). O `chatRoomId` é preenchido no aceite e libera o grupo: o app só mostra o grupo para o motorista e para os passageiros aceitos. As regras do Firebase só exigem usuário logado e conferem `senderUid`, `sentAt` e o formato da mensagem; **elas não conferem se o usuário participa da viagem** (limitação conhecida). Os avisos de início e fim da viagem vão no grupo; as **cobranças não**: cada passageiro vê a própria na tela de pagamento. O grupo some da lista uma semana depois do fim da viagem. As mensagens de pagamento e de viagem são só avisos: a fonte de verdade continua sendo a API. As regras de acesso ficam em `app/converge/database.rules.json`.
 > **Pagamento PIX:** no MVP o pagamento usa **QR Code PIX estático** ("Pix Copia e Cola"), gerado pelo próprio backend, sem gateway e sem API externa. O valor da cobrança vai travado dentro do payload e o dinheiro vai direto da conta do passageiro para a do motorista — o Converge nunca toca no dinheiro. Como o banco não devolve nenhuma confirmação ao servidor, o pagamento é **informado pelo próprio passageiro** ("Já paguei"); o motorista não confirma o recebimento. A verificação automática via gateway (QR Code dinâmico + webhook) fica como evolução futura.
 
 ---
@@ -299,31 +299,31 @@ As duas formas não se misturam: enquanto a cobrança está em aberto, só o pra
 - **Método principal (MVP): e-mail institucional.** No cadastro, o usuário informa um e-mail institucional (`institutionalEmail`, ex.: `@puc-campinas.edu.br`) e confirma via link enviado. Ao confirmar, o `status` vai de `PENDING` → `VERIFIED` automaticamente, sem moderador humano. `verificationMethod = INSTITUTIONAL_EMAIL`.
 - **Método alternativo: documento.** Caso a universidade não use e-mail institucional confiável, o usuário envia um documento (`documentUrl`) que passa por revisão (`status = UNDER_REVIEW`). `verificationMethod = DOCUMENT`.
 - **Rejeição:** se o vínculo for recusado, `status = REJECTED`, `rejectionReason` descreve o motivo e `reviewedAt` registra quando. O usuário pode corrigir e reenviar.
-- Somente usuários `VERIFIED` acessam as funcionalidades principais (criar trajeto, aparecer no matching, confirmar carona).
+- Somente usuários `VERIFIED` buscam carona, aparecem no matching, pedem vaga e aceitam passageiros (`RideEligibility`). Cadastrar o trajeto não exige a verificação: ele só aparece para os outros depois que o vínculo estiver `VERIFIED`.
 
 ### Regras de Negócio — Habilitação (CNH)
 
 O objeto `driverLicense` é **opcional** e só se aplica a quem atua como motorista (`DRIVER` em `participationRoles`). Passageiros não precisam.
 
-- **Obrigatória para oferecer carona:** o usuário só pode criar trajetos do tipo `OFFER` e aparecer no matching como motorista se tiver `driverLicense.status = VERIFIED`.
+- **Obrigatória para oferecer carona:** para aparecer no matching como motorista, receber pedidos e aceitar passageiros, o usuário precisa de `driverLicense.status = VERIFIED` dentro da validade. O cadastro do trajeto `OFFER` não confere isso.
 - **MVP — autodeclaração com documento:** o motorista informa número, categoria e validade da CNH e envia uma foto (`documentUrl`). O vínculo entra em `UNDER_REVIEW` e um moderador aprova (`VERIFIED`) ou recusa (`REJECTED` com `rejectionReason`).
-- **Validade:** quando a data `expiresAt` passa, o status vira `EXPIRED` automaticamente e o motorista é retirado do matching até renovar. Garante que motorista com CNH vencida não dirija pela plataforma.
+- **Validade:** quando a data `expiresAt` passa, a CNH passa a valer como `EXPIRED` na leitura (`DriverLicense.effectiveStatus`; o status gravado continua `VERIFIED`, sem job que regrave) e o motorista sai do matching até renovar. Garante que motorista com CNH vencida não dirija pela plataforma.
 - **Evolução futura:** validação automática via API oficial (SERPRO) ou serviço de KYC com biometria (compara selfie com a foto da CNH). Fica fora do MVP por exigir contrato e custo.
 
 ### Regras de Negócio — Chave PIX
 
-- **Obrigatória para oferecer carona:** o usuário só pode criar trajetos `OFFER` se `pixKey` estiver preenchida, senão o passageiro chega ao fim da viagem sem ter para quem pagar.
+- **Obrigatória para oferecer carona:** sem `pixKey` o motorista não aparece no matching, não recebe pedidos e não aceita passageiros (`NOT_ALLOWED`), senão o passageiro chega ao fim da viagem sem ter para quem pagar. O cadastro do trajeto não confere a chave.
 - **`pixKeyType` é necessário** porque o formato no payload depende do tipo (uma chave de 11 dígitos pode ser CPF ou celular).
 - **Normalização ao salvar:** CPF só com dígitos; `PHONE` no formato `+55DDDNÚMERO` (ex.: `+5511999999999`); `EMAIL` em minúsculas; `RANDOM` como UUID.
 - O backend **não consulta o banco** para validar a chave. Quem faz isso é o app do banco do passageiro, ao ler o QR.
 
 ### Regras de Negócio — Desativação de Conta
 
-Quando `active = false` (conta suspensa ou excluída):
-- Os vínculos recorrentes do usuário passam a `TERMINATED`.
-- Viagens futuras onde ele é motorista são canceladas (`CANCELLED`); onde é passageiro, sua vaga é liberada.
+Quando `active = false` (`DELETE /api/v1/users/me`):
+- A conta fica marcada como inativa e os dados são mantidos.
+- A conta inativa não pede vaga, não aceita passageiros e não aparece no matching (`NOT_ALLOWED`, pela mesma elegibilidade de `RideEligibility`).
 - **Dívidas em aberto permanecem** — desativar a conta não perdoa valores devidos.
-- O usuário não aparece no matching, não loga e não recebe novas combinações.
+- **Ainda não implementado:** cancelar as viagens futuras, liberar as vagas, encerrar vínculos recorrentes (`TERMINATED`), bloquear o login e gravar a auditoria `USER_DEACTIVATED`.
 
 ---
 
@@ -588,7 +588,7 @@ A chegada não usa mais um valor fixo enviado pelo app: ela sai do tempo de carr
 ### Histórico de viagens (RF59)
 
 `GET /api/v1/rides/history?role=&from=&to=` lista as viagens terminadas (`COMPLETED` ou `CANCELLED`) do usuário, da mais recente para a mais antiga. Não há coleção própria: as viagens já guardam o trajeto, o carro, os custos e os pagamentos.
-- **Passageiro:** vê o próprio embarque e desembarque, a própria parte estimada (`estimatedAmount`), o valor pago e a situação do pagamento. Pedidos recusados, expirados ou nunca aceitos não entram, porque ele não fez a viagem.
+- **Passageiro:** vê o próprio embarque e desembarque, a própria parte estimada (`estimatedAmount`), o valor pago e a situação do pagamento. Aparecem as participações concluídas, ausentes e canceladas (inclusive as que ele mesmo cancelou); pedidos recusados, expirados e pendentes não entram.
 - **Motorista:** vê o trajeto da carona, o custo total (`costs.totalCost`) e quanto recebeu (a soma dos pagamentos confirmados).
 - **Pessoas:** o motorista mais os passageiros que concluíram a viagem.
 - **Filtros:** `role` (`DRIVER` ou `PASSENGER`) e o intervalo de datas da saída (`from` e `to`, inclusive).
@@ -620,10 +620,10 @@ O motorista vai até cada passageiro: `itinerary` guarda as paradas na ordem em 
 - `availableSeats` é decrementado ao confirmar participante e incrementado ao cancelar — operação atômica obrigatória.
 - **`estimatedAmount` (RF34, RF36):** valor estimado atual de cada participante, exibido durante a vida da carona. É **recalculado sempre que há entrada, cancelamento ou ausência** de participantes — o custo é dividido só entre os passageiros efetivos no momento (o motorista não entra na divisão). Nunca ultrapassa o `maxAmount`.
 - `maxAmount` é o **teto de proteção do passageiro** (RF35/RF37): corresponde ao **custo inteiro da rota com o desvio do passageiro** (o caso em que ele é o único passageiro), calculado e gravado no momento da confirmação. O `finalAmount` **nunca pode superá-lo**, mesmo que outros participantes cancelem/faltem ou que o custo mude depois.
-- `finalAmount` só é calculado e gravado quando `status = COMPLETED` (RF38), com base nos participantes efetivos.
+- `finalAmount` é gravado quando o passageiro termina a viagem (RF38): na confirmação de chegada (viagem ainda em andamento) ou no encerramento da viagem, com base nos participantes efetivos. Ausente (`NO_SHOW`) fica com `0`.
 - **Ausência (RF23, RF24):** quando o motorista marca um passageiro como `NO_SHOW`, a vaga é liberada, o ausente **não é cobrado** (`finalAmount = 0`, `paymentStatus = NOT_APPLICABLE`), é **desconsiderado dos indicadores**, e o `estimatedAmount`/`finalAmount` dos demais participantes efetivos é recalculado.
 - `totalCost / qtdParticipantesEfetivos = valorPorPessoa`. Diferença de centavos vai para o motorista.
-- Se o passageiro cancelar com menos de 2h de antecedência (ou depois das 20h da véspera, no caso de vaga reservada recorrente), `lateCancellation = true` e a viagem é cobrada como se tivesse ido.
+- Se o passageiro **confirmado** cancelar com menos de 2h da saída, `lateCancellation = true`. Isso soma 1 em `lateCancellations` na reputação e gera auditoria `RIDE_CANCELLED`. **Não há cobrança** nesse caso. A regra das 20h da véspera é do vínculo recorrente, ainda sem código.
 - Se entrar passageiro avulso, o valor daquele dia cai para todos — cada um paga o `finalAmount` real da viagem.
 - **Horários da viagem:**
   - **Pedido de vaga expira em 1 hora sem resposta** (`converge.ride.request-timeout`, padrão `1h`) ou 5 min antes da saída, o que vier primeiro. Uma tarefa agendada (`RideExpirationScheduler`, a cada 30 s) marca o pedido como `EXPIRED` e avisa o passageiro (`REQUEST_EXPIRED`).
@@ -764,7 +764,7 @@ O backend monta o payload sob demanda (padrão BR Code do Banco Central, CRC16 i
 ### Regras de Negócio
 
 - `reportedId` diferente do denunciante (`BAD_REQUEST`) e o denunciado precisa existir (`USER_NOT_FOUND`). O `status` nasce `PENDING`.
-- `LATE_NO_SHOW` (RF25) **exige** `rideId`. Para os outros motivos, `rideId` é opcional.
+- `LATE_NO_SHOW` (RF25) e `NON_PAYMENT` **exigem** `rideId`. Para os outros motivos, `rideId` é opcional.
 - Quando `rideId` vem, o denunciante **e** o denunciado precisam ter participado da viagem (`NOT_ALLOWED` se não); viagem inexistente dá `RIDE_NOT_FOUND`. "Participou" vale para o motorista e para passageiros que tiveram vaga em qualquer status da viagem (inclui ausente e cancelado) e **exclui** pedidos `REQUESTED`, `REJECTED` e `EXPIRED`. É uma leitura própria do módulo `ride` (`GetRideParticipantsUseCase`), porque a leitura de participantes concluídos barraria o motorista que denuncia um passageiro ausente. A regra **não** exige que o denunciado esteja `NO_SHOW`.
 - `OTHER` exige `description`. A `description` tem no máximo **500 caracteres** (limite definido no código, validado no DTO e na entidade).
 - Denúncia idêntica ainda `PENDING` (mesmo denunciante, denunciado, `rideId` e `reason`) é recusada com `BAD_REQUEST`. Não há índice único para isso: a checagem é uma consulta. Sem `rideId`, a consulta casa também denúncias sem o campo.
@@ -825,7 +825,8 @@ O backend monta o payload sob demanda (padrão BR Code do Banco Central, CRC16 i
 | Aceite do passageiro (`AcceptPassengerUseCase`) | Aplicado. `NOT_ALLOWED` ("Não é possível aceitar este passageiro."), antes de gravar o aceite |
 | Chat criado no aceite | O backend não cria a sala: só preenche `rides.chatRoomId` (`ride_<rideId>`) quando o passageiro é aceito. Como o aceite é barrado, a sala **não é liberada** para quem já está bloqueado |
 | Chat depois do aceite | **Não coberto pelo backend.** As mensagens passam direto pelo Firebase Realtime Database, sem a API no meio. O app desabilita o envio no chat com um usuário bloqueado |
-| Viagem já aceita, saída da viagem, cancelamentos | Não aplicado |
+| Viagem já aceita e ainda não iniciada | Aplicado: ao bloquear, o `UserBlockedEvent` faz o `BlockedUsersRideListener` separar os dois (se o motorista bloqueou, o passageiro sai; se o passageiro bloqueou, ele sai). Sem penalidade, a vaga volta e quem saiu recebe `RIDE_CANCELLED` |
+| Viagem em andamento | Não afetada pelo bloqueio |
 
 - **Desbloquear remove só o bloqueio do usuário logado.** Se o outro lado também bloqueou, o bloqueio dele continua e a interação segue barrada.
 - Não há auditoria (`USER_BLOCKED` de `AuditAction` não é usado pelas rotas).
@@ -941,7 +942,7 @@ Ficam de fora:
 | Filtro | Regra |
 |---|---|
 | Dias | Nenhum dia da semana em comum |
-| Vagas | `availableSeats` do motorista menor que 1 |
+| Vagas | O trajeto do motorista tem `totalSeats` menor que 1. As vagas livres de cada data são conferidas no pedido e no aceite, na viagem (`rides.availableSeats`) |
 | Horário | O motorista sai mais de **5 min antes** ou mais de **30 min depois** do horário do passageiro (considera a virada da meia-noite) |
 | Embarque | Embarque do passageiro a mais de `maxDetourKm` do caminho do motorista (a rota pelas ruas, `encodedPolyline`; sem ela, a linha reta origem → destino) |
 | Destino | Destino do passageiro a mais de `maxDetourKm` do destino do motorista |
@@ -1020,7 +1021,7 @@ A tela de Dados (ver wireframes `indicadores` e `indicadores ambientais`) exibe 
 
 - **Documentos pré-calculados por período:** o backend mantém documentos `WEEKLY`, `MONTHLY` e `SEMESTERLY` prontos, para resposta imediata ao trocar o filtro.
 - **Total histórico:** calculado **somando apenas os documentos `MONTHLY`** quando o usuário solicitar o acumulado. Nunca somar `WEEKLY` + `MONTHLY` + `SEMESTERLY` juntos — eles contêm os mesmos dados em granularidades diferentes e isso causaria contagem duplicada.
-- **Paginação:** quando houver muitos meses, o histórico é carregado em páginas (ex: 12 meses por página), com opção de filtrar por intervalo de datas.
+- **Paginação:** ainda não existe, nem o filtro por intervalo de datas. O acumulado soma todos os meses de uma vez, e a série (`/me/series`) devolve os últimos N períodos, no máximo 12. Paginar fica como evolução, para quando houver muitos meses.
 - **Sem cache em memória persistente:** o cálculo do acumulado é feito sob demanda na requisição. Como soma no máximo algumas dezenas de documentos mensais pequenos, é leve. Evita o risco de cache crescer indefinidamente e pesar com o tempo.
 - **Série para os gráficos:** `GET /api/v1/indicators/me/series?period=WEEKLY|MONTHLY|SEMESTERLY&limit=6` devolve os últimos N períodos (até 12), do mais antigo ao mais recente. Período sem documento vem zerado, para o gráfico não pular a semana ou o mês. O app usa as semanas para "viagens por semana" e os meses para "CO₂ evitado por mês".
 
@@ -1172,7 +1173,7 @@ A tela de Dados (ver wireframes `indicadores` e `indicadores ambientais`) exibe 
 |---|---|---|
 | `userId` + `read` | Composto | Listar notificações não lidas do usuário |
 | `userId` + `createdAt` | Composto | Listar notificações em ordem cronológica |
-| `createdAt` | Simples (TTL) | Expiração automática de notificações antigas (ex: 90 dias) |
+| `createdAt` | Simples (TTL) — sugerido, ainda não criado | Expiração automática de notificações antigas (ex: 90 dias). Hoje as notificações não expiram |
 
 ### Regras de Negócio
 
@@ -1211,7 +1212,7 @@ A tela de Dados (ver wireframes `indicadores` e `indicadores ambientais`) exibe 
 
 ### Regras de Negócio
 
-- Antes de executar uma operação crítica, o backend verifica se a `key` já existe. Se existe, retorna o resultado anterior sem reexecutar.
+- A chave vale para `POST`, `PUT` e `PATCH` em `/api/v1/rides/**` (`IdempotencyFilter`). Antes de executar, o backend verifica se a `key` já existe. Se existe, retorna o resultado anterior sem reexecutar. A chave é **opcional**: sem o header `Idempotency-Key`, a operação roda normalmente, sem essa proteção (o app sempre envia).
 - O TTL é de **24 h** — reenvios por falha de rede acontecem em minutos, não dias.
 
 ---
@@ -1502,25 +1503,25 @@ Formato geoespacial padrão do MongoDB para o índice `2dsphere`.
 |---|---|
 | `PAYMENT_CONFIRMED` | Reservado. Não é gravado hoje: o motorista não confirma mais o recebimento (o passageiro informa com "Já paguei") |
 | `NO_SHOW_REGISTERED` | Motorista registrou ausência de passageiro |
-| `RIDE_CANCELLED` | Viagem cancelada |
-| `USER_BLOCKED` | Usuário bloqueou outro |
-| `REPORT_RESOLVED` | Denúncia analisada e resolvida |
-| `ACADEMIC_VERIFIED` | Vínculo acadêmico verificado |
-| `LICENSE_VERIFIED` | CNH verificada |
-| `USER_DEACTIVATED` | Conta desativada |
-| `RESERVED_SEAT_TERMINATED` | Vínculo de vaga reservada encerrado |
+| `RIDE_CANCELLED` | Viagem cancelada. Gravado no cancelamento pelo motorista (só com passageiro confirmado), no cancelamento automático, na viagem sem participantes, na saída tardia do passageiro e na remoção de passageiro confirmado |
+| `USER_BLOCKED` | Reservado. Existe no enum, mas nenhum fluxo grava hoje |
+| `REPORT_RESOLVED` | Reservado. Existe no enum, mas nenhum fluxo grava hoje (moderação fora do MVP) |
+| `ACADEMIC_VERIFIED` | Reservado. Existe no enum, mas nenhum fluxo grava hoje |
+| `LICENSE_VERIFIED` | Reservado. Existe no enum, mas nenhum fluxo grava hoje |
+| `USER_DEACTIVATED` | Reservado. Existe no enum, mas nenhum fluxo grava hoje |
+| `RESERVED_SEAT_TERMINATED` | Reservado. Depende do vínculo recorrente, ainda sem código |
 
 ### `NotificationType` (notifications.type)
 | Valor | Descrição |
 |---|---|
-| `RIDE_REQUEST` | Passageiro solicitou vaga (aviso ao motorista) |
+| `RIDE_REQUEST` | Reservado. Ainda não é criado: o motorista não recebe aviso gravado de pedido de vaga |
 | `RIDE_CONFIRMED` | Carona confirmada |
 | `RIDE_CANCELLED` | Carona cancelada |
 | `REQUEST_EXPIRED` | Aviso ao passageiro de que sua solicitação de vaga expirou por tempo limite |
 | `PAYMENT_DUE` | Lembrete de pagamento pendente |
 | `PAYMENT_CONFIRMED` | Aviso ao motorista de que um passageiro informou o pagamento ("Já paguei") |
-| `SEAT_RELEASED` | Vaga reservada foi liberada (passageiro recorrente não vai) |
-| `GENERIC` | Aviso geral da plataforma |
+| `SEAT_RELEASED` | Reservado. Depende do vínculo recorrente, ainda sem código |
+| `GENERIC` | Reservado. Nenhum fluxo cria hoje |
 
 ### `PixKeyType` (users.pixKeyType)
 | Valor | Descrição |
