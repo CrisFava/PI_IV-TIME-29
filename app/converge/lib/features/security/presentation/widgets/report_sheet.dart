@@ -38,6 +38,7 @@ Future<bool> showReportSheet(
   return sent ?? false;
 }
 
+/// Painel de denúncia (RF45): escolhe o motivo, escreve a descrição e envia.
 class ReportSheet extends ConsumerStatefulWidget {
   final String reportedId;
   final String reportedName;
@@ -59,6 +60,7 @@ class ReportSheet extends ConsumerStatefulWidget {
 }
 
 class _ReportSheetState extends ConsumerState<ReportSheet> {
+  // Descrição opcional (até 500 caracteres no backend), obrigatória só em "Outro motivo".
   final _descriptionController = TextEditingController();
   ReportReason? _reason;
   bool _submitting = false;
@@ -66,6 +68,8 @@ class _ReportSheetState extends ConsumerState<ReportSheet> {
 
   bool get _hasRide => widget.rideId != null && widget.rideId!.isNotEmpty;
 
+  // Motivos que aparecem na tela. Os dois que exigem viagem só aparecem com rideId, e
+  // "Não pagou a carona" só para o motorista. O backend confere as mesmas regras.
   List<ReportReason> get _reasons => [
     for (final reason in ReportReason.values)
       if ((reason != ReportReason.lateNoShow || _hasRide) &&
@@ -99,6 +103,8 @@ class _ReportSheetState extends ConsumerState<ReportSheet> {
     });
   }
 
+  // POST /reports pelo controller. Se o backend recusar (por exemplo, NON_PAYMENT antes do
+  // "Já paguei" ou denúncia repetida), a mensagem dele aparece no painel, que continua aberto.
   Future<void> _submit() async {
     final reason = _reason;
     if (reason == null || !_canSubmit) return;

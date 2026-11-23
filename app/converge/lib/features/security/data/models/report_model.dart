@@ -26,6 +26,8 @@ class ReportModel {
     required this.createdAt,
   });
 
+  // Lê a resposta de GET /reports/mine. Motivo ou status desconhecido vira null, para um valor novo
+  // do backend não quebrar a tela.
   factory ReportModel.fromJson(Map<String, dynamic> json) => ReportModel(
     id: json['id'] as String? ?? '',
     reportedId: json['reportedId'] as String? ?? '',

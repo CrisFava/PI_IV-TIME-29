@@ -22,6 +22,7 @@ class _BlockedUsersPageState extends ConsumerState<BlockedUsersPage> {
   /// Ids que estão sendo desbloqueados agora.
   final Set<String> _busy = {};
 
+  // DELETE /blocks/{id} pelo controller. Só a linha tocada fica carregando; as outras continuam livres.
   Future<void> _unblock(BlockModel block) async {
     if (_busy.contains(block.blockedUserId)) return;
     HapticFeedback.mediumImpact();
@@ -50,6 +51,7 @@ class _BlockedUsersPageState extends ConsumerState<BlockedUsersPage> {
 
   @override
   Widget build(BuildContext context) {
+    // A lista vem de GET /blocks. O provider já tira da lista quem foi desbloqueado.
     final blocks = ref.watch(blockedUsersProvider);
     return Scaffold(
       backgroundColor: AppColors.scaffoldBackground,
@@ -84,6 +86,7 @@ class _BlockedUsersPageState extends ConsumerState<BlockedUsersPage> {
               message: 'Quando você bloquear alguém, a pessoa aparece aqui para você desbloquear.',
             );
           }
+          // Puxar para baixo busca a lista de novo no backend.
           return RefreshIndicator(
             color: AppColors.primary,
             onRefresh: () async {
@@ -113,6 +116,7 @@ class _BlockedUsersPageState extends ConsumerState<BlockedUsersPage> {
   }
 }
 
+/// Uma linha da lista: nome da pessoa bloqueada e o botão "Desbloquear".
 class _BlockedTile extends StatelessWidget {
   final BlockModel block;
   final bool busy;
@@ -184,6 +188,7 @@ class _BlockedTile extends StatelessWidget {
   }
 }
 
+/// Tela de aviso usada para a lista vazia e para o erro ao carregar (com "Tentar novamente").
 class _Message extends StatelessWidget {
   final IconData icon;
   final String title;

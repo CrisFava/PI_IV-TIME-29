@@ -20,6 +20,8 @@ void main() {
   late List<RequestOptions> requests;
 
   /// Responde toda requisição com [body] e guarda o que foi pedido.
+  /// Fica no lugar do backend: nenhum teste faz chamada de rede de verdade.
+  /// Com status >= 400 a resposta vira erro, para testar o caminho do ApiException.
   void respondWith(Object? body, {int status = 200}) {
     dio.interceptors.insert(
       0,
@@ -44,6 +46,7 @@ void main() {
     );
   }
 
+  // Envelope ApplicationResponse de sucesso, igual ao que o backend devolve.
   Map<String, dynamic> success(Object? data) => {
     'success': true,
     'data': data,
