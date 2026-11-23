@@ -20,12 +20,22 @@ public class SustainabilityResponse extends Message {
     private final double co2AvoidedKg;
     private final double equivalentTrees;
 
+    /**
+     * Cria a resposta contendo as métricas de impacto ambiental calculadas.
+     *
+     * @param carsAvoided estimativa de veículos individuais retirados de circulação
+     * @param energySaved estimativa de energia poupada (litros de combustível ou kWh de eletricidade)
+     * @param co2AvoidedKg estimativa de CO₂ evitado em quilogramas
+     * @param equivalentTrees equivalência em quantidade de árvores anuais
+     */
     public SustainabilityResponse(int carsAvoided, double energySaved, double co2AvoidedKg, double equivalentTrees) {
         this.carsAvoided = carsAvoided;
         this.energySaved = energySaved;
         this.co2AvoidedKg = co2AvoidedKg;
         this.equivalentTrees = equivalentTrees;
     }
+
+    // Getters e setters
 
     public int getCarsAvoided() {
         return carsAvoided;

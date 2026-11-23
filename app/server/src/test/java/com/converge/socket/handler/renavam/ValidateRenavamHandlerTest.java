@@ -13,6 +13,12 @@ import static org.junit.jupiter.api.Assertions.assertNull;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
+/**
+ * Testes unitários para {@link ValidateRenavamHandler}.
+ * Valida o algoritmo de conferência de RENAVAM via módulo 11, verificando dígitos verificadores, tamanhos e dígitos repetidos.
+ * <p>
+ * Os métodos de teste estão bem explicativos através de suas anotações {@code @DisplayName}.
+ */
 class ValidateRenavamHandlerTest {
 
     private final ValidateRenavamHandler handler = new ValidateRenavamHandler();

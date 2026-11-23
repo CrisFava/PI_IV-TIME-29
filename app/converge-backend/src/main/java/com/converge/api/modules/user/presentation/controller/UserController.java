@@ -31,6 +31,17 @@ import org.springframework.web.bind.annotation.DeleteMapping;
 import com.converge.api.modules.user.application.BecomeDriverUseCase;
 import com.converge.api.modules.user.application.SubmitDriverLicenseUseCase;
 
+
+/**
+ * Controller REST dos usuários (/api/v1/users).
+ *
+ * Camada de entrada da API: recebe a requisição HTTP, descobre o usuário logado
+ * (UID do Firebase, quando o endpoint exige autenticação) e delega a regra de
+ * negócio ao caso de uso correspondente. A resposta é convertida em
+ * CreateUserResponseDTO pelo UserMapper. Cobre cadastro, consulta, edição e
+ * exclusão do próprio usuário, a ida para o papel de motorista, o envio da CNH
+ * e validações auxiliares (e-mail e CPF). Não há regra de negócio aqui.
+ */
 @RestController
 @RequestMapping("/api/v1/users")
 @RequiredArgsConstructor
@@ -46,6 +57,10 @@ public class UserController {
     private final ValidateCpfUseCase validateCpf;
     private final CheckEmailAvailabilityUseCase checkEmailAvailability;
 
+    /**
+     * GET /email-availability?email=...: diz se um e-mail ainda está livre para
+     * cadastro. Não exige usuário logado, porque é usado antes do cadastro.
+     */
     @GetMapping("/email-availability")
     public ResponseEntity<ApplicationResponse<EmailAvailabilityResponseDTO>> checkEmailAvailability(
             @RequestParam String email
@@ -55,6 +70,11 @@ public class UserController {
         );
     }
 
+    /**
+     * POST /: cadastra um novo usuário. Retorna 201 (CREATED) com os dados do
+     * usuário criado. Não usa @AuthenticationPrincipal: o firebaseUid vem no
+     * próprio corpo da requisição (CreateUserRequestDTO).
+     */
     @PostMapping
     public ResponseEntity<ApplicationResponse<CreateUserResponseDTO>> createUser(
             @Valid @RequestBody CreateUserRequestDTO request
@@ -65,6 +85,10 @@ public class UserController {
                 .body(ApplicationResponse.success(mapper.toResponse(user)));
     }
 
+    /**
+     * GET /me: devolve os dados do usuário logado. Lança INVALID_CREDENTIALS
+     * ("Não autenticado.") se não houver usuário autenticado ou UID.
+     */
     @GetMapping("/me")
     public ResponseEntity<ApplicationResponse<CreateUserResponseDTO>> getCurrentUser(
             @AuthenticationPrincipal AuthenticatedUser principal
@@ -80,6 +104,10 @@ public class UserController {
         return ResponseEntity.ok(ApplicationResponse.success(mapper.toResponse(user)));
     }
 
+    /**
+     * PUT /me: atualiza os dados do usuário logado (perfil e PIX) e devolve o
+     * usuário atualizado. Exige autenticação.
+     */
     @PutMapping("/me")
     public ResponseEntity<ApplicationResponse<CreateUserResponseDTO>> updateCurrentUser(
             @AuthenticationPrincipal AuthenticatedUser principal,
@@ -97,6 +125,12 @@ public class UserController {
         return ResponseEntity.ok(ApplicationResponse.success(mapper.toResponse(user)));
     }
 
+
+    /**
+     * DELETE /me: exclui a conta do usuário logado. Retorna 204 (sem conteúdo).
+     * Pela entidade User, a exclusão deve ser lógica (deactivate), mas quem
+     * decide isso é o DeleteUserUseCase.
+     */
     @DeleteMapping("/me")
     public ResponseEntity<Void> deleteCurrentUser(
 
@@ -113,6 +147,11 @@ public class UserController {
         return ResponseEntity.noContent().build();
     }
 
+
+    /**
+     * POST /me/driver: o usuário logado pede para virar motorista (adiciona o
+     * papel DRIVER). Os requisitos (CNH e PIX) são conferidos no domínio.
+     */
     @PostMapping("/me/driver")
     public ResponseEntity<ApplicationResponse<CreateUserResponseDTO>> becomeDriver(
             @AuthenticationPrincipal AuthenticatedUser principal
@@ -127,6 +166,10 @@ public class UserController {
         return ResponseEntity.ok(ApplicationResponse.success(mapper.toResponse(user)));
     }
 
+    /**
+     * POST /me/driver-license: o usuário logado envia os dados da CNH (número,
+     * categoria, validade e documento). Ela entra em análise (UNDER_REVIEW).
+     */
     @PostMapping("/me/driver-license")
     public ResponseEntity<ApplicationResponse<CreateUserResponseDTO>> submitDriverLicense(
             @AuthenticationPrincipal AuthenticatedUser principal,
@@ -143,6 +186,10 @@ public class UserController {
         return ResponseEntity.ok(ApplicationResponse.success(mapper.toResponse(user)));
     }
 
+    /**
+     * POST /validate-cpf: valida um CPF recebido no corpo e devolve o resultado.
+     * Não exige usuário logado.
+     */
     @PostMapping("/validate-cpf")
     public ResponseEntity<ApplicationResponse<CpfValidationResponseDTO>> validateCpf(
             @Valid @RequestBody CpfValidationRequestDTO request

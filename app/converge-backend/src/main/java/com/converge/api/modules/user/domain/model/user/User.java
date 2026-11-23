@@ -38,6 +38,20 @@ import java.util.*;
 import static com.converge.api.modules.user.domain.enums.user.ParticipationRole.DRIVER;
 import static com.converge.api.modules.user.domain.enums.user.ParticipationRole.PASSENGER;
 
+/**
+ * Entidade de usuário (coleção "users" no MongoDB).
+ *
+ * Guarda os dados de perfil (nome, e-mail, telefone, foto), os papéis de
+ * participação (passageiro e/ou motorista), o vínculo acadêmico, a CNH, a chave
+ * PIX, a situação de pagamento e inadimplência, a reputação e os selos.
+ * Concentra as regras de domínio do usuário: o que é preciso para ser motorista,
+ * quando o usuário está bloqueado por dívida, como a reputação é atualizada e
+ * quando o selo de confiança é concedido ou perdido.
+ *
+ * O e-mail institucional é único (índice parcial: só vale quando preenchido),
+ * assim como o e-mail e o firebaseUid. A igualdade entre usuários considera só
+ * id e firebaseUid.
+ */
 @Document(collection = "users")
 @NoArgsConstructor(access = AccessLevel.PROTECTED)
 @Getter
@@ -129,6 +143,12 @@ public class User {
     @LastModifiedDate
     private LocalDateTime updatedAt;
 
+    /**
+     * Construtor completo, usado no cadastro. Inicializa os papéis (sempre com
+     * PASSENGER), aplica a chave PIX e guarda os dados informados. Se o usuário
+     * pediu o papel DRIVER, valida na hora se ele tem CNH e PIX, senão lança
+     * BAD_REQUEST.
+     */
     public User(
             String firebaseUid,
             String name,
@@ -182,14 +202,27 @@ public class User {
                 null);
     }
 
+    /**
+     * Adiciona um selo à lista. Compara pelo record inteiro (tipo + data), então
+     * prefira grantBadge, que evita duplicar o mesmo tipo.
+     */
     public void addBadge(UserBadge badge) {
         this.badges.add(badge);
     }
 
+
+    /**
+     * Remove um selo pelo record inteiro (tipo + data). Para remover por tipo,
+     * use revokeBadge.
+     */
     public void removeBadge(UserBadge badge) {
         this.badges.remove(badge);
     }
 
+    /**
+     * Diz se o usuário tem exatamente aquele selo (tipo + data). Para saber se ele
+     * tem o tipo, use hasBadgeOfType.
+     */
     public boolean hasBadge(UserBadge badge) {
         return this.badges.contains(badge);
     }
@@ -241,6 +274,11 @@ public class User {
                 && this.driverLicense.effectiveStatus(now) == VerificationStatus.VERIFIED;
     }
 
+    /**
+     * Adiciona um papel ao usuário. Para DRIVER, exige antes CNH e PIX
+     * configurados (lança BAD_REQUEST se faltar). Garante que PASSENGER também
+     * esteja na lista. Ignora papel nulo.
+     */
     public void addRole(ParticipationRole role) {
         if (role == null) return;
         if (role == DRIVER){
@@ -251,21 +289,39 @@ public class User {
         this.participationRoles.add(role);
     }
 
+
+    /**
+     * Remove um papel do usuário. O papel PASSENGER não pode ser removido.
+     */
     public void removeRole(ParticipationRole role) {
         if (role == PASSENGER) return;
         this.participationRoles.remove(role);
     }
 
+
+    /**
+     * Devolve os papéis do usuário como conjunto somente leitura, sempre
+     * incluindo PASSENGER.
+     */
     public Set<ParticipationRole> getParticipationRoles() {
         Set<ParticipationRole> roles = new HashSet<>(this.participationRoles);
         roles.add(PASSENGER);
         return Collections.unmodifiableSet(roles);
     }
 
+    /**
+     * Devolve os selos do usuário como conjunto somente leitura (a lista só muda
+     * pelos métodos da própria entidade).
+     */
     public Set<UserBadge> getBadges() {
         return Collections.unmodifiableSet(this.badges);
     }
 
+
+    /**
+     * Inicializa o conjunto de papéis: sempre com PASSENGER, mais os papéis
+     * informados (se houver).
+     */
     private void initRoleSet(@Nullable Set<ParticipationRole> roles){
         this.participationRoles.add(PASSENGER);
 
@@ -274,6 +330,10 @@ public class User {
         }
     }
 
+    /**
+     * Confere os requisitos para ser motorista: chave PIX com o tipo e CNH
+     * cadastrada. Se faltar algo, lança BAD_REQUEST listando os campos que faltam.
+     */
     private void validateDriverRequirements(){
 
         List<String> fields = new ArrayList<>(2);
@@ -294,6 +354,11 @@ public class User {
         }
     }
 
+    /**
+     * Aplica a chave PIX e o tipo, que andam juntos. Sem nenhum dos dois, limpa
+     * ambos; com só um dos dois, lança BAD_REQUEST. Quando vêm os dois, a chave
+     * é normalizada conforme o tipo (pixKeyType.normalize) antes de guardar.
+     */
     private void applyPixKey(@Nullable String pixKey, @Nullable PixKeyType pixKeyType) {
         boolean hasKey = pixKey != null && !pixKey.isBlank();
 
@@ -315,6 +380,11 @@ public class User {
         this.pixKeyType = pixKeyType;
     }
 
+
+    /**
+     * Atualiza os dados de perfil (nome, telefone, foto e PIX). Se o usuário é
+     * motorista, revalida os requisitos, o que impede remover o PIX de quem dirige.
+     */
     public void updateProfile(
             String name,
             String phone,
@@ -332,6 +402,10 @@ public class User {
         }
     }
 
+    /**
+     * Registra a CNH enviada pelo usuário, substituindo a anterior. Lança
+     * BAD_REQUEST se vier nula.
+     */
     public void submitDriverLicense(DriverLicense driverLicense) {
         if (driverLicense == null) {
             throw new ApplicationException(
@@ -343,61 +417,115 @@ public class User {
         this.driverLicense = driverLicense;
     }
 
+
+    /**
+     * Desativa a conta (exclusão lógica, os dados continuam salvos).
+     */
     public void deactivate() {
         this.active = false;
     }
 
+    /**
+     * Registra um cancelamento feito pelo motorista na reputação e, se isso
+     * estourar o limite, revoga o selo de confiança.
+     */
     public void recordDriverCancellation(LocalDateTime now) {
         this.reputation = currentReputation().withDriverCancellation(now);
         revokeTrustBadgeIfThresholdExceeded();
     }
 
+
+    /**
+     * Registra um cancelamento tardio de passageiro na reputação e revoga o
+     * selo de confiança se o limite for estourado.
+     */
     public void recordPassengerLateCancellation(LocalDateTime now) {
         this.reputation = currentReputation().withPassengerLateCancellation(now);
         revokeTrustBadgeIfThresholdExceeded();
     }
 
+    /**
+     * Registra uma ausência (no-show) de passageiro na reputação e revoga o
+     * selo de confiança se o limite for estourado.
+     */
     public void recordPassengerNoShow(LocalDateTime now) {
         this.reputation = currentReputation().withPassengerNoShow(now);
         revokeTrustBadgeIfThresholdExceeded();
     }
 
+    /**
+     * Registra uma carona com pagamento vencido de passageiro na reputação e
+     * revoga o selo de confiança se o limite for estourado.
+     */
     public void recordPassengerOverdueRide(LocalDateTime now) {
         this.reputation = currentReputation().withPassengerOverdueRide(now);
         revokeTrustBadgeIfThresholdExceeded();
     }
 
+    /**
+     * Registra uma carona concluída como motorista na reputação. Não mexe nos selos.
+     */
     public void recordDriverCompletedRide(LocalDateTime now) {
         this.reputation = currentReputation().withDriverCompletedRide(now);
     }
 
+    /**
+     * Registra uma carona concluída como passageiro na reputação. Não mexe nos selos.
+     */
     public void recordPassengerCompletedRide(LocalDateTime now) {
         this.reputation = currentReputation().withPassengerCompletedRide(now);
     }
-
-    // Troca os contadores da janela pelos recalculados a partir das viagens. Não mexe nos selos.
+    // Troca os contadores da janela pelos recalculados a partir das viagens.
+    /**
+     * Substitui os contadores da janela de reputação pelos valores recalculados
+     * a partir do histórico de viagens (usado por rotina de recálculo).
+     */
     public void refreshReputationWindow(ReputationWindowCounts counts, LocalDateTime now) {
         this.reputation = currentReputation().withWindowCounts(counts, now);
     }
 
+    /**
+     * Atualiza a nota média e o total de avaliações do usuário como motorista.
+     */
     public void recordDriverRating(double averageRating, int totalReviews, LocalDateTime now) {
         this.reputation = currentReputation().withDriverRating(averageRating, totalReviews, now);
     }
 
+    /**
+     * Atualiza a nota média e o total de avaliações do usuário como passageiro.
+     */
     public void recordPassengerRating(double averageRating, int totalReviews, LocalDateTime now) {
         this.reputation = currentReputation().withPassengerRating(averageRating, totalReviews, now);
     }
 
+    /**
+     * Devolve a reputação atual, ou uma reputação inicial padrão se o usuário
+     * ainda não tiver (evita nulo em registros antigos).
+     */
     private Reputation currentReputation() {
         return this.reputation != null ? this.reputation : Reputation.defaultInitial();
     }
 
+    /**
+     * Remove o selo de confiança se o usuário passou dos limites de penalidade.
+     */
     private void revokeTrustBadgeIfThresholdExceeded() {
         if (trustThresholdExceeded()) {
             this.badges.removeIf(b -> b.badge() == Badge.TRUST);
         }
     }
 
+
+    /**
+     * Decide se o usuário perdeu (ou não merece) o selo de confiança. Retorna
+     * true quando ocorre qualquer um destes casos:
+     * - motorista com mais de 2 cancelamentos iniciados por ele na janela;
+     * - passageiro com mais de 2 cancelamentos tardios, mais de 1 no-show ou
+     *   qualquer carona com pagamento vencido na janela;
+     * - não cumpre os critérios de confiança nem como motorista nem como
+     *   passageiro (basta cumprir em um dos papéis).
+     * Contadores nulos são tratados como "sem violação".
+     */
     private boolean trustThresholdExceeded() {
         Reputation current = currentReputation();
         boolean driverEligible = current.driver() != null && current.driver().meetsTrustCriteria();

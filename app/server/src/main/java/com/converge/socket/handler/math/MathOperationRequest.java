@@ -6,6 +6,9 @@ import com.converge.socket.core.protocol.Message;
 
 import java.io.Serial;
 
+/**
+ * Mensagem de requisição para execução de operação matemática aritmética básica.
+ */
 public class MathOperationRequest extends Message {
     @Serial
     private static final long serialVersionUID = 1L;
@@ -14,11 +17,20 @@ public class MathOperationRequest extends Message {
     private final double operandA;
     private final double operandB;
 
+    /**
+     * Cria uma requisição de operação matemática.
+     *
+     * @param operation caractere que define a operação ('+', '-', '*', '/')
+     * @param operandA primeiro operando numérico
+     * @param operandB segundo operando numérico
+     */
     public MathOperationRequest(char operation, double operandA, double operandB) {
         this.operation = operation;
         this.operandA = operandA;
         this.operandB = operandB;
     }
+
+    // Getters e setters
 
     public char getOperation() {
         return operation;

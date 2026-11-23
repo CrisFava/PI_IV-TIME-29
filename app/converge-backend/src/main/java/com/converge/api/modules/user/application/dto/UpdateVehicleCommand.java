@@ -2,6 +2,7 @@
 
 package com.converge.api.modules.user.application.dto;
 
+// Comando para atualização de dados de um veículo
 public record UpdateVehicleCommand(
         String vehicleId,
         String firebaseUid,

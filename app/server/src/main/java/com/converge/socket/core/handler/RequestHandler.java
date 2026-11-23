@@ -5,21 +5,21 @@ package com.converge.socket.core.handler;
 import com.converge.socket.core.protocol.Message;
 
 /**
- * Standard interface for business logic handlers.
- * Developers implement this in separate classes to handle specific request types.
+ * Interface funcional que define o contrato padrão para manipuladores de regras de negócio do servidor socket.
+ * Desenvolvedores implementam esta interface em classes separadas para atender tipos específicos de requisição.
  *
- * @param <T> the request message type
- * @param <R> the response message type (or null if no response is needed)
+ * @param <T> tipo da mensagem de requisição
+ * @param <R> tipo da mensagem de resposta gerada
  */
 @FunctionalInterface
 public interface RequestHandler<T extends Message, R extends Message> {
 
     /**
-     * Executes business logic for the received request.
+     * Executa a regra de negócio associada à requisição recebida.
      *
-     * @param request the request message
-     * @return the response message to send back to the client, or null if no response
-     * @throws Exception if processing fails
+     * @param request mensagem contendo os dados de entrada da requisição
+     * @return mensagem contendo a resposta a ser enviada ao cliente, ou null se não houver resposta
+     * @throws Exception se ocorrer qualquer erro durante o processamento da requisição
      */
     R execute(T request) throws Exception;
 }

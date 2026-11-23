@@ -26,12 +26,34 @@ import java.util.stream.Stream;
 
 import static org.springframework.data.mongodb.core.query.Criteria.where;
 
+/**
+ * Implementação das consultas e atualizações customizadas de carona no MongoDB
+ * (RideRepositoryCustom), usando o MongoTemplate.
+ *
+ * Tem dois grupos de métodos:
+ * - Operações atômicas (findAndModify): a condição de elegibilidade e a alteração
+ *   acontecem numa única operação no banco, então duas requisições simultâneas não
+ *   passam pela mesma checagem (ex.: não ocupam a mesma vaga). Se a condição não
+ *   bate, retornam Optional vazio. Todas incrementam "version" para conviver com
+ *   o controle otimista (@Version) da entidade.
+ * - Consultas para rotinas automáticas (jobs): pedidos expirados, cobranças
+ *   vencidas, caronas abertas que já passaram do horário, fatos de reputação etc.
+ *
+ * "Carona aberta" = status AWAITING_CONFIRMATION ou CONFIRMED.
+ */
 @Repository
 @RequiredArgsConstructor
 public class RideRepositoryImpl implements RideRepositoryCustom {
 
     private final MongoTemplate mongoTemplate;
-
+    /**
+     * Aceita um passageiro de forma atômica (confirmação pelo motorista).
+     * Só atualiza se a carona está aberta, ainda não passou do limite de pedidos
+     * antes da saída, tem vaga e o passageiro tem um pedido REQUESTED (e, se
+     * informado, feito depois do requestCutoff). Se der certo: tira uma vaga,
+     * confirma a carona e o participante, cria o chatRoomId e grava os horários.
+     * Opcionalmente grava o desvio gerado e o valor máximo do passageiro.
+     */
     @Override
     public Optional<Ride> acceptPassengerAtomic(
             ObjectId rideId,
@@ -84,6 +106,12 @@ public class RideRepositoryImpl implements RideRepositoryCustom {
         return Optional.ofNullable(updated);
     }
 
+    /**
+     * Registra o pedido de vaga de um passageiro de forma atômica.
+     * Só adiciona o participante se a carona está aberta, antes do limite de
+     * pedidos, tem vaga, o passageiro não é o próprio motorista e ele ainda não
+     * tem pedido ativo, confirmado ou rejeitado nessa carona.
+     */
     @Override
     public Optional<Ride> requestSeatAtomic(
             ObjectId rideId,
@@ -122,6 +150,11 @@ public class RideRepositoryImpl implements RideRepositoryCustom {
         return Optional.ofNullable(updated);
     }
 
+    /**
+     * Busca caronas abertas com pedidos pendentes que devem expirar: pedidos
+     * feitos antes do cutoff, ou pedidos ainda pendentes quando a saída está
+     * dentro do limite (departureLimit).
+     */
     @Override
     public List<Ride> findRidesWithExpiredRequests(LocalDateTime cutoff, LocalDateTime departureLimit) {
         Query query = new Query(new Criteria().andOperator(
@@ -144,6 +177,10 @@ public class RideRepositoryImpl implements RideRepositoryCustom {
         return mongoTemplate.find(query, Ride.class);
     }
 
+    /**
+     * Busca caronas abertas em que os dois usuários participam. Útil, por exemplo,
+     * para tratar caronas em comum quando há um bloqueio entre eles.
+     */
     @Override
     public List<Ride> findOpenRidesWithBoth(String userId, String otherUserId) {
         Query query = new Query(new Criteria().andOperator(
@@ -153,6 +190,10 @@ public class RideRepositoryImpl implements RideRepositoryCustom {
         return mongoTemplate.find(query, Ride.class);
     }
 
+    /**
+     * Busca caronas abertas cujo horário de saída já passou e que não têm nenhum
+     * passageiro confirmado (carona que não vai acontecer).
+     */
     @Override
     public List<Ride> findOpenRidesPastDepartureWithoutConfirmedPassengers(LocalDateTime now) {
         Query query = new Query(new Criteria().andOperator(
@@ -166,6 +207,10 @@ public class RideRepositoryImpl implements RideRepositoryCustom {
         return mongoTemplate.find(query, Ride.class);
     }
 
+    /**
+     * Busca caronas concluídas com cobranças vencidas e ainda pendentes, dentro da
+     * janela entre "since" e "dueLimit" (ver dueChargeCriteria).
+     */
     @Override
     public List<Ride> findRidesWithDueCharges(LocalDateTime dueLimit, LocalDateTime since) {
         Query query = new Query(new Criteria().andOperator(
@@ -175,6 +220,11 @@ public class RideRepositoryImpl implements RideRepositoryCustom {
         return mongoTemplate.find(query, Ride.class);
     }
 
+    /**
+     * Marca de forma atômica a cobrança de um passageiro como vencida (overdue).
+     * Só atua se a carona está concluída e a cobrança daquele passageiro ainda
+     * atende aos critérios de cobrança vencida, evitando marcar duas vezes.
+     */
     @Override
     public Optional<Ride> markPaymentOverdueAtomic(
             ObjectId rideId,
@@ -192,6 +242,12 @@ public class RideRepositoryImpl implements RideRepositoryCustom {
         return Optional.ofNullable(markOverdue(query, new Update(), now));
     }
 
+    /**
+     * Registra de forma atômica que o motorista reportou não pagamento. Só vale
+     * depois que o passageiro marcou "Já paguei" (paymentStatus PAID), se a
+     * cobrança foi solicitada e se ainda não houve denúncia. Também marca a
+     * cobrança como vencida.
+     */
     @Override
     public Optional<Ride> markNonPaymentAtomic(ObjectId rideId, String passengerId, LocalDateTime now) {
         Query query = new Query(new Criteria().andOperator(
@@ -211,7 +267,11 @@ public class RideRepositoryImpl implements RideRepositoryCustom {
         Update reported = new Update().set("participants.$.nonPaymentReportedAt", now);
         return Optional.ofNullable(markOverdue(query, reported, now));
     }
-
+    /**
+     * Critério reutilizável de "cobrança vencida": passageiro com participação
+     * concluída, pagamento pendente, valor cobrado definido, ainda sem overdueAt
+     * e com a cobrança solicitada dentro da janela [since, dueLimit].
+     */
     private Criteria dueChargeCriteria(LocalDateTime dueLimit, LocalDateTime since) {
         return where("role").is(ParticipationRole.PASSENGER)
                 .and("status").is(ParticipantStatus.COMPLETED)
@@ -222,6 +282,11 @@ public class RideRepositoryImpl implements RideRepositoryCustom {
     }
 
     // O inc em version faz um "Já paguei" salvo em paralelo (com @Version) falhar em vez de sobrescrever.
+    /**
+     * Aplica de forma atômica a marcação de vencimento (overdueAt e updatedAt) na
+     * consulta recebida, junto com qualquer alteração extra já presente no Update,
+     * e devolve a carona atualizada (ou null se nada bateu).
+     */
     private Ride markOverdue(Query query, Update update, LocalDateTime now) {
         update
                 .set("participants.$.overdueAt", now)
@@ -237,6 +302,13 @@ public class RideRepositoryImpl implements RideRepositoryCustom {
         );
     }
 
+    /**
+     * Devolve, em stream (sem carregar tudo na memória), as caronas que geraram
+     * algum fato de reputação desde "since": concluídas, com no-show, cancelamento
+     * do motorista com penalidade, cancelamento tardio de passageiro, pagamento
+     * vencido ou passageiro removido pelo motorista.
+     * Quem consumir o Stream deve fechá-lo (try-with-resources).
+     */
     @Override
     public Stream<Ride> streamRidesWithReputationFactsSince(LocalDateTime since) {
         Query query = new Query(new Criteria().orOperator(
@@ -259,6 +331,9 @@ public class RideRepositoryImpl implements RideRepositoryCustom {
         return mongoTemplate.stream(query, Ride.class);
     }
 
+    /**
+     * Busca caronas abertas cujo horário de saída é anterior ao limite informado.
+     */
     @Override
     public List<Ride> findOpenRidesDepartedBefore(LocalDateTime limit) {
         Query query = new Query(new Criteria().andOperator(

@@ -2,6 +2,7 @@
 
 package com.converge.api.modules.user.domain.enums.user;
 
+// Status da verificação do usuário
 public enum VerificationStatus {
     VERIFIED, UNDER_REVIEW, REJECTED, PENDING, EXPIRED;
 }

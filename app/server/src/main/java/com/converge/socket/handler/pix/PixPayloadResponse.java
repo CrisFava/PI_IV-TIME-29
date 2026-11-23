@@ -15,9 +15,16 @@ public class PixPayloadResponse extends Message {
 
     private final String payload;
 
+    /**
+     * Cria a resposta com o código do payload PIX gerado.
+     *
+     * @param payload string contendo o código Pix Copia e Cola completo no padrão EMVCo com CRC16
+     */
     public PixPayloadResponse(String payload) {
         this.payload = payload;
     }
+
+    // Getters e setters
 
     public String getPayload() {
         return payload;

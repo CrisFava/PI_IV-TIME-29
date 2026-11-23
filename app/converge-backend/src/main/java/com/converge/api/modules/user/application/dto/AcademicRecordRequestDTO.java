@@ -6,6 +6,7 @@ import jakarta.annotation.Nullable;
 import jakarta.validation.constraints.Email;
 import jakarta.validation.constraints.NotBlank;
 
+// Dados de requisição para cadastro e comprovação de vínculo acadêmico
 public record AcademicRecordRequestDTO(
         @NotBlank(message = "Universidade é obrigatória")
         String university,

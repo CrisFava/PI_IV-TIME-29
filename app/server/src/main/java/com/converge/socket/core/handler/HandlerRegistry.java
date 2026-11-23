@@ -11,17 +11,23 @@ import java.util.Map;
 import java.util.concurrent.ConcurrentHashMap;
 
 
+/**
+ * Catálogo e despachante central de manipuladores de requisição do servidor socket.
+ * Mapeia classes de mensagem de requisição às suas respectivas implementações de {@link RequestHandler},
+ * intercepta exceções durante a execução e retorna respostas apropriadas ou instâncias de {@link ErrorResponse}.
+ */
 public class HandlerRegistry {
 
     private final Map<Class<? extends Message>, RequestHandler<?, ?>> handlers = new ConcurrentHashMap<>();
 
     /**
-     * Registers a handler for a specific request message class.
+     * Registra um handler de negócio associado a uma classe específica de mensagem de requisição.
      *
-     * @param requestClass the class of the request message
-     * @param handler the handler implementation
-     * @param <T> request type
-     * @param <R> response type
+     * @param <T> tipo da mensagem de requisição
+     * @param <R> tipo da mensagem de resposta
+     * @param requestClass classe da mensagem de requisição a ser registrada
+     * @param handler instância do handler que processará a requisição
+     * @throws IllegalArgumentException se a classe ou o handler forem nulos
      */
     public <T extends Message, R extends Message> void register(Class<T> requestClass, RequestHandler<T, R> handler) {
         if (requestClass == null || handler == null) {
@@ -31,10 +37,10 @@ public class HandlerRegistry {
     }
 
     /**
-     * Dispatches a request to its registered handler and returns the response message.
+     * Despacha uma mensagem de requisição ao handler registrado correspondente e retorna a resposta gerada.
      *
-     * @param request the request message
-     * @return response message, or null if handler returned null
+     * @param request mensagem de requisição recebida do cliente
+     * @return mensagem de resposta produzida pelo handler, ou {@link ErrorResponse} em caso de falha ou ausência de handler
      */
     @SuppressWarnings("unchecked")
     public Message dispatch(Message request) {

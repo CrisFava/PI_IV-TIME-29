@@ -8,6 +8,7 @@ import jakarta.validation.constraints.Positive;
 
 import java.math.BigDecimal;
 
+// Dados de requisição para fonte de energia e consumo de combustível do veículo
 public record FuelSourceRequestDTO(
         @NotNull(message = "Informe a fonte de energia.")
         EnergySource energySource,

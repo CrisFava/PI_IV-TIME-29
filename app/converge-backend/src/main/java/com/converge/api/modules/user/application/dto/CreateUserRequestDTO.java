@@ -14,6 +14,7 @@ import jakarta.validation.constraints.Size;
 
 import java.util.Set;
 
+// Dados de requisição para criação de usuário
 public record CreateUserRequestDTO(
         @NotBlank(message = "firebaseUid é obrigatório")
         String firebaseUid,

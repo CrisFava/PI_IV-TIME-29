@@ -30,11 +30,26 @@ import java.util.Set;
 
 /**
  * Filtro de idempotência para endpoints de mutação de viagens (RNF21).
+ *
+ * Evita que a mesma operação seja executada duas vezes quando o app repete uma
+ * requisição (ex.: timeout de rede e novo toque no botão). O cliente manda um
+ * header "Idempotency-Key". Na primeira vez, o filtro reserva a chave no banco e
+ * deixa a requisição seguir; ao terminar, guarda a resposta. Se a mesma chave
+ * chegar de novo com a mesma requisição, a resposta guardada é devolvida (replay)
+ * sem executar nada outra vez.
+ *
+ * Só atua em POST, PUT e PATCH sob /api/v1/rides, e só quando há o header e um
+ * usuário autenticado. Nos demais casos, a requisição passa direto.
+ *
+ * Estados de uma chave: IN_PROGRESS (reservada, ainda executando), COMPLETED
+ * (resposta guardada) e UNKNOWN_OUTCOME (executou, mas não deu para guardar o
+ * resultado).
  */
 @Slf4j
 @Component
 public class IdempotencyFilter extends OncePerRequestFilter {
 
+    // Nome do header, limite padrão do corpo (1 MB), status 413, métodos e prefixo cobertos
     public static final String IDEMPOTENCY_KEY_HEADER = "Idempotency-Key";
     static final int DEFAULT_MAX_BODY_BYTES = 1024 * 1024;
     private static final int PAYLOAD_TOO_LARGE_STATUS = 413;
@@ -45,10 +60,19 @@ public class IdempotencyFilter extends OncePerRequestFilter {
     private final int maxBodyBytes;
     private final IdempotencyResponseWriter responseWriter = new IdempotencyResponseWriter();
 
+    /**
+     * Construtor com o limite de corpo padrão (1 MB). Parece existir para uso
+     * direto (ex.: testes); o Spring usa o construtor abaixo.
+     */
     public IdempotencyFilter(IdempotencyKeyRepository idempotencyKeyRepository) {
         this(idempotencyKeyRepository, DEFAULT_MAX_BODY_BYTES);
     }
 
+
+    /**
+     * Construtor usado pelo Spring. O limite do corpo vem da propriedade
+     * app.idempotency.max-body-bytes (padrão 1 MB se não for definida).
+     */
     @Autowired
     public IdempotencyFilter(
             IdempotencyKeyRepository idempotencyKeyRepository,
@@ -58,6 +82,10 @@ public class IdempotencyFilter extends OncePerRequestFilter {
         this.maxBodyBytes = maxBodyBytes;
     }
 
+    /**
+     * Decide se o filtro deve ser ignorado. Ele só roda para POST, PUT e PATCH
+     * cujo caminho começa com /api/v1/rides.
+     */
     @Override
     protected boolean shouldNotFilter(HttpServletRequest request) {
         String method = request.getMethod();
@@ -68,6 +96,17 @@ public class IdempotencyFilter extends OncePerRequestFilter {
                 || !path.startsWith(RIDES_PATH_PREFIX);
     }
 
+    /**
+     * Fluxo principal do filtro:
+     * 1. Sem o header Idempotency-Key, ou sem usuário autenticado, deixa passar
+     *    sem nenhuma proteção.
+     * 2. Lê o corpo para a memória (com limite). Se passar do limite, responde 413.
+     * 3. Calcula a "impressão digital" da requisição (método, caminho, query e
+     *    corpo) para saber se uma chave repetida é mesmo a mesma requisição.
+     * 4. Tenta reservar a chave como IN_PROGRESS. Se ela já existir
+     *    (DuplicateKeyException), delega a handleDuplicateKey.
+     * 5. Se reservou, executa a requisição e registra o resultado.
+     */
     @Override
     protected void doFilterInternal(
             HttpServletRequest request,
@@ -115,6 +154,13 @@ public class IdempotencyFilter extends OncePerRequestFilter {
         executeAndRecordOutcome(cachedRequest, response, filterChain, key, entry);
     }
 
+    /**
+     * Executa o resto da cadeia (o controller) e registra o desfecho. Se houve
+     * exceção ou a resposta foi 5xx, apaga a chave para o cliente poder tentar de
+     * novo. Caso contrário (2xx, 3xx ou 4xx), guarda a resposta como COMPLETED.
+     * No final, sempre copia o corpo da resposta guardado para a resposta real,
+     * porque o ContentCachingResponseWrapper segura o corpo até esse momento.
+     */
     private void executeAndRecordOutcome(
             CachedBodyHttpServletRequest cachedRequest,
             HttpServletResponse response,
@@ -139,6 +185,12 @@ public class IdempotencyFilter extends OncePerRequestFilter {
         }
     }
 
+
+    /**
+     * Guarda no banco o status, o content-type e o corpo da resposta, marcando a
+     * chave como COMPLETED. Se salvar falhar, registra o erro e tenta marcar como
+     * UNKNOWN_OUTCOME (a operação aconteceu, mas o resultado não foi guardado).
+     */
     private void persistCompletedOutcome(
             IdempotencyKey entry,
             int status,
@@ -159,6 +211,10 @@ public class IdempotencyFilter extends OncePerRequestFilter {
         }
     }
 
+    /**
+     * Tenta marcar a chave como UNKNOWN_OUTCOME. Se até isso falhar, só registra
+     * um aviso: a chave fica IN_PROGRESS até expirar pelo TTL.
+     */
     private void markUnknownOutcomeSafely(IdempotencyKey entry) {
         try {
             entry.markUnknownOutcome();
@@ -169,6 +225,15 @@ public class IdempotencyFilter extends OncePerRequestFilter {
         }
     }
 
+    /**
+     * Trata uma chave que já existe. Conforme o caso, responde:
+     * - chave sumiu entre o erro e a busca: RIDE_CONFLICT, "tente novamente";
+     * - chave de outro usuário, método, caminho ou corpo: BAD_REQUEST ("já
+     *   utilizada em outra requisição");
+     * - COMPLETED: reenvia a resposta guardada (replay);
+     * - UNKNOWN_OUTCOME: RIDE_CONFLICT pedindo para consultar o estado da viagem;
+     * - IN_PROGRESS: RIDE_CONFLICT dizendo que ainda está processando.
+     */
     private void handleDuplicateKey(
             String key,
             String userId,
@@ -205,6 +270,10 @@ public class IdempotencyFilter extends OncePerRequestFilter {
         responseWriter.writeError(response, ErrorCode.RIDE_CONFLICT, "Requisição já está em processamento.");
     }
 
+    /**
+     * Confere se a chave existente pertence à mesma requisição: mesmo usuário,
+     * método, caminho e impressão digital.
+     */
     private boolean matchesRequest(
             IdempotencyKey existing,
             String userId,
@@ -218,6 +287,10 @@ public class IdempotencyFilter extends OncePerRequestFilter {
                 && Objects.equals(fingerprint, existing.getRequestFingerprint());
     }
 
+    /**
+     * Apaga a chave pelo valor, sem deixar a exceção subir: se falhar, só avisa
+     * no log (a chave expira pelo TTL).
+     */
     private void safeDeleteKey(String key) {
         try {
             idempotencyKeyRepository.deleteByKey(key);

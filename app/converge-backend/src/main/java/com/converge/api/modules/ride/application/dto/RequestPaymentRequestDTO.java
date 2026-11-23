@@ -8,6 +8,7 @@ import jakarta.validation.constraints.NotNull;
 
 import java.math.BigDecimal;
 
+// Requisição do pagamento enviado pelo cliente
 public record RequestPaymentRequestDTO(
         @NotNull(message = "Informe o valor combinado.")
         @DecimalMin(value = "0.01", message = "O valor da cobrança deve ser maior que zero.")

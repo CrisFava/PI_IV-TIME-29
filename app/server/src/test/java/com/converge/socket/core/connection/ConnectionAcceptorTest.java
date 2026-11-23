@@ -24,6 +24,12 @@ import static org.junit.jupiter.api.Assertions.assertInstanceOf;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
+/**
+ * Testes unitários para {@link ConnectionAcceptor}.
+ * Valida a thread de escuta do ServerSocket responsável por aceitar conexões TCP entrantes e instanciar os supervisores de conexão.
+ * <p>
+ * Os métodos de teste estão bem explicativos através de suas anotações {@code @DisplayName}.
+ */
 class ConnectionAcceptorTest {
 
     private static class HelloRequest extends Message {

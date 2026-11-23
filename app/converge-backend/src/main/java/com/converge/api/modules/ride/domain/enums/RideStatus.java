@@ -2,6 +2,7 @@
 
 package com.converge.api.modules.ride.domain.enums;
 
+// Estados possíveis de uma viagem
 public enum RideStatus {
     AWAITING_CONFIRMATION,
     CONFIRMED,

@@ -10,7 +10,13 @@ import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
 
 import java.time.LocalDateTime;
-
+/**
+ * Caso de uso responsável por iniciar uma carona.
+ *
+ * Só o dono da carona (o motorista) pode iniciá-la. A regra de quando e como uma
+ * carona pode começar fica na própria entidade Ride; este caso de uso apenas
+ * busca a carona, dispara o início com o horário atual e salva o resultado.
+ */
 @Service
 @RequiredArgsConstructor
 public class StartRideUseCase implements UseCase<RideRefCommand, Ride> {

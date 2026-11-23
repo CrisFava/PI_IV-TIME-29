@@ -13,6 +13,12 @@ import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
+/**
+ * Testes unitários para {@link RideCostHandler}.
+ * Valida o cálculo do custo estimado da viagem, definição de teto protetivo (maxAmount) e rateio proporcional de despesas entre passageiros.
+ * <p>
+ * Os métodos de teste estão bem explicativos através de suas anotações {@code @DisplayName}.
+ */
 class RideCostHandlerTest {
 
     // Rota do motorista de 40 km; o passageiro embarca após 8 km, viaja 30 km e desce a 6 km do destino

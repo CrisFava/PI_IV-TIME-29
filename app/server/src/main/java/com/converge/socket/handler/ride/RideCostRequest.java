@@ -16,11 +16,21 @@ public class RideCostRequest extends Message {
     @Serial
     private static final long serialVersionUID = 1L;
 
+    /**
+     * Operações disponíveis para cálculo de custos de carona.
+     */
     public enum Operation {
         CONFIRMATION_QUOTE,
         COST_SHARING
     }
 
+    /**
+     * Registro com os dados de custo de um passageiro individual para rateio.
+     *
+     * @param userId identificador único do passageiro
+     * @param detourGeneratedKm desvio adicional gerado em quilômetros
+     * @param maxAmount teto máximo cobrável do passageiro acordado previamente
+     */
     public record PassengerCostInput(
             String userId,
             Double detourGeneratedKm,
@@ -41,6 +51,20 @@ public class RideCostRequest extends Message {
     private final BigDecimal parking;
     private final List<PassengerCostInput> passengers;
 
+    /**
+     * Construtor privado para inicialização dos dados da requisição.
+     *
+     * @param operation tipo da operação de custo
+     * @param baseDistanceKm distância base do trajeto em quilômetros
+     * @param legOriginToBoardingKm distância da origem do motorista até o embarque do passageiro
+     * @param legBoardingToDropOffKm distância do embarque até o desembarque do passageiro
+     * @param legDropOffToDestinationKm distância do desembarque até o destino final do motorista
+     * @param averageConsumption consumo médio do veículo (km/L ou km/kWh)
+     * @param currentEnergyPrice preço atual unitário da energia/combustível
+     * @param toll custos de pedágio
+     * @param parking custos de estacionamento
+     * @param passengers lista de passageiros e seus parâmetros para rateio
+     */
     private RideCostRequest(
             Operation operation,
             double baseDistanceKm,
@@ -65,6 +89,19 @@ public class RideCostRequest extends Message {
         this.passengers = passengers != null ? List.copyOf(passengers) : List.of();
     }
 
+    /**
+     * Cria uma requisição para cotação de confirmação de carona com cálculo de desvio (RF37).
+     *
+     * @param baseDistanceKm distância base do trajeto do motorista em quilômetros
+     * @param legOriginToBoardingKm distância até o embarque
+     * @param legBoardingToDropOffKm distância entre embarque e desembarque
+     * @param legDropOffToDestinationKm distância até o destino do motorista
+     * @param averageConsumption consumo médio do veículo
+     * @param currentEnergyPrice preço unitário da energia
+     * @param toll valor de pedágio
+     * @param parking valor de estacionamento
+     * @return requisição configurada para cotação de confirmação
+     */
     public static RideCostRequest forConfirmationQuote(
             double baseDistanceKm,
             Double legOriginToBoardingKm,
@@ -89,6 +126,17 @@ public class RideCostRequest extends Message {
         );
     }
 
+    /**
+     * Cria uma requisição para rateio final proporcional de custos da carona (RF36, RF38).
+     *
+     * @param baseDistanceKm distância base do motorista em quilômetros
+     * @param averageConsumption consumo médio do veículo
+     * @param currentEnergyPrice preço unitário da energia
+     * @param toll valor de pedágio
+     * @param parking valor de estacionamento
+     * @param passengers lista de passageiros que participaram da viagem
+     * @return requisição configurada para rateio de custos
+     */
     public static RideCostRequest forCostSharing(
             double baseDistanceKm,
             double averageConsumption,
@@ -111,6 +159,7 @@ public class RideCostRequest extends Message {
         );
     }
 
+    // Getters e setters
     public Operation getOperation() {
         return operation;
     }

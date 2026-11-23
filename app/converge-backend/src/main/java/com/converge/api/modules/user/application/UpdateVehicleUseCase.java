@@ -15,6 +15,7 @@ import org.springframework.stereotype.Service;
 
 import java.util.Set;
 
+// Caso de uso para atualizar as informações de um veículo
 @Service
 @RequiredArgsConstructor
 public class UpdateVehicleUseCase implements UseCase<UpdateVehicleCommand, Vehicle> {

@@ -8,6 +8,7 @@ import jakarta.validation.constraints.NotNull;
 
 import java.time.LocalDate;
 
+// Dados da requisição para solicitar assento em uma carona
 public record RequestRideSeatRequestDTO(
         @NotBlank(message = "Informe o trajeto do motorista.")
         String driverRouteId,

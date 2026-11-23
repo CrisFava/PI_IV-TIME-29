@@ -2,6 +2,7 @@
 
 package com.converge.api.shared.infrastructure.config.customization;
 
+// Cores para logs
 public enum Color {
     GREEN("\u001B[32m"),
     RED("\u001B[31m"),

@@ -2,6 +2,7 @@
 
 package com.converge.api.modules.user.domain.enums.vehicle;
 
+// Tipos de unidades de consumo de um veículo
 public enum ConsumptionUnit {
     KM_PER_LITER,
     KM_PER_KWH

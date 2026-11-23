@@ -62,6 +62,13 @@ public class MatchRoutesHandler implements RequestHandler<MatchRoutesRequest, Ma
             .thenComparing(MatchResult::getDriverRouteId, Comparator.nullsLast(Comparator.naturalOrder()))
             .thenComparing(MatchResult::getPassengerRouteId, Comparator.nullsLast(Comparator.naturalOrder()));
 
+    /**
+     * Executa a busca e ranqueamento de trajetos compatíveis entre a rota solicitante e a lista de candidatos.
+     *
+     * @param request requisição contendo o modo de matching, a rota base e os candidatos
+     * @return resposta com a lista ordenada dos trajetos compatíveis (do maior índice para o menor)
+     * @throws ServerException se a requisição, o modo ou o trajeto forem nulos
+     */
     @Override
     public MatchRoutesResponse execute(MatchRoutesRequest request) throws ServerException {
         if (request == null || request.getMode() == null || request.getRoute() == null) {
@@ -87,6 +94,13 @@ public class MatchRoutesHandler implements RequestHandler<MatchRoutesRequest, Ma
         return new MatchRoutesResponse(results);
     }
 
+    /**
+     * Avalia os critérios eliminatórios e calcula os índices de compatibilidade e custos para um par de trajetos.
+     *
+     * @param offer trajeto com a oferta do motorista
+     * @param search trajeto com a procura do passageiro
+     * @return {@link Optional} contendo o {@link MatchResult} se compatível, ou vazio caso reprovado em algum filtro
+     */
     Optional<MatchResult> match(MatchRoute offer, MatchRoute search) {
         Double maxDetourKm = offer.getMaxDetourKm();
         if (maxDetourKm == null || maxDetourKm <= 0) {
@@ -136,6 +150,10 @@ public class MatchRoutesHandler implements RequestHandler<MatchRoutesRequest, Ma
     /**
      * Quanto o caminho do motorista aumenta para buscar o passageiro na origem dele e deixá-lo no destino dele.
      * Nunca é negativo: em linha reta, passar por pontos no caminho não encurta a viagem.
+     *
+     * @param offer trajeto da oferta
+     * @param search trajeto da procura
+     * @return desvio adicional em quilômetros
      */
     static double detourKm(MatchRoute offer, MatchRoute search) {
         double direct = distance(offer.getOriginLat(), offer.getOriginLng(),
@@ -152,13 +170,12 @@ public class MatchRoutesHandler implements RequestHandler<MatchRoutesRequest, Ma
     }
 
     /**
-     * Diferença entre os horários de saída em minutos, considerando a virada da meia-noite
-     * (23:50 e 00:10 estão a 20 min). Null se algum horário for inválido.
-     */
-    /**
      * Quantos minutos o motorista sai depois do passageiro (negativo: antes), considerando
-     * a virada da meia-noite (motorista 23:50 e passageiro 00:10: -20). Null se algum
-     * horário for inválido.
+     * a virada da meia-noite (motorista 23:50 e passageiro 00:10: -20). Null se algum horário for inválido.
+     *
+     * @param driverTime horário de saída do motorista no formato HH:mm
+     * @param passengerTime horário de saída do passageiro no formato HH:mm
+     * @return deslocamento em minutos do motorista relativo ao passageiro, ou {@code null} se inválido
      */
     static Integer driverOffsetMin(String driverTime, String passengerTime) {
         try {
@@ -172,6 +189,13 @@ public class MatchRoutesHandler implements RequestHandler<MatchRoutesRequest, Ma
         }
     }
 
+    /**
+     * Diferença absoluta entre os horários de saída em minutos, considerando a virada da meia-noite.
+     *
+     * @param first primeiro horário no formato HH:mm
+     * @param second segundo horário no formato HH:mm
+     * @return menor diferença em minutos entre os horários, ou {@code null} se inválido
+     */
     static Integer scheduleDifferenceMin(String first, String second) {
         try {
             int a = LocalTime.parse(first).toSecondOfDay() / 60;
@@ -184,6 +208,17 @@ public class MatchRoutesHandler implements RequestHandler<MatchRoutesRequest, Ma
         }
     }
 
+    /**
+     * Calcula o índice de compatibilidade ponderado (0 a 1) entre oferta e procura.
+     *
+     * @param offer trajeto da oferta
+     * @param search trajeto da procura
+     * @param pickupKm distância do ponto de embarque até a rota
+     * @param destinationKm distância entre os destinos
+     * @param scheduleDifference diferença em minutos entre os horários
+     * @param commonDays conjunto de dias em comum
+     * @return pontuação normalizada entre 0.0 e 1.0
+     */
     private double score(
             MatchRoute offer,
             MatchRoute search,
@@ -212,6 +247,10 @@ public class MatchRoutesHandler implements RequestHandler<MatchRoutesRequest, Ma
      * Custo da viagem com o desvio, dividido só entre os passageiros: os que já ocupam o carro e este.
      * O motorista não entra na divisão.
      * É uma estimativa: o valor final depende de quem realmente for (RF35 a RF38).
+     *
+     * @param offer trajeto da oferta contendo parâmetros de custo
+     * @param detourKm desvio em quilômetros calculado
+     * @return custo estimado arredondado por passageiro
      */
     static BigDecimal estimatedCostPerPassenger(MatchRoute offer, double detourKm) {
         BigDecimal tripCost = tripCost(offer, detourKm);
@@ -231,13 +270,23 @@ public class MatchRoutesHandler implements RequestHandler<MatchRoutesRequest, Ma
     /**
      * Teto do passageiro (RF35, RF37): o custo inteiro da rota com o desvio dele.
      * É o pior caso, em que ele é o único passageiro e paga a viagem sozinho.
+     *
+     * @param offer trajeto da oferta
+     * @param detourKm desvio em quilômetros
+     * @return valor monetário teto para cobrança do passageiro
      */
     static BigDecimal maxAmount(MatchRoute offer, double detourKm) {
         BigDecimal tripCost = tripCost(offer, detourKm);
         return tripCost == null ? null : tripCost.setScale(2, RoundingMode.HALF_EVEN);
     }
 
-    /** Energia da rota com o desvio mais pedágio e estacionamento. Null sem o custo por km do veículo. */
+    /**
+     * Calcula o custo total da viagem (energia/combustível com desvio + custos fixos).
+     *
+     * @param offer trajeto da oferta com custo por km e custos fixos
+     * @param detourKm desvio adicional em quilômetros
+     * @return custo monetário total da viagem, ou {@code null} caso não haja custo por km informado
+     */
     private static BigDecimal tripCost(MatchRoute offer, double detourKm) {
         BigDecimal costPerKm = offer.getEnergyCostPerKm();
         if (costPerKm == null || costPerKm.signum() <= 0) {
@@ -255,6 +304,13 @@ public class MatchRoutesHandler implements RequestHandler<MatchRoutesRequest, Ma
                 .add(fixedCosts);
     }
 
+    /**
+     * Identifica os dias da semana coincidentes entre os dois trajetos.
+     *
+     * @param offer trajeto da oferta
+     * @param search trajeto da procura
+     * @return conjunto de dias da semana em comum
+     */
     private static Set<DayOfWeek> commonDays(MatchRoute offer, MatchRoute search) {
         if (offer.getWeekDays().isEmpty() || search.getWeekDays().isEmpty()) {
             return EnumSet.noneOf(DayOfWeek.class);
@@ -265,14 +321,37 @@ public class MatchRoutesHandler implements RequestHandler<MatchRoutesRequest, Ma
         return common;
     }
 
+    /**
+     * Verifica se os trajetos pertencem ao mesmo usuário.
+     *
+     * @param route trajeto base
+     * @param candidate trajeto candidato
+     * @return {@code true} se ambos pertencerem ao mesmo usuário; {@code false} caso contrário
+     */
     private static boolean sameUser(MatchRoute route, MatchRoute candidate) {
         return route.getUserId() != null && route.getUserId().equals(candidate.getUserId());
     }
 
+    /**
+     * Calcula a distância geodésica entre duas coordenadas em quilômetros.
+     *
+     * @param lat1 latitude do primeiro ponto
+     * @param lng1 longitude do primeiro ponto
+     * @param lat2 latitude do segundo ponto
+     * @param lng2 longitude do segundo ponto
+     * @return distância em quilômetros
+     */
     private static double distance(double lat1, double lng1, double lat2, double lng2) {
         return GeoDistance.km(lat1, lng1, lat2, lng2);
     }
 
+    /**
+     * Arredonda um valor double para a escala decimal desejada usando {@link RoundingMode#HALF_EVEN}.
+     *
+     * @param value valor double original
+     * @param scale quantidade de casas decimais
+     * @return valor double arredondado
+     */
     private static double round(double value, int scale) {
         return BigDecimal.valueOf(value).setScale(scale, RoundingMode.HALF_EVEN).doubleValue();
     }

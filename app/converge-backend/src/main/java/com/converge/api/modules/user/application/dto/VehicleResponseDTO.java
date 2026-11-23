@@ -8,6 +8,7 @@ import com.converge.api.modules.user.domain.model.vehicle.subtypes.FuelSource;
 import java.time.LocalDateTime;
 import java.util.List;
 
+// Dados de resposta com os detalhes de um veículo
 public record VehicleResponseDTO(
         String id,
         String nickname,

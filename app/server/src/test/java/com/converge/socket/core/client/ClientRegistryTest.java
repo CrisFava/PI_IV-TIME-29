@@ -21,6 +21,12 @@ import java.util.List;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
+/**
+ * Testes unitários para {@link ClientRegistry}.
+ * Valida o gerenciamento centralizado e thread-safe de clientes ativos, adição, remoção, contagem, broadcast e desconexão em massa.
+ * <p>
+ * Os métodos de teste estão bem explicativos através de suas anotações {@code @DisplayName}.
+ */
 class ClientRegistryTest {
 
     private static class RecordingClientConnection extends ClientConnection {

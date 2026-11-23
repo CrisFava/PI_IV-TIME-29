@@ -12,6 +12,7 @@ import java.time.LocalDate;
 import java.time.LocalDateTime;
 import java.util.Set;
 
+// Dados de resposta com informações completas de um trajeto
 public record RouteResponseDTO(
         String id,
         RouteType type,

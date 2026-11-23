@@ -18,6 +18,14 @@ import org.springframework.stereotype.Service;
 import java.util.Optional;
 import java.util.Set;
 
+/**
+ * Caso de uso responsável por cadastrar um veículo para o usuário logado.
+ *
+ * Fluxo geral: confere se o usuário é motorista, valida o RENAVAM e monta o
+ * veículo. Se o usuário ainda não tem um veículo com aquela placa, salva um novo.
+ * Se já existe um com a mesma placa, só aceita quando o antigo está inativo,
+ * reaproveitando-o (atualiza os dados e reativa); se estiver ativo, lança erro.
+ */
 @Service
 @RequiredArgsConstructor
 public class CreateVehicleUseCase implements UseCase<CreateVehicleCommand, Vehicle> {

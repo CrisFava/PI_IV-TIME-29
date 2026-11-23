@@ -2,6 +2,7 @@
 
 package com.converge.api.modules.user.domain.enums.user;
 
+// Categorias de CNH's
 public enum DriverLicenseCategory {
     A,
     B,

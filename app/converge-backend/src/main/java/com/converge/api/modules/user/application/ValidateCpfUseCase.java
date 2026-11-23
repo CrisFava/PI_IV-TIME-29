@@ -13,6 +13,7 @@ import com.converge.socket.handler.cpf.ValidateCpfResponse;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
 
+// Caso de uso que implementa o ValidateCpfHandler do servidor socket
 @Slf4j
 @Service
 public class ValidateCpfUseCase implements UseCase<CpfValidationRequestDTO, CpfValidationResponseDTO> {

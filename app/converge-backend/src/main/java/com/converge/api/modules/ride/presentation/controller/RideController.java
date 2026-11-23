@@ -53,6 +53,15 @@ import org.springframework.web.bind.annotation.RestController;
 
 import java.util.List;
 
+/**
+ * Controller REST das caronas (/api/v1/rides).
+ *
+ * Camada de entrada da API: recebe a requisição HTTP, descobre o usuário logado
+ * (UID do Firebase), monta o comando e delega a regra de negócio ao caso de uso
+ * correspondente. Quase todos os endpoints terminam do mesmo jeito: o caso de uso
+ * devolve a entidade Ride e o RideViewService a converte em RideResponseDTO do
+ * ponto de vista de quem está pedindo. Não há regra de negócio aqui.
+ */
 @RestController
 @RequestMapping("/api/v1/rides")
 @RequiredArgsConstructor
@@ -75,6 +84,10 @@ public class RideController {
     private final CancelRideUseCase cancelRide;
     private final RideViewService rideView;
 
+    /**
+     * POST /request: passageiro pede vaga em uma carona.
+     * Retorna 201 (CREATED) com a carona.
+     */
     @PostMapping("/request")
     public ResponseEntity<ApplicationResponse<RideResponseDTO>> requestSeat(
             @AuthenticationPrincipal AuthenticatedUser principal,
@@ -87,6 +100,9 @@ public class RideController {
                 .body(ApplicationResponse.success(rideView.view(ride, uid(principal))));
     }
 
+    /**
+     * GET /: lista as caronas do usuário logado.
+     */
     @GetMapping
     public ResponseEntity<ApplicationResponse<List<RideResponseDTO>>> listMyRides(
             @AuthenticationPrincipal AuthenticatedUser principal
@@ -97,7 +113,6 @@ public class RideController {
 
         return ResponseEntity.ok(ApplicationResponse.success(rides));
     }
-
     // Histórico (RF59): viagens terminadas, com filtro de papel e de datas da saída (yyyy-MM-dd)
     @GetMapping("/history")
     public ResponseEntity<ApplicationResponse<List<RideHistoryItemDTO>>> listHistory(
@@ -120,6 +135,9 @@ public class RideController {
         return ResponseEntity.ok(ApplicationResponse.success(listPendingPayments.execute(uid(principal))));
     }
 
+    /**
+     * GET /{rideId}: detalhes de uma carona.
+     */
     @GetMapping("/{rideId}")
     public ResponseEntity<ApplicationResponse<RideResponseDTO>> getRide(
             @AuthenticationPrincipal AuthenticatedUser principal,
@@ -129,7 +147,10 @@ public class RideController {
 
         return ResponseEntity.ok(ApplicationResponse.success(rideView.view(ride, uid(principal))));
     }
-
+    /**
+     * POST /{rideId}/cancel: cancela a carona. O corpo (motivo) é opcional; se
+     * não vier, usa um DTO com motivo nulo.
+     */
     @PostMapping("/{rideId}/cancel")
     public ResponseEntity<ApplicationResponse<RideResponseDTO>> cancelRide(
             @AuthenticationPrincipal AuthenticatedUser principal,
@@ -141,6 +162,9 @@ public class RideController {
 
         return ResponseEntity.ok(ApplicationResponse.success(rideView.view(ride, uid(principal))));
     }
+    /**
+     * POST /{rideId}/start: o motorista inicia a carona.
+     */
 
     @PostMapping("/{rideId}/start")
     public ResponseEntity<ApplicationResponse<RideResponseDTO>> startRide(
@@ -152,6 +176,9 @@ public class RideController {
         return ResponseEntity.ok(ApplicationResponse.success(rideView.view(ride, uid(principal))));
     }
 
+    /**
+     * POST /{rideId}/complete: o motorista finaliza a carona.
+     */
     @PostMapping("/{rideId}/complete")
     public ResponseEntity<ApplicationResponse<RideResponseDTO>> completeRide(
             @AuthenticationPrincipal AuthenticatedUser principal,
@@ -163,6 +190,11 @@ public class RideController {
     }
 
     // Como ficaria a viagem aceitando o pedido (só o motorista): os dois caminhos e o desvio
+    /**
+     * GET /{rideId}/passengers/{passengerId}/preview: simulação de como a viagem
+     * ficaria se o motorista aceitasse aquele passageiro (rotas e desvio), sem
+     * alterar nada.
+     */
     @GetMapping("/{rideId}/passengers/{passengerId}/preview")
     public ResponseEntity<ApplicationResponse<RidePreviewResponseDTO>> previewPassenger(
             @AuthenticationPrincipal AuthenticatedUser principal,
@@ -199,6 +231,10 @@ public class RideController {
         return ResponseEntity.ok(ApplicationResponse.success(rideView.view(ride, uid(principal))));
     }
 
+    /**
+     * POST /{rideId}/passengers/{passengerId}/no-show: o motorista marca que o
+     * passageiro não compareceu.
+     */
     @PostMapping("/{rideId}/passengers/{passengerId}/no-show")
     public ResponseEntity<ApplicationResponse<RideResponseDTO>> markNoShow(
             @AuthenticationPrincipal AuthenticatedUser principal,
@@ -210,6 +246,10 @@ public class RideController {
         return ResponseEntity.ok(ApplicationResponse.success(rideView.view(ride, uid(principal))));
     }
 
+    /**
+     * POST /{rideId}/leave: o passageiro sai da carona. O corpo (motivo) é
+     * opcional, como no cancelamento.
+     */
     @PostMapping("/{rideId}/leave")
     public ResponseEntity<ApplicationResponse<RideResponseDTO>> leaveRide(
             @AuthenticationPrincipal AuthenticatedUser principal,
@@ -222,6 +262,10 @@ public class RideController {
         return ResponseEntity.ok(ApplicationResponse.success(rideView.view(ride, uid(principal))));
     }
 
+    /**
+     * POST /{rideId}/passengers/{passengerId}/accept: o motorista aceita o
+     * pedido de vaga do passageiro.
+     */
     @PostMapping("/{rideId}/passengers/{passengerId}/accept")
     public ResponseEntity<ApplicationResponse<RideResponseDTO>> acceptPassenger(
             @AuthenticationPrincipal AuthenticatedUser principal,
@@ -232,7 +276,10 @@ public class RideController {
 
         return ResponseEntity.ok(ApplicationResponse.success(rideView.view(ride, uid(principal))));
     }
-
+    /**
+     * POST /{rideId}/passengers/{passengerId}/reject: o motorista recusa o pedido
+     * de vaga. O corpo (motivo) é opcional.
+     */
     @PostMapping("/{rideId}/passengers/{passengerId}/reject")
     public ResponseEntity<ApplicationResponse<RideResponseDTO>> rejectPassenger(
             @AuthenticationPrincipal AuthenticatedUser principal,
@@ -246,6 +293,10 @@ public class RideController {
         return ResponseEntity.ok(ApplicationResponse.success(rideView.view(ride, uid(principal))));
     }
 
+    /**
+     * Extrai o UID do Firebase do usuário autenticado. Se não houver usuário ou
+     * UID, lança INVALID_CREDENTIALS ("Não autenticado").
+     */
     private String uid(AuthenticatedUser principal) {
         if (principal == null || principal.uid() == null) {
             throw new ApplicationException(

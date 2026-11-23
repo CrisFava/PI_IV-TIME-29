@@ -20,6 +20,12 @@ import static org.junit.jupiter.api.Assertions.assertNull;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
+/**
+ * Testes unitários para {@link MatchRoutesHandler}.
+ * Valida o algoritmo de correspondência de rotas (matching), considerando modos de busca, tolerância de desvios e score multidimensional.
+ * <p>
+ * Os métodos de teste estão bem explicativos através de suas anotações {@code @DisplayName}.
+ */
 class MatchRoutesHandlerTest {
 
     // Centro de Campinas -> PUC Campinas Campus I (cerca de 8 km em linha reta)

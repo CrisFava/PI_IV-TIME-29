@@ -11,6 +11,7 @@ import org.springframework.stereotype.Service;
 import com.converge.api.modules.user.domain.enums.user.ParticipationRole;
 
 
+// Caso de uso para um usuário se tornar um motorista
 @Service
 @RequiredArgsConstructor
 public class BecomeDriverUseCase implements UseCase<String, User> {

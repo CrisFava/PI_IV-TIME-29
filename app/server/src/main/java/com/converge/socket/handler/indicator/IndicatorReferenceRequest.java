@@ -20,10 +20,18 @@ public class IndicatorReferenceRequest extends Message {
     private final String[] periods;
     private final LocalDate[] dates;
 
+    /**
+     * Cria a requisição com os vetores alinhados de tipos de período e datas de referência.
+     *
+     * @param periods vetor contendo os identificadores de período (WEEKLY, MONTHLY, SEMESTERLY ou ALL_TIME)
+     * @param dates vetor contendo as datas de ocorrência associadas a cada período
+     */
     public IndicatorReferenceRequest(String[] periods, LocalDate[] dates) {
         this.periods = periods;
         this.dates = dates;
     }
+
+    // Getters e setters
 
     public String[] getPeriods() {
         return periods;

@@ -2,6 +2,7 @@
 
 package com.converge.api.modules.route.application.dto;
 
+// Dados de resposta com endereço e coordenadas de um local
 public record PlaceResponseDTO(
         String address,
         String neighborhood,

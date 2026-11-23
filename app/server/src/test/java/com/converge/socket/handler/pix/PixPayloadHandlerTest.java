@@ -12,6 +12,12 @@ import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
+/**
+ * Testes unitários para {@link PixPayloadHandler}.
+ * Valida a geração do payload EMVCo para PIX Copia e Cola (BR Code) e cálculo de redundância cíclica CRC16-CCITT.
+ * <p>
+ * Os métodos de teste estão bem explicativos através de suas anotações {@code @DisplayName}.
+ */
 class PixPayloadHandlerTest {
 
     private final PixPayloadHandler handler = new PixPayloadHandler();

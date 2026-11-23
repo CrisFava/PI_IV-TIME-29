@@ -13,9 +13,21 @@ public final class RoutePath {
     // km por grau de latitude; o de longitude encolhe com o cosseno da latitude
     private static final double KM_PER_DEGREE = 111.32;
 
+    /**
+     * Construtor privado para evitar instanciação de classe utilitária.
+     */
     private RoutePath() {
     }
 
+    /**
+     * Calcula a menor distância em quilômetros de um ponto até o caminho percorrido pelo motorista.
+     * Caso não haja polyline codificada, utiliza a linha reta entre origem e destino.
+     *
+     * @param lat latitude do ponto de teste
+     * @param lng longitude do ponto de teste
+     * @param offer rota ofertada pelo motorista
+     * @return distância mínima em quilômetros até a rota
+     */
     public static double distanceKm(double lat, double lng, MatchRoute offer) {
         List<double[]> path = PolylineDecoder.decode(offer.getEncodedPolyline());
         if (path.size() < 2) {
@@ -33,8 +45,13 @@ public final class RoutePath {
     }
 
     /**
-     * Distância do ponto ao trecho A-B. Em trechos curtos de cidade, projetar em um plano
-     * centrado no ponto (km para leste e para norte) é preciso o bastante.
+     * Distância do ponto ao trecho A-B em quilômetros por projeção euclidiana.
+     *
+     * @param lat latitude do ponto de teste
+     * @param lng longitude do ponto de teste
+     * @param a ponto inicial do trecho [latitude, longitude]
+     * @param b ponto final do trecho [latitude, longitude]
+     * @return distância mínima em quilômetros até o segmento
      */
     static double distanceToSegmentKm(double lat, double lng, double[] a, double[] b) {
         double kmPerLng = KM_PER_DEGREE * Math.cos(Math.toRadians(lat));

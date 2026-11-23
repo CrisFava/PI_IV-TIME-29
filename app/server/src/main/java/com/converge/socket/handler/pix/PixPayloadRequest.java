@@ -19,12 +19,22 @@ public class PixPayloadRequest extends Message {
     private final String receiverName;
     private final String receiverCity;
 
+    /**
+     * Cria a requisição com os dados para geração do payload PIX estático.
+     *
+     * @param pixKey chave PIX do recebedor (CPF, celular, e-mail ou aleatória)
+     * @param amount valor monetário da cobrança
+     * @param receiverName nome do recebedor/beneficiário
+     * @param receiverCity cidade do recebedor/beneficiário
+     */
     public PixPayloadRequest(String pixKey, BigDecimal amount, String receiverName, String receiverCity) {
         this.pixKey = pixKey;
         this.amount = amount;
         this.receiverName = receiverName;
         this.receiverCity = receiverCity;
     }
+
+    // Getters e setters
 
     public String getPixKey() {
         return pixKey;

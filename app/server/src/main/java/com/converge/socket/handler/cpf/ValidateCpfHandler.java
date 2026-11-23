@@ -6,8 +6,19 @@ import com.converge.socket.core.exception.ServerErrorCode;
 import com.converge.socket.core.exception.ServerException;
 import com.converge.socket.core.handler.RequestHandler;
 
+/**
+ * Handler responsável pela validação algorítmica de números de CPF (Cadastro de Pessoas Físicas).
+ * Verifica quantidade de dígitos, elimina sequências com dígitos repetidos e confere os dois dígitos verificadores.
+ */
 public class ValidateCpfHandler implements RequestHandler<ValidateCpfRequest, ValidateCpfResponse> {
 
+    /**
+     * Executa a validação do número de CPF informado na requisição.
+     *
+     * @param request requisição contendo a string do CPF a ser validada
+     * @return resposta contendo status de validade, CPF formatado e mensagem explicativa
+     * @throws ServerException se a requisição for nula
+     */
     @Override
     public ValidateCpfResponse execute(ValidateCpfRequest request) throws ServerException {
         if (request == null) {

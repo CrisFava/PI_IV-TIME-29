@@ -9,6 +9,7 @@ import org.springframework.stereotype.Repository;
 
 import java.util.Optional;
 
+// Repositório de persistência para as idempotency keys
 @Repository
 public interface IdempotencyKeyRepository extends MongoRepository<IdempotencyKey, ObjectId> {
 

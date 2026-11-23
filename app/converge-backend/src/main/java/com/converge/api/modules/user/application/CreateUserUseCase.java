@@ -17,6 +17,7 @@ import org.springframework.stereotype.Service;
 
 import java.util.Set;
 
+// Caso de uso para criar um usuário
 @Service
 @RequiredArgsConstructor
 public class CreateUserUseCase implements UseCase<CreateUserRequestDTO, User> {

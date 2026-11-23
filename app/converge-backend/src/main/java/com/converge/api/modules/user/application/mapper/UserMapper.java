@@ -18,6 +18,16 @@ import java.time.LocalDateTime;
 
 import org.springframework.stereotype.Component;
 
+/**
+ * Mapper do módulo de usuários.
+ *
+ * Converte entre os DTOs da API e o modelo de domínio: transforma o pedido de
+ * criação de usuário (CreateUserRequestDTO) em entidade User, e a entidade User
+ * na resposta da API (CreateUserResponseDTO). Também converte os dados
+ * acadêmicos e da CNH recebidos na requisição. Não tem regra de negócio, só
+ * mapeamento, com duas exceções pequenas: o status inicial da verificação
+ * acadêmica e o status efetivo da CNH (explicados nos métodos).
+ */
 @Component
 public class UserMapper {
 

@@ -13,6 +13,12 @@ import static org.junit.jupiter.api.Assertions.assertNull;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
+/**
+ * Testes unitários para {@link ValidateCpfHandler}.
+ * Valida a execução de validação de CPF sobre números válidos, inválidos, formatação com pontuação e sequências repetidas.
+ * <p>
+ * Os métodos de teste estão bem explicativos através de suas anotações {@code @DisplayName}.
+ */
 class ValidateCpfHandlerTest {
 
     private final ValidateCpfHandler handler = new ValidateCpfHandler();

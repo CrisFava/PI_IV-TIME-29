@@ -20,6 +20,13 @@ public class IndicatorReferenceHandler implements RequestHandler<IndicatorRefere
     public static final String ALL_TIME_REFERENCE = "ALL_TIME";
     static final int MAX_BATCH = 1000;
 
+    /**
+     * Executa a resolução em lote dos códigos de referência temporal para os períodos e datas informados.
+     *
+     * @param request requisição contendo os vetores de tipos de período e datas correspondentes
+     * @return resposta com o vetor de códigos de referência calculados
+     * @throws ServerException se a requisição for nula, listas tiverem tamanhos divergentes ou excederem o limite
+     */
     @Override
     public IndicatorReferenceResponse execute(IndicatorReferenceRequest request) throws ServerException {
         if (request == null || request.getPeriods() == null || request.getDates() == null) {
@@ -40,6 +47,15 @@ public class IndicatorReferenceHandler implements RequestHandler<IndicatorRefere
         return new IndicatorReferenceResponse(references);
     }
 
+    /**
+     * Formata o código de referência temporal correspondente ao período e data fornecidos.
+     *
+     * @param index índice do elemento para mensagens de erro
+     * @param period tipo do período (WEEKLY, MONTHLY, SEMESTERLY ou ALL_TIME)
+     * @param date data base para extração do período
+     * @return string formatada da referência temporal (ex.: "2025-W20", "2025-05", "2025-S1", "ALL_TIME")
+     * @throws ServerException se o período for desconhecido ou os dados forem nulos
+     */
     private static String reference(int index, String period, LocalDate date) throws ServerException {
         if (period == null) {
             throw invalid("Period at index " + index + " cannot be null");
@@ -61,6 +77,12 @@ public class IndicatorReferenceHandler implements RequestHandler<IndicatorRefere
         };
     }
 
+    /**
+     * Cria uma instância de {@link ServerException} com código {@link ServerErrorCode#INVALID_MESSAGE}.
+     *
+     * @param message mensagem descritiva do erro de validação
+     * @return nova instância de ServerException
+     */
     private static ServerException invalid(String message) {
         return new ServerException(ServerErrorCode.INVALID_MESSAGE, message);
     }

@@ -25,7 +25,6 @@ public class SocketCpfValidationGateway implements CpfValidationGateway {
     private final String host;
     private final int port;
 
-    @Autowired
     public SocketCpfValidationGateway() {
         this(SocketClient.DEFAULT_HOST, SocketClient.DEFAULT_PORT);
     }

@@ -18,6 +18,13 @@ import java.util.Set;
  */
 public class RideCostHandler implements RequestHandler<RideCostRequest, RideCostResponse> {
 
+    /**
+     * Executa a operação de cálculo de custo de carona solicitada (cotação padrão, cotação de confirmação ou rateio).
+     *
+     * @param request requisição contendo a operação desejada e os parâmetros numéricos e de trajeto
+     * @return resposta com os custos calculados, rateios por passageiro ou tetos correspondentes
+     * @throws ServerException se os dados da requisição forem inválidos ou inconsistentes
+     */
     @Override
     public RideCostResponse execute(RideCostRequest request) throws ServerException {
         validateRequest(request);
@@ -30,6 +37,12 @@ public class RideCostHandler implements RequestHandler<RideCostRequest, RideCost
 
     // calcula o desvio e o valor máximo ao confirmar o passageiro, considerando a distância original da rota do motorista, os trechos do passageiro, o consumo médio do veículo, o preço da energia, pedágio e estacionamento
     // o valor máximo é o custo inteiro da rota com o desvio do passageiro: o rateio é só entre os passageiros, então um passageiro sozinho paga a viagem toda
+    /**
+     * Calcula o teto de custo para confirmação de um passageiro considerando o desvio do trajeto (RF37).
+     *
+     * @param request requisição contendo distâncias dos trechos, custos e parâmetros do veículo
+     * @return resposta configurada com a cotação de confirmação e teto calculado
+     */
     private RideCostResponse confirmationQuote(RideCostRequest request) {
 
         double detourKm = detourKm(request);
@@ -40,8 +53,14 @@ public class RideCostHandler implements RequestHandler<RideCostRequest, RideCost
         return RideCostResponse.forConfirmationQuote(detourKm, maxAmount);
     }
 
-    // calcula o rateio da viagem, considerando a distância original da rota do motorista, os trechos do passageiro, o consumo médio do veículo, o preço da energia, pedágio e estacionamento
-    // o custo é dividido igualmente só entre os passageiros, cada um limitado ao próprio teto; o motorista fica com o que sobrar (centavos do arredondamento e o que os tetos cortaram)
+    /**
+     * Calcula o rateio da viagem proporcional entre os passageiros (RF36, RF38).
+     * O custo é dividido igualmente só entre os passageiros, cada um limitado ao próprio teto;
+     * o motorista fica com o que sobrar (centavos do arredondamento e o que os tetos cortaram).
+     *
+     * @param request requisição contendo a distância original, consumo, preço de energia, custos adicionais e passageiros
+     * @return resposta de custo com os valores calculados por passageiro
+     */
     private RideCostResponse costSharing(RideCostRequest request) {
 
         double totalDetourKm = 0.0;
@@ -73,7 +92,12 @@ public class RideCostHandler implements RequestHandler<RideCostRequest, RideCost
                 request.getBaseDistanceKm(), totalDistanceKm, energyCost, totalCost, totalShared, shares);
     }
 
-    // calcula o desvio gerado pelo passageiro, que é a diferença entre a distância percorrida pelo motorista com o passageiro e a distância original da rota do motorista
+    /**
+     * Calcula o desvio gerado pelo passageiro em relação à rota original do motorista.
+     *
+     * @param request requisição contendo os trechos do trajeto e distância base
+     * @return distância adicional em quilômetros
+     */
     private double detourKm(RideCostRequest request) {
 
         double detourKm = 0.0;
@@ -90,7 +114,13 @@ public class RideCostHandler implements RequestHandler<RideCostRequest, RideCost
         return detourKm;
     }
 
-    // calcula o custo total da rota, incluindo combustível, pedágio e estacionamento
+    /**
+     * Calcula o custo total da rota, incluindo combustível/energia, pedágio e estacionamento.
+     *
+     * @param distanceKm distância total percorrida em quilômetros
+     * @param request requisição contendo dados de consumo e custos fixos
+     * @return valor monetário total do custo da rota
+     */
     private BigDecimal routeCost(double distanceKm, RideCostRequest request) {
         BigDecimal energyCost = energyCost(distanceKm, request);
         BigDecimal toll = request.getToll() == null ? BigDecimal.ZERO : request.getToll();
@@ -99,13 +129,25 @@ public class RideCostHandler implements RequestHandler<RideCostRequest, RideCost
         return energyCost.add(parking).add(toll);
     }
 
-    // calcula o custo de energia com base na distância percorrida, preço da energia e consumo médio do veículo
+    /**
+     * Calcula o custo de energia com base na distância percorrida, preço da energia e consumo médio do veículo.
+     *
+     * @param distanceKm distância em quilômetros
+     * @param request requisição com preço da energia e consumo do veículo
+     * @return custo monetário de energia calculado
+     */
     private BigDecimal energyCost(double distanceKm, RideCostRequest request) {
         return BigDecimal.valueOf(distanceKm)
                 .multiply(request.getCurrentEnergyPrice())
                 .divide(BigDecimal.valueOf(request.getAverageConsumption()), 2, RoundingMode.HALF_UP);
     }
 
+    /**
+     * Valida os campos gerais da requisição de custos de carona.
+     *
+     * @param request requisição a ser validada
+     * @throws ServerException se a requisição contiver parâmetros inválidos
+     */
     private void validateRequest(RideCostRequest request) throws ServerException {
         if (request == null || request.getOperation() == null) {
             throw new ServerException(ServerErrorCode.INVALID_MESSAGE, "RideCostRequest cannot be null");
@@ -124,7 +166,12 @@ public class RideCostHandler implements RequestHandler<RideCostRequest, RideCost
         }
     }
 
-    // os trechos do passageiro são opcionais (nulos valem desvio zero), mas, se vierem, precisam ser distâncias válidas
+    /**
+     * Valida os trechos adicionais da cotação de confirmação de carona.
+     *
+     * @param request requisição contendo os trechos
+     * @throws ServerException se algum trecho for não-finito
+     */
     private void validateQuoteLegs(RideCostRequest request) throws ServerException {
         if (isNonFinite(request.getLegOriginToBoardingKm())
                 || isNonFinite(request.getLegBoardingToDropOffKm())
@@ -133,7 +180,12 @@ public class RideCostHandler implements RequestHandler<RideCostRequest, RideCost
         }
     }
 
-    // desvio finito, teto não negativo e nenhum passageiro repetido (senão o divisor contaria dois e o mapa guardaria um)
+    /**
+     * Valida a lista de passageiros para o cálculo de rateio de custos.
+     *
+     * @param request requisição contendo a lista de passageiros
+     * @throws ServerException se houver passageiros duplicados, desvios não-finitos ou tetos negativos
+     */
     private void validatePassengers(RideCostRequest request) throws ServerException {
         Set<String> ids = new HashSet<>();
 
@@ -150,6 +202,12 @@ public class RideCostHandler implements RequestHandler<RideCostRequest, RideCost
         }
     }
 
+    /**
+     * Verifica se um valor numérico em quilômetros é não-finito.
+     *
+     * @param km valor em quilômetros
+     * @return {@code true} se o valor não for finito; {@code false} caso contrário
+     */
     private static boolean isNonFinite(Double km) {
         return km != null && !Double.isFinite(km);
     }

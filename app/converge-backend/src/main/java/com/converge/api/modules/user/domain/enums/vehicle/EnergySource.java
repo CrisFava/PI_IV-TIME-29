@@ -2,6 +2,7 @@
 
 package com.converge.api.modules.user.domain.enums.vehicle;
 
+// Fonte de energia de um veículo
 public enum EnergySource {
     GASOLINE,
     ETHANOL,

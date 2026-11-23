@@ -35,6 +35,13 @@ public class PixPayloadHandler implements RequestHandler<PixPayloadRequest, PixP
     private static final String FALLBACK_RECEIVER_NAME = "MOTORISTA CONVERGE";
     private static final BigDecimal MAX_AMOUNT = new BigDecimal("999999.99");
 
+    /**
+     * Constrói e valida o payload EMVCo para PIX Copia e Cola estático a partir dos dados da cobrança.
+     *
+     * @param request requisição contendo a chave PIX, valor, nome e cidade do recebedor
+     * @return resposta com o payload completo e o checksum CRC16 calculado
+     * @throws ServerException se dados obrigatórios estiverem ausentes ou forem inválidos
+     */
     @Override
     public PixPayloadResponse execute(PixPayloadRequest request) throws ServerException {
         if (request == null) {
@@ -84,11 +91,25 @@ public class PixPayloadHandler implements RequestHandler<PixPayloadRequest, PixP
         return new PixPayloadResponse(withoutCrc + crc16(withoutCrc));
     }
 
+    /**
+     * Formata um campo no padrão TLV (Tag-Length-Value) do padrão EMVCo.
+     *
+     * @param id identificador de dois dígitos do campo
+     * @param value conteúdo textual do campo
+     * @return string formatada contendo ID, tamanho com 2 dígitos e valor
+     */
     // Campo EMV: id (2 dígitos) + tamanho do valor (2 dígitos) + valor.
     private static String field(String id, String value) {
         return id + String.format("%02d", value.length()) + value;
     }
 
+    /**
+     * Normaliza e limpa um texto para compatibilidade com o padrão EMVCo, removendo acentos e caracteres especiais.
+     *
+     * @param raw texto original a ser sanitizado
+     * @param maxLength comprimento máximo permitido após sanitização
+     * @return texto em maiúsculas, sanitizado e truncado no tamanho limite
+     */
     // Sem acento, em maiúsculas e só com letras, números e espaço, como os apps de banco esperam.
     static String sanitize(String raw, int maxLength) {
         if (raw == null) {
@@ -105,6 +126,12 @@ public class PixPayloadHandler implements RequestHandler<PixPayloadRequest, PixP
         return clean.length() > maxLength ? clean.substring(0, maxLength).trim() : clean;
     }
 
+    /**
+     * Calcula o código de redundância cíclica CRC16-CCITT sobre os bytes do payload.
+     *
+     * @param data string base sobre a qual o checksum será calculado
+     * @return string hexadecimal de 4 dígitos em maiúsculas com o CRC16
+     */
     // CRC16/CCITT-FALSE (polinômio 0x1021, valor inicial 0xFFFF), em 4 dígitos hexadecimais maiúsculos.
     static String crc16(String data) {
         int crc = 0xFFFF;
@@ -120,6 +147,12 @@ public class PixPayloadHandler implements RequestHandler<PixPayloadRequest, PixP
         return String.format("%04X", crc);
     }
 
+    /**
+     * Cria uma instância de {@link ServerException} com código {@link ServerErrorCode#INVALID_MESSAGE}.
+     *
+     * @param message mensagem explicativa do erro de validação
+     * @return nova instância de ServerException
+     */
     private static ServerException invalid(String message) {
         return new ServerException(ServerErrorCode.INVALID_MESSAGE, message);
     }

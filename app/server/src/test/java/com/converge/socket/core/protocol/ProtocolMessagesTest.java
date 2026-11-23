@@ -15,6 +15,12 @@ import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertInstanceOf;
 import static org.junit.jupiter.api.Assertions.assertNotSame;
 
+/**
+ * Testes unitários para as mensagens de protocolo do servidor (Message, DisconnectRequest, ServerShutdownNotification e ErrorResponse).
+ * Valida instanciação, construtores, serialização, clonagem e representação textual.
+ * <p>
+ * Os métodos de teste estão bem explicativos através de suas anotações {@code @DisplayName}.
+ */
 class ProtocolMessagesTest {
 
     @SuppressWarnings("unchecked")
