@@ -285,6 +285,16 @@ class RideRouteOverview extends StatefulWidget {
 
 class _RideRouteOverviewState extends State<RideRouteOverview> {
   int _selected = 0;
+
+  // A lista de passos pode encolher (a viagem mudou): o passo escolhido continua válido
+  @override
+  void didUpdateWidget(covariant RideRouteOverview oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    if (_selected >= widget.steps.length) {
+      _selected = widget.steps.isEmpty ? 0 : widget.steps.length - 1;
+    }
+  }
+
   final Map<String, List<LatLng>> _decoded = {};
   final ScrollController _stripController = ScrollController();
 
@@ -382,7 +392,9 @@ class _RideRouteOverviewState extends State<RideRouteOverview> {
           // Só o pino do passo escolhido em foco; os outros, cinza
           stops: [
             for (var i = 0; i < _steps.length; i++)
-              if (!TripProgress.sameSpot(_steps[i].to, widget.destination))
+              // Só o passo da chegada fica sem pino (a bandeira do destino já
+              // marca o lugar); um embarque perto do destino continua visível
+              if (!(i == _steps.length - 1 && !_steps[i].isPickup))
                 RouteMapStop(
                   position: _latLng(_steps[i].to),
                   title: _steps[i].title,
@@ -465,7 +477,7 @@ class _Summary extends StatelessWidget {
   Widget build(BuildContext context) {
     final items = [
       (Icons.schedule_rounded, schedule),
-      if (minutes != null) (Icons.timer_outlined, '$minutes min'),
+      if (minutes != null) (Icons.timer_rounded, '$minutes min'),
       if (distance != null) (Icons.route_rounded, distance!),
     ];
     return Container(
@@ -475,8 +487,11 @@ class _Summary extends StatelessWidget {
         borderRadius: BorderRadius.circular(14),
         border: Border.all(color: AppColors.borderSubtle),
       ),
-      child: Row(
-        mainAxisAlignment: MainAxisAlignment.spaceBetween,
+      // Quebra de linha com fonte grande: nada some
+      child: Wrap(
+        alignment: WrapAlignment.spaceBetween,
+        spacing: 12,
+        runSpacing: 6,
         children: [
           for (final (icon, text) in items)
             Row(

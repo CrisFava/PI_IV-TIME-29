@@ -35,6 +35,11 @@ class PassengerMatchController extends Notifier<PassengerMatchState> {
   Timer? _polling;
   int _pollGeneration = 0;
 
+  // Sem motoristas na busca: procura de novo em silêncio até aparecer um (o aviso
+  // de motorista compatível aparece sozinho quando a lista deixa de estar vazia)
+  Timer? _watching;
+  static const _watchInterval = Duration(seconds: 30);
+
   // Trajeto de procura deste pedido que sai do matching quando o pedido é fechado sem
   // carona aceita: o criado para ele ou um avulso reaproveitado. Um trajeto semanal
   // reaproveitado fica, porque o passageiro o salvou para procurar carona toda semana.
@@ -117,6 +122,7 @@ class PassengerMatchController extends Notifier<PassengerMatchState> {
         phase: PassengerMatchPhase.ready,
         matches: matches,
       );
+      if (matches.isEmpty) _watchForDrivers(searchRouteId);
     } catch (e) {
       if (state.searchRouteId != searchRouteId) return;
       state = state.copyWith(
@@ -287,5 +293,36 @@ class PassengerMatchController extends Notifier<PassengerMatchState> {
     _pollGeneration++;
     _polling?.cancel();
     _polling = null;
+    _watching?.cancel();
+    _watching = null;
+  }
+
+  /// Busca vazia: consulta os motoristas de novo de tempos em tempos, sem mostrar
+  /// carregamento, até aparecer o primeiro (ou a busca mudar ou ser fechada).
+  void _watchForDrivers(String searchRouteId) {
+    _watching?.cancel();
+    _watching = Timer.periodic(_watchInterval, (timer) async {
+      final stillEmpty =
+          state.searchRouteId == searchRouteId &&
+          state.phase == PassengerMatchPhase.ready &&
+          state.matches.isEmpty;
+      if (!stillEmpty) {
+        timer.cancel();
+        return;
+      }
+      try {
+        final matches = await _matching.findDriversFor(searchRouteId);
+        if (!ref.mounted ||
+            state.searchRouteId != searchRouteId ||
+            state.phase != PassengerMatchPhase.ready ||
+            matches.isEmpty) {
+          return;
+        }
+        timer.cancel();
+        state = state.copyWith(matches: matches);
+      } catch (_) {
+        // Falhou desta vez: tenta de novo na próxima
+      }
+    });
   }
 }

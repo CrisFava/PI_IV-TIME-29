@@ -169,7 +169,8 @@ public class GoogleMapsGateway implements MapsGateway {
         List<String> legs = route.legs().stream()
                 .map(leg -> leg.polyline() != null ? leg.polyline().encodedPolyline() : null)
                 .toList();
-        return legs.contains(null) ? List.of() : legs;
+        // Um trecho sem desenho (nulo ou vazio) invalida a lista toda
+        return legs.stream().anyMatch(leg -> leg == null || leg.isBlank()) ? List.of() : legs;
     }
 
     // O tempo de cada trecho em segundos; só vale completo, como os desenhos

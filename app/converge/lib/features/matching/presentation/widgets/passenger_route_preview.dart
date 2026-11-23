@@ -167,7 +167,8 @@ class _PassengerRoutePreviewState extends ConsumerState<PassengerRoutePreview> {
       RoutePlaceModel a,
       RoutePlaceModel b,
     ) => polyline == null || polyline.isEmpty
-        ? [_latLng(a), _latLng(b)]
+        // Sem o caminho pelas ruas ainda, nada de linha reta: só os pinos
+        ? const <LatLng>[]
         : GoogleMapsService.decodePolyline(polyline);
 
     final steps = [
@@ -183,7 +184,8 @@ class _PassengerRoutePreviewState extends ConsumerState<PassengerRoutePreview> {
                 widget.driverOrigin,
                 widget.pickup,
               ),
-        minutes: widget.pickupMinutes ?? approach?.durationMinutes ?? 0,
+        // Só os tempos da viagem (com as paradas); o caminho direto não conta
+        minutes: widget.pickupMinutes ?? (_approachIsEmpty ? 0 : null),
         stops: _stopsLabel(widget.stopsBeforePickup, 'antes de você'),
       ),
       (
@@ -192,7 +194,7 @@ class _PassengerRoutePreviewState extends ConsumerState<PassengerRoutePreview> {
         from: widget.pickup,
         to: widget.dropOff,
         points: points(onBoard?.encodedPolyline, widget.pickup, widget.dropOff),
-        minutes: widget.rideMinutes ?? onBoard?.durationMinutes,
+        minutes: widget.rideMinutes,
         stops: _stopsLabel(widget.stopsDuringRide, 'no caminho'),
       ),
     ];
@@ -252,15 +254,19 @@ class _PassengerRoutePreviewState extends ConsumerState<PassengerRoutePreview> {
           from: selected.from,
           to: selected.to,
           toIcon: selected.icon,
-          samePlaceLabel: 'O motorista já sai de',
+          samePlaceLabel: _selected == 0
+              ? 'O motorista já sai de'
+              : 'No mesmo ponto',
           info: [
-            ?_timeLabel(
-              steps[0].minutes,
-              _selected == 0 ? null : steps[1].minutes,
-              arriving: _selected == 0
-                  ? 'O motorista chega por volta das'
-                  : 'Você chega por volta das',
-            ),
+            // A chegada só com os dois tempos da viagem (como nos detalhes)
+            if (_selected == 0 || steps[1].minutes != null)
+              ?_timeLabel(
+                steps[0].minutes,
+                _selected == 0 ? null : steps[1].minutes,
+                arriving: _selected == 0
+                    ? 'O motorista chega por volta das'
+                    : 'Você chega por volta das',
+              ),
             ?selected.stops,
           ].join(' · '),
         ),

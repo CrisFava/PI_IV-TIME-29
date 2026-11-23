@@ -17,11 +17,15 @@ class RideCancellationNotice {
   /// O aviso é para quem dirige (abre "Minhas caronas" como motorista).
   final bool forDriver;
 
+  /// A carona do motorista em "Minhas caronas" (para abrir ao tocar).
+  final String? driverRouteId;
+
   const RideCancellationNotice({
     required this.key,
     required this.title,
     required this.message,
     required this.forDriver,
+    this.driverRouteId,
   });
 }
 
@@ -51,6 +55,7 @@ List<RideCancellationNotice> rideCancellationNotices({
               title: 'Carona cancelada',
               message: 'Sua carona $when foi cancelada.',
               forDriver: true,
+              driverRouteId: old.driverRouteId,
             ),
           );
         }
@@ -64,7 +69,7 @@ List<RideCancellationNotice> rideCancellationNotices({
             was != ParticipantStatus.requested) {
           continue;
         }
-        final current = _participationOf(now, passenger.userId!, since: was);
+        final current = _participationOf(now, passenger);
         if (current == null ||
             current.status != ParticipantStatus.cancelled ||
             current.removedByDriver) {
@@ -73,7 +78,10 @@ List<RideCancellationNotice> rideCancellationNotices({
         final name = passenger.displayName.split(' ').first;
         notices.add(
           RideCancellationNotice(
-            key: 'passenger_left_${old.id}_${passenger.userId}',
+            // Uma chave por participação: quem pede de novo e desiste é avisado de novo
+            key:
+                'passenger_left_${old.id}_${passenger.userId}_'
+                '${passenger.requestedAt?.millisecondsSinceEpoch}',
             title: was == ParticipantStatus.confirmed
                 ? 'Passageiro saiu da carona'
                 : 'Pedido de vaga cancelado',
@@ -81,6 +89,7 @@ List<RideCancellationNotice> rideCancellationNotices({
                 ? '$name saiu da sua carona $when. A vaga foi liberada.'
                 : '$name desistiu do pedido para a sua carona $when.',
             forDriver: true,
+            driverRouteId: old.driverRouteId,
           ),
         );
       }
@@ -103,13 +112,13 @@ List<RideCancellationNotice> rideCancellationNotices({
       );
       continue;
     }
-    final current = _participationOf(now, viewerId, since: mine.status);
+    final current = _participationOf(now, mine);
     if (current == null) continue;
     if (current.status == ParticipantStatus.cancelled &&
         current.removedByDriver) {
       notices.add(
         RideCancellationNotice(
-          key: 'removed_${old.id}',
+          key: 'removed_${old.id}_${mine.requestedAt?.millisecondsSinceEpoch}',
           title: 'Você saiu da carona',
           message: '$driver tirou você da carona $when.',
           forDriver: false,
@@ -120,7 +129,9 @@ List<RideCancellationNotice> rideCancellationNotices({
             current.status == ParticipantStatus.expired)) {
       notices.add(
         RideCancellationNotice(
-          key: 'request_closed_${old.id}',
+          key:
+              'request_closed_${old.id}_'
+              '${mine.requestedAt?.millisecondsSinceEpoch}',
           title: 'Pedido não aceito',
           message: current.status == ParticipantStatus.expired
               ? 'Seu pedido para a carona $when expirou sem resposta.'
@@ -146,20 +157,24 @@ RideParticipantModel? _activeParticipation(RideModel ride, String userId) {
 }
 
 // A mesma participação na leitura nova: quem saiu e pediu de novo aparece mais de
-// uma vez, então vale a que não é a nova (a que veio do status [since])
+// uma vez, então a participação é reconhecida pela hora do pedido
 RideParticipantModel? _participationOf(
   RideModel ride,
-  String userId, {
-  required ParticipantStatus since,
-}) {
-  RideParticipantModel? found;
+  RideParticipantModel previous,
+) {
+  final userId = previous.userId;
+  RideParticipantModel? sameUser;
+  var count = 0;
   for (final p in ride.participants) {
     if (!p.isPassenger || p.userId != userId) continue;
-    // Ainda valendo: nada mudou
-    if (p.status == since) return p;
-    found ??= p;
+    count++;
+    sameUser = p;
+    if (previous.requestedAt != null && p.requestedAt == previous.requestedAt) {
+      return p;
+    }
   }
-  return found;
+  // Uma participação só: é ela
+  return count == 1 ? sameUser : null;
 }
 
 String _whenLabel(DateTime? departure) {

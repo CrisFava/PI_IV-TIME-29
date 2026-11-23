@@ -149,7 +149,13 @@ class _HomeRideAlertsOverlayState extends ConsumerState<HomeRideAlertsOverlay> {
                 ref
                     .read(rideCancellationNoticeProvider.notifier)
                     .dismiss(cancellation.key);
-                if (!cancellation.forDriver) widget.onOpenRidesAsPassenger();
+                // Abre a carona em questão: a do motorista ou as do passageiro
+                final routeId = cancellation.driverRouteId;
+                if (cancellation.forDriver && routeId != null) {
+                  widget.onOpenOffer(routeId);
+                } else if (!cancellation.forDriver) {
+                  widget.onOpenRidesAsPassenger();
+                }
               },
               onDismiss: () {
                 _dismissNotification(cancellation.key);

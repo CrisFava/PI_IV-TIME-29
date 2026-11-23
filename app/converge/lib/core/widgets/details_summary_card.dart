@@ -33,11 +33,13 @@ class DetailsSummaryCard extends StatelessWidget {
                 children: [
                   Icon(row.icon, size: 18, color: AppColors.textPrimary),
                   const SizedBox(width: 10),
-                  Text(
-                    row.label,
-                    style: const TextStyle(
-                      fontSize: 13.5,
-                      color: AppColors.textDark,
+                  Flexible(
+                    child: Text(
+                      row.label,
+                      style: const TextStyle(
+                        fontSize: 13.5,
+                        color: AppColors.textDark,
+                      ),
                     ),
                   ),
                   const SizedBox(width: 12),

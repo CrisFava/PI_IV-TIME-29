@@ -126,7 +126,14 @@ class _RideRouteMapState extends State<RideRouteMap> {
         oldWidget.destination != widget.destination) {
       _path = _decode();
     }
-    if (!listEquals(oldWidget.focus, widget.focus)) {
+    // Com foco, ele manda; sem foco, enquadra de novo quando o caminho muda
+    final focusChanged = !listEquals(oldWidget.focus, widget.focus);
+    final pathChanged =
+        widget.focus == null &&
+        (oldWidget.polyline != widget.polyline ||
+            oldWidget.stops.length != widget.stops.length ||
+            oldWidget.segments.length != widget.segments.length);
+    if (focusChanged || pathChanged) {
       final controller = _controller;
       if (controller != null) _fit(controller, animate: true);
     }

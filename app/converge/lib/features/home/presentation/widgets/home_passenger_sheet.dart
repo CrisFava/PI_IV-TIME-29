@@ -186,13 +186,14 @@ class _HomePassengerSheetState extends ConsumerState<HomePassengerSheet> {
 
     if (phase == PassengerMatchPhase.loading ||
         phase == PassengerMatchPhase.idle) {
-      return const [
-        Padding(
+      return [
+        const Padding(
           padding: EdgeInsets.all(28),
           child: Center(
             child: CircularProgressIndicator(color: AppColors.primary),
           ),
         ),
+        _cancelSearchButton(),
       ];
     }
 
@@ -201,6 +202,7 @@ class _HomePassengerSheetState extends ConsumerState<HomePassengerSheet> {
         _buildDriverListMessage(
           matchState.errorMessage ?? 'Não foi possível buscar os motoristas.',
         ),
+        _cancelSearchButton(),
       ];
     }
 

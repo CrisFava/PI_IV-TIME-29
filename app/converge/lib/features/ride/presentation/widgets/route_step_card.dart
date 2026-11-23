@@ -119,7 +119,7 @@ class RouteStepCard extends StatelessWidget {
             const SizedBox(height: 6),
             _PlaceLine(icon: toIcon, label: 'Indo para', address: to.address),
           ],
-          if (infoText != null && infoText.isNotEmpty && !samePlace) ...[
+          if (infoText != null && infoText.isNotEmpty) ...[
             const SizedBox(height: 8),
             Text(
               infoText,
