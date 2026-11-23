@@ -123,9 +123,9 @@
 | `email` | Único | Login e identificação — nunca duplicar |
 | `firebaseUid` | Único | Chave de autenticação Firebase |
 | `academicRecord.institutionalEmail` | Único Parcial (`$type: 'string'`) | Garante unicidade do e-mail institucional acadêmico |
-| `academicRecord.university` | Simples | Filtro de matching por universidade |
-| `academicRecord.status` | Simples | Consultas de moderação e verificação |
-| `reputation.driver.level` | Simples | Consultas de reputação de motoristas |
+| `academicRecord.university` | Simples (sugerido, ainda não criado) | Filtro de matching por universidade |
+| `academicRecord.status` | Simples (sugerido, ainda não criado) | Consultas de moderação e verificação |
+| `reputation.driver.level` | Simples (sugerido, ainda não criado) | Consultas de reputação de motoristas |
 | `isDefaulter` | Simples | Verificação rápida de inadimplência no matching |
 
 ### Regras de Negócio — Reputação (`reputation`)
@@ -608,7 +608,7 @@ O motorista vai até cada passageiro: `itinerary` guarda as paradas na ordem em 
 | `driverId` + `sequentialNumber` | Composto Único | Referência amigável por motorista (Ride #042). Sequencial por motorista — não vaza volume total da plataforma |
 | `driverRouteId` + `departureDateTime` | Composto Único Parcial (`status in [AWAITING_CONFIRMATION, CONFIRMED, IN_PROGRESS, COMPLETED]`) | Garante que o motorista tenha apenas uma viagem aberta por data/horário em um trajeto |
 | `driverId` | Simples | Listar viagens do motorista |
-| `participants.userId` | Simples | Listar viagens de um passageiro |
+| `participants.userId` | Simples (sugerido, ainda não criado) | Listar viagens de um passageiro |
 | `status` | Simples | Filtrar viagens ativas, concluídas, etc. |
 | `departureDateTime` | Simples | Ordenação e filtro por data |
 | `driverRouteId` | Simples | Vincular viagens a um trajeto recorrente |
@@ -1012,7 +1012,7 @@ Assim o resultado não depende da ordem em que os candidatos chegaram.
 | Campo(s) | Tipo | Justificativa |
 |---|---|---|
 | `userId` + `period` + `reference` | Composto Único | Um documento por usuário/período/referência |
-| `userId` + `period` | Composto | Filtrar por tipo de período e ordenar por referência |
+| `userId` + `period` | Composto (não criado à parte: o índice acima já atende, porque começa pelos mesmos campos) | Filtrar por tipo de período e ordenar por referência |
 
 ### Estratégia de leitura e acumulado histórico
 
