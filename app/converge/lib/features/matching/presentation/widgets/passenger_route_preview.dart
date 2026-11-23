@@ -109,6 +109,34 @@ class _PassengerRoutePreviewState extends ConsumerState<PassengerRoutePreview> {
     return '$arriving $hhmm';
   }
 
+  /// O aviso das paradas de outros passageiros: quantas, e quando (antes de
+  /// buscar o passageiro e com ele no carro).
+  String _stopsNotice() {
+    final before = widget.stopsBeforePickup ?? 0;
+    final during = widget.stopsDuringRide ?? 0;
+    final total = before + during;
+    if (total == 0) {
+      return 'Por enquanto não há paradas de outros passageiros. O trajeto pode mudar se alguém entrar na carona.';
+    }
+    String count(int n, String what) =>
+        n == 1 ? '1 $what' : '$n ${what.replaceFirst('parada', 'paradas')}';
+    final when = [
+      if (before > 0) '${count(before, 'parada')} antes de te buscar',
+      if (during > 0) '${count(during, 'parada')} no caminho',
+    ].join(' e ');
+    final stops = total == 1
+        ? '1 parada de outro passageiro'
+        : '$total paradas de outros passageiros';
+    // Dos dois tipos, detalha quantas de cada; de um só, diz quando
+    final detail = before > 0 && during > 0
+        ? ' ($when)'
+        : before > 0
+        ? ' antes de te buscar'
+        : ' no caminho';
+    return 'O trajeto real pode mudar: o motorista faz $stops$detail. '
+        'Os horários já contam com elas.';
+  }
+
   void _select(int index) {
     if (index == _selected) return;
     HapticFeedback.selectionClick();
@@ -237,9 +265,26 @@ class _PassengerRoutePreviewState extends ConsumerState<PassengerRoutePreview> {
           ].join(' · '),
         ),
         const SizedBox(height: 10),
-        const Text(
-          'O mapa mostra o caminho entre os seus pontos; as paradas de outros passageiros já estão contadas no tempo.',
-          style: TextStyle(fontSize: 12.5, color: AppColors.textSecondary),
+        // As paradas dos outros, contadas: o mapa mostra um caminho direto
+        Row(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            const Icon(
+              Icons.info_outline_rounded,
+              size: 16,
+              color: AppColors.textSecondary,
+            ),
+            const SizedBox(width: 6),
+            Expanded(
+              child: Text(
+                _stopsNotice(),
+                style: const TextStyle(
+                  fontSize: 12.5,
+                  color: AppColors.textSecondary,
+                ),
+              ),
+            ),
+          ],
         ),
       ],
     );
