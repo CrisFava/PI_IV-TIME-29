@@ -8,6 +8,7 @@ import '../../../../core/services/maps/google_maps_service.dart';
 import '../../../matching/data/models/match_model.dart';
 import '../../../matching/state/matching_viewer_provider.dart';
 import '../../../matching/state/passenger_match_controller.dart';
+import '../../../matching/state/passenger_segment_provider.dart';
 import '../../../ride/data/models/ride_model.dart';
 import '../../../route/data/models/route_place_model.dart';
 import 'home_real_map_background.dart';
@@ -135,14 +136,34 @@ class _HomeMapViewportState extends ConsumerState<HomeMapViewport> {
     final showShiftRoute =
         shiftRide != null && widget.passengerStep == PassengerRideStep.idle;
     final viewerId = ref.watch(matchingViewerIdProvider);
-    final tripLayers = showShiftRoute
-        ? TripLayersCalculator.calculateLayers(shiftRide, viewerId)
-        : null;
-
     final ownTrip =
         showShiftRoute && viewerId != null && !shiftRide.isDrivenBy(viewerId)
             ? shiftRide.passengerOf(viewerId)
             : null;
+    // O passageiro vê um caminho limpo, sem os desvios até as paradas dos outros:
+    // antes de entrar, do início do motorista até ele; a bordo, até o desembarque
+    final pickupPlace = ownTrip?.boardingLocation;
+    final dropOffPlace = ownTrip?.dropOffLocation;
+    final passengerSegment = ownTrip == null ||
+            pickupPlace == null ||
+            dropOffPlace == null
+        ? null
+        : ref
+            .watch(
+              passengerSegmentProvider(
+                ownTrip.boardedAt == null
+                    ? (from: shiftRide!.origin, to: pickupPlace)
+                    : (from: pickupPlace, to: dropOffPlace),
+              ),
+            )
+            .value;
+    final tripLayers = showShiftRoute
+        ? TripLayersCalculator.calculateLayers(
+            shiftRide,
+            viewerId,
+            passengerPath: passengerSegment?.encodedPolyline,
+          )
+        : null;
     final tripEnd = ownTrip == null
         ? shiftRide?.destination
         : (ownTrip.dropOffLocation ?? shiftRide!.destination);

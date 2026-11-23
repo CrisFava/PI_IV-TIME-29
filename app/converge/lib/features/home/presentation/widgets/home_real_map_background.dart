@@ -317,9 +317,13 @@ class _HomeRealMapBackgroundState extends State<HomeRealMapBackground> {
         Marker(
           markerId: const MarkerId('destination_marker'),
           position: widget.destinationLocation!,
-          // Bandeira de chegada, o mesmo padrão em todos os mapas com percurso
+          // Bandeira de chegada, o mesmo padrão em todos os mapas com percurso.
+          // Na viagem em andamento fica cinza como as outras paradas que faltam;
+          // só fica preta quando é o próximo lugar (todas as paradas feitas)
           icon:
-              _nextStopIcon ??
+              (widget.tripLegs != null && widget.tripStops.isNotEmpty
+                  ? _laterStopIcon
+                  : _nextStopIcon) ??
               _destinationDotIcon ??
               BitmapDescriptor.defaultMarkerWithHue(BitmapDescriptor.hueRed),
           anchor: const Offset(0.5, 0.5),

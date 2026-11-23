@@ -50,11 +50,17 @@ class RideModel {
   /// aceitar o primeiro passageiro.
   final String? chatRoomId;
 
+  /// Quem cancelou a viagem (o id do usuário); nulo quando o sistema cancelou.
+  final String? cancelledBy;
+
   /// Modelo do veículo, copiado na criação da viagem.
   final String? vehicleModel;
 
   /// Placa do veículo, copiada na criação da viagem.
   final String? vehicleLicensePlate;
+
+  /// Cor do veículo, copiada na criação da viagem (ajuda o passageiro a achar o carro).
+  final String? vehicleColor;
 
   /// Lista imutável: quem chamou o construtor não consegue alterá-la depois.
   final List<RideParticipantModel> participants;
@@ -70,6 +76,9 @@ class RideModel {
   /// Vazio sem o Google; aí o app desenha o caminho inteiro de uma vez.
   final List<String> itineraryLegPolylines;
 
+  /// Só para o motorista: o tempo de cada trecho, em segundos, na mesma ordem.
+  final List<int> itineraryLegSeconds;
+
   /// Viagem em andamento: a parada em que ela está. O trecho atual é
   /// `itineraryLegPolylines[itineraryNextStop]` (o último leva ao destino).
   final int? itineraryNextStop;
@@ -79,6 +88,11 @@ class RideModel {
 
   /// Para o passageiro: posição do desembarque dele no itinerário.
   final int? itineraryMyDropOffStop;
+
+  /// Para o passageiro, com as paradas dos outros: quanto o motorista leva até ele
+  /// e quanto dura o trecho com ele no carro.
+  final int? itineraryMyPickupMinutes;
+  final int? itineraryMyRideMinutes;
 
   /// Distância da rota com as paradas, em km.
   final double? itineraryDistanceKm;
@@ -99,20 +113,26 @@ class RideModel {
     required this.totalSeats,
     required this.availableSeats,
     required this.chatRoomId,
+    this.cancelledBy,
     required this.vehicleModel,
     required this.vehicleLicensePlate,
+    this.vehicleColor,
     required List<RideParticipantModel> participants,
     List<RideStopModel> itinerary = const [],
     this.itineraryPolyline,
     this.itineraryDistanceKm,
     this.estimatedArrivalDateTime,
     List<String> itineraryLegPolylines = const [],
+    List<int> itineraryLegSeconds = const [],
     this.itineraryNextStop,
     this.itineraryMyPickupStop,
     this.itineraryMyDropOffStop,
+    this.itineraryMyPickupMinutes,
+    this.itineraryMyRideMinutes,
   }) : participants = List.unmodifiable(participants),
        itinerary = List.unmodifiable(itinerary),
-       itineraryLegPolylines = List.unmodifiable(itineraryLegPolylines);
+       itineraryLegPolylines = List.unmodifiable(itineraryLegPolylines),
+       itineraryLegSeconds = List.unmodifiable(itineraryLegSeconds);
 
   /// Se o usuário é o motorista da viagem.
   bool isDrivenBy(String userId) => driverId == userId;
@@ -175,11 +195,15 @@ class RideModel {
       totalSeats: (json['totalSeats'] as num?)?.toInt() ?? 0,
       availableSeats: (json['availableSeats'] as num?)?.toInt() ?? 0,
       chatRoomId: json['chatRoomId'] as String?,
+      cancelledBy: json['cancelledBy'] as String?,
       vehicleModel: vehicle is Map<String, dynamic>
           ? vehicle['model'] as String?
           : null,
       vehicleLicensePlate: vehicle is Map<String, dynamic>
           ? vehicle['licensePlate'] as String?
+          : null,
+      vehicleColor: vehicle is Map<String, dynamic>
+          ? vehicle['color'] as String?
           : null,
       participants: [
         if (participants is List)
@@ -200,10 +224,18 @@ class RideModel {
       itineraryNextStop: (json['itineraryNextStop'] as num?)?.toInt(),
       itineraryMyPickupStop: (json['itineraryMyPickupStop'] as num?)?.toInt(),
       itineraryMyDropOffStop: (json['itineraryMyDropOffStop'] as num?)?.toInt(),
+      itineraryMyPickupMinutes: (json['itineraryMyPickupMinutes'] as num?)
+          ?.toInt(),
+      itineraryMyRideMinutes: (json['itineraryMyRideMinutes'] as num?)?.toInt(),
       itineraryLegPolylines: [
         if (json['itineraryLegPolylines'] case final List legs)
           for (final leg in legs)
             if (leg is String) leg,
+      ],
+      itineraryLegSeconds: [
+        if (json['itineraryLegSeconds'] case final List seconds)
+          for (final value in seconds)
+            if (value is num) value.toInt(),
       ],
     );
   }

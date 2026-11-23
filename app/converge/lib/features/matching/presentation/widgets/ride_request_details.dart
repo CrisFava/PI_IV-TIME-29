@@ -1,31 +1,23 @@
 // Autor: Gustavo Alves de Siqueira Costa - RA 25001650
 
-import 'dart:math' as math;
-
-import 'package:flutter/foundation.dart';
-import 'package:flutter/gestures.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
-import 'package:google_maps_flutter/google_maps_flutter.dart';
 
 import '../../../../core/config/styles.dart';
-import '../../../../core/services/maps/google_maps_service.dart';
-import '../../../../core/services/maps/map_marker_icons.dart';
-import '../../../../core/services/maps/map_styles.dart';
 import '../../../../core/widgets/details_section.dart';
-import '../../../../core/widgets/details_stat_tile.dart';
+import '../../../../core/widgets/details_summary_card.dart';
 import '../../../auth/state/auth_action_controller.dart';
 import '../../../ride/data/models/ride_preview_model.dart';
 import '../../../ride/presentation/widgets/ride_place_line.dart';
+import '../../../ride/presentation/widgets/ride_route_overview.dart';
 import '../../data/models/driver_ride_request.dart';
 import '../../state/ride_request_actions_controller.dart';
 import '../../state/ride_request_preview_provider.dart';
 
 /// Detalhes de um pedido de vaga: de onde o passageiro sai, para onde vai, a hora que
-/// ele quer sair, o desvio que ele acrescenta e o mapa da viagem com e sem ele.
-/// No mapa, o caminho de agora fica cinza por cima do caminho com o passageiro, em
-/// preto: o que aparece em preto é exatamente o desvio.
+/// ele quer sair, o desvio que ele acrescenta e como a viagem ficaria com ele, nos
+/// mesmos passos do trajeto completo (os dele em destaque) e com a nova chegada.
 class RideRequestDetails extends ConsumerWidget {
   final DriverRideRequest request;
   final VoidCallback onAccept;
@@ -126,23 +118,17 @@ class RideRequestDetails extends ConsumerWidget {
         ),
         Padding(
           padding: const EdgeInsets.only(top: 12),
-          child: Row(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              Expanded(
-                child: DetailsStatTile(
-                  icon: Icons.schedule_rounded,
-                  value: passenger.requestedDepartureTime ?? '—',
-                  label: 'Quer sair às',
-                ),
+          child: DetailsSummaryCard(
+            rows: [
+              (
+                icon: Icons.schedule_rounded,
+                label: 'Quer sair às',
+                value: passenger.requestedDepartureTime ?? '—',
               ),
-              const SizedBox(width: 8),
-              Expanded(
-                child: DetailsStatTile(
-                  icon: Icons.directions_car_rounded,
-                  value: departure == null ? '—' : _hhmm(departure),
-                  label: 'Sua saída',
-                ),
+              (
+                icon: Icons.directions_car_rounded,
+                label: 'Sua saída',
+                value: departure == null ? '—' : _hhmm(departure),
               ),
             ],
           ),
@@ -229,211 +215,33 @@ class RideRequestDetails extends ConsumerWidget {
           ),
         ),
         const SizedBox(height: 6),
-        // Sem recorte arredondado: no iOS, recortar o mapa nativo some com o que vem depois
-        Container(
-          height: 220,
-          decoration: BoxDecoration(
-            border: Border.all(color: AppColors.borderSubtle),
+        // A viagem como ficaria, nos mesmos passos do trajeto completo: os passos
+        // do passageiro novo em destaque e o horário em que o carro chega a cada um
+        switch (preview) {
+          AsyncData(:final value) => RideRouteOverview.ofPreview(
+            request.ride,
+            value,
+            passengerId: request.passengerId,
+            passengerName: passenger.displayName,
           ),
-          child: switch (preview) {
-            AsyncData(:final value) => _DetourMap(
-              preview: value,
-              boarding: boarding == null
-                  ? null
-                  : LatLng(boarding.latitude, boarding.longitude),
-              dropOff: dropOff == null
-                  ? null
-                  : LatLng(dropOff.latitude, dropOff.longitude),
-            ),
-            AsyncError(:final error) => _MapMessage(
-              text: authErrorMessage(error),
-            ),
-            _ => const ColoredBox(
-              color: AppColors.neutralLight,
-              child: Center(
-                child: CircularProgressIndicator(color: AppColors.primary),
+          AsyncError(:final error) => Padding(
+            padding: const EdgeInsets.symmetric(vertical: 16),
+            child: Text(
+              authErrorMessage(error),
+              style: const TextStyle(
+                fontSize: 13,
+                color: AppColors.textSecondary,
               ),
             ),
-          },
-        ),
-        const SizedBox(height: 4),
-        const Text(
-          'Cinza: o seu caminho. Preto: o desvio para buscar e deixar o passageiro.',
-          style: TextStyle(fontSize: 12, color: AppColors.textSecondary),
-        ),
+          ),
+          _ => const Padding(
+            padding: EdgeInsets.all(24),
+            child: Center(
+              child: CircularProgressIndicator(color: AppColors.primary),
+            ),
+          ),
+        },
       ],
-    );
-  }
-}
-
-class _MapMessage extends StatelessWidget {
-  final String text;
-
-  const _MapMessage({required this.text});
-
-  @override
-  Widget build(BuildContext context) => ColoredBox(
-    color: AppColors.neutralLight,
-    child: Center(
-      child: Padding(
-        padding: const EdgeInsets.all(16),
-        child: Text(
-          text,
-          textAlign: TextAlign.center,
-          style: const TextStyle(fontSize: 13, color: AppColors.textSecondary),
-        ),
-      ),
-    ),
-  );
-}
-
-/// O mapa da viagem com e sem o passageiro, no estilo dos outros mapas. Dá para
-/// arrastar e aproximar: os gestos ficam com o mapa, não com o painel.
-class _DetourMap extends StatefulWidget {
-  final RidePreviewModel preview;
-  final LatLng? boarding;
-  final LatLng? dropOff;
-
-  const _DetourMap({
-    required this.preview,
-    required this.boarding,
-    required this.dropOff,
-  });
-
-  @override
-  State<_DetourMap> createState() => _DetourMapState();
-}
-
-class _DetourMapState extends State<_DetourMap> {
-  BitmapDescriptor? _originIcon;
-  BitmapDescriptor? _flagIcon;
-
-  @override
-  void initState() {
-    super.initState();
-    // Os mesmos ícones dos outros mapas: bolinha de partida e bandeira de chegada
-    // Embarque com a pessoa e desembarque com a bandeira, como no mapa da viagem
-    Future.wait([MapMarkerIcons.pickup(), MapMarkerIcons.flag()]).then((icons) {
-      if (mounted) {
-        setState(() {
-          _originIcon = icons[0];
-          _flagIcon = icons[1];
-        });
-      }
-    });
-  }
-
-  late List<LatLng> _current = _decode(widget.preview.currentPolyline);
-  late List<LatLng> _withPassenger = _decode(
-    widget.preview.withPassengerPolyline,
-  );
-
-  // Simulação recarregada (outro passageiro aceito, por exemplo): redesenha
-  @override
-  void didUpdateWidget(covariant _DetourMap oldWidget) {
-    super.didUpdateWidget(oldWidget);
-    if (oldWidget.preview.currentPolyline != widget.preview.currentPolyline) {
-      _current = _decode(widget.preview.currentPolyline);
-    }
-    if (oldWidget.preview.withPassengerPolyline !=
-        widget.preview.withPassengerPolyline) {
-      _withPassenger = _decode(widget.preview.withPassengerPolyline);
-    }
-  }
-
-  static List<LatLng> _decode(String? polyline) =>
-      polyline == null || polyline.isEmpty
-      ? const []
-      : GoogleMapsService.decodePolyline(polyline);
-
-  List<LatLng> get _allPoints => [
-    ..._withPassenger,
-    ..._current,
-    ?widget.boarding,
-    ?widget.dropOff,
-  ];
-
-  void _fit(GoogleMapController controller) {
-    final points = _allPoints;
-    if (points.isEmpty) return;
-    var south = points.first.latitude, north = south;
-    var west = points.first.longitude, east = west;
-    for (final p in points) {
-      south = math.min(south, p.latitude);
-      north = math.max(north, p.latitude);
-      west = math.min(west, p.longitude);
-      east = math.max(east, p.longitude);
-    }
-    controller.moveCamera(
-      CameraUpdate.newLatLngBounds(
-        LatLngBounds(
-          southwest: LatLng(south, west),
-          northeast: LatLng(north, east),
-        ),
-        32,
-      ),
-    );
-  }
-
-  @override
-  Widget build(BuildContext context) {
-    final points = _allPoints;
-    if (points.isEmpty) {
-      return const _MapMessage(text: 'Não foi possível desenhar o caminho.');
-    }
-    return GoogleMap(
-      initialCameraPosition: CameraPosition(target: points.first, zoom: 12),
-      onMapCreated: (controller) =>
-          Future.delayed(const Duration(milliseconds: 250), () {
-            if (mounted) _fit(controller);
-          }),
-      style: monochromeMapStyle,
-      // Arrastar e aproximar o mapa sem rolar o painel junto
-      gestureRecognizers: {
-        Factory<OneSequenceGestureRecognizer>(EagerGestureRecognizer.new),
-      },
-      rotateGesturesEnabled: false,
-      tiltGesturesEnabled: false,
-      zoomControlsEnabled: false,
-      myLocationButtonEnabled: false,
-      mapToolbarEnabled: false,
-      polylines: {
-        // Com o passageiro, em preto, por baixo: só o desvio fica visível em preto
-        if (_withPassenger.isNotEmpty)
-          Polyline(
-            polylineId: const PolylineId('with_passenger'),
-            points: _withPassenger,
-            color: AppColors.primary,
-            width: 6,
-            zIndex: 1,
-          ),
-        if (_current.isNotEmpty)
-          Polyline(
-            polylineId: const PolylineId('current'),
-            points: _current,
-            color: AppColors.routeUpcoming,
-            width: 6,
-            zIndex: 2,
-          ),
-      },
-      markers: {
-        if (widget.boarding != null)
-          Marker(
-            markerId: const MarkerId('request_boarding'),
-            position: widget.boarding!,
-            icon: _originIcon ?? BitmapDescriptor.defaultMarker,
-            anchor: const Offset(0.5, 0.5),
-            infoWindow: const InfoWindow(title: 'Embarque'),
-          ),
-        if (widget.dropOff != null)
-          Marker(
-            markerId: const MarkerId('request_drop_off'),
-            position: widget.dropOff!,
-            icon: _flagIcon ?? BitmapDescriptor.defaultMarker,
-            anchor: const Offset(0.5, 0.5),
-            infoWindow: const InfoWindow(title: 'Desembarque'),
-          ),
-      },
     );
   }
 }

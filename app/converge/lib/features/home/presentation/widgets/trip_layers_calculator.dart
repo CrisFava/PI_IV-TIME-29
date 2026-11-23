@@ -32,8 +32,9 @@ class TripLayersCalculator {
 
   static ({List<TripMapLeg>? legs, List<TripMapStop> stops}) calculateLayers(
     RideModel ride,
-    String? viewerId,
-  ) {
+    String? viewerId, {
+    String? passengerPath,
+  }) {
     final isDriver = viewerId != null && ride.isDrivenBy(viewerId);
     final progress = TripProgress.of(ride);
 
@@ -50,49 +51,20 @@ class TripLayersCalculator {
         ),
     ];
 
-    final legPolylines = ride.itineraryLegPolylines;
-    if (legPolylines.isEmpty) {
-      return (legs: isDriver ? null : const <TripMapLeg>[], stops: stops);
-    }
-
+    // Passageiro: os trechos desenhados não vêm para ele (mostrariam onde os outros
+    // embarcam e descem); o app desenha um caminho limpo até o próximo ponto dele
     if (!isDriver) {
-      final next = ride.itineraryNextStop;
-      final pickup = ride.itineraryMyPickupStop;
-      final dropOff = ride.itineraryMyDropOffStop;
-      if (next == null || pickup == null || dropOff == null) {
-        return (legs: const <TripMapLeg>[], stops: stops);
-      }
-      final boarded =
-          ride.passengerOf(viewerId ?? '')?.boardedAt != null || next > pickup;
-      final target = boarded ? dropOff : pickup;
-      if (next > target || target >= legPolylines.length) {
-        return (legs: const <TripMapLeg>[], stops: stops);
-      }
-      if (boarded) {
-        return (
-          legs: [
-            TripMapLeg(
-              points: [
-                for (var i = next; i <= target; i++)
-                  ...legPoints(legPolylines[i]),
-              ],
-              isCurrent: true,
-            ),
-          ],
-          stops: stops,
-        );
-      }
       return (
         legs: [
-          for (var i = next; i <= target; i++)
-            TripMapLeg(
-              points: legPoints(legPolylines[i]),
-              isCurrent: i == next,
-            ),
+          if (passengerPath != null && passengerPath.isNotEmpty)
+            TripMapLeg(points: legPoints(passengerPath), isCurrent: true),
         ],
         stops: stops,
       );
     }
+
+    final legPolylines = ride.itineraryLegPolylines;
+    if (legPolylines.isEmpty) return (legs: null, stops: stops);
 
     final legs = progress.legsFor(legPolylines.length);
     return (
