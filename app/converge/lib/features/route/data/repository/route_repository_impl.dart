@@ -19,7 +19,7 @@ final routeRepositoryProvider = Provider<RouteRepository>(
   (ref) => RouteRepositoryImpl(ref.watch(dioProvider)),
 );
 
-/// Implementação do repositório de rotas, autocompletar de locais e estimativas de custo/distância.
+/// Implementação do repositório de rotas, autocompletar de locais e estimativas de distância e tempo.
 class RouteRepositoryImpl implements RouteRepository {
   final Dio _dio;
 

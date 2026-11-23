@@ -15,8 +15,9 @@ import java.net.SocketException;
 import java.util.concurrent.Semaphore;
 
 /**
- * Encapsula a conexão de um cliente socket TCP, fornecendo controle thread-safe de I/O,
- * semáforo para sincronização, buffer de inspeção (peek) e fechamento de streams e socket.
+ * Encapsula a conexão de um cliente socket TCP com buffer de inspeção (peek) e fechamento de streams e socket.
+ * A leitura de mensagens (input) requer um único leitor e não é geralmente thread-safe, enquanto o método
+ * {@link #send(Message)} serializa as operações de escrita concorrentes por meio de semáforo.
  */
 public class ClientConnection {
 
