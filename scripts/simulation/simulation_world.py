@@ -123,7 +123,7 @@ class SimulationWorld:
 
         body = {
             "firebaseUid": user.firebase_uid,
-            "name": f"[SIM] {nickname}",
+            "name": nickname,
             "email": email,
             "phone": "(19) 99999-0000",
             "participationRoles": ["PASSENGER", "DRIVER"] if is_driver else ["PASSENGER"],
