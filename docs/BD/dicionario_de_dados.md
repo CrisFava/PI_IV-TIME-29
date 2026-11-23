@@ -29,7 +29,7 @@
 | 20/11/2026 | Daniela Mikie Kikuchi Gonçalves | 1.8.0 | Inadimplência implementada (RF67): `overdueAt` e `nonPaymentReportedAt` na Participação; prazo de 5 minutos e limite de 2 dívidas; denúncia `NON_PAYMENT` aceita só depois do "Já paguei" e contada como dívida; `overdueRides` passa a ser incrementado |
 | 20/11/2026 | Daniela Mikie Kikuchi Gonçalves | 1.9.0 | Janela de 90 dias da reputação recalculada a partir das viagens (job semanal); campos `cancelledAt` e `driverCancellationPenalized` na Viagem e `removedByDriver` na Participação |
 | 20/11/2026 | Daniela Mikie Kikuchi Gonçalves | 1.9.1 | Reputação: a nota da avaliação só é gravada se o total for maior que o já gravado, e penalidade e viagem concluída deixam de regravar a média e o total (avaliações simultâneas não se sobrescrevem) |
-| 22/11/2026 | Daniela Mikie Kikuchi Gonçalves | 1.9.2 | Alinhamento com o código: avaliação também em viagem `IN_PROGRESS` para quem já desceu; `startedAt` na Viagem; datas como `LocalDateTime` no horário de Brasília, convertidas para UTC pelo fuso da máquina; ausências antigas sem `startedAt` fora da janela de 90 dias; na modelagem, pedido de vaga expira em 1 h e `PAYMENT_CONFIRMED` descrito pelo fluxo do "Já paguei" |
+| 22/11/2026 | Daniela Mikie Kikuchi Gonçalves | 1.9.2 | Alinhamento com o código: avaliação também em viagem `IN_PROGRESS` para quem já desceu; `startedAt` na Viagem; datas como `LocalDateTime` no horário de Brasília, convertidas para UTC pelo fuso da máquina; ausências antigas sem `startedAt` fora da janela de 90 dias; na modelagem, pedido de vaga expira em 1 h e `PAYMENT_CONFIRMED` descrito pelo fluxo do "Já paguei"; índices sugeridos separados dos que o código cria |
 
 ---
 
@@ -1271,6 +1271,8 @@ Estrutura composta e multivalorada usada no array `itinerary` da Ride. Cada item
 ---
 
 ## 5. Consultas, índices e observações de arquitetura
+
+> **Criados de fato:** só os índices declarados nas entidades Java (`@Indexed` e `@CompoundIndex`), que o Spring cria ao subir (`auto-index-creation: true`). Os índices desta tabela que não aparecem nas entidades são **sugestões ainda não criadas**: `participants.userId` (sozinho ou com `participants.paymentStatus`), `academicRecord.status`, `driverLicense.status`, `driverLicense.expiresAt + driverLicense.status`, `weekDays + status`, `driverId + status`, `driverId + participants.status` e `userId + period` (este último já é atendido pelo índice único `userId + period + reference`, que começa pelos mesmos campos). No volume do MVP as consultas funcionam sem eles; ficam para quando houver mais dados.
 
 | Consulta esperada | Campos envolvidos | Índices sugeridos | Observações |
 | :--- | :--- | :--- | :--- |
