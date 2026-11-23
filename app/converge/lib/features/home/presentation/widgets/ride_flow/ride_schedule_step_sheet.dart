@@ -50,7 +50,8 @@ class RideScheduleStepSheet extends StatelessWidget {
     final repeatChanged = onRepeatWeeklyChanged;
 
     return RideFlowSheetFrame(
-      initialSize: isDriver ? 0.45 : 0.4,
+      // Alto o bastante para o botão ficar acima da dock, com folga
+      initialSize: isDriver ? 0.525 : 0.475,
       bottomSafeArea: bottomSafeArea,
       children: [
         RideFlowHeader(
@@ -70,6 +71,32 @@ class RideScheduleStepSheet extends StatelessWidget {
           ),
         ),
 
+        // Aviso: com antecedência dá tempo de combinar e ninguém se atrasa
+        Padding(
+          padding: const EdgeInsets.only(top: 8),
+          child: Row(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              const Icon(
+                Icons.info_outline_rounded,
+                size: 16,
+                color: AppColors.textSecondary,
+              ),
+              const SizedBox(width: 6),
+              Expanded(
+                child: Text(
+                  isDriver
+                      ? 'Recomendamos criar a carona com antecedência para receber pedidos a tempo e evitar atrasos.'
+                      : 'Recomendamos pedir a carona com antecedência para evitar atrasos.',
+                  style: const TextStyle(
+                    fontSize: 12.5,
+                    color: AppColors.textSecondary,
+                  ),
+                ),
+              ),
+            ],
+          ),
+        ),
         if (isDriver && repeatChanged != null) ...[
           const SizedBox(height: 4),
           RepeatWeeklyCheckbox(

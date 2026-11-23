@@ -197,14 +197,23 @@ class _IndicatorsPageState extends ConsumerState<IndicatorsPage> {
     ),
     const SizedBox(height: 10),
     IndicatorChartCard(
-      title: 'Viagens por semana',
-      period: IndicatorPeriod.weekly,
+      title: 'Viagens por ${_chartUnit.$2}',
+      period: _chartUnit.$1,
       unit: 'viagens',
       valueOf: (point) => point.totalRides.toDouble(),
     ),
     const SizedBox(height: 10),
     PlatformImpactCard(period: _period),
   ];
+
+  /// Os gráficos seguem o filtro: semana a semana, mês a mês ou semestre a
+  /// semestre; o total aparece mês a mês.
+  (IndicatorPeriod, String) get _chartUnit => switch (_period) {
+    IndicatorPeriod.weekly => (IndicatorPeriod.weekly, 'semana'),
+    IndicatorPeriod.semesterly => (IndicatorPeriod.semesterly, 'semestre'),
+    IndicatorPeriod.monthly ||
+    IndicatorPeriod.allTime => (IndicatorPeriod.monthly, 'mês'),
+  };
 
   List<Widget> _environmental(UserIndicatorModel value) => [
     Co2HighlightCard(
@@ -233,8 +242,8 @@ class _IndicatorsPageState extends ConsumerState<IndicatorsPage> {
     ),
     const SizedBox(height: 10),
     IndicatorChartCard(
-      title: 'CO₂ evitado por mês (kg)',
-      period: IndicatorPeriod.monthly,
+      title: 'CO₂ evitado por ${_chartUnit.$2} (kg)',
+      period: _chartUnit.$1,
       asLine: true,
       unit: 'kg',
       valueOf: (point) => point.co2AvoidedKg,

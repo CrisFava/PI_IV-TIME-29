@@ -129,7 +129,7 @@ class _RidePlaceStepSheetState extends ConsumerState<RidePlaceStepSheet> {
 
     // Metade da tela: o conteúdo fica acima da barra de navegação
     return RideFlowSheetFrame(
-      initialSize: 0.5,
+      initialSize: 0.525,
       bottomSafeArea: widget.bottomSafeArea,
       children: [
         RideFlowHeader(

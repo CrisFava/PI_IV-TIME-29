@@ -6,7 +6,7 @@ import 'package:flutter/services.dart';
 import '../../../../../core/config/styles.dart';
 import '../../../../../core/widgets/details_section.dart';
 import '../../../../../core/widgets/details_sheet.dart';
-import '../../../../../core/widgets/details_stat_tile.dart';
+import '../../../../../core/widgets/details_summary_card.dart';
 import '../../../../ride/presentation/widgets/ride_place_line.dart';
 import '../../../../route/data/models/route_estimate_model.dart';
 import 'ride_flow_format.dart';
@@ -67,19 +67,6 @@ class RideReview extends StatelessWidget {
     this.searchRadiusKm = 3,
   });
 
-  static Widget _row(List<Widget> tiles) => Padding(
-    padding: const EdgeInsets.only(top: 12),
-    child: Row(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: [
-        for (var i = 0; i < tiles.length; i++) ...[
-          if (i > 0) const SizedBox(width: 8),
-          Expanded(child: tiles[i]),
-        ],
-      ],
-    ),
-  );
-
   @override
   Widget build(BuildContext context) {
     final trip = estimate;
@@ -106,40 +93,45 @@ class RideReview extends StatelessWidget {
             emphasized: true,
           ),
         ),
-        _row([
-          DetailsStatTile(
-            icon: Icons.event_rounded,
-            value: departureLabel,
-            label: 'Saída',
+        // Tudo num cartão só, uma linha por item: nada fica desalinhado
+        Padding(
+          padding: const EdgeInsets.only(top: 12),
+          child: DetailsSummaryCard(
+            rows: [
+              (
+                icon: Icons.event_rounded,
+                label: 'Saída',
+                value: departureLabel,
+              ),
+              if (minutes != null)
+                (
+                  icon: Icons.schedule_rounded,
+                  label: 'Viagem',
+                  value: '~${formatTripDuration(minutes)}',
+                ),
+              if (trip != null)
+                (
+                  icon: Icons.route_rounded,
+                  label: 'Percurso',
+                  value: '${formatRideKm(trip.distanceKm)} km',
+                ),
+              if (isDriver) ...[
+                (
+                  icon: repeatWeekly
+                      ? Icons.event_repeat_rounded
+                      : Icons.looks_one_rounded,
+                  label: 'Frequência',
+                  value: repeatWeekly ? 'Toda semana' : 'Só neste dia',
+                ),
+                (
+                  icon: Icons.radar_rounded,
+                  label: 'Raio de busca',
+                  value: '${formatRideKm(searchRadiusKm)} km',
+                ),
+              ],
+            ],
           ),
-          if (minutes != null)
-            DetailsStatTile(
-              icon: Icons.schedule_rounded,
-              value: '~${formatTripDuration(minutes)}',
-              label: 'Viagem',
-            ),
-          if (trip != null)
-            DetailsStatTile(
-              icon: Icons.route_rounded,
-              value: '${formatRideKm(trip.distanceKm)} km',
-              label: 'Percurso',
-            ),
-        ]),
-        if (isDriver)
-          _row([
-            DetailsStatTile(
-              icon: repeatWeekly
-                  ? Icons.event_repeat_rounded
-                  : Icons.looks_one_rounded,
-              value: repeatWeekly ? 'Toda semana' : 'Só neste dia',
-              label: 'Frequência',
-            ),
-            DetailsStatTile(
-              icon: Icons.radar_rounded,
-              value: '${formatRideKm(searchRadiusKm)} km',
-              label: 'Raio de busca',
-            ),
-          ]),
+        ),
         const SizedBox(height: 24),
         FilledButton.icon(
           key: const ValueKey('ride_review_confirm'),

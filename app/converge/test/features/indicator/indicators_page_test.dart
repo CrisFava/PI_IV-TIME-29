@@ -89,20 +89,27 @@ void main() {
       expect(find.text('1.240 km'), findsOneWidget);
       expect(find.text('34'), findsOneWidget);
       expect(find.text('5.400 caronas • 214 pessoas'), findsOneWidget);
-      expect(find.text('S46'), findsOneWidget);
+      // O gráfico segue o filtro: no mês, mês a mês; na semana, semana a semana
+      expect(find.text('Viagens por mês'), findsOneWidget);
+      expect(find.text('out'), findsOneWidget);
+      await tester.tap(find.byKey(const ValueKey('period_WEEKLY')));
+      await tester.pumpAndSettle();
+      expect(find.text('Viagens por semana'), findsOneWidget);
+      expect(find.text('09/11'), findsOneWidget);
 
       // Ambiental: CO₂ em destaque e as árvores
       await tester.tap(find.byKey(const ValueKey('indicators_tab_Ambiental')));
       await tester.pumpAndSettle();
       expect(find.text('186 kg'), findsOneWidget);
       expect(find.text('9 árvores em um ano'), findsOneWidget);
-      expect(find.text('out'), findsOneWidget);
+      expect(find.text('CO₂ evitado por semana (kg)'), findsOneWidget);
 
       // Trocar o período busca de novo
       await tester.tap(find.byKey(const ValueKey('period_ALL_TIME')));
       await tester.pumpAndSettle();
       expect(repository.requested, [
         IndicatorPeriod.monthly,
+        IndicatorPeriod.weekly,
         IndicatorPeriod.allTime,
       ]);
     },

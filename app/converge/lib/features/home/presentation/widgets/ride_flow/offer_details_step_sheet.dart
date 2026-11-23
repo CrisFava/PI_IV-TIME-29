@@ -51,7 +51,7 @@ class OfferDetailsStepSheet extends StatelessWidget {
     final maxSeats = selected?.passengerSeats ?? seats;
 
     return RideFlowSheetFrame(
-      initialSize: 0.7,
+      initialSize: 0.66,
       bottomSafeArea: bottomSafeArea,
       children: [
         RideFlowHeader(
