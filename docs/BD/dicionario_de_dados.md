@@ -30,6 +30,7 @@
 | 20/11/2026 | Daniela Mikie Kikuchi Gonçalves | 1.9.0 | Janela de 90 dias da reputação recalculada a partir das viagens (job semanal); campos `cancelledAt` e `driverCancellationPenalized` na Viagem e `removedByDriver` na Participação |
 | 20/11/2026 | Daniela Mikie Kikuchi Gonçalves | 1.9.1 | Reputação: a nota da avaliação só é gravada se o total for maior que o já gravado, e penalidade e viagem concluída deixam de regravar a média e o total (avaliações simultâneas não se sobrescrevem) |
 | 22/11/2026 | Daniela Mikie Kikuchi Gonçalves | 1.9.2 | Alinhamento com o código: avaliação também em viagem `IN_PROGRESS` para quem já desceu; `startedAt` na Viagem; datas como `LocalDateTime` no horário de Brasília, convertidas para UTC pelo fuso da máquina; ausências antigas sem `startedAt` fora da janela de 90 dias; na modelagem, pedido de vaga expira em 1 h e `PAYMENT_CONFIRMED` descrito pelo fluxo do "Já paguei"; índices sugeridos separados dos que o código cria |
+| 22/11/2026 | Daniela Mikie Kikuchi Gonçalves | 1.9.3 | Regras de negócio alinhadas com o código: o cadastro do trajeto não confere vínculo, CNH e PIX (a conferência é no matching, no pedido e no aceite); desativação de conta só marca `active = false`; cancelamento tardio pesa só na reputação; bloqueio separa os dois em viagens não iniciadas; chat sem regra de participante no Firebase; `finalAmount` gravado na chegada ou no encerramento; vagas por data em `rides.availableSeats`; auditoria e notificações reservadas marcadas; notificações sem TTL; idempotência só em `/rides`; e ajustes em e-mail, telefone, moto, desvio, `totalSeats`, CNH vencida, `NON_PAYMENT` e histórico |
 
 ---
 
@@ -58,13 +59,13 @@ Usuário é toda pessoa que se cadastra na plataforma Converge. Pode assumir um 
 | `_id` | Texto alfanumérico | Sim | Simples | `64a1f3c2...` | vazio, nulo | Gerado automaticamente pelo banco. Imutável após criação. |
 | `firebaseUid` | Texto alfanumérico | Sim | Simples | `UID123abc` | vazio, nulo | UID gerado pelo Firebase Auth no primeiro login. Nunca alterado. Usado para validar tokens JWT. |
 | `name` | Texto | Sim | Simples | `Ana Souza`, `João da Silva` | `""`, menos de 3 caracteres | Nome completo da pessoa. Exibido em perfis, combinações e detalhes de viagem. |
-| `email` | Endereço de e-mail | Sim | Simples | `ana@puc-campinas.edu.br` | `ana@gmail.com`, vazio | Deve ser e-mail institucional acadêmico. Único no sistema. Imutável após criação. |
-| `phone` | Texto numérico | Sim | Simples | `(19) 91234-5678` | `19912345678`, vazio | Formato com DDD. Exibido no perfil. |
+| `email` | Endereço de e-mail | Sim | Simples | `ana@puc-campinas.edu.br` | `ana@`, vazio | Formato de e-mail válido e único no sistema. O backend **não confere** se o domínio é institucional. Imutável após criação. |
+| `phone` | Texto numérico | Sim | Simples | `(19) 91234-5678` | vazio | Formato `(00) 90000-0000`, conferido na edição do perfil; no cadastro só não pode ser vazio. Exibido no perfil. |
 | `photoUrl` | URL | Não | Simples | `https://storage.firebase...` | URL inválida | URL da imagem armazenada no Firebase Storage. Nulo até o upload. |
 | `participationRoles` | Elemento de lista enumerada | Sim | Multivalorado (M) | `["PASSENGER"]`, `["DRIVER", "PASSENGER"]` | lista vazia, valor fora do enum | Mínimo 1 valor. Valores: `PASSENGER`, `DRIVER`. Selecionado no onboarding. |
 | `academicRecord` | Dados de vínculo universitário | Sim | Composto (C) | ver tipo especial 3.1 | incompleto, nulo | Obrigatório no cadastro. Contém universidade, curso, matrícula e status da verificação. |
-| `driverLicense` | Dados de habilitação (CNH) | Não | Composto (C) | ver tipo especial 3.13 | — | Obrigatório apenas para quem atua como motorista. Deve estar `VERIFIED` para oferecer carona. Nulo para passageiros. |
-| `pixKey` | Texto | Não | Simples | `+5519912345678` (PHONE), `ana@email.com` (EMAIL) | vazio para quem oferece carona | Chave PIX do motorista, normalizada ao salvar conforme o `pixKeyType`. Obrigatória para criar trajetos `OFFER` (senão o passageiro não tem para quem pagar). Usada para gerar o QR Code "Pix Copia e Cola". |
+| `driverLicense` | Dados de habilitação (CNH) | Não | Composto (C) | ver tipo especial 3.13 | — | Obrigatório apenas para quem atua como motorista. Deve estar `VERIFIED` e dentro da validade para aparecer no matching, receber pedidos e aceitar passageiros (o cadastro do trajeto não confere). Nulo para passageiros. |
+| `pixKey` | Texto | Não | Simples | `+5519912345678` (PHONE), `ana@email.com` (EMAIL) | vazio para quem oferece carona | Chave PIX do motorista, normalizada ao salvar conforme o `pixKeyType`. Obrigatória para aparecer no matching como motorista, receber pedidos e aceitar passageiros (senão o passageiro não tem para quem pagar). O cadastro do trajeto não confere. Usada para gerar o QR Code "Pix Copia e Cola". |
 | `pixKeyType` | Elemento de lista enumerada | Não | Simples | `CPF`, `PHONE`, `EMAIL`, `RANDOM` | tipo que não corresponde à chave | Tipo da chave PIX. Necessário porque o formato no payload depende dele (uma chave de 11 dígitos pode ser CPF ou celular). Nulo se não houver chave. |
 | `paymentStanding` | Elemento de lista enumerada | Sim | Simples | `UP_TO_DATE`, `HAS_OVERDUE`, `BLOCKED` | valor fora do enum | Situação de pagamento do passageiro. `UP_TO_DATE` sem dívidas vencidas; `HAS_OVERDUE` com dívidas vencidas abaixo do limite; `BLOCKED` ao atingir o limite (padrão 2). Ver "Inadimplência" na modelagem. |
 | `overdueRidesCount` | Número inteiro | Sim | Simples | `0`, `1`, `2` | negativo | Quantidade de dívidas vencidas: cobranças não marcadas como pagas em 5 minutos (`converge.payment.due-after`) e denúncias `NON_PAYMENT`. Soma 1 a cada dívida e tira 1 quando uma cobrança vencida é paga. Ao chegar em `converge.payment.overdue-limit` (padrão 2), o passageiro é bloqueado. |
@@ -72,7 +73,7 @@ Usuário é toda pessoa que se cadastra na plataforma Converge. Pode assumir um 
 | `defaulterSince` | Data e hora | Não | Simples | `2025-05-20T00:00:00Z` | data futura | Preenchido quando `isDefaulter = true`. Nulo quando em dia. |
 | `reputation` | Dados de reputação por papel | Sim | Composto (C) | ver tipo especial 3.2 | nulo | Separada por papel (driver e passenger). A média e o `level` são gravados quando uma avaliação é salva; `completedRides` quando a viagem é concluída; cancelamentos e ausências quando ocorrem. A janela de 90 dias é **recalculada semanalmente** pelo job dos selos a partir das viagens. Ver tipo especial 3.2. |
 | `badges` | Selos de reconhecimento | Não | Multivalorado e Composto (MC) | ver tipo especial 3.3 | — | Concedidos e removidos automaticamente por um job semanal (segunda-feira, 03h, America/Sao_Paulo) quando o usuário atinge ou deixa de atender os critérios. Cada item grava o selo no campo `badge` (não `type`). Ver tipo especial 3.3. |
-| `active` | Booleano | Sim | Simples | `true`, `false` | nulo | `true` por padrão. `false` para contas suspensas ou excluídas. |
+| `active` | Booleano | Sim | Simples | `true`, `false` | nulo | `true` por padrão. `false` ao desativar a conta (`DELETE /api/v1/users/me`): a conta inativa não pede vaga, não aceita passageiros e não aparece no matching. Ver "Desativação de Conta" na modelagem. |
 | `createdAt` | Data e hora | Sim | Simples | `2025-05-01T10:00:00Z` | data futura | Gerado automaticamente no cadastro. |
 | `updatedAt` | Data e hora | Sim | Simples | `2025-09-15T08:30:00Z` | data anterior à criação | Atualizado a cada alteração no documento. |
 
@@ -93,7 +94,7 @@ Veículo é o automóvel cadastrado por um motorista. Um usuário pode ter múlt
 | `licensePlate` | Texto alfanumérico | Sim | Simples | `ABC1234`, `ABC1D23` | placa duplicada, vazio | Única por proprietário. Armazenada em maiúsculas sem hífen. |
 | `renavam` | Texto numérico | Sim | Simples | `14283256656` | `1428325665` (10 dígitos), `14283256657` (dígito verificador errado), `11111111111` | Registro Nacional de Veículos Automotores. 11 dígitos, guardados sem pontuação; o último é o dígito verificador (soma dos 10 primeiros com os pesos 3, 2, 9, 8, 7, 6, 5, 4, 3, 2; dígito = soma × 10 mod 11, com 10 virando 0). Pode faltar em veículos cadastrados antes do campo existir. A conferência é feita pelo **servidor de sockets** (`ValidateRenavamHandler`) ao criar e ao editar o veículo, antes de montar a entidade; o `Vehicle` só guarda os dígitos e não valida o dígito verificador sozinho. Mensagens de erro: `O RENAVAM deve ter 11 dígitos.` e `RENAVAM inválido.` |
 | `color` | Texto | Sim | Simples | `Branco`, `Prata`, `Azul` | vazio | Texto livre. Auxilia o passageiro a identificar o veículo. |
-| `type` | Elemento de lista enumerada | Sim | Simples | `HATCH`, `VAN`, `MOTORCYCLE` | valor fora do enum | Valores: `HATCH`, `SEDAN`, `SUV`, `PICKUP`, `VAN`, `MOTORCYCLE`, `OTHER`. Moto tem capacidade máxima de 1. |
+| `type` | Elemento de lista enumerada | Sim | Simples | `HATCH`, `VAN`, `MOTORCYCLE` | valor fora do enum | Valores: `HATCH`, `SEDAN`, `SUV`, `PICKUP`, `VAN`, `MOTORCYCLE`, `OTHER`. Moto: até 2 lugares (contando o piloto). |
 | `totalCapacity` | Número inteiro | Sim | Simples | `5`, `7`, `15` (van), `2` (moto) | `0`, negativo, carro com mais de 7, maior que 15 | Inclui o motorista. Carro (hatch, sedã, SUV, picape): até 7. Van ou outro: até 15. Moto: até 2. |
 | `fuelSources` | Dados de consumo por fonte de energia | Sim | Multivalorado e Composto (MC) | ver tipo especial 3.4 | lista vazia | Não pode haver dois itens da mesma fonte no mesmo veículo. Flex tem 2 itens. |
 | `active` | Booleano | Sim | Simples | `true`, `false` | nulo | Veículo inativo não aparece na seleção de trajeto. |
@@ -124,8 +125,8 @@ Route é o registro de um deslocamento recorrente cadastrado por um usuário. Po
 | `maxDetourKm` | Número decimal | Sim | Simples | `2.0`, `0.5`, `5.0` | negativo, zero | Somente para `OFFER`. Distância máxima de desvio aceita pelo motorista. Usado no matching. |
 | `toll` | Número decimal monetário | Não | Simples | `12.50`, `null` | negativo | Somente para `OFFER`. Valor estimado de pedágio informado pelo motorista na oferta. `Decimal128`. |
 | `parking` | Número decimal monetário | Não | Simples | `20.00`, `null` | negativo | Somente para `OFFER`. Valor estimado de estacionamento informado pelo motorista na oferta. `Decimal128`. |
-| `totalSeats` | Número inteiro | Não | Simples | `3`, `8` | `0`, negativo | Somente para `OFFER`. Calculado como `totalCapacity do veículo - 1`. |
-| `availableSeats` | Número inteiro | Não | Simples | `3`, `1`, `0` | negativo, maior que totalSeats | Somente para `OFFER`. Decrementado ao confirmar; incrementado ao cancelar. |
+| `totalSeats` | Número inteiro | Não | Simples | `3`, `8` | `0`, negativo | Somente para `OFFER`. Informado pelo app (o app usa `totalCapacity do veículo - 1`). O backend só exige maior que 0 e não confere com a capacidade do veículo. |
+| `availableSeats` | Número inteiro | Não | Simples | `3`, `1`, `0` | negativo, maior que totalSeats | Somente para `OFFER`. Copia `totalSeats` na criação e não muda depois. As vagas que restam ficam em `rides.availableSeats`, por data. |
 | `routeDistanceKm` | Número decimal | Não | Simples | `12.4`, `5.8` | negativo, zero | Distância pelas ruas, calculada pela Routes API (Google Maps) na criação e em cada edição. Se o Google estiver indisponível, recebe a distância em linha reta (Haversine), calculada pelo **servidor de sockets** (`DistanceHandler`, em lote). Base para custos e desvios. |
 | `encodedPolyline` | Texto | Não | Simples | `x~ijCzbe_HnAkBtCwE` | `""` (texto vazio) | Desenho do caminho no formato *encoded polyline* do Google, usado pelo app para traçar o trajeto no mapa. Calculado junto com `routeDistanceKm`. Nulo quando a distância veio do Haversine. |
 | `status` | Elemento de lista enumerada | Sim | Simples | `ACTIVE`, `PAUSED`, `INACTIVE` | valor fora do enum | Somente `ACTIVE` entra no matching. |
@@ -165,7 +166,7 @@ Ride é o evento central do sistema. Representa uma viagem concreta com data, ho
 | `cancelledAt` | Data e hora | Não | Simples | `2025-05-12T09:00:00Z` | — | Armazenado em UTC. Momento em que a viagem foi cancelada (pelo motorista, pelo job de não iniciada, por falta de participantes ou por todos os passageiros ausentes). Nulo em viagens não canceladas e nas canceladas antes da versão 1.9.0. Usado para datar o cancelamento do motorista na janela de reputação. |
 | `driverCancellationPenalized` | Booleano | Sim | Simples | `false`, `true` | — | `false` por padrão. `true` só quando o motorista cancelou a viagem com passageiro confirmado, o mesmo caso que soma em `driverInitiatedCancellations`. Cancelamentos automáticos ficam `false`. |
 | `chatRoomId` | Texto | Não | Simples | `ride_64d4c3b2` | — | Identificador da sala de chat no **Firebase Realtime Database**. As mensagens não ficam no MongoDB — só a referência da sala. |
-| `costs` | Detalhamento de custos | Sim | Composto (C) | ver tipo especial 3.7 | nulo | Calculado ao concluir a viagem. Todos os valores monetários em `Decimal128`. |
+| `costs` | Detalhamento de custos | Sim | Composto (C) | ver tipo especial 3.7 | nulo | Recalculado a cada aceite, saída ou ausência; os valores finais vêm do encerramento da viagem. Todos os valores monetários em `Decimal128`. |
 | `participants` | Participação na viagem | Sim | Multivalorado e Composto (MC) | ver tipo especial 3.8 | lista vazia | Mínimo 1 elemento (o motorista). |
 | `itinerary` | Parada do itinerário | Não | Multivalorado e Composto (MC) | ver tipo especial 3.14 | — | Paradas na ordem em que o motorista busca (`PICKUP`) e deixa (`DROPOFF`) os passageiros confirmados. Lista vazia quando não há passageiro confirmado. Recalculada ao aceitar um passageiro, quando um confirmado sai e quando o motorista remove um confirmado. Não muda depois de `IN_PROGRESS`. |
 | `itineraryDistanceKm` | Número decimal | Não | Simples | `15.8`, `null` | negativo | Distância da rota passando pelas paradas. Vem da Routes API (Google); sem o Google, é a soma das linhas retas entre os pontos (calculada pelo servidor de sockets). Nulo quando não há paradas. `Double`. |
@@ -210,7 +211,7 @@ Report é o registro formal de uma ocorrência reportada por um usuário contra 
 
 **Regras do registro:**
 - Quem denuncia é o usuário logado; não pode denunciar a si mesmo; o denunciado precisa existir.
-- `LATE_NO_SHOW` exige `rideId`. `OTHER` exige `description`. Os demais motivos aceitam `rideId` opcional.
+- `LATE_NO_SHOW` e `NON_PAYMENT` exigem `rideId`. `OTHER` exige `description`. Os demais motivos aceitam `rideId` opcional.
 - Quando `rideId` vem, denunciante e denunciado precisam ter participado da viagem (motorista ou passageiro que teve vaga, em qualquer status da viagem, inclusive ausente ou cancelado; pedido `REQUESTED`, `REJECTED` ou `EXPIRED` não conta).
 - Denúncia idêntica (mesmo denunciante, denunciado, `rideId` e `reason`) ainda `PENDING` é recusada.
 
@@ -241,6 +242,7 @@ Block é o registro de que um usuário optou por impedir interações com outro.
 **Onde o bloqueio vale (RF47):**
 - Matching: sim, nos dois sentidos.
 - Pedido de vaga e aceite do passageiro: sim, nos dois sentidos (`NOT_ALLOWED`). Como a sala de chat só é liberada no aceite, quem já está bloqueado não chega a ter a conversa criada.
+- Viagem já aceita e ainda não iniciada: sim. Ao bloquear, o `BlockedUsersRideListener` separa os dois (se o motorista bloqueou, o passageiro sai; se o passageiro bloqueou, ele sai), sem penalidade, com a vaga liberada e aviso `RIDE_CANCELLED`. Viagem em andamento não é afetada.
 - Chat **depois** do aceite: **não coberto pelo backend**. As mensagens vivem no Firebase Realtime Database, sem a API no meio. O app desabilita o envio no chat com um usuário bloqueado.
 - Desbloquear remove só o bloqueio do usuário logado; se o outro lado também bloqueou, a interação segue barrada.
 
@@ -297,7 +299,7 @@ Matching é o resultado calculado pelo algoritmo de compatibilidade entre dois t
 | `calculatedDetourKm` | Número decimal | Sim | Simples | `2.1`, `0.8` | negativo | Quilômetros adicionais que o motorista percorreria. |
 | `scheduleDifferenceMin` | Número inteiro | Sim | Simples | `5`, `0`, `15` | negativo | Diferença entre os horários de partida dos dois trajetos. Fator de penalização no score. |
 | `compatibleDays` | Elemento de lista enumerada | Sim | Multivalorado (M) | `["MONDAY","TUESDAY"]` | lista vazia | Interseção dos dias dos dois trajetos. |
-| `estimatedCostPerPassenger` | Número decimal monetário | Sim | Simples | `6.00`, `4.50` | negativo, zero | `Decimal128`. Estimativa do valor que o passageiro pagará. Exibido na lista de combinações. |
+| `estimatedCostPerPassenger` | Número decimal monetário | Não | Simples | `6.00`, `4.50`, `null` | negativo | `Decimal128`. Estimativa do valor que o passageiro pagará. `null` quando o veículo não tem consumo e preço. Exibido na lista de combinações. |
 | `valid` | Booleano | Sim | Simples | `true`, `false` | nulo | `false` quando algum dos trajetos é editado ou inativado. Somente `true` é exibido ao usuário. |
 | `expiresAt` | Data e hora | Não | Simples | `2025-06-01T00:00:00Z` | anterior à criação | Data de expiração automática (TTL). MongoDB deleta o documento após esta data. |
 | `createdAt` | Data e hora | Sim | Simples | `2025-05-12T06:00:00Z` | data futura | Gerado automaticamente quando o algoritmo calcula o resultado. |
@@ -397,13 +399,13 @@ Aviso destinado ao usuário dentro do app. Mantida simples: só o aviso, o tipo 
 | :--- | :---: | :---: | :---: | :--- | :--- | :--- |
 | `_id` | Texto alfanumérico | Sim | Simples | `64n1o2t3...` | vazio, nulo | Gerado pelo banco. |
 | `userId` | Texto alfanumérico | Sim | Simples | `64a1f3c2...` | nulo | Referência ao User destinatário. |
-| `type` | Elemento de lista enumerada | Sim | Simples | `PAYMENT_DUE`, `REQUEST_EXPIRED` | valor fora do enum | Ver enum `NotificationType` (`RIDE_REQUEST`, `RIDE_CONFIRMED`, `RIDE_CANCELLED`, `REQUEST_EXPIRED`, `PAYMENT_DUE`, `PAYMENT_CONFIRMED`, `SEAT_RELEASED`, `GENERIC`). |
+| `type` | Elemento de lista enumerada | Sim | Simples | `PAYMENT_DUE`, `REQUEST_EXPIRED` | valor fora do enum | Ver enum `NotificationType` (`RIDE_REQUEST`, `RIDE_CONFIRMED`, `RIDE_CANCELLED`, `REQUEST_EXPIRED`, `PAYMENT_DUE`, `PAYMENT_CONFIRMED`, `SEAT_RELEASED`, `GENERIC`). Hoje são gravados `RIDE_CONFIRMED`, `RIDE_CANCELLED`, `REQUEST_EXPIRED`, `PAYMENT_DUE` e `PAYMENT_CONFIRMED`; `RIDE_REQUEST`, `SEAT_RELEASED` e `GENERIC` estão reservados. |
 | `title` | Texto | Sim | Simples | `Pagamento pendente` | vazio | Título curto do aviso. |
 | `message` | Texto | Sim | Simples | `Você tem uma carona a pagar.` | vazio | Corpo do aviso. |
 | `relatedEntityType` | Texto | Não | Simples | `RIDE`, `RESERVED_SEAT` | — | Tipo da entidade relacionada, para navegação ao tocar no aviso. |
 | `relatedEntityId` | Texto alfanumérico | Não | Simples | `64d4c3b2...` | — | Id da entidade relacionada. |
 | `read` | Booleano | Sim | Simples | `true`, `false` | nulo | `false` por padrão. Marcado `true` quando o usuário vê. |
-| `createdAt` | Data e hora | Sim | Simples | `2025-05-12T08:20:00Z` | — | Momento do aviso. Expira por TTL após ~90 dias. |
+| `createdAt` | Data e hora | Sim | Simples | `2025-05-12T08:20:00Z` | — | Momento do aviso. Notificações **não expiram** (não há índice TTL); expiração em ~90 dias é evolução futura. |
 
 ---
 
@@ -418,7 +420,7 @@ Registra as chaves de idempotência já processadas, para evitar que uma operaç
 | `_id` | Texto alfanumérico | Sim | Simples | `64i1d2k3...` | vazio, nulo | Gerado pelo banco. |
 | `key` | Texto alfanumérico | Sim | Simples | `c3f8e562-b13c...` | duplicada, vazio | Chave UUID v4 enviada pelo cliente no cabeçalho `Idempotency-Key`. Única. |
 | `userId` | Texto alfanumérico | Sim | Simples | `64a1f3c2...` | nulo | Referência ao `_id` do User que originou a requisição. |
-| `method` | Texto | Sim | Simples | `POST`, `PUT`, `DELETE` | vazio | Método HTTP da operação protegida. |
+| `method` | Texto | Sim | Simples | `POST`, `PUT`, `PATCH` | vazio, `DELETE` | Método HTTP da operação protegida. Só `POST`, `PUT` e `PATCH` em `/api/v1/rides/**` passam pelo filtro de idempotência. |
 | `path` | Texto | Sim | Simples | `/api/v1/rides/64d.../accept` | vazio | URI do recurso acionado. |
 | `requestFingerprint` | Texto | Sim | Simples | hash SHA-256 | vazio | Hash do corpo da requisição para verificar consistência em caso de repetição. |
 | `status` | Elemento de lista enumerada | Sim | Simples | `IN_PROGRESS`, `COMPLETED`, `UNKNOWN_OUTCOME` | fora do enum | Estado da execução da operação associada à chave. |
@@ -627,17 +629,17 @@ Estrutura composta e multivalorada que representa cada participante de uma viage
 | `passengerRouteId` | Texto alfanumérico | Não | Referência ao Route de procura. Nulo para o motorista. |
 | `boardingLocation` | Location (C) | Não | Ponto de embarque do passageiro. Nulo para o motorista. |
 | `dropOffLocation` | Location (C) | Não | Ponto de desembarque do passageiro. Nulo para o motorista. |
-| `detourGeneratedKm` | Número decimal | Não | Desvio gerado por este passageiro. `Double`. Calculado no matching. Nulo para o motorista. |
+| `detourGeneratedKm` | Número decimal | Não | Desvio gerado por este passageiro. `Double`. Calculado no aceite pelo `RideCostHandler` (3 trechos pelas ruas menos a rota base); é outro valor que o desvio em linha reta do matching. Nulo para o motorista e antes do aceite. |
 | `status` | Elemento de lista enumerada | Sim | Valores: `REQUESTED`, `REJECTED`, `CONFIRMED`, `CANCELLED`, `NO_SHOW`, `COMPLETED`, `EXPIRED`. |
 | `requestedAt` | Data e hora | Sim | Momento em que o passageiro solicitou a vaga (RF19). |
 | `respondedAt` | Data e hora | Não | Momento em que o motorista aceitou ou recusou. Nulo enquanto `REQUESTED`. |
 | `rejectionReason` | Texto | Não | Motivo da recusa pelo motorista. Presente somente quando `status = REJECTED`. |
 | `cancellationReason` | Texto | Não | Preenchido pelo participante ao cancelar. |
-| `lateCancellation` | Booleano | Sim | `false` por padrão. `true` quando cancela com menos de 2h de antecedência. |
+| `lateCancellation` | Booleano | Sim | `false` por padrão. `true` quando o passageiro confirmado cancela com menos de 2h de antecedência. Pesa só na reputação (`lateCancellations`); não gera cobrança. |
 | `removedByDriver` | Booleano | Sim | `false` por padrão. `true` só quando o motorista remove um passageiro já `CONFIRMED` (o status vai para `CANCELLED` e `cancelledAt` é gravado), o mesmo caso que soma em `driverInitiatedCancellations`. Recusar pedido pendente (`REJECTED`) não marca. Remoções anteriores à versão 1.9.0 ficam `false`. |
 | `estimatedAmount` | Número decimal monetário | Sim | `Decimal128`. Valor estimado atual (RF34/RF36). Recalculado a cada entrada, cancelamento ou ausência de participantes. Nunca ultrapassa o `maxAmount`. |
 | `maxAmount` | Número decimal monetário | Sim | `Decimal128`. Teto de proteção do passageiro (RF35/RF37): custo inteiro da rota com o desvio do passageiro, gravado na confirmação. Nunca pode ser superado pelo `finalAmount`. |
-| `finalAmount` | Número decimal monetário | Não | `Decimal128`. Calculado somente ao concluir a viagem. Nulo até a conclusão. |
+| `finalAmount` | Número decimal monetário | Não | `Decimal128`. Gravado quando o passageiro termina a viagem (confirmação de chegada ou encerramento). Ausente fica com `0`. Nulo antes disso. |
 | `paymentStatus` | Elemento de lista enumerada | Sim | Valores: `PENDING`, `PAID`, `NOT_APPLICABLE`. Todo passageiro nasce `PENDING`; só com `paymentRequestedAt` é uma cobrança em aberto, que bloqueia pedir vaga e cadastrar trajeto (RF74). |
 | `requestedAmount` | Número decimal monetário | Não | `Decimal128`. Valor cobrado: o `finalAmount` do rateio, gravado automaticamente no fim da viagem do passageiro (RF39). Nunca ultrapassa o `maxAmount` quando este estiver definido. Nulo até a cobrança. |
 | `paymentRequestedAt` | Data e hora | Não | Momento da última cobrança. Nulo até a primeira cobrança. |
@@ -713,7 +715,7 @@ Estrutura composta que representa a CNH do motorista. Opcional — só preenchid
 | :---: | :--- | :---: | :--- |
 | `number` | Texto alfanumérico | Sim | Número de registro da CNH. |
 | `category` | Elemento de lista enumerada | Sim | Valores: `A`, `B`, `AB`, `C`, `D`, `E`. Define que tipo de veículo o motorista pode dirigir. |
-| `expiresAt` | Data | Sim | Data de validade da CNH. Ao vencer, o `status` vira `EXPIRED` automaticamente. |
+| `expiresAt` | Data | Sim | Data de validade da CNH. Depois dela, a CNH vale como `EXPIRED` na leitura (o status gravado continua `VERIFIED`; não há job que regrave) e o motorista não oferece carona. |
 | `documentUrl` | URL | Não | URL da foto da CNH no Firebase Storage, para conferência. |
 | `status` | Elemento de lista enumerada | Sim | Valores: `PENDING`, `UNDER_REVIEW`, `VERIFIED`, `REJECTED`, `EXPIRED`. |
 | `verifiedAt` | Data e hora | Não | Preenchido quando a CNH é aprovada (`VERIFIED`). |
@@ -755,7 +757,7 @@ Estrutura composta e multivalorada usada no array `itinerary` da Ride. Cada item
 | IndicatorRideRegistration | `indicator_ride_registrations` | `modules/indicator` | Sem classe de entidade. `_id` é o `rideId` (impede registrar a viagem duas vezes). Marca as viagens já contabilizadas nos indicadores. |
 | AuditLog | `audit_logs` | `modules/shared` | Append-only. Referências por id. `metadata` flexível sem esquema rígido. |
 | University | `universities` | `modules/shared` | **Ainda sem código** (sem `@Document`). Lista de referência. `emailDomains` como array. Pouco alterada. |
-| Notification | `notifications` | `modules/shared` | Documento simples por aviso. TTL para expirar antigos. |
+| Notification | `notifications` | `modules/shared` | Documento simples por aviso. Sem TTL: os avisos ficam guardados (expiração é evolução futura). |
 | IdempotencyKey | `idempotency_keys` | `modules/shared` | Documento simples com `key` única e TTL de 24 h. |
 
 ---
