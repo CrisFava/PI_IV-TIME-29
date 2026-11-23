@@ -29,6 +29,7 @@
 | 20/11/2026 | Daniela Mikie Kikuchi Gonçalves | 1.8.0 | Inadimplência implementada (RF67): `overdueAt` e `nonPaymentReportedAt` na Participação; prazo de 5 minutos e limite de 2 dívidas; denúncia `NON_PAYMENT` aceita só depois do "Já paguei" e contada como dívida; `overdueRides` passa a ser incrementado |
 | 20/11/2026 | Daniela Mikie Kikuchi Gonçalves | 1.9.0 | Janela de 90 dias da reputação recalculada a partir das viagens (job semanal); campos `cancelledAt` e `driverCancellationPenalized` na Viagem e `removedByDriver` na Participação |
 | 20/11/2026 | Daniela Mikie Kikuchi Gonçalves | 1.9.1 | Reputação: a nota da avaliação só é gravada se o total for maior que o já gravado, e penalidade e viagem concluída deixam de regravar a média e o total (avaliações simultâneas não se sobrescrevem) |
+| 22/11/2026 | Daniela Mikie Kikuchi Gonçalves | 1.9.2 | Alinhamento com o código: avaliação também em viagem `IN_PROGRESS` para quem já desceu; `startedAt` na Viagem; datas como `LocalDateTime` no horário de Brasília, convertidas para UTC pelo fuso da máquina; ausências antigas sem `startedAt` fora da janela de 90 dias; na modelagem, pedido de vaga expira em 1 h e `PAYMENT_CONFIRMED` descrito pelo fluxo do "Já paguei" |
 
 ---
 
@@ -150,9 +151,10 @@ Ride é o evento central do sistema. Representa uma viagem concreta com data, ho
 | `driverRouteId` | Texto alfanumérico | Sim | Simples | `64c3a2b1...` | nulo | Referência ao Route que originou esta viagem. |
 | `origin` | Localização | Sim | Composto (C) | ver tipo especial 3.5 | nulo | Snapshot da origem. Imutável. |
 | `destination` | Localização | Sim | Composto (C) | ver tipo especial 3.5 | nulo | Snapshot do destino. Imutável. |
-| `departureDateTime` | Data e hora | Sim | Simples | `2025-05-12T10:30:00Z` | data passada no cadastro | Armazenado em **UTC**. Combinação da data concreta com `route.departureTime`, convertida de America/Sao_Paulo para UTC (ex.: 07:30 BRT = 10:30 UTC). Nunca usar o fuso do servidor na conversão. |
+| `departureDateTime` | Data e hora | Sim | Simples | `2025-05-12T10:30:00Z` | data passada no cadastro | Combinação da data concreta com `route.departureTime`, no horário de Brasília. No código é um `LocalDateTime` (sem fuso); o Mongo guarda em UTC, e a conversão usa o **fuso da máquina** onde o backend roda. Por isso o backend precisa rodar com o fuso America/Sao_Paulo (ex.: 07:30 BRT = 10:30 UTC). Numa máquina em UTC, os horários e os prazos ficam 3 horas errados (limitação conhecida). |
 | `estimatedArrivalDateTime` | Data e hora | Sim | Simples | `2025-05-12T11:10:00Z` | anterior à partida | Armazenado em UTC. Calculada a partir da partida + duração estimada. |
 | `directArrivalDateTime` | Data e hora | Não | Simples | `2025-05-12T11:00:00Z` | anterior à partida | Armazenado em UTC. Chegada pela rota direta, sem paradas, guardada na criação. Volta a ser a `estimatedArrivalDateTime` quando a viagem fica sem passageiros. |
+| `startedAt` | Data e hora | Não | Simples | `2025-05-12T10:32:00Z` | — | Armazenado em UTC. Hora real em que o motorista iniciou a viagem (`POST /rides/{id}/start`, que muda o status para `IN_PROGRESS`). Nulo até iniciar. O histórico mostra o início e o fim reais, e a janela de reputação usa esta data como a data das ausências (`NO_SHOW`). Viagens iniciadas antes de o campo existir (19/11/2026) não têm a data, e as ausências delas não entram na janela de 90 dias. |
 | `completedAt` | Data e hora | Não | Simples | `2025-05-12T11:15:00Z` | anterior à partida | Armazenado em UTC. Nulo até o motorista concluir a viagem. |
 | `weekDays` | Elemento de lista enumerada | Sim | Multivalorado (M) | `["MONDAY","WEDNESDAY"]` | lista vazia | Cópia dos dias do trajeto no momento da criação. |
 | `totalSeats` | Número inteiro | Sim | Simples | `3`, `8` | `0`, negativo | Copiado do trajeto. Não se altera após a criação. |
@@ -179,7 +181,7 @@ Ride é o evento central do sistema. Representa uma viagem concreta com data, ho
 Review é o registro de nota e comentário na relação **motorista ↔ passageiro** após a conclusão de uma viagem. Passageiros **não avaliam outros passageiros** — apenas o motorista avalia cada passageiro e cada passageiro avalia o motorista. Cada par (avaliador, avaliado) registra no máximo uma avaliação por viagem (unicidade por `rideId + reviewerId + reviewedId`). As notas alimentam a reputação por papel do usuário.
 
 **Regras do MVP:**
-- **Quem pode avaliar e ser avaliado:** apenas quem **concluiu** a viagem, ou seja, o participante com `status = COMPLETED` em uma viagem `COMPLETED`. Passageiro ausente (`NO_SHOW`), recusado (`REJECTED`), expirado (`EXPIRED`), que cancelou ou saiu (`CANCELLED`) e quem só pediu a vaga (`REQUESTED`) não avaliam nem são avaliados. Viagem cancelada ou sem passageiro efetivo não gera avaliação.
+- **Quem pode avaliar e ser avaliado:** apenas quem **concluiu** a viagem, ou seja, o participante com `status = COMPLETED`. A viagem pode estar `COMPLETED` ou ainda `IN_PROGRESS`: o passageiro que já desceu (chegada confirmada pelo motorista) avalia na hora e pode ser avaliado, sem esperar o fim da viagem dos outros (`GetCompletedRideParticipantsUseCase`). Passageiro ausente (`NO_SHOW`), recusado (`REJECTED`), expirado (`EXPIRED`), que cancelou ou saiu (`CANCELLED`) e quem só pediu a vaga (`REQUESTED`) não avaliam nem são avaliados. Viagem cancelada ou sem passageiro efetivo não gera avaliação.
 - **Sem edição e sem exclusão:** a avaliação é imutável depois de criada.
 - **Sem prazo:** não há limite de tempo para avaliar depois que a viagem termina. Um prazo pode ser definido numa versão futura.
 - **Papel do avaliado:** o servidor calcula o `reviewedRole` a partir da viagem. O cliente não envia esse campo.
@@ -190,9 +192,9 @@ Review é o registro de nota e comentário na relação **motorista ↔ passagei
 | Atributo / Dado | Tipo conceitual | Obrigatório | Característica | Ex. aceitos | Ex. não aceitos | Comentários |
 | :--- | :---: | :---: | :---: | :--- | :--- | :--- |
 | `_id` | Texto alfanumérico | Sim | Simples | `64e5d4c3...` | vazio, nulo | Gerado pelo banco. |
-| `rideId` | Texto alfanumérico | Sim | Simples | `64d4c3b2...` | nulo | Referência ao Ride. Somente viagens com `status = COMPLETED` podem ser avaliadas. |
+| `rideId` | Texto alfanumérico | Sim | Simples | `64d4c3b2...` | nulo | Referência ao Ride. A viagem precisa estar `COMPLETED` ou `IN_PROGRESS` (avaliação ao descer). |
 | `reviewerId` | Texto alfanumérico | Sim | Simples | `64a1f3c2...` | nulo | Referência ao User que avalia. |
-| `reviewedId` | Texto alfanumérico | Sim | Simples | `64a9f8e7...` | igual ao reviewerId, nulo | Referência ao User avaliado. Deve ter concluído a mesma viagem (`COMPLETED`). |
+| `reviewedId` | Texto alfanumérico | Sim | Simples | `64a9f8e7...` | igual ao reviewerId, nulo | Referência ao User avaliado. Deve ter concluído a mesma viagem (participante `COMPLETED`). |
 | `reviewedRole` | Elemento de lista enumerada | Sim | Simples | `DRIVER`, `PASSENGER` | valor fora do enum | Papel do avaliado naquela viagem. Alimenta a reputação correta. |
 | `rating` | Número inteiro | Sim | Simples | `1`, `3`, `5` | `0`, `6`, negativo | Escala de 1 a 5 estrelas. O app deve enviar apenas inteiros: o servidor não valida decimais e descarta a parte fracionária (`4.5` vira `4`). Entra na média do avaliado no papel correspondente. |
 | `comment` | Texto | Não | Simples | `Ótima viagem!`, `Pontual e educado.` | — | Texto livre. Exibido no histórico de avaliações. |
@@ -477,7 +479,7 @@ Estrutura composta que representa os indicadores de comportamento do usuário se
 **Limitações conhecidas:**
 - `HIGH` só é alcançável com a gravação da média e a contagem de `completedRides` funcionando juntas.
 - Nenhum fluxo grava `window.delays` nem `window.substantiatedReports` (depende da moderação de denúncias, que não existe); ficam em 0. O job semanal não os recalcula.
-- `noShows` é datado pelo `startedAt` da viagem, porque a participação não guarda a data da ausência.
+- `noShows` é datado pelo `startedAt` da viagem, porque a participação não guarda a data da ausência. Viagens iniciadas antes de 19/11/2026 não têm `startedAt`, então as ausências delas **não entram** na janela: no primeiro job, quem tinha essas ausências antigas volta a 0 em `noShows`.
 - Cancelamentos do motorista e remoções de passageiro confirmado gravados antes da versão 1.9.0 não têm `cancelledAt`, `driverCancellationPenalized` nem `removedByDriver` e **não entram** na janela: no primeiro job, o contador de quem tinha essas penalidades antigas volta a 0.
 - Entre duas execuções do job os contadores seguem somando em tempo real; o job reescreve os valores uma vez por semana.
 - O job lê as contagens uma vez, no início. Um incremento em tempo real entre essa leitura e a gravação do usuário é sobrescrito e só volta a ficar certo no job seguinte.

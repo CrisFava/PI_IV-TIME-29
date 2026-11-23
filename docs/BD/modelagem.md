@@ -5,7 +5,7 @@
 > Referências entre coleções de módulos distintos são feitas **exclusivamente por `String id`**, sem `@DBRef`.
 > Valores monetários são armazenados como **`Decimal128`** no MongoDB e **`BigDecimal`** no Java. A diferença de centavos no rateio é sempre atribuída ao motorista.
 > Coordenadas geográficas são armazenadas no formato **GeoJSON `Point`** exigido pelo índice `2dsphere` do MongoDB: `{ "type": "Point", "coordinates": [longitude, latitude] }` — **longitude sempre antes da latitude**.
-> **Datas e horas:** todos os campos `ISODate` são armazenados em **UTC**. Campos de hora recorrente (`departureTime`, `estimatedArrivalTime`) são `String "HH:mm"` interpretados no fuso oficial da aplicação (**America/Sao_Paulo**). Ao combinar uma data concreta com um horário recorrente para gerar `departureDateTime`, a conversão para UTC deve usar explicitamente America/Sao_Paulo — nunca o fuso do servidor.
+> **Datas e horas:** todos os campos `ISODate` são armazenados em **UTC** no Mongo. Campos de hora recorrente (`departureTime`, `estimatedArrivalTime`) são `String "HH:mm"` interpretados no fuso oficial da aplicação (**America/Sao_Paulo**). No código, as datas são `LocalDateTime` (sem fuso) no horário de Brasília, e a conversão para UTC usa o **fuso da máquina** onde o backend roda. Por isso o backend precisa rodar com o fuso America/Sao_Paulo. Numa máquina em UTC (nuvem, Docker), os horários e os prazos (corte de 5 min, expiração dos pedidos, cancelamento de viagem não iniciada) ficam 3 horas errados. Fixar o fuso na subida do backend fica como evolução.
 > **Chat:** as mensagens entre participantes **não ficam no MongoDB** — vivem no **Firebase Realtime Database**, conforme a arquitetura do projeto (comunicação em tempo real). O MongoDB guarda apenas o identificador da sala de conversa quando necessário (ex.: um `chatRoomId` na viagem para localizar o histórico no Firebase). Por isso não há coleção `messages`/`chat` nesta modelagem.
 >
 > Estrutura no Realtime Database: `chats/{chatRoomId}/group/messages/{pushId}`: **um grupo por viagem**, com o motorista e os passageiros confirmados, com os campos `senderId`, `senderName`, `senderUid` (uid do Firebase, conferido pelas regras; é ele que diz de quem é a mensagem), `type` (`TEXT`, `PAYMENT_REQUEST`, `PAYMENT_CONFIRMED`, `SYSTEM`), `text`, `amount` e `sentAt` (horário do servidor). O `chatRoomId` é preenchido no aceite e libera o grupo (só quem foi aceito na viagem conversa). Os avisos de início e fim da viagem vão no grupo; as **cobranças não**: cada passageiro vê a própria na tela de pagamento. O grupo some da lista uma semana depois do fim da viagem. As mensagens de pagamento e de viagem são só avisos: a fonte de verdade continua sendo a API. As regras de acesso ficam em `app/converge/database.rules.json`.
@@ -188,7 +188,7 @@ A contagem fica no módulo `ride` (`CountReputationFactsUseCase`). O módulo `us
 **Custo:** uma passada por semana nas viagens dos últimos N dias. Nenhum índice novo foi criado.
 
 **Limitações conhecidas da janela:**
-- `noShows` usa o `startedAt` da viagem como data, porque a participação não guarda a data da ausência. A diferença para a hora real é de poucas horas.
+- `noShows` usa o `startedAt` da viagem como data, porque a participação não guarda a data da ausência. A diferença para a hora real é de poucas horas. Viagens iniciadas antes de 19/11/2026 não têm `startedAt`, e as ausências delas não entram na janela.
 - Os campos `cancelledAt` e `driverCancellationPenalized` da viagem e `removedByDriver` da participação só existem a partir da versão 1.9.0. **Cancelamentos do motorista e remoções de passageiro confirmado gravados antes dessa mudança não entram na janela**: no primeiro job, quem tinha essas penalidades antigas volta a 0 em `driverInitiatedCancellations`.
 - Se um incremento em tempo real acontecer entre a leitura das contagens (feita uma vez, no início do job) e a gravação do usuário, o `$set` da janela o sobrescreve. O valor volta a ficar certo no job da semana seguinte.
 
@@ -498,6 +498,7 @@ Quando `active = false` (conta suspensa ou excluída):
   "departureDateTime": "ISODate",
   "estimatedArrivalDateTime": "ISODate",
   "directArrivalDateTime": "ISODate | null",
+  "startedAt": "ISODate | null (hora real em que o motorista iniciou; nulo até iniciar)",
   "completedAt": "ISODate | null",
   "weekDays": ["MONDAY | TUESDAY | ..."],
   "totalSeats": "Integer",
@@ -625,6 +626,7 @@ O motorista vai até cada passageiro: `itinerary` guarda as paradas na ordem em 
 - Se o passageiro cancelar com menos de 2h de antecedência (ou depois das 20h da véspera, no caso de vaga reservada recorrente), `lateCancellation = true` e a viagem é cobrada como se tivesse ido.
 - Se entrar passageiro avulso, o valor daquele dia cai para todos — cada um paga o `finalAmount` real da viagem.
 - **Horários da viagem:**
+  - **Pedido de vaga expira em 1 hora sem resposta** (`converge.ride.request-timeout`, padrão `1h`) ou 5 min antes da saída, o que vier primeiro. Uma tarefa agendada (`RideExpirationScheduler`, a cada 30 s) marca o pedido como `EXPIRED` e avisa o passageiro (`REQUEST_EXPIRED`).
   - **Pedidos e aceites param 5 min antes da saída** (`Ride.REQUEST_CUTOFF_MINUTES`): a partir daí ninguém entra nem é aceito, e o matching já mostra a próxima data (para a semanal) ou deixa de mostrar a viagem.
   - **"Iniciar trajeto" só vale de 5 min antes a 5 min depois da saída** (`Ride.START_TOLERANCE_MINUTES`).
   - **Cancelamento automático:** passados 5 min do horário de saída sem o motorista iniciar, a viagem é cancelada por uma tarefa agendada (`CancelRidesNotStartedUseCase`, a cada minuto). Os confirmados saem sem penalidade, os pedidos pendentes expiram, o motorista e os passageiros são avisados e a carona de um dia só termina junto.
@@ -707,7 +709,7 @@ O backend monta o payload sob demanda (padrão BR Code do Banco Central, CRC16 i
 
 ### Regra de validação
 
-- Só é permitido avaliar se a viagem está `COMPLETED`, se avaliador e avaliado **concluíram** a mesma viagem (participante com `status = COMPLETED`) **e** um deles é `DRIVER` e o outro é `PASSENGER`. Avaliação `PASSENGER → PASSENGER` é rejeitada no service. Passageiro ausente (`NO_SHOW`), recusado, expirado, cancelado ou que saiu da viagem não avalia nem é avaliado.
+- Só é permitido avaliar se a viagem está `COMPLETED` ou `IN_PROGRESS` (o passageiro que já desceu avalia na hora, sem esperar o fim da viagem), se avaliador e avaliado **concluíram** a mesma viagem (participante com `status = COMPLETED`) **e** um deles é `DRIVER` e o outro é `PASSENGER`. Avaliação `PASSENGER → PASSENGER` é rejeitada no service. Passageiro ausente (`NO_SHOW`), recusado, expirado, cancelado ou que saiu da viagem não avalia nem é avaliado.
 - O `reviewedRole` é calculado pelo servidor a partir da viagem; o cliente não envia.
 - A avaliação é imutável (sem edição nem exclusão) e não tem prazo no MVP.
 - **Salvar a avaliação atualiza a reputação do avaliado.** Depois do `save`, o `CreateReviewUseCase` relê todas as avaliações recebidas no papel (índice `reviewedId + reviewedRole`), calcula a média e o total e os grava em `users.reputation.driver` (se `reviewedRole = DRIVER`) ou `users.reputation.passenger` (se `PASSENGER`), junto com o `level` e o `calculatedAt` (ver coleção `users`, "Reputação"). Cada recálculo parte de todas as avaliações, nunca soma de forma incremental.
@@ -1447,7 +1449,7 @@ Formato geoespacial padrão do MongoDB para o índice `2dsphere`.
 | `CANCELLED` | Cancelou antes da viagem |
 | `NO_SHOW` | Não compareceu (registrado pelo motorista) |
 | `COMPLETED` | Participou até o fim |
-| `EXPIRED` | Solicitação expirada por inatividade do motorista após a janela de timeout |
+| `EXPIRED` | Pedido sem resposta do motorista em 1 hora, ou ainda pendente 5 min antes da saída |
 
 ### `PaymentStatus` (rides.participants[].paymentStatus)
 | Valor | Descrição |
@@ -1498,7 +1500,7 @@ Formato geoespacial padrão do MongoDB para o índice `2dsphere`.
 ### `AuditAction` (audit_logs.action)
 | Valor | Descrição |
 |---|---|
-| `PAYMENT_CONFIRMED` | Motorista confirmou recebimento de pagamento |
+| `PAYMENT_CONFIRMED` | Reservado. Não é gravado hoje: o motorista não confirma mais o recebimento (o passageiro informa com "Já paguei") |
 | `NO_SHOW_REGISTERED` | Motorista registrou ausência de passageiro |
 | `RIDE_CANCELLED` | Viagem cancelada |
 | `USER_BLOCKED` | Usuário bloqueou outro |
@@ -1516,7 +1518,7 @@ Formato geoespacial padrão do MongoDB para o índice `2dsphere`.
 | `RIDE_CANCELLED` | Carona cancelada |
 | `REQUEST_EXPIRED` | Aviso ao passageiro de que sua solicitação de vaga expirou por tempo limite |
 | `PAYMENT_DUE` | Lembrete de pagamento pendente |
-| `PAYMENT_CONFIRMED` | Motorista confirmou recebimento |
+| `PAYMENT_CONFIRMED` | Aviso ao motorista de que um passageiro informou o pagamento ("Já paguei") |
 | `SEAT_RELEASED` | Vaga reservada foi liberada (passageiro recorrente não vai) |
 | `GENERIC` | Aviso geral da plataforma |
 
