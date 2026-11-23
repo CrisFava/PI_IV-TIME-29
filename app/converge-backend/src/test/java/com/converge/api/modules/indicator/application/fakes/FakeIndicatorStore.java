@@ -16,39 +16,53 @@ import java.util.Set;
 /**
  * IndicatorStore em memória com as mesmas garantias do MongoIndicatorStore:
  * cada documento soma uma viagem uma vez só, e os totais derivados nunca diminuem ($max).
+ *
+ * Os mapas ficam públicos para os testes conferirem quantos documentos foram criados. A chave de cada
+ * documento é "dono|período|referência", com "platform" como dono dos indicadores da plataforma.
  */
 public class FakeIndicatorStore implements IndicatorStore {
 
+    /** Indicadores por usuário, como a coleção indicators. */
     public final Map<String, UserIndicator> users = new HashMap<>();
+    /** Indicadores da plataforma, como a coleção platform_indicators. */
     public final Map<String, PlatformIndicator> platform = new HashMap<>();
+    /** Viagens já somadas em cada documento, como o campo appliedRideIds. */
     private final Map<String, Set<String>> appliedRides = new HashMap<>();
+    /** Viagens já contabilizadas, como a coleção indicator_ride_registrations. */
     private final Set<String> registeredRides = new HashSet<>();
 
-    // Quando >= 0, a escrita de número N na plataforma falha (simula queda no meio do registro).
+    /** Quando >= 0, a escrita de número N na plataforma (contando do zero) falha, simulando queda no meio do registro. */
     public int failOnPlatformWrite = -1;
+    /** Quantas escritas na plataforma já foram tentadas, inclusive a que falhou. */
     private int platformWrites = 0;
 
+    /** Chave de um documento: dono, período e referência. */
     public static String key(String owner, IndicatorPeriod period, String reference) {
         return owner + "|" + period + "|" + reference;
     }
 
+    /** Indicador de um usuário; null se não existir. */
     public UserIndicator user(String userId, IndicatorPeriod period, String reference) {
         return users.get(key(userId, period, reference));
     }
 
+    /** Indicador da plataforma; null se não existir. */
     public PlatformIndicator platform(IndicatorPeriod period, String reference) {
         return platform.get(key("platform", period, reference));
     }
 
+    /** Mesma busca, no formato do PlatformIndicatorRepository, para o mock do repositório ler daqui. */
     public Optional<PlatformIndicator> findPlatform(IndicatorPeriod period, String reference) {
         return Optional.ofNullable(platform(period, reference));
     }
 
+    /** Consulta o conjunto de viagens registradas. */
     @Override
     public boolean isRideRegistered(String rideId) {
         return registeredRides.contains(rideId);
     }
 
+    /** Soma nos totais do usuário, se a viagem ainda não foi aplicada nesse documento. */
     @Override
     public void addToUser(
             String rideId,
@@ -76,6 +90,10 @@ public class FakeIndicatorStore implements IndicatorStore {
         );
     }
 
+    /**
+     * Soma na plataforma, se a viagem ainda não foi aplicada nesse documento. Antes, conta a escrita e
+     * lança IllegalStateException se for a escrita configurada em failOnPlatformWrite.
+     */
     @Override
     public void addToPlatform(
             String rideId,
@@ -104,6 +122,7 @@ public class FakeIndicatorStore implements IndicatorStore {
         );
     }
 
+    /** Conta os usuários distintos do período e guarda o maior valor entre o atual e o novo. */
     @Override
     public void refreshActiveUsers(IndicatorPeriod period, String reference) {
         long activeUsers = users.values().stream()
@@ -122,6 +141,7 @@ public class FakeIndicatorStore implements IndicatorStore {
         );
     }
 
+    /** Soma os semestres da plataforma no ALL_TIME, sempre com o maior valor entre o atual e o novo. */
     @Override
     public void refreshAllTime() {
         int rides = 0;
@@ -152,15 +172,18 @@ public class FakeIndicatorStore implements IndicatorStore {
         );
     }
 
+    /** Adiciona a viagem ao conjunto de registradas; repetir não muda nada. */
     @Override
     public void markRideRegistered(String rideId) {
         registeredRides.add(rideId);
     }
 
+    /** Registra a viagem no documento e diz se ela era nova nele (false = já tinha sido somada). */
     private boolean markApplied(String documentKey, String rideId) {
         return appliedRides.computeIfAbsent(documentKey, ignored -> new HashSet<>()).add(rideId);
     }
 
+    /** Indicador da plataforma, criado zerado se ainda não existir (como o upsert). */
     private PlatformIndicator platformOf(IndicatorPeriod period, String reference) {
         return platform.computeIfAbsent(key("platform", period, reference),
                 ignored -> new PlatformIndicator(period, reference));

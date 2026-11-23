@@ -6,10 +6,19 @@ import '../../../../core/config/styles.dart';
 
 /// Aviso centralizado no lugar da conversa: carregando com erro, chat bloqueado ou vazio.
 class ChatNotice extends StatelessWidget {
+  /// Ícone dentro do círculo.
   final IconData icon;
+
+  /// Título em destaque.
   final String title;
+
+  /// Explicação abaixo do título.
   final String message;
+
+  /// Texto do botão de ação; o botão só aparece com [actionLabel] e [onAction].
   final String? actionLabel;
+
+  /// O que o botão faz (ex.: tentar de novo).
   final VoidCallback? onAction;
 
   const ChatNotice({

@@ -9,7 +9,11 @@ import 'chat_notice.dart';
 import 'chat_time.dart';
 
 /// Lista de mensagens da conversa, da mais antiga para a mais nova.
+///
+/// Com a lista vazia, mostra um convite para combinar a carona. Separa os dias com uma etiqueta
+/// (`Hoje`, `Ontem` ou a data).
 class ChatMessageList extends StatelessWidget {
+  /// Mensagens em ordem cronológica, como vêm do repositório.
   final List<ChatMessageModel> messages;
 
   /// Uid do Firebase de quem está logado.

@@ -7,8 +7,14 @@ import '../../data/models/chat_message_model.dart';
 import 'chat_time.dart';
 
 /// Balão de uma mensagem de texto: à direita para quem enviou, à esquerda para o outro.
+///
+/// No grupo, as mensagens dos outros mostram o nome de quem enviou. O balão ocupa no máximo 78% da
+/// largura da tela.
 class ChatTextBubble extends StatelessWidget {
+  /// Mensagem de texto.
   final ChatMessageModel message;
+
+  /// Se foi enviada pelo usuário logado.
   final bool isMine;
 
   const ChatTextBubble({

@@ -38,6 +38,10 @@ import java.util.Set;
 @RequiredArgsConstructor
 public class RegisterCompletedRideUseCase implements UseCase<CompletedRideCommand, PlatformIndicator> {
 
+    /**
+     * Períodos gravados por viagem. O ALL_TIME do usuário não é gravado: na leitura ele é a soma dos
+     * documentos MONTHLY. O ALL_TIME da plataforma é recalculado à parte, em refreshAllTime().
+     */
     private static final List<IndicatorPeriod> USER_PERIODS =
             List.of(IndicatorPeriod.WEEKLY, IndicatorPeriod.MONTHLY, IndicatorPeriod.SEMESTERLY);
 
@@ -46,6 +50,15 @@ public class RegisterCompletedRideUseCase implements UseCase<CompletedRideComman
     private final SustainabilityGateway sustainabilityGateway;
     private final IndicatorReferenceGateway indicatorReferenceGateway;
 
+    /**
+     * Valida o comando e, se a viagem ainda não foi contabilizada, registra-a em todos os indicadores.
+     * Uma viagem já registrada não é somada de novo: o método só devolve o acumulado atual.
+     *
+     * @param command dados da viagem concluída (só passageiros efetivos)
+     * @return o indicador ALL_TIME da plataforma; um indicador zerado se ele ainda não existir no banco
+     * @throws ApplicationException com BAD_REQUEST quando falta a viagem, o motorista, a data de conclusão,
+     *                              não há passageiro efetivo (RF49) ou a distância é negativa
+     */
     @Override
     public PlatformIndicator execute(CompletedRideCommand command) {
         validate(command);
@@ -59,6 +72,19 @@ public class RegisterCompletedRideUseCase implements UseCase<CompletedRideComman
                 .orElseGet(() -> new PlatformIndicator(IndicatorPeriod.ALL_TIME, PlatformIndicator.ALL_TIME_REFERENCE));
     }
 
+    /**
+     * Faz a contabilização propriamente dita.
+     *
+     * 1. Pede ao servidor de sockets (SustainabilityHandler) os carros evitados e o CO2 evitado da viagem.
+     * 2. Pede, numa única chamada, a referência de cada período (semana ISO, mês e semestre) da data
+     *    de conclusão.
+     * 3. Em cada período, soma a viagem no motorista, em cada passageiro e na plataforma, e atualiza os
+     *    usuários ativos do período.
+     * 4. Recalcula o acumulado da plataforma e, só no fim, marca a viagem como registrada. Se algo falhar
+     *    no meio, a reconciliação completa o que faltou sem contar nada em dobro.
+     *
+     * Passageiros repetidos na lista são contados uma vez só.
+     */
     private void register(CompletedRideCommand command) {
         String rideId = command.rideId();
         List<String> passengerIds = command.passengerIds().stream().distinct().toList();
@@ -93,6 +119,10 @@ public class RegisterCompletedRideUseCase implements UseCase<CompletedRideComman
         indicatorStore.markRideRegistered(rideId);
     }
 
+    /**
+     * Confere os campos obrigatórios antes de qualquer gravação. Viagem sem passageiro efetivo é recusada
+     * porque não entra nos indicadores (RF49).
+     */
     private void validate(CompletedRideCommand command) {
         if (command.rideId() == null || command.rideId().isBlank()) {
             throw new ApplicationException(ErrorCode.BAD_REQUEST, "Ride is required.", Set.of("rideId"));

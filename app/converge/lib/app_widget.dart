@@ -9,6 +9,9 @@ import 'core/config/app_config.dart';
 import 'core/config/styles.dart';
 
 /// Widget raiz do aplicativo com configurações de tema, rotas e localização.
+///
+/// Usa o `GoRouter` do `appRouterProvider`, que reage à sessão de login, e um tema Material 3
+/// montado só com cores de [AppColors]. O idioma é fixo em português do Brasil.
 class AppWidget extends ConsumerWidget {
   const AppWidget({super.key});
 

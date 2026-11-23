@@ -24,15 +24,19 @@ import static org.assertj.core.api.Assertions.assertThat;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 
 /**
- * "Confirmar chegada" por passageiro, cobrança automática ao fim da viagem de cada um e o "Já paguei".
+ * Testes de domínio da {@link Ride}: "Confirmar chegada" por passageiro (RF73), cobrança automática ao fim da
+ * viagem de cada um (RF39) e o "Já paguei" (RF41). Usam só a entidade, sem banco nem casos de uso.
  */
 class RidePassengerArrivalTest {
 
+    /** Ids dos dois passageiros da viagem. */
     private static final String ANA = "passenger-ana";
     private static final String BRUNO = "passenger-bruno";
 
+    /** Horário de saída da viagem: amanhã, para os pedidos e aceites ainda valerem. */
     private final LocalDateTime tomorrow = LocalDateTime.now().plusDays(1);
 
+    /** Lugar em Campinas com o endereço dado. */
     private Place place(String address) {
         return Place.of(address, "Centro", "Campinas", new Coordinates(-22.9064, -47.0616));
     }
@@ -62,6 +66,7 @@ class RidePassengerArrivalTest {
         return ride;
     }
 
+    /** Participação do usuário na viagem; falha se ele não estiver nela. */
     private Participant passenger(Ride ride, String userId) {
         return ride.getParticipants().stream()
                 .filter(participant -> participant.getUserId().equals(userId))

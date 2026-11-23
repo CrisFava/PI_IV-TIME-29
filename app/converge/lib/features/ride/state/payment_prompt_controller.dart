@@ -11,6 +11,7 @@ import 'payment_prompt_state.dart';
 import 'pending_payments_provider.dart';
 import 'ride_providers.dart';
 
+/// Controle do painel de pagamento. Não é `autoDispose`: as cobranças dispensadas valem a sessão toda.
 final paymentPromptProvider =
     NotifierProvider<PaymentPromptController, PaymentPromptState>(
       PaymentPromptController.new,
@@ -22,8 +23,10 @@ final paymentPromptProvider =
 /// recusa com PAYMENT_PENDING). Por isso o pagamento volta a aparecer sempre que uma
 /// dessas ações é recusada, mesmo que ele o tenha fechado antes.
 class PaymentPromptController extends Notifier<PaymentPromptState> {
+  /// Chamadas de viagem e pagamento na API.
   RideRepository get _rides => ref.read(rideRepositoryProvider);
 
+  /// Começa sem cobranças dispensadas e sem "Já paguei" em andamento.
   @override
   PaymentPromptState build() => const PaymentPromptState();
 
@@ -47,6 +50,8 @@ class PaymentPromptController extends Notifier<PaymentPromptState> {
 
   /// Uma ação foi recusada porque há pagamento em aberto: mostra o pagamento de novo.
   /// Devolve `true` se era esse o motivo da recusa.
+  ///
+  /// Limpa as dispensas e recarrega as cobranças, o que faz o `PendingPaymentPrompt` abrir o painel.
   bool handleBlockedAction(Object error) {
     if (error is! ApiException || !error.isPaymentPending) return false;
 
@@ -56,6 +61,9 @@ class PaymentPromptController extends Notifier<PaymentPromptState> {
   }
 
   /// "Já paguei": informa o pagamento e libera o passageiro. Devolve a mensagem de erro, ou `null`.
+  ///
+  /// Ignora um segundo envio enquanto o primeiro não termina. Em sucesso, recarrega as cobranças em
+  /// aberto, o pagamento da viagem e a lista de viagens.
   Future<String?> markAsPaid(RidePaymentModel payment) async {
     if (state.isMarking) return null;
     state = PaymentPromptState(

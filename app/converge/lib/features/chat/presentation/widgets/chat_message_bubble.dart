@@ -12,7 +12,10 @@ import 'chat_time.dart';
 /// Uma mensagem da conversa: balão para texto, aviso centralizado para
 /// eventos de pagamento e da viagem.
 class ChatMessageBubble extends StatelessWidget {
+  /// Mensagem a exibir.
   final ChatMessageModel message;
+
+  /// Se foi enviada pelo usuário logado (balão à direita).
   final bool isMine;
 
   const ChatMessageBubble({
@@ -21,6 +24,7 @@ class ChatMessageBubble extends StatelessWidget {
     required this.isMine,
   });
 
+  /// Escolhe o visual pelo tipo: texto vira balão, os demais viram aviso centralizado.
   @override
   Widget build(BuildContext context) => switch (message.type) {
     ChatMessageType.text => ChatTextBubble(message: message, isMine: isMine),
@@ -42,6 +46,7 @@ class ChatMessageBubble extends StatelessWidget {
     ),
   };
 
+  /// Acrescenta o valor em reais ao rótulo, quando a mensagem tem valor.
   String _withAmount(String label) {
     final amount = message.amount;
     return amount == null

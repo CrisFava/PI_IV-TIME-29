@@ -4,11 +4,22 @@ import '../../data/models/academic_record_model.dart';
 import '../../data/models/create_user_request.dart';
 
 /// Dados de perfil enviados ao backend no cadastro.
+///
+/// Usado tanto no cadastro completo quanto na tela de completar perfil.
 class ProfileInput {
+  /// Nome completo.
   final String name;
+
+  /// Telefone com DDD.
   final String phone;
+
+  /// Universidade do vínculo acadêmico.
   final String university;
+
+  /// Curso.
   final String course;
+
+  /// Número de matrícula.
   final String enrollmentNumber;
 
   const ProfileInput({
@@ -19,7 +30,10 @@ class ProfileInput {
     required this.enrollmentNumber,
   });
 
-  /// O e-mail vem sempre da conta Firebase, para que os dois não divirjam.
+  /// Monta o corpo de `POST /users`, tirando os espaços das pontas de cada campo.
+  ///
+  /// O e-mail vem sempre da conta Firebase, para que os dois não divirjam. Ele também é usado como
+  /// e-mail institucional do vínculo acadêmico.
   CreateUserRequest toRequest({
     required String firebaseUid,
     required String email,

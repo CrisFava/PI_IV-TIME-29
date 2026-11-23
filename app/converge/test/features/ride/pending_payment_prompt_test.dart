@@ -18,6 +18,8 @@ import 'fakes/fake_ride_repository.dart';
 void main() {
   late FakeRideRepository rides;
 
+  // Monta uma "Home" mínima só com o PendingPaymentPrompt, numa tela alta o bastante para o painel
+  // de pagamento caber inteiro.
   Future<void> openHome(WidgetTester tester) async {
     tester.view.physicalSize = const Size(800, 1800);
     tester.view.devicePixelRatio = 1;

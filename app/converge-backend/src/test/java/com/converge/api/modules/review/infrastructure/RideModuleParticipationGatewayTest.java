@@ -24,6 +24,8 @@ import static org.mockito.Mockito.when;
  * Testes unitários para {@link RideModuleParticipationGateway}.
  * Valida cenários como: Deve traduzir a viagem concluída em motorista e passageiros com os papéis certos; Viagem inexistente ou não concluída deve continuar vazia.
  * <p>
+ * O caso de uso do módulo ride é um mock: o teste confere só a tradução do DTO dele para o modelo do review.
+ * <p>
  * Os métodos de teste estão bem explicativos através de suas anotações {@code @DisplayName}.
  */
 @ExtendWith(MockitoExtension.class)

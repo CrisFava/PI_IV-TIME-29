@@ -2,11 +2,21 @@
 
 import 'package:converge/features/ride/data/models/ride_model.dart';
 
+/// Id do motorista da viagem falsa.
 const fakeDriverId = 'driver-1';
+
+/// Id do passageiro principal da viagem falsa.
 const fakePassengerId = 'passenger-1';
+
+/// Id da viagem falsa.
 const fakeRideId = 'ride-1';
 
 /// JSON de uma viagem como o backend devolve para o motorista (vê todos por completo).
+///
+/// - [status]: status da viagem.
+/// - [chatRoomId]: sala do chat; `null` simula viagem ainda sem aceite.
+/// - [passengerStatus]: status do passageiro principal.
+/// - [extraParticipants]: participantes a mais, já em JSON.
 Map<String, dynamic> fakeRideJson({
   String status = 'CONFIRMED',
   String? chatRoomId = 'ride_ride-1',
@@ -79,6 +89,7 @@ Map<String, dynamic> fakeRideJson({
   ],
 };
 
+/// A mesma viagem de [fakeRideJson], já convertida em [RideModel].
 RideModel fakeRide({
   String status = 'CONFIRMED',
   String? chatRoomId = 'ride_ride-1',

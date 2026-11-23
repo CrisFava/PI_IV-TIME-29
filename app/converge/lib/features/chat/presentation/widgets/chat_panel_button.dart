@@ -7,10 +7,19 @@ import '../../../../core/config/styles.dart';
 /// Botão compacto das faixas da conversa. Fica desabilitado e mostra o
 /// progresso enquanto [busy] for `true`.
 class ChatPanelButton extends StatelessWidget {
+  /// Texto do botão.
   final String label;
+
+  /// Ícone à esquerda do texto (trocado pelo progresso durante [busy]).
   final IconData icon;
+
+  /// Ação do botão; nulo desabilita.
   final VoidCallback? onPressed;
+
+  /// Preenchido (ação principal) ou só com contorno (ação secundária).
   final bool primary;
+
+  /// Ação em andamento.
   final bool busy;
 
   const ChatPanelButton({

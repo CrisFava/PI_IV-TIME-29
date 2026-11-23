@@ -31,6 +31,12 @@ public class RidePaymentViewService {
     private final GetUserPixInfoUseCase getUserPixInfo;
     private final PixPayloadGateway pixPayloadGateway;
 
+    /**
+     * Garante que o motorista tem chave PIX cadastrada antes de cobrar (RF72).
+     *
+     * @param driverId id (Mongo) do motorista
+     * @throws ApplicationException com NOT_ALLOWED se ele não tem chave PIX
+     */
     public void assertDriverCanCharge(String driverId) {
         if (!getUserPixInfo.execute(driverId).hasPixKey()) {
             throw new ApplicationException(
@@ -41,6 +47,15 @@ public class RidePaymentViewService {
         }
     }
 
+    /**
+     * Monta a resposta da cobrança de um passageiro: valor, status, datas, nome do motorista e o
+     * Pix Copia e Cola (só enquanto a cobrança está aberta).
+     *
+     * @param ride        viagem
+     * @param passengerId id (Mongo) do passageiro
+     * @return a visão do pagamento
+     * @throws ApplicationException com RIDE_NOT_FOUND se o usuário nunca foi passageiro dessa viagem
+     */
     public PaymentResponseDTO view(Ride ride, String passengerId) {
         Participant passenger = findPassenger(ride, passengerId);
 
@@ -59,7 +74,10 @@ public class RidePaymentViewService {
         );
     }
 
-    // Quem saiu e pediu vaga de novo tem mais de uma participação: vale a que está com a vaga.
+    /**
+     * Encontra a participação do passageiro. Quem saiu e pediu vaga de novo tem mais de uma participação:
+     * vale a que está com a vaga (CONFIRMED ou COMPLETED); sem nenhuma assim, vale a mais recente.
+     */
     private Participant findPassenger(Ride ride, String passengerId) {
         List<Participant> participations = ride.getParticipants().stream()
                 .filter(participant -> participant.getRole() == ParticipationRole.PASSENGER)
@@ -74,6 +92,12 @@ public class RidePaymentViewService {
                 .orElseThrow(() -> new ApplicationException(ErrorCode.RIDE_NOT_FOUND, "Viagem não encontrada."));
     }
 
+    /**
+     * Gera o Pix Copia e Cola pelo servidor de sockets (PixPayloadHandler), com a chave e o nome do
+     * motorista, o valor cobrado e a cidade de origem da viagem.
+     *
+     * @return o payload BR Code; nulo quando a cobrança não está aberta ou o motorista não tem chave PIX
+     */
     private String pixCopyPaste(Ride ride, Participant passenger, UserPixInfoDTO driver) {
         boolean openCharge = passenger.getRequestedAmount() != null
                 && passenger.getPaymentStatus() == ParticipantPaymentStatus.PENDING;

@@ -51,15 +51,22 @@ import static org.mockito.Mockito.verifyNoInteractions;
 import static org.mockito.Mockito.when;
 
 /**
- * Testes unitários para {@link RidePaymentUseCases}.
+ * Testes unitários dos casos de uso de pagamento da viagem: {@link RequestPaymentUseCase},
+ * {@link GetPaymentUseCase} e {@link MarkPaymentAsPaidUseCase}.
  * Valida cenários como: O motorista deve solicitar o pagamento e receber o Pix Copia e Cola com a sua chave e o valor; Se o código PIX não puder ser gerado, a cobrança não deve ser gravada; Motorista sem chave PIX não pode solicitar pagamento.
+ * <p>
+ * Os casos de uso, o RideAccess e o RidePaymentViewService são reais. O banco, o usuário logado e os dados PIX
+ * do motorista são mocks, e o gerador de PIX é uma lambda que devolve um código falso e guarda cada cobrança
+ * pedida, para o teste conferir a chave, o valor e o recebedor enviados.
  * <p>
  * Os métodos de teste estão bem explicativos através de suas anotações {@code @DisplayName}.
  */
 @ExtendWith(MockitoExtension.class)
 class RidePaymentUseCasesTest {
 
+    /** uid do usuário logado; quem ele é (motorista ou passageiro) é decidido em cada teste por currentUserIs. */
     private static final String UID = "firebase-uid-123";
+    /** Código PIX devolvido pelo gerador falso. */
     private static final String FAKE_PIX = "000201-PIX-FALSO";
 
     @Mock
@@ -77,11 +84,13 @@ class RidePaymentUseCasesTest {
     private final ObjectId driverObjectId = new ObjectId();
     private final ObjectId passengerObjectId = new ObjectId();
     private final ObjectId rideObjectId = new ObjectId();
+    /** Cobranças que o gerador falso recebeu, na ordem. */
     private final List<PixCharge> generatedCharges = new ArrayList<>();
 
     private RideAccess rideAccess;
     private RidePaymentViewService paymentView;
 
+    /** Monta o acesso às viagens e a visão de pagamento com o gerador de PIX falso. */
     @BeforeEach
     void setUp() {
         rideAccess = new RideAccess(rideRepository, userUtils);
@@ -91,18 +100,22 @@ class RidePaymentUseCasesTest {
         });
     }
 
+    /** Id do motorista em texto, como é gravado na viagem. */
     private String driverId() {
         return driverObjectId.toHexString();
     }
 
+    /** Id do passageiro em texto, como é gravado na viagem. */
     private String passengerId() {
         return passengerObjectId.toHexString();
     }
 
+    /** Lugar em Campinas com o endereço dado. */
     private Place place(String address) {
         return Place.of(address, "Centro", "Campinas", new Coordinates(-22.9064, -47.0616));
     }
 
+    /** Viagem de amanhã com o passageiro já aceito e ainda sem cobrança. */
     private Ride rideWithConfirmedPassenger() {
         LocalDateTime departure = LocalDateTime.now().plusDays(1);
         Ride ride = new Ride(
@@ -126,29 +139,35 @@ class RidePaymentUseCasesTest {
         return ride;
     }
 
+    /** Faz o UID logado corresponder ao usuário com esse id. */
     private void currentUserIs(ObjectId id) {
         when(userUtils.getCurrentUser(UID)).thenReturn(user);
         when(user.getId()).thenReturn(id);
     }
 
+    /** Faz o repositório devolver a viagem pelo id. */
     private void rideIsStored(Ride ride) {
         when(rideRepository.findById(rideObjectId)).thenReturn(Optional.of(ride));
     }
 
+    /** Faz o save devolver a própria viagem recebida, como o MongoDB. */
     private void savingReturnsTheSameRide() {
         when(rideRepository.save(any(Ride.class))).thenAnswer(invocation -> invocation.getArgument(0));
     }
 
+    /** Motorista com chave PIX do tipo e-mail cadastrada. */
     private void driverHasPixKey() {
         when(getUserPixInfo.execute(driverId()))
                 .thenReturn(new UserPixInfoDTO("Lucas Silveira", "lucas@puc-campinas.edu.br", PixKeyType.EMAIL));
     }
 
+    /** Comando de "Solicitar pagamento" do passageiro da viagem com o valor dado. */
     private RequestPaymentCommand requestOf(String amount) {
         return new RequestPaymentCommand(
                 rideObjectId.toHexString(), passengerId(), UID, new RequestPaymentRequestDTO(new BigDecimal(amount)));
     }
 
+    /** Referência à cobrança de um passageiro da viagem, pedida pelo UID logado. */
     private PassengerRequestCommand paymentRef(String passengerId) {
         return new PassengerRequestCommand(rideObjectId.toHexString(), passengerId, UID);
     }
@@ -220,15 +239,19 @@ class RidePaymentUseCasesTest {
         verify(rideRepository, never()).save(any());
     }
 
+    /** Avisos de pagamento, mockados para o teste conferir se o motorista foi avisado. */
     private final RidePaymentNotifier paymentNotifier = mock(RidePaymentNotifier.class);
 
+    /** Caso de uso do "Já paguei" com os mocks de aviso e de regularização de dívida. */
     private MarkPaymentAsPaidUseCase markPaymentAsPaid() {
         return new MarkPaymentAsPaidUseCase(
                 rideAccess, rideRepository, paymentView, paymentNotifier, resolveOverduePayment);
     }
 
+    /** Regularização de dívida vencida (RF67), mockada para contar quantas vezes é chamada. */
     private final ResolveOverduePaymentUseCase resolveOverduePayment = mock(ResolveOverduePaymentUseCase.class);
 
+    /** Viagem com cobrança de R$ 12,50 emitida e marcada como vencida no instante dado (ou não vencida, se null). */
     private Ride rideWithChargeOverdueAt(LocalDateTime overdueAt) {
         Ride ride = rideWithConfirmedPassenger();
         ride.requestPayment(passengerId(), new BigDecimal("12.50"));

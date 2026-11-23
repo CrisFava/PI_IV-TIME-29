@@ -9,23 +9,51 @@ import 'ride_status.dart';
 
 /// Uma viagem concreta, conforme `RideResponseDTO`.
 @immutable
+///
+/// O que cada usuário recebe depende de quem ele é na viagem: o backend esconde dados dos outros
+/// passageiros e as paradas que não são do usuário logado.
 class RideModel {
+  /// Id da viagem no MongoDB.
   final String id;
+
+  /// Número amigável da viagem por motorista (`Ride #042`).
   final int sequentialNumber;
+
+  /// Id do motorista.
   final String driverId;
+
+  /// Trajeto de oferta do motorista que gerou a viagem.
   final String driverRouteId;
+
+  /// Origem da viagem (cópia do trajeto na criação).
   final RoutePlaceModel origin;
+
+  /// Destino da viagem (cópia do trajeto na criação).
   final RoutePlaceModel destination;
+
+  /// Data e hora de saída; nula se não puder ser lida.
   final DateTime? departureDateTime;
+
+  /// Quando a viagem foi concluída; nula até lá.
   final DateTime? completedAt;
+
+  /// Situação da viagem.
   final RideStatus status;
+
+  /// Vagas para passageiros (sem contar o motorista).
   final int totalSeats;
+
+  /// Vagas ainda livres.
   final int availableSeats;
 
   /// Sala do chat no Firebase Realtime Database. Fica `null` até o motorista
   /// aceitar o primeiro passageiro.
   final String? chatRoomId;
+
+  /// Modelo do veículo, copiado na criação da viagem.
   final String? vehicleModel;
+
+  /// Placa do veículo, copiada na criação da viagem.
   final String? vehicleLicensePlate;
 
   /// Lista imutável: quem chamou o construtor não consegue alterá-la depois.
@@ -48,7 +76,11 @@ class RideModel {
 
   /// Para o passageiro: onde ficam o embarque e o desembarque dele no itinerário.
   final int? itineraryMyPickupStop;
+
+  /// Para o passageiro: posição do desembarque dele no itinerário.
   final int? itineraryMyDropOffStop;
+
+  /// Distância da rota com as paradas, em km.
   final double? itineraryDistanceKm;
 
   /// Chegada estimada ao destino, já contando o tempo das paradas.
@@ -82,8 +114,10 @@ class RideModel {
        itinerary = List.unmodifiable(itinerary),
        itineraryLegPolylines = List.unmodifiable(itineraryLegPolylines);
 
+  /// Se o usuário é o motorista da viagem.
   bool isDrivenBy(String userId) => driverId == userId;
 
+  /// Nome do motorista; "Motorista" se a API não mandou o nome.
   String get driverName => participants
       .where((participant) => participant.isDriver)
       .map((participant) => participant.displayName)
@@ -116,6 +150,8 @@ class RideModel {
     return own.firstWhere((p) => p.status.hasSeat, orElse: () => own.last);
   }
 
+  /// Lê a viagem do JSON da API. Campos ausentes viram valores vazios e itens malformados das listas
+  /// são ignorados, para uma resposta incompleta não derrubar a tela.
   factory RideModel.fromJson(Map<String, dynamic> json) {
     final vehicle = json['vehicleSnapshot'];
     final participants = json['participants'];

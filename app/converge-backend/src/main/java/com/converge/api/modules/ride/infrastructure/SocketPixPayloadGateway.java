@@ -24,9 +24,14 @@ import java.util.Set;
 @Component
 public class SocketPixPayloadGateway implements PixPayloadGateway {
 
-    // Servidor travado não pode segurar a resposta: passado o limite, gera localmente.
+    /** Servidor travado não pode segurar a resposta: passado o limite, gera localmente. */
     private static final int SOCKET_TIMEOUT_MILLIS = 3000;
 
+    /**
+     * Envia o PixPayloadRequest ao servidor de sockets (localhost:3000) e devolve o payload. Se o servidor
+     * estiver fora, demorar mais de 3 s ou responder outra coisa (por exemplo, um ErrorResponse), cai na
+     * geração local, que dá a resposta final: o mesmo erro de validação vira um BAD_REQUEST lá.
+     */
     @Override
     public String generate(PixCharge charge) {
         PixPayloadRequest request = new PixPayloadRequest(
@@ -53,6 +58,11 @@ public class SocketPixPayloadGateway implements PixPayloadGateway {
         return generateLocally(request);
     }
 
+    /**
+     * Roda o PixPayloadHandler do servidor dentro do backend (a classe vem do artefato com.converge:server).
+     *
+     * @throws ApplicationException com BAD_REQUEST se a cobrança for inválida (chave vazia, valor fora do limite etc.)
+     */
     private String generateLocally(PixPayloadRequest request) {
         try {
             return new PixPayloadHandler().execute(request).getPayload();
@@ -61,6 +71,7 @@ public class SocketPixPayloadGateway implements PixPayloadGateway {
         }
     }
 
+    /** Erro devolvido ao app quando o código PIX não pode ser gerado, apontando o campo amount. */
     private ApplicationException invalidCharge(String detail) {
         return new ApplicationException(
                 ErrorCode.BAD_REQUEST,

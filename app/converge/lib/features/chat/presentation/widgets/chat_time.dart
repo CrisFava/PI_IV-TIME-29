@@ -9,7 +9,7 @@ String formatChatTime(DateTime? sentAt) {
       '${local.minute.toString().padLeft(2, '0')}';
 }
 
-// Representa a data local em UTC para que o horário de verão não afete a diferença.
+/// Representa a data local em UTC para que o horário de verão não afete a diferença.
 DateTime _calendarDate(DateTime local) =>
     DateTime.utc(local.year, local.month, local.day);
 

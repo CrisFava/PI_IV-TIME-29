@@ -19,6 +19,12 @@ public class ListReviewsGivenInRideUseCase implements UseCase<ListReviewsGivenIn
 
     private final ReviewRepository reviewRepository;
 
+    /**
+     * Busca pelo índice rideId + reviewerId as avaliações já feitas pelo avaliador na viagem.
+     *
+     * @param query viagem e avaliador
+     * @return as avaliações encontradas; lista vazia se ele ainda não avaliou ninguém nessa viagem
+     */
     @Override
     public List<Review> execute(ListReviewsGivenInRideQuery query) {
         return reviewRepository.findByRideIdAndReviewerId(query.rideId(), query.reviewerId());

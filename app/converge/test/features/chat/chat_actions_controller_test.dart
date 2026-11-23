@@ -21,6 +21,7 @@ import 'fakes/fake_chat_user.dart';
 /// Cobre cenários como: sendText, viagem.
 /// Os casos de teste estão descritos de forma autoexplicativa nas chamadas de [test] e [group].
 void main() {
+  // A conversa da viagem falsa, vista pelo passageiro principal.
   const thread = ChatThreadRef(
     chatRoomId: 'ride_ride-1',
     rideId: fakeRideId,
@@ -32,6 +33,7 @@ void main() {
   late FakeChatRepository chat;
   late ProviderContainer container;
 
+  // Controller das ações da conversa no container do teste.
   ChatActionsController controller() =>
       container.read(chatActionsProvider(thread).notifier);
 

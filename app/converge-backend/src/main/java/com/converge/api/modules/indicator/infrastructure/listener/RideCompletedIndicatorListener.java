@@ -25,8 +25,16 @@ public class RideCompletedIndicatorListener {
 
     private final RegisterCompletedRideUseCase registerCompletedRide;
 
-    // Roda só depois do commit da conclusão. O NOT_SUPPORTED tira a escrita da sessão da transação
-    // já commitada, e o fallbackExecution mantém o listener funcionando quando não há transação.
+    /**
+     * Converte o evento de viagem concluída no comando do caso de uso e contabiliza os indicadores.
+     *
+     * Roda só depois do commit da conclusão. O NOT_SUPPORTED tira a escrita da sessão da transação
+     * já commitada, e o fallbackExecution mantém o listener funcionando quando não há transação.
+     * Qualquer erro é capturado e vai para o log; a reconciliação de 15 minutos
+     * (CompletedRidesIndicatorReconciler) contabiliza a viagem depois.
+     *
+     * @param event viagem concluída com ao menos um passageiro efetivo
+     */
     @TransactionalEventListener(phase = TransactionPhase.AFTER_COMMIT, fallbackExecution = true)
     @Transactional(propagation = Propagation.NOT_SUPPORTED, transactionManager = "mongoTransactionManager")
     public void onRideCompleted(RideCompletedEvent event) {

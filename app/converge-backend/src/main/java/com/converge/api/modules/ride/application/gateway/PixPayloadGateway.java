@@ -8,5 +8,11 @@ package com.converge.api.modules.ride.application.gateway;
  */
 public interface PixPayloadGateway {
 
+    /**
+     * Monta o Pix Copia e Cola (BR Code estático com CRC16) da cobrança. Nada é gravado.
+     *
+     * @param charge chave, valor e recebedor
+     * @return o payload pronto para copiar ou virar QR Code
+     */
     String generate(PixCharge charge);
 }

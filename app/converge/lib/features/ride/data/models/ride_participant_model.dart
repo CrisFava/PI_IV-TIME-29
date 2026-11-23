@@ -13,10 +13,19 @@ import 'payment_status.dart';
 /// ver por completo (ex.: um passageiro olhando outro passageiro).
 @immutable
 class RideParticipantModel {
+  /// Id do participante; nulo quando o backend o esconde.
   final String? userId;
+
+  /// Nome do participante.
   final String? name;
+
+  /// Motorista ou passageiro.
   final ParticipationRole? role;
+
+  /// Situação da participação.
   final ParticipantStatus status;
+
+  /// Situação do pagamento; nula para o motorista e quando o backend esconde.
   final PaymentStatus? paymentStatus;
 
   /// Valor estimado do rateio enquanto o passageiro está na viagem.
@@ -27,6 +36,8 @@ class RideParticipantModel {
 
   /// Onde o passageiro embarca e desembarca (o motorista não tem).
   final RoutePlaceModel? boardingLocation;
+
+  /// Onde o passageiro desce.
   final RoutePlaceModel? dropOffLocation;
 
   /// Quando o passageiro pediu a vaga (os pedidos aparecem do mais antigo ao mais novo).
@@ -53,14 +64,19 @@ class RideParticipantModel {
     this.requestedDepartureTime,
   });
 
+  /// Se é o motorista.
   bool get isDriver => role == ParticipationRole.driver;
+
+  /// Se é passageiro.
   bool get isPassenger => role == ParticipationRole.passenger;
 
+  /// Nome para exibir; sem nome, "Motorista" ou "Passageiro".
   String get displayName {
     final value = name?.trim() ?? '';
     return value.isNotEmpty ? value : (isDriver ? 'Motorista' : 'Passageiro');
   }
 
+  /// Lê o participante do JSON da API.
   factory RideParticipantModel.fromJson(Map<String, dynamic> json) {
     final paymentStatus = json['paymentStatus'];
     return RideParticipantModel(
@@ -81,6 +97,7 @@ class RideParticipantModel {
     );
   }
 
+  /// Lê um lugar só se o valor for um objeto JSON.
   static RoutePlaceModel? _placeOrNull(Object? json) =>
       json is Map<String, dynamic> ? RoutePlaceModel.fromJson(json) : null;
 }

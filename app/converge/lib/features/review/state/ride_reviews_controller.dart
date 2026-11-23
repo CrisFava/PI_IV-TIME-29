@@ -13,13 +13,20 @@ final rideReviewsProvider = AsyncNotifierProvider.autoDispose
       RideReviewsController.new,
     );
 
+/// Carrega e mantém as avaliações que o usuário logado já fez em uma viagem.
+///
+/// As telas usam a lista para saber quem ainda falta avaliar e esconder o botão "Avaliar" depois do
+/// envio, sem buscar de novo na API.
 class RideReviewsController extends AsyncNotifier<List<ReviewModel>> {
   RideReviewsController(this.rideId);
 
+  /// Viagem das avaliações.
   final String rideId;
 
+  /// Chamadas de avaliação na API.
   ReviewRepository get _repository => ref.read(reviewRepositoryProvider);
 
+  /// Busca as avaliações feitas na viagem (`GET /reviews/given`).
   @override
   Future<List<ReviewModel>> build() => _repository.listGivenInRide(rideId);
 

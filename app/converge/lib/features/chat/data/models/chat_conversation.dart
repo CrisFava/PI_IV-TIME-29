@@ -6,9 +6,15 @@ import '../../../ride/data/models/ride_model.dart';
 import 'chat_thread_ref.dart';
 
 /// Uma conversa liberada, vista pelo usuário logado.
+///
+/// É o item da aba de conversas: junta o endereço da conversa no Firebase, a viagem e o nome de quem
+/// está do outro lado.
 @immutable
 class ChatConversation {
+  /// Endereço da conversa no Realtime Database.
   final ChatThreadRef thread;
+
+  /// Viagem da conversa, para mostrar trajeto, horário e status.
   final RideModel ride;
 
   /// Quem está do outro lado: o motorista (para o passageiro) ou os
@@ -30,6 +36,9 @@ class ChatConversation {
   /// O chat só existe depois do aceite: a viagem precisa ter sala (`chatRoomId`).
   /// O motorista entra com pelo menos um passageiro com vaga; o passageiro, com a
   /// vaga dele confirmada. Todos falam na mesma conversa.
+  ///
+  /// Devolve uma lista com uma conversa, ou vazia quando o usuário não tem acesso. Para o motorista, o
+  /// `passengerId` do [ChatThreadRef] é o próprio id dele, porque a conversa é do grupo todo.
   static List<ChatConversation> ofRide(RideModel ride, String viewerId) {
     final chatRoomId = ride.chatRoomId;
     if (chatRoomId == null || chatRoomId.isEmpty) return const [];

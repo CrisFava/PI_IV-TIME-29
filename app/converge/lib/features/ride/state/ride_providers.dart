@@ -18,6 +18,8 @@ final rideProvider = FutureProvider.autoDispose.family<RideModel, String>(
 );
 
 /// O pagamento de um passageiro em uma viagem.
+///
+/// A chave é o par viagem + passageiro. Recarregue com `ref.invalidate(ridePaymentProvider(ref))`.
 final ridePaymentProvider = FutureProvider.autoDispose
     .family<RidePaymentModel, RidePassengerRef>(
       (ref, passenger) => ref

@@ -21,9 +21,11 @@ void main() {
   late FakeRideRepository rides;
   late ProviderContainer container;
 
+  // Controller do painel de pagamento no container do teste.
   PaymentPromptController controller() =>
       container.read(paymentPromptProvider.notifier);
 
+  // Cobrança de R$ 12,50 emitida e ainda não paga.
   final open = FakeRideRepository.fakePayment(amount: 12.5);
 
   setUp(() {
@@ -188,10 +190,16 @@ void main() {
   });
 }
 
+/// Repositório cujo "Já paguei" só responde quando o teste completar [result], para simular uma
+/// requisição demorada e conferir o que acontece com cliques repetidos no meio dela.
 class _DelayedPaymentRepository extends FakeRideRepository {
+  /// Resposta do "Já paguei", completada pelo teste.
   final result = Completer<RidePaymentModel>();
+
+  /// Cada "Já paguei" recebido (viagem e passageiro).
   final requests = <(String, String)>[];
 
+  /// Registra o pedido e espera [result].
   @override
   Future<RidePaymentModel> markPaymentAsPaid(
     String rideId,

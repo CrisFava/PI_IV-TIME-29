@@ -22,11 +22,16 @@ final authRepositoryProvider = Provider<AuthRepository>(
 );
 
 /// Implementação do repositório de autenticação e perfil de usuário utilizando Dio.
+///
+/// Todos os métodos seguem o mesmo padrão: chamam a rota, desempacotam o envelope `ApplicationResponse`
+/// e trocam o `DioException` pela [ApiException] que o interceptor colocou nele.
 class AuthRepositoryImpl implements AuthRepository {
+  /// Cliente HTTP com os interceptors de autenticação, idempotência e erro.
   final Dio _dio;
 
   AuthRepositoryImpl(this._dio);
 
+  /// `GET /users/me`.
   @override
   Future<UserModel> fetchCurrentUser() async {
     try {
@@ -41,6 +46,7 @@ class AuthRepositoryImpl implements AuthRepository {
     }
   }
 
+  /// `POST /users` com o corpo do [CreateUserRequest].
   @override
   Future<UserModel> createUser(CreateUserRequest request) async {
     try {
@@ -58,6 +64,8 @@ class AuthRepositoryImpl implements AuthRepository {
     }
   }
 
+  /// `PUT /users/me`. Campos opcionais nulos não vão no corpo, para o backend manter o valor atual.
+  /// Se a conta logada mudou no meio, a [AuthException] do interceptor é repassada como está.
   @override
   Future<UserModel> updateProfile({
     required String name,
@@ -93,6 +101,8 @@ class AuthRepositoryImpl implements AuthRepository {
     }
   }
 
+  /// `POST /users/me/driver-license`. A validade vai como data e hora local à meia-noite
+  /// (`yyyy-MM-ddT00:00:00`), o formato do `LocalDateTime` do backend. Ainda não há envio da foto.
   @override
   Future<UserModel> submitDriverLicense(DriverLicenseInput license) async {
     try {
@@ -120,6 +130,7 @@ class AuthRepositoryImpl implements AuthRepository {
     }
   }
 
+  /// `POST /users/me/driver`, sem corpo.
   @override
   Future<UserModel> becomeDriver() async {
     try {
@@ -134,6 +145,7 @@ class AuthRepositoryImpl implements AuthRepository {
     }
   }
 
+  /// `POST /users/validate-cpf` com o CPF como digitado; o servidor de sockets confere os dígitos verificadores.
   @override
   Future<CpfValidationResult> validateCpf(String cpf) async {
     try {
@@ -151,6 +163,7 @@ class AuthRepositoryImpl implements AuthRepository {
     }
   }
 
+  /// `GET /users/email-availability` com o e-mail sem espaços nas pontas.
   @override
   Future<bool> isEmailAvailable(String email) async {
     try {

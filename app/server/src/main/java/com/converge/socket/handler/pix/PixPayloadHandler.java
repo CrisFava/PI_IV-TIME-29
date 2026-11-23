@@ -15,28 +15,48 @@ import java.text.Normalizer;
  * Monta o Pix Copia e Cola estático no padrão BR Code (EMV) do Banco Central.
  *
  * O valor vai travado no campo 54 e a chave do recebedor no campo 26. Nenhum banco é consultado:
- * o código só descreve a cobrança, e quem confirma o recebimento é o motorista.
+ * o código só descreve a cobrança, e o pagamento é informado pelo próprio passageiro ("Já paguei"),
+ * sem confirmação do banco nem do motorista (RT21).
+ *
+ * É chamado pelo backend pela rede (SocketPixPayloadGateway) e também instanciado direto no backend
+ * quando o servidor de sockets está fora do ar, com o mesmo resultado. Não guarda estado.
  */
 public class PixPayloadHandler implements RequestHandler<PixPayloadRequest, PixPayloadResponse> {
 
+    /** Campo 00: versão do payload, sempre "01". */
     private static final String PAYLOAD_FORMAT_INDICATOR = "000201";
+    /** Identificador do arranjo PIX dentro do campo 26 (subcampo 00). */
     private static final String PIX_GUI = "br.gov.bcb.pix";
+    /** Campo 52: categoria do recebedor; "0000" quando não é informada. */
     private static final String MERCHANT_CATEGORY_CODE = "52040000";
+    /** Campo 53: moeda, 986 é o real (ISO 4217). */
     private static final String CURRENCY_BRL = "5303986";
+    /** Campo 58: país do recebedor. */
     private static final String COUNTRY_BR = "5802BR";
+    /** Subcampo 05 do campo 62: o PIX estático não tem txid útil, então vai "***". */
     private static final String STATIC_TXID = "***";
+    /** Campo 63 com tamanho 04: o CRC16 é calculado sobre tudo até aqui, inclusive este cabeçalho. */
     private static final String CRC_HEADER = "6304";
 
+    /** Limite do campo 59 (nome do recebedor) no BR Code. */
     private static final int MAX_NAME_LENGTH = 25;
+    /** Limite do campo 60 (cidade do recebedor) no BR Code. */
     private static final int MAX_CITY_LENGTH = 15;
+    /** Tamanho máximo de uma chave PIX (a maior é o e-mail, com até 77 caracteres). */
     private static final int MAX_KEY_LENGTH = 77;
+    /** Cidade usada quando a viagem não tem cidade de origem. */
     private static final String DEFAULT_CITY = "BRASIL";
-    // Usado quando o nome existe mas não sobra nenhuma letra latina depois de limpar (ex.: só ideogramas).
+    /** Usado quando o nome existe mas não sobra nenhuma letra latina depois de limpar (ex.: só ideogramas). */
     private static final String FALLBACK_RECEIVER_NAME = "MOTORISTA CONVERGE";
+    /** Maior valor aceito, igual ao limite do DTO de cobrança do backend. */
     private static final BigDecimal MAX_AMOUNT = new BigDecimal("999999.99");
 
     /**
      * Constrói e valida o payload EMVCo para PIX Copia e Cola estático a partir dos dados da cobrança.
+     *
+     * Validações: chave entre 1 e 77 caracteres; valor maior que zero, até 999.999,99 e com no máximo 2 casas;
+     * nome do recebedor preenchido. A cidade vazia vira "BRASIL". Os campos vão na ordem 00, 26, 52, 53, 54,
+     * 58, 59, 60, 62 e, por último, o 63 com o CRC16 de todo o texto anterior.
      *
      * @param request requisição contendo a chave PIX, valor, nome e cidade do recebedor
      * @return resposta com o payload completo e o checksum CRC16 calculado
@@ -94,11 +114,13 @@ public class PixPayloadHandler implements RequestHandler<PixPayloadRequest, PixP
     /**
      * Formata um campo no padrão TLV (Tag-Length-Value) do padrão EMVCo.
      *
+     * Campo EMV: id (2 dígitos) + tamanho do valor (2 dígitos) + valor. Campos com subcampos (26 e 62)
+     * recebem como valor a concatenação dos subcampos já formatados.
+     *
      * @param id identificador de dois dígitos do campo
      * @param value conteúdo textual do campo
      * @return string formatada contendo ID, tamanho com 2 dígitos e valor
      */
-    // Campo EMV: id (2 dígitos) + tamanho do valor (2 dígitos) + valor.
     private static String field(String id, String value) {
         return id + String.format("%02d", value.length()) + value;
     }
@@ -106,11 +128,13 @@ public class PixPayloadHandler implements RequestHandler<PixPayloadRequest, PixP
     /**
      * Normaliza e limpa um texto para compatibilidade com o padrão EMVCo, removendo acentos e caracteres especiais.
      *
+     * Sem acento, em maiúsculas e só com letras, números e espaço, como os apps de banco esperam.
+     * Outros caracteres viram espaço, espaços repetidos viram um só e o resultado é cortado no limite.
+     *
      * @param raw texto original a ser sanitizado
      * @param maxLength comprimento máximo permitido após sanitização
-     * @return texto em maiúsculas, sanitizado e truncado no tamanho limite
+     * @return texto em maiúsculas, sanitizado e truncado no tamanho limite; vazio se raw for nulo
      */
-    // Sem acento, em maiúsculas e só com letras, números e espaço, como os apps de banco esperam.
     static String sanitize(String raw, int maxLength) {
         if (raw == null) {
             return "";
@@ -129,10 +153,12 @@ public class PixPayloadHandler implements RequestHandler<PixPayloadRequest, PixP
     /**
      * Calcula o código de redundância cíclica CRC16-CCITT sobre os bytes do payload.
      *
+     * Variante CRC16/CCITT-FALSE (polinômio 0x1021, valor inicial 0xFFFF), a exigida pelo BR Code.
+     * Um teste unitário fixa o resultado para evitar regressão (RNF13).
+     *
      * @param data string base sobre a qual o checksum será calculado
      * @return string hexadecimal de 4 dígitos em maiúsculas com o CRC16
      */
-    // CRC16/CCITT-FALSE (polinômio 0x1021, valor inicial 0xFFFF), em 4 dígitos hexadecimais maiúsculos.
     static String crc16(String data) {
         int crc = 0xFFFF;
 

@@ -34,13 +34,22 @@ import static org.mockito.Mockito.when;
  * Testes unitários para {@link RegisterCompletedRideUseCase}.
  * Valida cenários como: Uma viagem deve entrar na semana, no mês, no semestre e no acumulado da plataforma; Cada participante deve receber a viagem no seu papel e a sua fração do CO2; A soma do CO2 dos participantes deve bater com o CO2 da plataforma.
  * <p>
+ * Montagem: o banco é trocado pelo {@link FakeIndicatorStore}, que guarda os indicadores em memória com a mesma
+ * regra de idempotência por viagem do MongoDB. Os gateways de sustentabilidade e de referência de período apontam
+ * para a porta 1, onde não há servidor de sockets, então caem na execução local dos handlers: o teste usa as
+ * fórmulas reais sem precisar do servidor no ar.
+ * <p>
+ * A data de conclusão fixa (12/11/2026) cai na semana ISO 2026-W46, no mês 2026-11 e no semestre 2026-S2.
+ * <p>
  * Os métodos de teste estão bem explicativos através de suas anotações {@code @DisplayName}.
  */
 @ExtendWith(MockitoExtension.class)
 @MockitoSettings(strictness = Strictness.LENIENT)
 class RegisterCompletedRideUseCaseTest {
 
+    /** Data de conclusão de todas as viagens, salvo quando o teste diz outra. */
     private static final LocalDateTime COMPLETED_AT = LocalDateTime.of(2026, 11, 12, 18, 30);
+    /** Fator de emissão da gasolina usado pelo SustainabilityHandler. */
     private static final double CO2_KG_PER_LITER_GASOLINE = 2.31;
 
     @Mock
@@ -49,6 +58,10 @@ class RegisterCompletedRideUseCaseTest {
     private FakeIndicatorStore store;
     private RegisterCompletedRideUseCase registerCompletedRide;
 
+    /**
+     * Cria o caso de uso com o store em memória e faz o repositório da plataforma ler do mesmo store,
+     * para o ALL_TIME devolvido pelo execute ser o mesmo objeto que o store gravou.
+     */
     @BeforeEach
     void setUp() {
         store = new FakeIndicatorStore();
@@ -59,18 +72,22 @@ class RegisterCompletedRideUseCaseTest {
                 .thenAnswer(call -> store.findPlatform(call.getArgument(0), call.getArgument(1)));
     }
 
+    /** Viagem a gasolina, 12 km/L, concluída em {@link #COMPLETED_AT}. */
     private CompletedRideCommand ride(String rideId, String driverId, List<String> passengerIds, double distanceKm) {
         return new CompletedRideCommand(rideId, driverId, passengerIds, distanceKm, "GASOLINE", 12.0, COMPLETED_AT);
     }
 
+    /** Mesma viagem do método acima, sempre com o id "ride-1". */
     private CompletedRideCommand ride(String driverId, List<String> passengerIds, double distanceKm) {
         return ride("ride-1", driverId, passengerIds, distanceKm);
     }
 
+    /** Indicador gravado de um usuário; null se não existir. */
     private UserIndicator userIndicator(String userId, IndicatorPeriod period, String reference) {
         return store.user(userId, period, reference);
     }
 
+    /** Indicador gravado da plataforma; null se não existir. */
     private PlatformIndicator platformIndicator(IndicatorPeriod period, String reference) {
         return store.platform(period, reference);
     }

@@ -26,8 +26,14 @@ import '../widgets/chat_scaffold.dart';
 /// A conversa só abre depois que o motorista aceita o passageiro. Além das
 /// mensagens, a tela mostra a viagem e, para o passageiro, o próprio pagamento
 /// (as cobranças não vão para o grupo).
+///
+/// A rota recebe a viagem e um passageiro, mas a conversa é a mesma para todos: o [passengerId] do
+/// link não muda o grupo aberto.
 class ChatPage extends ConsumerStatefulWidget {
+  /// Viagem da conversa.
   final String rideId;
+
+  /// Passageiro que veio no link da rota.
   final String passengerId;
 
   const ChatPage({super.key, required this.rideId, required this.passengerId});
@@ -36,10 +42,12 @@ class ChatPage extends ConsumerStatefulWidget {
   ConsumerState<ChatPage> createState() => _ChatPageState();
 }
 
+/// Estado da tela: carrega a viagem, confere o acesso e monta a conversa.
 class _ChatPageState extends ConsumerState<ChatPage> {
-  // A conversa já foi marcada como lida ao abrir (o número da navbar zera)
+  /// A conversa já foi marcada como lida ao abrir (o número da navbar zera).
   bool _markedReadOnOpen = false;
 
+  /// Mostra carregamento, erro com "Tentar novamente", aviso de chat ainda não liberado ou a conversa.
   @override
   Widget build(BuildContext context) {
     final viewer = ref.watch(chatViewerProvider);
@@ -87,6 +95,9 @@ class _ChatPageState extends ConsumerState<ChatPage> {
     );
   }
 
+  /// Monta a conversa liberada: painel da viagem, painel de pagamento (só para o passageiro), lista de
+  /// mensagens e campo de envio (ou o aviso de bloqueio). Também marca as mensagens como lidas e
+  /// recarrega a viagem quando chega um aviso de outro participante.
   Widget _buildConversation(ChatConversation conversation, String viewerUid) {
     final thread = conversation.thread;
     final messages = ref.watch(chatMessagesProvider(thread));
@@ -195,6 +206,7 @@ class _ChatPageState extends ConsumerState<ChatPage> {
     );
   }
 
+  /// Mostra o erro de uma ação do chat num aviso rápido.
   void _showError(Object error) => showAppNotice(
     context,
     chatErrorMessage(error),

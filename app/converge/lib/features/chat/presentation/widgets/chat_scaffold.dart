@@ -6,11 +6,16 @@ import '../../../../core/config/styles.dart';
 
 /// Estrutura da tela de conversa: barra com o nome de quem está do outro lado e o conteúdo.
 class ChatScaffold extends StatelessWidget {
+  /// Nome da conversa na barra.
   final String title;
+
+  /// Linha menor abaixo do título (ex.: quem está no grupo).
   final String? subtitle;
+
+  /// Conteúdo da tela.
   final Widget body;
 
-  /// Botoes na direita da barra (ex.: menu de denuncia e bloqueio).
+  /// Botões na direita da barra (ex.: menu de denúncia e bloqueio).
   final List<Widget> actions;
 
   const ChatScaffold({

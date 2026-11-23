@@ -51,7 +51,9 @@ import static org.mockito.Mockito.when;
 @ExtendWith(MockitoExtension.class)
 class RideCompletionPublisherTest {
 
+    /** Origem da viagem e embarque dos passageiros (centro de Campinas). */
     private static final Coordinates HOME = new Coordinates(-22.9064, -47.0616);
+    /** Destino da viagem e desembarque dos passageiros (campus da PUC-Campinas). */
     private static final Coordinates CAMPUS = new Coordinates(-22.8338, -47.0519);
 
     @Mock
@@ -69,17 +71,20 @@ class RideCompletionPublisherTest {
     @Mock
     private Vehicle vehicle;
 
+    /** Distância em linha reta calculada em memória, sem o servidor de sockets. */
     private final FakeDistanceGateway distanceGateway = new FakeDistanceGateway();
 
     private RideCompletionPublisher publisher;
 
     private final ObjectId rideObjectId = new ObjectId();
 
+    /** Cria o publicador com os mocks e o gateway de distância falso. */
     @BeforeEach
     void setUp() {
         publisher = new RideCompletionPublisher(eventPublisher, routeAccess, vehicleAccess, distanceGateway);
     }
 
+    /** Viagem de amanhã com dois passageiros aceitos, ainda sem custo gravado e sem distância. */
     private Ride confirmedRide() {
         LocalDateTime departure = LocalDateTime.now().plusDays(1);
         Ride ride = new Ride(
@@ -108,6 +113,7 @@ class RideCompletionPublisherTest {
         return ride;
     }
 
+    /** Captura o único evento publicado; falha se nenhum ou mais de um evento foi publicado. */
     private RideCompletedEvent publishedEvent() {
         ArgumentCaptor<RideCompletedEvent> captor = ArgumentCaptor.forClass(RideCompletedEvent.class);
         verify(eventPublisher).publishEvent(captor.capture());
@@ -115,6 +121,7 @@ class RideCompletionPublisherTest {
         return captor.getValue();
     }
 
+    /** Faz o veículo da viagem existir, ativo, com gasolina a 12 km/L e R$ 6,00 o litro. */
     private void vehicleRunsOnGasoline() {
         when(vehicleAccess.getActiveVehicleOf("vehicle-123", "driver-123")).thenReturn(vehicle);
         when(vehicle.getFuelSources()).thenReturn(List.of(new FuelSource(

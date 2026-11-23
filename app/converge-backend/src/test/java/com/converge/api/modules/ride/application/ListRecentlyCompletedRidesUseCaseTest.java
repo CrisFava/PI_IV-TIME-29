@@ -25,6 +25,9 @@ import static org.mockito.Mockito.when;
  * Testes unitários para {@link ListRecentlyCompletedRidesUseCase}.
  * Valida cenários como: Deve devolver os eventos das viagens concluídas, pulando as que não contam.
  * <p>
+ * O repositório e o RideCompletionPublisher são mocks: o teste confere só a consulta por status e data e o
+ * descarte das viagens cujo evento vem vazio.
+ * <p>
  * Os métodos de teste estão bem explicativos através de suas anotações {@code @DisplayName}.
  */
 @ExtendWith(MockitoExtension.class)

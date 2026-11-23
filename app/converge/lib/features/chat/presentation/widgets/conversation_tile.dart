@@ -16,7 +16,11 @@ import 'live_dot.dart';
 
 /// Uma conversa na aba "Mensagens". Ao tocar, abre o chat. Mostra a hora da última
 /// mensagem e quantas ainda não foram vistas.
+///
+/// A viagem confirmada ou em andamento fica destacada; a em andamento ganha borda verde e o ponto
+/// pulsante.
 class ConversationTile extends ConsumerWidget {
+  /// Conversa da linha.
   final ChatConversation conversation;
 
   const ConversationTile({super.key, required this.conversation});
@@ -160,6 +164,7 @@ class ConversationTile extends ConsumerWidget {
     );
   }
 
+  /// Data e hora da saída como `17/11 07:30`; vazio sem data.
   static String _date(DateTime? date) {
     if (date == null) return '';
     return '${date.day.toString().padLeft(2, '0')}/'
@@ -170,7 +175,10 @@ class ConversationTile extends ConsumerWidget {
 }
 
 /// Quantas mensagens da conversa ainda não foram vistas.
+///
+/// Acima de 99 mostra `99+`. O leitor de tela anuncia o número por extenso.
 class _UnreadBadge extends StatelessWidget {
+  /// Mensagens não vistas.
   final int count;
 
   const _UnreadBadge({required this.count});

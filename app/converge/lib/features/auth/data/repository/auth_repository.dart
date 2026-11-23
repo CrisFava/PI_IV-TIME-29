@@ -15,6 +15,8 @@ abstract class AuthRepository {
   /// cadastro no backend.
   Future<UserModel> fetchCurrentUser();
 
+  /// Cria o cadastro na API para a conta já criada no Firebase (`POST /users`).
+  /// Lança `ApiException` com `EMAIL_ALREADY_EXISTS` se o e-mail já tiver cadastro.
   Future<UserModel> createUser(CreateUserRequest request);
 
   /// Atualiza dados de perfil do usuário autenticado (`PUT /users/me`).

@@ -30,6 +30,12 @@ public class GetCompletedRideParticipantsUseCase
 
     private final RideRepository rideRepository;
 
+    /**
+     * Busca a viagem e devolve o motorista e os passageiros que já concluíram.
+     *
+     * @param rideId id da viagem; um id que não é ObjectId válido dá vazio em vez de erro
+     * @return participantes da viagem IN_PROGRESS ou COMPLETED; vazio nos demais casos
+     */
     @Override
     public Optional<CompletedRideParticipantsDTO> execute(String rideId) {
         if (rideId == null || !ObjectId.isValid(rideId)) {
@@ -42,6 +48,10 @@ public class GetCompletedRideParticipantsUseCase
                 .map(this::toParticipants);
     }
 
+    /**
+     * Monta o DTO só com os passageiros COMPLETED. Ausentes, cancelados e quem ainda está a bordo
+     * ficam de fora, porque não podem avaliar nem ser avaliados.
+     */
     private CompletedRideParticipantsDTO toParticipants(Ride ride) {
         List<String> passengerIds = ride.getParticipants().stream()
                 .filter(participant -> participant.getRole() == ParticipationRole.PASSENGER)

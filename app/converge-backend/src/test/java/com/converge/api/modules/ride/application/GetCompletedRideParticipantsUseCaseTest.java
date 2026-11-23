@@ -44,12 +44,18 @@ class GetCompletedRideParticipantsUseCaseTest {
     @InjectMocks
     private GetCompletedRideParticipantsUseCase getCompletedRideParticipants;
 
+    /** Id fixo da viagem, para o mock do repositório devolvê-la pelo id. */
     private final ObjectId rideObjectId = new ObjectId();
 
+    /** Lugar em Campinas com o endereço dado; as coordenadas não importam para estes testes. */
     private Place place(String address) {
         return Place.of(address, "Centro", "Campinas", new Coordinates(-22.9064, -47.0616));
     }
 
+    /**
+     * Viagem de amanhã com três pedidos: passenger-1 e passenger-2 aceitos e passenger-3 recusado.
+     * O recusado serve para conferir que ele nunca aparece entre os participantes.
+     */
     private Ride rideWithTwoConfirmedPassengers() {
         LocalDateTime departure = LocalDateTime.now().plusDays(1);
         Ride ride = new Ride(

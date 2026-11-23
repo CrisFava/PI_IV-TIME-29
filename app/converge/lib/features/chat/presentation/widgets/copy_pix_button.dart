@@ -8,6 +8,7 @@ import 'chat_panel_button.dart';
 
 /// Botão "Copiar código PIX". Fica desabilitado e mostra progresso enquanto copia.
 class CopyPixButton extends StatefulWidget {
+  /// Pix Copia e Cola a copiar.
   final String pixCode;
 
   const CopyPixButton({super.key, required this.pixCode});
@@ -16,9 +17,13 @@ class CopyPixButton extends StatefulWidget {
   State<CopyPixButton> createState() => _CopyPixButtonState();
 }
 
+/// Estado do botão: se a cópia está em andamento.
 class _CopyPixButtonState extends State<CopyPixButton> {
+  /// Cópia em andamento.
   bool _copying = false;
 
+  /// Copia o código para a área de transferência com vibração média. Ignora cliques durante a cópia e
+  /// só mostra aviso se falhar.
   Future<void> _copy() async {
     if (_copying) return;
     HapticFeedback.mediumImpact();

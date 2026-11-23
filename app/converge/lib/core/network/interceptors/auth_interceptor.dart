@@ -14,16 +14,23 @@ import '../../services/auth/auth_service.dart';
 /// emitido para essa conta; se a sessão ativa for outra, a requisição é
 /// rejeitada com `AuthException('session-changed')` sem ser despachada.
 class AuthInterceptor extends Interceptor {
+  /// Marca em `extra` de uma requisição que já foi repetida depois de um 401, para não repetir de novo.
   static const String _retriedFlag = 'auth_retried';
 
   /// Chave em `RequestOptions.extra` com o Firebase UID esperado.
   static const String expectedUidKey = 'auth_expected_uid';
 
+  /// Fonte do token do Firebase.
   final AuthService _authService;
+
+  /// O mesmo [Dio] da aplicação, usado para repetir a requisição depois de renovar o token.
   final Dio _dio;
 
   AuthInterceptor(this._authService, this._dio);
 
+  /// Antes de enviar: pega o token da sessão (renovando se expira em menos de 60 s), confere a conta
+  /// esperada e coloca o cabeçalho `Authorization`. Sem sessão, a requisição segue sem token e o backend
+  /// responde 401. Qualquer falha ao obter o token rejeita a requisição sem enviá-la.
   @override
   Future<void> onRequest(
     RequestOptions options,
@@ -59,6 +66,9 @@ class AuthInterceptor extends Interceptor {
     }
   }
 
+  /// Depois de um 401 (e só uma vez por requisição): força a renovação do token e repete a mesma
+  /// requisição. Se o retry falhar, repassa o erro do retry; se a sessão mudou de conta, repassa a
+  /// [AuthException]; qualquer outra falha devolve o 401 original.
   @override
   Future<void> onError(
     DioException err,
@@ -91,6 +101,7 @@ class AuthInterceptor extends Interceptor {
     }
   }
 
+  /// Firebase UID que a requisição exige, ou nulo se qualquer sessão serve.
   String? _expectedUid(RequestOptions options) {
     final value = options.extra[expectedUidKey];
     return value is String ? value : null;
@@ -112,6 +123,8 @@ class AuthInterceptor extends Interceptor {
     return uid is String ? uid : null;
   }
 
+  /// Decodifica a parte do meio (payload) do JWT, sem validar a assinatura: a validação é do backend.
+  /// Devolve nulo para qualquer texto que não seja um JWT legível.
   Map<String, dynamic>? _decodePayload(String token) {
     try {
       final parts = token.split('.');

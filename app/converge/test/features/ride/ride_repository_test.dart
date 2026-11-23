@@ -44,6 +44,7 @@ void main() {
     );
   }
 
+  // Envelope ApplicationResponse de sucesso com o data dado.
   Map<String, dynamic> success(Object? data) => {
     'success': true,
     'data': data,

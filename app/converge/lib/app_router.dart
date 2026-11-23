@@ -20,6 +20,13 @@ import 'features/auth/state/auth_controller.dart';
 import 'features/auth/state/session/auth_session.dart';
 
 /// Decide para onde o usuário deve ir conforme a sessão. Retorna `null` para manter a rota atual
+///
+/// - Sessão ainda carregando (ou com erro): fica na splash.
+/// - Sem login: só as rotas públicas; qualquer outra manda para as boas-vindas.
+/// - Logado no Firebase sem cadastro na API: só o complemento do perfil (ou o cadastro).
+/// - Logado com perfil completo: as telas públicas, a splash e o complemento mandam para a home.
+///
+/// Fica fora do provider para ser testada sem montar o [GoRouter].
 String? authRedirect(AsyncValue<AuthSession> session, String location) {
   final current = session.value;
 
@@ -45,6 +52,7 @@ String? authRedirect(AsyncValue<AuthSession> session, String location) {
   };
 }
 
+/// Roteador do app, com todas as rotas de [AppRoutes] e o redirecionamento por sessão.
 final appRouterProvider = Provider<GoRouter>((ref) {
   // O GoRouter é criado uma única vez; mudanças de sessão só reavaliam o
   // redirect através do refreshListenable.

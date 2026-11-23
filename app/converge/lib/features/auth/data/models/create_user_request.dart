@@ -8,12 +8,25 @@ import 'participation_role.dart';
 /// O cadastro inicial é sempre como passageiro: virar motorista exige CNH e
 /// chave PIX, que são informados depois, na feature de usuário.
 class CreateUserRequest {
+  /// UID da conta recém-criada no Firebase, que liga o cadastro da API ao login.
   final String firebaseUid;
+
+  /// Nome completo.
   final String name;
+
+  /// E-mail da conta.
   final String email;
+
+  /// Telefone no formato `(19) 91234-5678`.
   final String phone;
+
+  /// Foto de perfil, opcional.
   final String? photoUrl;
+
+  /// Papéis da conta; por padrão só passageiro.
   final Set<ParticipationRole> participationRoles;
+
+  /// Vínculo acadêmico informado no cadastro.
   final AcademicRecordModel academicRecord;
 
   const CreateUserRequest({
@@ -26,6 +39,7 @@ class CreateUserRequest {
     this.participationRoles = const {ParticipationRole.passenger},
   });
 
+  /// Corpo de `POST /users`.
   Map<String, dynamic> toJson() => {
     'firebaseUid': firebaseUid,
     'name': name,

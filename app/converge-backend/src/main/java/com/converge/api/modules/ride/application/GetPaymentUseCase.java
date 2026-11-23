@@ -22,6 +22,15 @@ public class GetPaymentUseCase implements UseCase<PassengerRequestCommand, Payme
     private final RideAccess rideAccess;
     private final RidePaymentViewService paymentView;
 
+    /**
+     * Devolve a cobrança do passageiro, com o Pix Copia e Cola enquanto ela estiver em aberto.
+     *
+     * Quem não é o motorista nem o próprio passageiro recebe RIDE_NOT_FOUND, e não NOT_ALLOWED, para não
+     * revelar que a viagem existe (a chave PIX do motorista é dado pessoal, RNF02).
+     *
+     * @param command viagem, passageiro consultado e firebaseUid de quem pede
+     * @return a visão da cobrança para quem pede
+     */
     @Override
     public PaymentResponseDTO execute(PassengerRequestCommand command) {
         Ride ride = rideAccess.getParticipatingRide(command.rideId(), command.firebaseUid());

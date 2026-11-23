@@ -38,11 +38,23 @@ public class RideCompletionPublisher {
     private final VehicleAccess vehicleAccess;
     private final DistanceGateway distanceGateway;
 
+    /**
+     * Publica o RideCompletedEvent da viagem, se ela contar para os indicadores. Os listeners (indicadores e
+     * reputação) rodam depois do commit da conclusão.
+     *
+     * @param ride viagem recém-concluída
+     */
     public void publish(Ride ride) {
         eventOf(ride).ifPresent(eventPublisher::publishEvent);
     }
 
-    // O evento da viagem concluída, ou vazio se ela não conta para os indicadores.
+    /**
+     * Monta o evento da viagem concluída. Também é usado pela reconciliação dos indicadores, que reconstrói
+     * o evento a partir da viagem gravada.
+     *
+     * @param ride viagem
+     * @return o evento; vazio se a viagem não está COMPLETED ou não tem passageiro COMPLETED (RF49)
+     */
     public Optional<RideCompletedEvent> eventOf(Ride ride) {
         if (ride.getStatus() != RideStatus.COMPLETED) {
             return Optional.empty();
@@ -85,7 +97,10 @@ public class RideCompletionPublisher {
         ));
     }
 
-    // Distância já calculada na viagem; senão a do trajeto do motorista; em último caso, linha reta.
+    /**
+     * Distância da viagem em km, na ordem de preferência: a gravada nos custos da viagem; a do trajeto do
+     * motorista; em último caso, a linha reta (Haversine, no servidor de sockets) entre a origem e o destino.
+     */
     private double distanceKmOf(Ride ride) {
         RideCosts costs = ride.getCosts();
         if (costs != null && costs.routeDistanceKm() != null) {
@@ -107,7 +122,10 @@ public class RideCompletionPublisher {
         return distanceGateway.distanceKm(ride.getOrigin().coordinates(), ride.getDestination().coordinates());
     }
 
-    // Só para viagens antigas: fonte principal do veículo hoje; vazio se ele foi desativado.
+    /**
+     * Só para viagens antigas, que não gravaram a fonte de energia: usa a primeira fonte do veículo como
+     * ele está hoje. Vazio se o veículo foi desativado ou não existe mais.
+     */
     private Optional<FuelSource> currentVehicleFuelOf(Ride ride) {
         try {
             return vehicleAccess.getActiveVehicleOf(ride.getVehicleId(), ride.getDriverId())
