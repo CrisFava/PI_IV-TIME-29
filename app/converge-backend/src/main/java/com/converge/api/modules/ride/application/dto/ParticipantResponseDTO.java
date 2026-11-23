@@ -27,6 +27,8 @@ public record ParticipantResponseDTO(
         // O motorista confirmou que o passageiro entrou no carro
         LocalDateTime boardedAt,
         // Horário que o passageiro escolheu (HH:mm), do trajeto dele
-        String requestedDepartureTime
+        String requestedDepartureTime,
+        // A vaga foi cancelada pelo motorista ("Remover"), e não pelo passageiro
+        boolean removedByDriver
 ) {
 }

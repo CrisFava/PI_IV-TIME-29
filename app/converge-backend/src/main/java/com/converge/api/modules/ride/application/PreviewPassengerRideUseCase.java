@@ -104,7 +104,9 @@ public class PreviewPassengerRideUseCase implements UseCase<PassengerRequestComm
                 extraKm,
                 extraMinutes,
                 withPassenger.durationMinutes(),
-                stopsWithPassenger.stream().map(rideMapper::toStopResponse).toList()
+                stopsWithPassenger.stream().map(rideMapper::toStopResponse).toList(),
+                withPassenger.legPolylines(),
+                withPassenger.legSeconds()
         );
     }
 

@@ -39,13 +39,19 @@ public record RideResponseDTO(
         List<RideStopResponseDTO> itinerary,
         Double itineraryDistanceKm,
         String itineraryPolyline,
-        // O mesmo caminho em trechos: um até cada parada e o último até o destino
+        // O mesmo caminho em trechos: um até cada parada e o último até o destino (só o motorista)
         List<String> itineraryLegPolylines,
         // Viagem em andamento: a parada em que ela está (o trecho atual termina nela)
         Integer itineraryNextStop,
         // Para o passageiro: onde ficam o embarque e o desembarque dele na viagem (o app
         // desenha só o caminho até eles, sem marcar as paradas dos outros)
         Integer itineraryMyPickupStop,
-        Integer itineraryMyDropOffStop
+        Integer itineraryMyDropOffStop,
+        // Para o passageiro, com as paradas dos outros: quanto o motorista leva até ele e
+        // quanto dura o trecho com ele no carro (os trechos desenhados não vão para ele)
+        Integer itineraryMyPickupMinutes,
+        Integer itineraryMyRideMinutes,
+        // Só para o motorista: o tempo de cada trecho, em segundos (o horário de cada parada)
+        List<Integer> itineraryLegSeconds
 ) {
 }

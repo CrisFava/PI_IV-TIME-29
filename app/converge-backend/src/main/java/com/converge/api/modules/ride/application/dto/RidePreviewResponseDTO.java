@@ -19,6 +19,9 @@ public record RidePreviewResponseDTO(
         @Nullable Integer extraMinutes,
         // A viagem como ficaria: o tempo total e as paradas na ordem, contando o passageiro
         @Nullable Integer withPassengerDurationMinutes,
-        List<RideStopResponseDTO> withPassengerStops
+        List<RideStopResponseDTO> withPassengerStops,
+        // O caminho com o passageiro em trechos e o tempo de cada um, em segundos
+        List<String> withPassengerLegPolylines,
+        List<Integer> withPassengerLegSeconds
 ) {
 }

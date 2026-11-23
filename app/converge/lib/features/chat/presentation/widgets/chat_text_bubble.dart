@@ -59,15 +59,15 @@ class ChatTextBubble extends StatelessWidget {
                 bottomRight: Radius.circular(isMine ? 4 : 18),
               ),
             ),
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.end,
-              mainAxisSize: MainAxisSize.min,
-              children: [
-                // No grupo, a mensagem dos outros mostra quem mandou
-                if (!isMine)
-                  Align(
-                    alignment: Alignment.centerLeft,
-                    child: Padding(
+            // Nome e texto sempre à esquerda; só o horário fica no canto direito
+            child: IntrinsicWidth(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.stretch,
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  // No grupo, a mensagem dos outros mostra quem mandou
+                  if (!isMine)
+                    Padding(
                       padding: const EdgeInsets.only(bottom: 2),
                       child: Text(
                         sender,
@@ -78,28 +78,29 @@ class ChatTextBubble extends StatelessWidget {
                         ),
                       ),
                     ),
-                  ),
-                Text(
-                  message.text,
-                  style: TextStyle(
-                    fontSize: 14.5,
-                    height: 1.3,
-                    color: foreground,
-                  ),
-                ),
-                if (time.isNotEmpty) ...[
-                  const SizedBox(height: 3),
                   Text(
-                    time,
+                    message.text,
                     style: TextStyle(
-                      fontSize: 10.5,
-                      color: isMine
-                          ? AppColors.dockItemInactive
-                          : AppColors.textMuted,
+                      fontSize: 14.5,
+                      height: 1.3,
+                      color: foreground,
                     ),
                   ),
+                  if (time.isNotEmpty) ...[
+                    const SizedBox(height: 3),
+                    Text(
+                      time,
+                      textAlign: TextAlign.right,
+                      style: TextStyle(
+                        fontSize: 10.5,
+                        color: isMine
+                            ? AppColors.dockItemInactive
+                            : AppColors.textMuted,
+                      ),
+                    ),
+                  ],
                 ],
-              ],
+              ),
             ),
           ),
         ),

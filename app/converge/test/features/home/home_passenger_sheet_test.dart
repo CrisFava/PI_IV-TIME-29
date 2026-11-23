@@ -21,7 +21,7 @@ class _FixedMatchController extends PassengerMatchController {
   PassengerMatchState build() => _initial;
 }
 
-const _keepSearching = 'Continuar procurando depois';
+const _keepSearching = 'Me avise quando aparecer';
 
 class _Taps {
   int keepSearching = 0;
@@ -73,16 +73,15 @@ void main() {
   group('sem motoristas compatíveis', () {
     const empty = PassengerMatchState(phase: PassengerMatchPhase.ready);
 
-    testWidgets('explica as duas saídas e oferece continuar procurando depois', (
+    testWidgets('explica que a busca continua e oferece ser avisado', (
       tester,
     ) async {
       await _pumpSheet(tester, empty);
 
       expect(
         find.text(
-          'Nenhum motorista compatível com o seu trajeto agora. '
-          'Você pode continuar procurando depois, e o seu pedido fica ativo. '
-          'Para desistir, toque no X.',
+          'Ainda não há motoristas para esse trajeto. Sua busca continua '
+          'ativa e avisamos quando aparecer um.',
         ),
         findsOneWidget,
       );
@@ -91,7 +90,7 @@ void main() {
       expect(find.textContaining('atualizar mais tarde'), findsNothing);
     });
 
-    testWidgets('"Continuar procurando depois" não cancela o pedido', (
+    testWidgets('"Me avise quando aparecer" não cancela o pedido', (
       tester,
     ) async {
       final taps = await _pumpSheet(tester, empty);
@@ -102,14 +101,17 @@ void main() {
       expect(taps.cancelFlow, 0);
     });
 
-    testWidgets('o X diz que cancela a busca e cancela', (tester) async {
+    testWidgets('o X só fecha; cancelar a busca é o botão próprio', (
+      tester,
+    ) async {
       final taps = await _pumpSheet(tester, empty);
 
-      expect(find.byTooltip('Fechar'), findsNothing);
-      await tester.tap(find.byTooltip('Cancelar busca'));
+      await tester.tap(find.byTooltip('Fechar (a busca continua)'));
+      expect(taps.keepSearching, 1);
+      expect(taps.cancelFlow, 0);
 
+      await tester.tap(find.text('Cancelar busca'));
       expect(taps.cancelFlow, 1);
-      expect(taps.keepSearching, 0);
     });
   });
 

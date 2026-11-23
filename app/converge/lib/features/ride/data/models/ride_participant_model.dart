@@ -49,6 +49,9 @@ class RideParticipantModel {
   /// Horário que o passageiro escolheu para sair (HH:mm). Só o motorista recebe.
   final String? requestedDepartureTime;
 
+  /// A vaga foi cancelada pelo motorista ("Remover"), e não pelo passageiro.
+  final bool removedByDriver;
+
   const RideParticipantModel({
     required this.userId,
     required this.name,
@@ -62,6 +65,7 @@ class RideParticipantModel {
     this.requestedAt,
     this.boardedAt,
     this.requestedDepartureTime,
+    this.removedByDriver = false,
   });
 
   /// Se é o motorista.
@@ -94,6 +98,7 @@ class RideParticipantModel {
       requestedAt: DateTime.tryParse(json['requestedAt'] as String? ?? ''),
       boardedAt: DateTime.tryParse(json['boardedAt'] as String? ?? ''),
       requestedDepartureTime: json['requestedDepartureTime'] as String?,
+      removedByDriver: json['removedByDriver'] == true,
     );
   }
 

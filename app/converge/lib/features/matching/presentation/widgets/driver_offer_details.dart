@@ -7,7 +7,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../../../../core/config/styles.dart';
 import '../../../../core/widgets/details_danger_button.dart';
 import '../../../../core/widgets/details_section.dart';
-import '../../../../core/widgets/details_stat_tile.dart';
+import '../../../../core/widgets/details_summary_card.dart';
 import '../../../ride/presentation/widgets/ride_place_line.dart';
 import '../../../route/data/models/route_recurrence.dart';
 import '../../data/models/driver_offer.dart';
@@ -113,24 +113,24 @@ class _DriverOfferDetailsState extends ConsumerState<DriverOfferDetails> {
     final occupied = nextRide == null
         ? 0
         : nextRide.totalSeats - nextRide.availableSeats;
-    final stats = [
+    final stats = <DetailsSummaryRow>[
       if (distanceKm != null)
-        DetailsStatTile(
+        (
           icon: Icons.route_rounded,
-          value: '${_km(distanceKm)} km',
           label: 'Percurso',
+          value: '${_km(distanceKm)} km',
         ),
       if (detourKm != null)
-        DetailsStatTile(
+        (
           icon: Icons.radar_rounded,
-          value: '${_km(detourKm)} km',
           label: 'Raio de busca',
+          value: '${_km(detourKm)} km',
         ),
       if (seats != null)
-        DetailsStatTile(
+        (
           icon: Icons.event_seat_rounded,
-          value: '$occupied/$seats',
           label: 'Vagas ocupadas',
+          value: '$occupied de $seats',
         ),
     ];
 
@@ -175,15 +175,7 @@ class _DriverOfferDetailsState extends ConsumerState<DriverOfferDetails> {
         if (stats.isNotEmpty)
           Padding(
             padding: const EdgeInsets.only(top: 12),
-            child: Row(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                for (var i = 0; i < stats.length; i++) ...[
-                  if (i > 0) const SizedBox(width: 8),
-                  Expanded(child: stats[i]),
-                ],
-              ],
-            ),
+            child: DetailsSummaryCard(rows: stats),
           ),
         // O trajeto completo da próxima viagem (ou só o caminho, sem ninguém aceito)
         if (nextRide != null || route != null)

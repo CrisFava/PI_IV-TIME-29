@@ -39,7 +39,7 @@ public class RideItineraryService {
                     ride.getDestination()
             );
             ride.updateItinerary(stops, geometry.distanceKm(), geometry.encodedPolyline(), geometry.durationMinutes(),
-                    geometry.legPolylines());
+                    geometry.legPolylines(), geometry.legSeconds());
         } catch (RuntimeException e) {
             log.warn("Não foi possível calcular a rota da viagem {}: {}", ride.getId(), e.getMessage());
             ride.updateItinerary(stops, null, null);

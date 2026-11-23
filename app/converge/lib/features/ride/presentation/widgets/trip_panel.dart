@@ -157,8 +157,11 @@ class TripPanel extends StatelessWidget {
       crossAxisAlignment: CrossAxisAlignment.stretch,
       children: [
         Text(
-          'Parada ${progress.currentIndex + 1} de ${progress.steps.length} · '
-          '${step.isPickup ? 'Embarque' : 'Desembarque'}',
+          [
+            'Parada ${progress.currentIndex + 1} de ${progress.steps.length}',
+            step.isPickup ? 'Embarque' : 'Desembarque',
+            ?_plannedAt(step),
+          ].join(' · '),
           style: const TextStyle(
             fontSize: 12.5,
             fontWeight: FontWeight.w700,
@@ -213,6 +216,21 @@ class TripPanel extends StatelessWidget {
   }
 
   /// "Parada de Ana" ou, com mais gente no mesmo ponto, "Parada de Ana/Bruno/Carla".
+  /// O horário previsto para chegar à parada, pelo plano da viagem: a saída mais o
+  /// tempo dos trechos até ela (só o motorista tem os tempos); nulo sem eles.
+  String? _plannedAt(TripStep step) {
+    final departure = ride.departureDateTime;
+    final seconds = ride.itineraryLegSeconds;
+    if (departure == null || step.lastStop >= seconds.length) return null;
+    var total = 0;
+    for (var i = 0; i <= step.lastStop; i++) {
+      total += seconds[i];
+    }
+    final at = departure.add(Duration(seconds: total));
+    return 'previsto ~${at.hour.toString().padLeft(2, '0')}:'
+        '${at.minute.toString().padLeft(2, '0')}';
+  }
+
   static String stopTitle(TripStep step) =>
       'Parada de ${step.passengers.map(_firstName).join('/')}';
 

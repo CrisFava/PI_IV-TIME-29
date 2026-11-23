@@ -29,6 +29,9 @@ class HomePassengerSheet extends ConsumerStatefulWidget {
 
   /// Fecha o painel sem cancelar: o pedido segue ativo e a busca continua.
   final VoidCallback onKeepSearching;
+
+  /// O que está sendo buscado: de onde, para onde e quando ("Hoje às 11:45").
+  final ({String from, String to, String when})? search;
   final double bottomSafeArea;
 
   const HomePassengerSheet({
@@ -39,6 +42,7 @@ class HomePassengerSheet extends ConsumerStatefulWidget {
     required this.onCancelRequest,
     required this.onCancelFlow,
     required this.onKeepSearching,
+    this.search,
     this.bottomSafeArea = 0,
   });
 
@@ -75,7 +79,6 @@ class _HomePassengerSheetState extends ConsumerState<HomePassengerSheet> {
   // ==========================================================================
   Widget _buildDriverListSheet() {
     final matchState = ref.watch(passengerMatchProvider);
-
     return DraggableScrollableSheet(
       initialChildSize: 0.5,
       minChildSize: 0.16,
@@ -117,11 +120,11 @@ class _HomePassengerSheetState extends ConsumerState<HomePassengerSheet> {
                     Row(
                       mainAxisAlignment: MainAxisAlignment.spaceBetween,
                       children: [
-                        const Expanded(
+                        Expanded(
                           child: Column(
                             crossAxisAlignment: CrossAxisAlignment.start,
                             children: [
-                              Text(
+                              const Text(
                                 'Motoristas Compatíveis',
                                 style: TextStyle(
                                   fontSize: 17,
@@ -129,11 +132,19 @@ class _HomePassengerSheetState extends ConsumerState<HomePassengerSheet> {
                                   color: AppColors.textPrimary,
                                 ),
                               ),
-                              SizedBox(height: 2),
+                              const SizedBox(height: 2),
+                              // Discreto: para onde e quando (de onde sai, a
+                              // pessoa já sabe)
                               Text(
-                                'Ordenados pela compatibilidade com o seu trajeto',
-                                style: TextStyle(
-                                  fontSize: 12,
+                                switch (widget.search) {
+                                  final search? =>
+                                    'Para ${search.to} · ${search.when}',
+                                  null => 'Ordenados pela compatibilidade com o seu trajeto',
+                                },
+                                maxLines: 2,
+                                overflow: TextOverflow.ellipsis,
+                                style: const TextStyle(
+                                  fontSize: 12.5,
                                   color: AppColors.textSecondary,
                                 ),
                               ),
@@ -151,8 +162,9 @@ class _HomePassengerSheetState extends ConsumerState<HomePassengerSheet> {
                         ),
                         IconButton(
                           icon: const Icon(Icons.close_rounded),
-                          onPressed: widget.onCancelFlow,
-                          tooltip: 'Cancelar busca',
+                          // Só fecha: a busca continua (cancelar tem botão próprio)
+                          onPressed: widget.onKeepSearching,
+                          tooltip: 'Fechar (a busca continua)',
                         ),
                       ],
                     ),
@@ -174,13 +186,14 @@ class _HomePassengerSheetState extends ConsumerState<HomePassengerSheet> {
 
     if (phase == PassengerMatchPhase.loading ||
         phase == PassengerMatchPhase.idle) {
-      return const [
-        Padding(
+      return [
+        const Padding(
           padding: EdgeInsets.all(28),
           child: Center(
             child: CircularProgressIndicator(color: AppColors.primary),
           ),
         ),
+        _cancelSearchButton(),
       ];
     }
 
@@ -189,15 +202,15 @@ class _HomePassengerSheetState extends ConsumerState<HomePassengerSheet> {
         _buildDriverListMessage(
           matchState.errorMessage ?? 'Não foi possível buscar os motoristas.',
         ),
+        _cancelSearchButton(),
       ];
     }
 
     if (drivers.isEmpty) {
       return [
         _buildDriverListMessage(
-          'Nenhum motorista compatível com o seu trajeto agora. '
-          'Você pode continuar procurando depois, e o seu pedido fica ativo. '
-          'Para desistir, toque no X.',
+          'Ainda não há motoristas para esse trajeto. Sua busca continua '
+          'ativa e avisamos quando aparecer um.',
         ),
         ElevatedButton(
           onPressed: widget.onKeepSearching,
@@ -211,10 +224,11 @@ class _HomePassengerSheetState extends ConsumerState<HomePassengerSheet> {
             ),
           ),
           child: const Text(
-            'Continuar procurando depois',
+            'Me avise quando aparecer',
             style: TextStyle(fontSize: 13.5, fontWeight: FontWeight.w700),
           ),
         ),
+        _cancelSearchButton(),
       ];
     }
 
@@ -232,8 +246,20 @@ class _HomePassengerSheetState extends ConsumerState<HomePassengerSheet> {
             onRequest: () => widget.onSelectDriver(driver),
           ),
         ),
+      _cancelSearchButton(),
     ];
   }
+
+  /// O único jeito de desistir da busca (o X só fecha a tela).
+  Widget _cancelSearchButton() => TextButton(
+    key: const ValueKey('cancel_ride_search'),
+    onPressed: widget.onCancelFlow,
+    style: TextButton.styleFrom(foregroundColor: AppColors.error),
+    child: const Text(
+      'Cancelar busca',
+      style: TextStyle(fontWeight: FontWeight.w700),
+    ),
+  );
 
   Widget _buildDriverListMessage(String text) {
     return Container(

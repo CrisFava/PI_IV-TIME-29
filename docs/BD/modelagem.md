@@ -573,6 +573,7 @@ Quando `active = false` (`DELETE /api/v1/users/me`):
   "itineraryDistanceKm": "Double | null",
   "itineraryPolyline": "String | null",
   "itineraryLegPolylines": ["String (um trecho até cada parada e o último até o destino; vazio sem o Google)"],
+  "itineraryLegSeconds": ["Integer (segundos de carro de cada trecho, na mesma ordem; vazio sem o Google)"],
   "createdAt": "ISODate",
   "updatedAt": "ISODate"
 }

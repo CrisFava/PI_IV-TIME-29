@@ -17,11 +17,23 @@ public record RouteGeometry(
         @Nullable String encodedPolyline,
         @Nullable Integer durationMinutes,
         // O desenho de cada trecho entre os pontos (origem, paradas, destino); vazio sem o Google
-        List<String> legPolylines
+        List<String> legPolylines,
+        // O tempo de carro de cada trecho, em segundos, na mesma ordem; vazio sem o Google
+        List<Integer> legSeconds
 ) {
 
     public RouteGeometry {
         legPolylines = legPolylines == null ? List.of() : List.copyOf(legPolylines);
+        legSeconds = legSeconds == null ? List.of() : List.copyOf(legSeconds);
+    }
+
+    public RouteGeometry(
+            double distanceKm,
+            @Nullable String encodedPolyline,
+            @Nullable Integer durationMinutes,
+            List<String> legPolylines
+    ) {
+        this(distanceKm, encodedPolyline, durationMinutes, legPolylines, List.of());
     }
 
     public RouteGeometry(double distanceKm, @Nullable String encodedPolyline, @Nullable Integer durationMinutes) {

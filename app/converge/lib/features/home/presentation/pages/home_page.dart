@@ -247,6 +247,16 @@ class _HomePageState extends ConsumerState<HomePage> {
 
   /// "Continuar procurando depois": fecha o painel sem cancelar o pedido. A busca
   /// segue ativa e volta pelo aviso "Procurando motorista" ou pelo botão do carro.
+  /// O que o passageiro está buscando: de onde, para onde e quando.
+  ({String from, String to, String when})? _searchSummary() {
+    if (_pickupAddress.isEmpty || _destinationAddress.isEmpty) return null;
+    return (
+      from: _pickupAddress,
+      to: _destinationAddress,
+      when: rideDepartureLabel(_rideDeparture, DateTime.now()),
+    );
+  }
+
   void _handleKeepSearching() {
     HapticFeedback.lightImpact();
     setState(() => _passengerSheetHidden = true);
@@ -1230,6 +1240,7 @@ class _HomePageState extends ConsumerState<HomePage> {
                 onCancelRequest: _handleCancelRequest,
                 onCancelFlow: _handleCloseRideFlow,
                 onKeepSearching: _handleKeepSearching,
+                search: _searchSummary(),
               ),
             ),
           ),

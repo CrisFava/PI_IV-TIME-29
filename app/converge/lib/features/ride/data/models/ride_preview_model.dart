@@ -21,6 +21,11 @@ class RidePreviewModel {
   final List<RideStopModel> withPassengerStops;
   final int? extraMinutes;
 
+  /// O caminho com o passageiro em trechos (um até cada parada e o último até o
+  /// destino) e o tempo de cada um, em segundos; vazios sem o Google.
+  final List<String> withPassengerLegPolylines;
+  final List<int> withPassengerLegSeconds;
+
   const RidePreviewModel({
     required this.currentPolyline,
     required this.withPassengerPolyline,
@@ -29,6 +34,8 @@ class RidePreviewModel {
     this.withPassengerDurationMinutes,
     this.withPassengerStops = const [],
     required this.extraMinutes,
+    this.withPassengerLegPolylines = const [],
+    this.withPassengerLegSeconds = const [],
   });
 
   factory RidePreviewModel.fromJson(Map<String, dynamic> json) =>
@@ -46,5 +53,15 @@ class RidePreviewModel {
               if (stop is Map<String, dynamic>) RideStopModel.fromJson(stop),
         ],
         extraMinutes: (json['extraMinutes'] as num?)?.toInt(),
+        withPassengerLegPolylines: [
+          if (json['withPassengerLegPolylines'] case final List legs)
+            for (final leg in legs)
+              if (leg is String) leg,
+        ],
+        withPassengerLegSeconds: [
+          if (json['withPassengerLegSeconds'] case final List seconds)
+            for (final value in seconds)
+              if (value is num) value.toInt(),
+        ],
       );
 }

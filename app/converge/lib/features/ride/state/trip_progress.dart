@@ -62,9 +62,7 @@ class TripProgress {
     final from = step?.firstStop ?? legCount - 1;
     final to = step?.lastStop ?? legCount - 1;
     return (
-      current: [
-        for (var i = from; i <= to && i < legCount; i++) i,
-      ],
+      current: [for (var i = from; i <= to && i < legCount; i++) i],
       upcoming: [for (var i = to + 1; i < legCount; i++) i],
     );
   }
@@ -82,7 +80,7 @@ class TripProgress {
       if (previous != null &&
           previous.type == stop.type &&
           previous.lastStop == i - 1 &&
-          _sameSpot(previous.place, stop.place)) {
+          sameSpot(previous.place, stop.place)) {
         final passengers = [...previous.passengers, ?passenger];
         steps.last = TripStep(
           type: previous.type,
@@ -125,8 +123,8 @@ class TripProgress {
     return !stillConfirmed;
   }
 
-  // Até uns 50 m: é o mesmo ponto de parada
-  static bool _sameSpot(RoutePlaceModel a, RoutePlaceModel b) {
+  /// Até uns 50 m: é o mesmo ponto de parada.
+  static bool sameSpot(RoutePlaceModel a, RoutePlaceModel b) {
     const metersPerDegree = 111320.0;
     final dLat = (a.latitude - b.latitude) * metersPerDegree;
     final dLng =
