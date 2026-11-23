@@ -78,28 +78,40 @@ public class RideMapper {
                 toItinerary(ride, viewerId),
                 ride.isOwnedBy(viewerId) ? ride.getItineraryDistanceKm() : null,
                 ride.isOwnedBy(viewerId) ? ride.getItineraryPolyline() : null,
-                visibleLegPolylines(ride, viewerId),
+                ride.isOwnedBy(viewerId) ? ride.getItineraryLegPolylines() : List.of(),
                 seesItineraryPath(ride, viewerId) ? ride.getItineraryNextStop() : null,
                 ownStopIndex(ride, viewerId, RideStopType.PICKUP),
-                ownStopIndex(ride, viewerId, RideStopType.DROPOFF)
+                ownStopIndex(ride, viewerId, RideStopType.DROPOFF),
+                passengerMinutes(ride, viewerId, true),
+                passengerMinutes(ride, viewerId, false),
+                ride.isOwnedBy(viewerId) ? ride.getItineraryLegSeconds() : List.of()
         );
     }
 
-    // Os trechos do caminho: o motorista vê todos; o passageiro, só até o desembarque
-    // dele (o que vem depois revelaria para onde vão os outros)
-    private List<String> visibleLegPolylines(Ride ride, String viewerId) {
-        if (!seesItineraryPath(ride, viewerId)) {
-            return List.of();
-        }
-        List<String> legs = ride.getItineraryLegPolylines();
+    // Os trechos do caminho só vão para o motorista: desenhados para o passageiro, os
+    // desvios até as paradas dos outros mostrariam onde eles embarcam e descem. O
+    // passageiro recebe só os tempos reais dele (com as paradas): até o motorista chegar
+    // ([untilPickup]) ou com ele no carro, do embarque ao desembarque
+    private Integer passengerMinutes(Ride ride, String viewerId, boolean untilPickup) {
         if (ride.isOwnedBy(viewerId)) {
-            return legs;
+            return null;
         }
+        Integer pickup = ownStopIndex(ride, viewerId, RideStopType.PICKUP);
         Integer dropOff = ownStopIndex(ride, viewerId, RideStopType.DROPOFF);
-        if (dropOff == null) {
-            return List.of();
+        List<Integer> seconds = ride.getItineraryLegSeconds();
+        if (pickup == null || dropOff == null || dropOff >= seconds.size()) {
+            return null;
         }
-        return legs.subList(0, Math.min(legs.size(), dropOff + 1));
+        return legMinutes(seconds, untilPickup ? 0 : pickup + 1, untilPickup ? pickup : dropOff);
+    }
+
+    /** A soma dos trechos [from, to], em minutos (arredonda para cima). */
+    public static int legMinutes(List<Integer> seconds, int from, int to) {
+        int total = 0;
+        for (int i = from; i <= to; i++) {
+            total += seconds.get(i);
+        }
+        return (int) Math.ceil(total / 60.0);
     }
 
     // A posição da parada do próprio passageiro no itinerário (só para quem vê o caminho)
@@ -116,13 +128,15 @@ public class RideMapper {
         return null;
     }
 
-    // O caminho com as paradas: o motorista sempre; o passageiro com vaga, só com a viagem
-    // em andamento (antes disso, o caminho revelaria a região do embarque dos outros)
+    // As paradas dele no itinerário: o motorista sempre; o passageiro com vaga, na viagem
+    // marcada ou em andamento (sem os trechos desenhados, só as posições e os tempos)
     private boolean seesItineraryPath(Ride ride, String viewerId) {
         if (ride.isOwnedBy(viewerId)) {
             return true;
         }
-        return ride.getStatus() == RideStatus.IN_PROGRESS && ride.getParticipants().stream()
+        boolean open = ride.getStatus() == RideStatus.IN_PROGRESS
+                || ride.getStatus() == RideStatus.CONFIRMED;
+        return open && ride.getParticipants().stream()
                 .anyMatch(participant -> participant.getUserId().equals(viewerId)
                         && participant.getRole() == ParticipationRole.PASSENGER
                         && participant.getStatus() == ParticipantStatus.CONFIRMED);
@@ -209,7 +223,8 @@ public class RideMapper {
                 participant.getConfirmedAt(),
                 participant.getRequestedAt(),
                 participant.getBoardedAt(),
-                requestedDepartureTime
+                requestedDepartureTime,
+                participant.isRemovedByDriver()
         );
     }
 
@@ -228,7 +243,8 @@ public class RideMapper {
                 null,
                 null,
                 null,
-                null
+                null,
+                participant.isRemovedByDriver()
         );
     }
 

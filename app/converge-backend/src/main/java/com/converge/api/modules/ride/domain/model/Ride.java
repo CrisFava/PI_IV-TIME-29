@@ -179,6 +179,9 @@ public class Ride {
     // O caminho em trechos: um até cada parada e o último até o destino (vazio sem o Google)
     private List<String> itineraryLegPolylines = new ArrayList<>();
 
+    // O tempo de carro de cada trecho, em segundos, na mesma ordem (vazio sem o Google)
+    private List<Integer> itineraryLegSeconds = new ArrayList<>();
+
     @CreatedDate
     private LocalDateTime createdAt;
 
@@ -439,6 +442,17 @@ public class Ride {
             @Nullable Integer durationMinutes,
             List<String> legPolylines
     ) {
+        updateItinerary(stops, distanceKm, polyline, durationMinutes, legPolylines, List.of());
+    }
+
+    public void updateItinerary(
+            List<RideStop> stops,
+            @Nullable Double distanceKm,
+            @Nullable String polyline,
+            @Nullable Integer durationMinutes,
+            List<String> legPolylines,
+            List<Integer> legSeconds
+    ) {
         this.itinerary = stops == null ? new ArrayList<>() : new ArrayList<>(stops);
         boolean hasStops = !this.itinerary.isEmpty();
 
@@ -452,6 +466,14 @@ public class Ride {
         // Um trecho por parada mais o último até o destino; com outra contagem, não servem
         boolean legsMatch = legPolylines != null && legPolylines.size() == this.itinerary.size() + 1;
         this.itineraryLegPolylines = hasStops && legsMatch ? new ArrayList<>(legPolylines) : new ArrayList<>();
+        boolean secondsMatch = legSeconds != null && legSeconds.size() == this.itinerary.size() + 1;
+        this.itineraryLegSeconds = hasStops && secondsMatch ? new ArrayList<>(legSeconds) : new ArrayList<>();
+    }
+
+    public List<Integer> getItineraryLegSeconds() {
+        return this.itineraryLegSeconds == null
+                ? List.of()
+                : Collections.unmodifiableList(this.itineraryLegSeconds);
     }
 
     /**

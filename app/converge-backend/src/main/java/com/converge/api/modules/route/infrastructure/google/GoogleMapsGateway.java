@@ -20,6 +20,7 @@ import com.converge.api.modules.route.infrastructure.google.GooglePlacesJson.Sug
 import com.converge.api.modules.route.infrastructure.google.GoogleRoutesJson.ComputeRoutesRequest;
 import com.converge.api.modules.route.infrastructure.google.GoogleRoutesJson.ComputeRoutesResponse;
 import com.converge.api.modules.route.infrastructure.google.GoogleRoutesJson.GoogleRoute;
+import com.converge.api.modules.route.infrastructure.google.GoogleRoutesJson.Leg;
 import com.converge.api.modules.route.infrastructure.google.GoogleRoutesJson.Location;
 import com.converge.api.modules.route.infrastructure.google.GoogleRoutesJson.Waypoint;
 import com.converge.api.shared.presentation.exception.ApplicationException;
@@ -36,6 +37,7 @@ import org.springframework.web.client.RestClientException;
 
 import java.net.http.HttpClient;
 import java.time.Duration;
+import java.util.ArrayList;
 import java.util.List;
 import java.util.Objects;
 import java.util.Optional;
@@ -52,7 +54,7 @@ public class GoogleMapsGateway implements MapsGateway {
     private static final String FIELD_MASK_HEADER = "X-Goog-FieldMask";
     private static final String DETAILS_FIELD_MASK = "formattedAddress,addressComponents,location";
     private static final String ROUTES_FIELD_MASK = "routes.distanceMeters,routes.duration,routes.polyline.encodedPolyline,"
-            + "routes.legs.polyline.encodedPolyline";
+            + "routes.legs.polyline.encodedPolyline,routes.legs.duration";
     private static final String LANGUAGE = "pt-BR";
     private static final List<String> REGIONS = List.of("br");
 
@@ -156,7 +158,7 @@ public class GoogleMapsGateway implements MapsGateway {
         String encodedPolyline = route.polyline() != null ? route.polyline().encodedPolyline() : null;
         return Optional.of(new RouteGeometry(
                 route.distanceMeters() / 1000.0, encodedPolyline, durationMinutes(route.duration()),
-                legPolylines(route)));
+                legPolylines(route), legSeconds(route)));
     }
 
     // Os trechos só valem completos: faltando o desenho de algum, o app usa o caminho inteiro
@@ -168,6 +170,26 @@ public class GoogleMapsGateway implements MapsGateway {
                 .map(leg -> leg.polyline() != null ? leg.polyline().encodedPolyline() : null)
                 .toList();
         return legs.contains(null) ? List.of() : legs;
+    }
+
+    // O tempo de cada trecho em segundos; só vale completo, como os desenhos
+    static List<Integer> legSeconds(GoogleRoute route) {
+        if (route.legs() == null || route.legs().isEmpty()) {
+            return List.of();
+        }
+        List<Integer> seconds = new ArrayList<>();
+        for (Leg leg : route.legs()) {
+            String duration = leg.duration();
+            if (duration == null || !duration.endsWith("s")) {
+                return List.of();
+            }
+            try {
+                seconds.add((int) Math.round(Double.parseDouble(duration.substring(0, duration.length() - 1))));
+            } catch (NumberFormatException e) {
+                return List.of();
+            }
+        }
+        return seconds;
     }
 
     // "1234s" -> 21 min (arredonda para cima); null se o Google não mandar

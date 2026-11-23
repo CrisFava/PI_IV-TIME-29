@@ -256,22 +256,28 @@ class RideMapperTest {
     }
 
     @Test
-    @DisplayName("Com a viagem em andamento, o passageiro com vaga vê os trechos até o desembarque dele; o pendente, nada")
+    @DisplayName("O passageiro com vaga recebe as paradas dele e os tempos reais, sem os trechos desenhados; o pendente, nada")
     void shouldShowItineraryPathToConfirmedPassengerDuringTheRide() {
         Ride ride = rideWithEveryKindOfPassenger();
         ride.updateItinerary(List.of(
                 new RideStop(RideStopType.PICKUP, ANA, place("Rua da Ana, 1")),
                 new RideStop(RideStopType.DROPOFF, ANA, place("Campus PUC"))
-        ), 15.0, "polyline", 20, List.of("ate-ana", "com-ana", "depois-da-ana"));
+        ), 15.0, "polyline", 20, List.of("ate-ana", "com-ana", "depois-da-ana"), List.of(240, 600, 120));
         ride.start();
 
-        // Nunca o caminho inteiro: só até onde ela desce
+        // Os desenhos mostrariam os desvios até a casa dos outros: só o motorista recebe
         assertThat(mapper.toResponse(ride, ANA, names).itineraryPolyline()).isNull();
-        assertThat(mapper.toResponse(ride, ANA, names).itineraryLegPolylines()).containsExactly("ate-ana", "com-ana");
+        assertThat(mapper.toResponse(ride, ANA, names).itineraryLegPolylines()).isEmpty();
         assertThat(mapper.toResponse(ride, ride.getDriverId(), names).itineraryLegPolylines()).hasSize(3);
-        // A Ana sabe onde ficam as paradas dela na viagem, para ver só o caminho até elas
+        // O motorista recebe o tempo de cada trecho, para o horário de cada parada
+        assertThat(mapper.toResponse(ride, ride.getDriverId(), names).itineraryLegSeconds())
+                .containsExactly(240, 600, 120);
+        assertThat(mapper.toResponse(ride, ANA, names).itineraryLegSeconds()).isEmpty();
+        // A Ana sabe onde ficam as paradas dela e quanto tempo leva cada parte
         assertThat(mapper.toResponse(ride, ANA, names).itineraryMyPickupStop()).isZero();
         assertThat(mapper.toResponse(ride, ANA, names).itineraryMyDropOffStop()).isEqualTo(1);
-        assertThat(mapper.toResponse(ride, BIA, names).itineraryLegPolylines()).isEmpty();
+        assertThat(mapper.toResponse(ride, ANA, names).itineraryMyPickupMinutes()).isEqualTo(4);
+        assertThat(mapper.toResponse(ride, ANA, names).itineraryMyRideMinutes()).isEqualTo(10);
+        assertThat(mapper.toResponse(ride, BIA, names).itineraryMyPickupStop()).isNull();
     }
 }

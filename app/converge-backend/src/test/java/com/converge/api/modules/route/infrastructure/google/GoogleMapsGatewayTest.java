@@ -158,18 +158,19 @@ class GoogleMapsGatewayTest {
     }
 
     @Test
-    @DisplayName("Deve traduzir a rota do Google: metros para km, a polyline, o tempo em minutos e os trechos")
+    @DisplayName("Deve traduzir a rota do Google: metros para km, a polyline, o tempo em minutos e os trechos com o tempo de cada um")
     void shouldMapComputedRoute() {
         google.expect(requestTo(GoogleMapsGateway.ROUTES_URL))
                 .andExpect(method(HttpMethod.POST))
                 .andExpect(header("X-Goog-FieldMask", "routes.distanceMeters,routes.duration,routes.polyline.encodedPolyline,"
-                        + "routes.legs.polyline.encodedPolyline"))
+                        + "routes.legs.polyline.encodedPolyline,routes.legs.duration"))
                 .andExpect(jsonPath("$.origin.location.latLng.latitude").value(-22.9056))
                 .andExpect(jsonPath("$.destination.location.latLng.longitude").value(-47.0524))
                 .andExpect(jsonPath("$.travelMode").value("DRIVE"))
                 .andRespond(withSuccess("""
                         { "routes": [ { "distanceMeters": 12630, "duration": "1234s", "polyline": { "encodedPolyline": "abc123" },
-                          "legs": [ { "polyline": { "encodedPolyline": "abc" } }, { "polyline": { "encodedPolyline": "123" } } ] } ] }
+                          "legs": [ { "polyline": { "encodedPolyline": "abc" }, "duration": "400s" },
+                                    { "polyline": { "encodedPolyline": "123" }, "duration": "834s" } ] } ] }
                         """, MediaType.APPLICATION_JSON));
 
         Optional<RouteGeometry> route = gateway.computeRoute(
@@ -177,7 +178,7 @@ class GoogleMapsGatewayTest {
         );
 
         // 1234 s = 20,6 min: arredonda para cima
-        assertThat(route).contains(new RouteGeometry(12.63, "abc123", 21, List.of("abc", "123")));
+        assertThat(route).contains(new RouteGeometry(12.63, "abc123", 21, List.of("abc", "123"), List.of(400, 834)));
         google.verify();
     }
 
