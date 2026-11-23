@@ -10,12 +10,24 @@ import java.net.ServerSocket;
 import java.net.Socket;
 import java.net.SocketException;
 
+/**
+ * Thread responsável por escutar continuamente o {@link ServerSocket} e aceitar conexões TCP entrantes.
+ * Para cada conexão aceita com sucesso, instancia e inicializa uma thread {@link ConnectionSupervisor}.
+ */
 public class ConnectionAcceptor extends Thread {
 
     private final ServerSocket serverSocket;
     private final ClientRegistry clientRegistry;
     private final HandlerRegistry handlerRegistry;
 
+    /**
+     * Cria uma instância da thread de aceitação de conexões socket.
+     *
+     * @param serverSocket socket do servidor responsável por escutar a porta
+     * @param clientRegistry registro global onde novas conexões serão incluídas
+     * @param handlerRegistry catálogo de handlers que processarão requisições
+     * @throws IllegalArgumentException se algum parâmetro obrigatório for nulo
+     */
     public ConnectionAcceptor(ServerSocket serverSocket, ClientRegistry clientRegistry, HandlerRegistry handlerRegistry) {
         if (serverSocket == null) {
             throw new IllegalArgumentException("ServerSocket cannot be null");
@@ -33,6 +45,9 @@ public class ConnectionAcceptor extends Thread {
         setName("ConnectionAcceptor-Thread");
     }
 
+    /**
+     * Executa o loop contínuo de aceitação de novas conexões no ServerSocket até que seja fechado.
+     */
     @Override
     public void run() {
         while (!serverSocket.isClosed()) {

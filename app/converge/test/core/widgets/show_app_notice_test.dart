@@ -4,6 +4,9 @@ import 'package:converge/core/widgets/show_app_notice.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 
+/// Testes unitários e de widgets para show app notice.
+/// Cobre cenários como: aparece no topo e fecha pelo botão, some sozinho e um aviso novo substitui o anterior.
+/// Os casos de teste estão descritos de forma autoexplicativa nas chamadas de [test] e [group].
 void main() {
   Future<BuildContext> pumpApp(WidgetTester tester) async {
     late BuildContext captured;

@@ -24,8 +24,18 @@ import com.converge.socket.handler.distance.DistanceRequest;
 
 import java.util.Scanner;
 
+/**
+ * Ponto de entrada principal da aplicação do servidor socket TCP.
+ * Inicializa a instância do {@link SocketServer}, registra todos os handlers de negócio
+ * e gerencia o loop de comandos administrativos via console para encerramento gracioso.
+ */
 public class Main {
 
+    /**
+     * Registra todos os handlers de regras de negócio suportados no servidor socket.
+     *
+     * @param server instância do servidor socket onde os handlers serão registrados
+     */
     private static void registerHandlers(SocketServer server){
         server.registerHandler(MathOperationRequest.class, new MathOperationHandler());
         server.registerHandler(ValidateCpfRequest.class, new ValidateCpfHandler());
@@ -38,6 +48,11 @@ public class Main {
         server.registerHandler(DistanceRequest.class, new DistanceHandler());
     }
     
+    /**
+     * Método principal que inicializa o servidor socket e processa comandos administrativos do console.
+     *
+     * @param args argumentos de linha de comando; opcionalmente a porta TCP na primeira posição
+     */
     public static void main(String[] args) {
         int port = SocketServer.DEFAULT_PORT;
 

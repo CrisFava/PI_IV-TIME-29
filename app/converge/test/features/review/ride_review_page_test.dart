@@ -32,6 +32,9 @@ const _lucas = ReviewTarget(
   isDriver: true,
 );
 
+/// Testes unitários e de widgets para ride review page.
+/// Cobre cenários como: motorista vê todos os passageiros, e o botão só liga com estrelas, envia só quem recebeu estrelas, com o comentário, e fecha a tela.
+/// Os casos de teste estão descritos de forma autoexplicativa nas chamadas de [test] e [group].
 void main() {
   late FakeReviewRepository reviews;
 

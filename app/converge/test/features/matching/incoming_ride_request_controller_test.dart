@@ -9,6 +9,9 @@ import 'package:flutter_test/flutter_test.dart';
 import '../ride/fakes/fake_ride.dart';
 import 'fakes/fake_seat_ride_repository.dart';
 
+/// Testes unitários e de widgets para incoming ride request controller.
+/// Cobre cenários como: mostra o pedido pendente, com o embarque do passageiro, dispensar passa para o próximo pedido e, sem mais nenhum, some.
+/// Os casos de teste estão descritos de forma autoexplicativa nas chamadas de [test] e [group].
 void main() {
   ProviderContainer containerWith(FakeSeatRideRepository rides) {
     final container = ProviderContainer.test(

@@ -7,6 +7,9 @@ import 'package:flutter_test/flutter_test.dart';
 
 import 'fakes/valid_vehicle_request.dart';
 
+/// Testes unitários e de widgets para vehicle form.
+/// Cobre cenários como: formulário vazio mostra os erros e não envia, RENAVAM inválido impede o envio.
+/// Os casos de teste estão descritos de forma autoexplicativa nas chamadas de [test] e [group].
 void main() {
   Future<List<CreateVehicleRequest>> pumpForm(
     WidgetTester tester, {

@@ -7,6 +7,9 @@ import 'package:converge/features/route/data/repository/route_repository_impl.da
 import 'package:dio/dio.dart';
 import 'package:flutter_test/flutter_test.dart';
 
+/// Testes unitários e de widgets para route repository.
+/// Cobre cenários como: RouteRepositoryImpl.
+/// Os casos de teste estão descritos de forma autoexplicativa nas chamadas de [test] e [group].
 void main() {
   group('RouteRepositoryImpl', () {
     late Dio dio;

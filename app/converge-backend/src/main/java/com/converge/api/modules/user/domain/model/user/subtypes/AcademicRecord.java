@@ -11,6 +11,14 @@ import jakarta.validation.constraints.PastOrPresent;
 
 import java.time.LocalDateTime;
 
+/**
+ * Dados acadêmicos de um usuário (value object imutável).
+ *
+ * Guarda a universidade, o curso, a matrícula e o e-mail institucional, além do
+ * estado da verificação do vínculo acadêmico (status, método usado, datas e
+ * motivo de recusa). É esse vínculo verificado que o RideEligibility exige para
+ * o usuário participar de caronas.
+ */
 public record AcademicRecord(
 
         @NotBlank

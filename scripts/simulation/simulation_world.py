@@ -57,21 +57,25 @@ class SimulationWorld:
 
     @staticmethod
     def step(description: str) -> None:
+        """Imprime uma etapa narrativa do cenário de simulação."""
         print(f"    · {description}")
 
     @staticmethod
     def check(condition: bool, message: str) -> None:
+        """Valida uma condição de negócio, lançando SimulationFailure se for falsa."""
         if not condition:
             raise SimulationFailure(message)
 
     @staticmethod
     def expect_ok(response: ApiResponse, what: str):
+        """Assegura que a chamada à API teve sucesso e retorna seu campo 'data'."""
         if not response.ok:
             raise SimulationFailure(f"{what}: esperava sucesso, veio {response.describe()}")
         return response.data
 
     @staticmethod
     def expect_error(response: ApiResponse, what: str, code: Optional[str] = None) -> None:
+        """Assegura que a chamada à API falhou conforme o esperado (opcionalmente checando o código)."""
         if response.ok:
             raise SimulationFailure(f"{what}: esperava erro{f' {code}' if code else ''}, mas deu certo")
         if code and response.error_code != code:
@@ -81,6 +85,7 @@ class SimulationWorld:
     # ------------------------------------------------------------------ pessoas
 
     def create_driver(self, nickname: str) -> SimulatedUser:
+        """Cria conta no Firebase, registra perfil de motorista na API, aprova documentos e cadastra veículo."""
         driver = self._create_user(nickname, is_driver=True)
         vehicle = self.expect_ok(self.api.post("/vehicles", driver.token, {
             "nickname": "Carro da simulação",
@@ -97,9 +102,11 @@ class SimulationWorld:
         return driver
 
     def create_passenger(self, nickname: str) -> SimulatedUser:
+        """Cria conta no Firebase, registra perfil de passageiro na API e aprova vínculo acadêmico."""
         return self._create_user(nickname, is_driver=False)
 
     def _create_user(self, nickname: str, is_driver: bool) -> SimulatedUser:
+        """Registra a conta no Firebase Auth e cria o perfil de usuário na API Converge."""
         self._sequence += 1
         email = f"sim.{self.run_id}.{self._sequence}.{_slug(nickname)}@converge-sim.test"
 
@@ -138,6 +145,7 @@ class SimulationWorld:
         return user
 
     def _approve_documents(self, user: SimulatedUser, is_driver: bool) -> None:
+        """Aprova diretamente no MongoDB o vínculo acadêmico e a CNH do usuário de teste."""
         document = verificar_usuario.find_user(self.users_collection, user.email)
         self.check(document is not None,
                    f"{user.nickname} não apareceu no Mongo: o script e o backend estão no mesmo banco?")
@@ -190,6 +198,7 @@ class SimulationWorld:
     # ------------------------------------------------------------------ trajetos e pedidos
 
     def offer_route(self, driver: SimulatedUser, seats: int, origin: tuple = DRIVER_ORIGIN) -> str:
+        """Cria e agenda um trajeto de oferta (motorista) com capacidade de assentos."""
         self._schedule_next_departure()
         return self._create_route(driver, {
             "type": "OFFER",
@@ -202,10 +211,12 @@ class SimulationWorld:
         })
 
     def search_route(self, passenger: SimulatedUser) -> str:
+        """Cria um trajeto de procura (passageiro) partindo de um dos pontos residenciais."""
         origin = PASSENGER_ORIGINS[self._sequence % len(PASSENGER_ORIGINS)]
         return self._create_route(passenger, {"type": "SEARCH", "origin": _place(origin)})
 
     def _create_route(self, user: SimulatedUser, fields: dict) -> str:
+        """Submete uma requisição de cadastro de trajeto à API."""
         body = {
             "destination": _place(CAMPUS),
             "departureTime": self.departure.strftime("%H:%M"),
@@ -224,6 +235,7 @@ class SimulationWorld:
         self.week_day = WEEK_DAYS[departure.weekday()]
 
     def request_seat(self, passenger: SimulatedUser, driver_route_id: str, passenger_route_id: str) -> ApiResponse:
+        """Envia requisição de solicitação de vaga do passageiro para o trajeto do motorista."""
         return self.api.post("/rides/request", passenger.token, {
             "driverRouteId": driver_route_id,
             "passengerRouteId": passenger_route_id,
@@ -233,17 +245,20 @@ class SimulationWorld:
     # ------------------------------------------------------------------ viagem
 
     def ride(self, user: SimulatedUser, ride_id: str) -> dict:
+        """Obtém os detalhes da carona pela API a partir do usuário autenticado."""
         return self.expect_ok(self.api.get(f"/rides/{ride_id}", user.token),
                               f"{user.nickname} consultar a viagem")
 
     def ride_action(self, user: SimulatedUser, ride_id: str, action: str,
                     body: Optional[dict] = None, expect_success: bool = True) -> ApiResponse:
+        """Dispara uma ação de controle da carona (ex: start, complete, cancel, leave)."""
         # Só um início que deve dar certo espera a janela abrir; o que deve ser recusado vai na hora
         if action == "start" and expect_success:
             self._wait_for_start_window()
         return self.api.post(f"/rides/{ride_id}/{action}", user.token, body)
 
     def _wait_for_start_window(self) -> None:
+        """Aguarda a janela de horário de início da carona abrir."""
         opens_at = self.departure - START_WINDOW + timedelta(seconds=5)
         wait = (opens_at - datetime.now()).total_seconds()
         if wait > 0:
@@ -252,10 +267,12 @@ class SimulationWorld:
 
     def passenger_action(self, driver: SimulatedUser, ride_id: str, passenger: SimulatedUser,
                          action: str, body: Optional[dict] = None) -> ApiResponse:
+        """Executa uma ação direcionada a um passageiro da carona (ex: accept, reject, no-show)."""
         return self.api.post(f"/rides/{ride_id}/passengers/{passenger.id}/{action}", driver.token, body)
 
     def payment(self, user: SimulatedUser, ride_id: str, passenger: SimulatedUser,
                 action: str = "", body: Optional[dict] = None) -> ApiResponse:
+        """Consulta ou executa uma ação de cobrança/pagamento para o passageiro."""
         path = f"/rides/{ride_id}/passengers/{passenger.id}/payment" + (f"/{action}" if action else "")
         if action:
             return self.api.post(path, user.token, body)
@@ -263,12 +280,14 @@ class SimulationWorld:
 
     @staticmethod
     def participant(ride: dict, user: SimulatedUser) -> dict:
+        """Encontra o registro do participante correspondente ao usuário no payload da viagem."""
         for participant in ride.get("participants") or []:
             if participant.get("userId") == user.id:
                 return participant
         raise SimulationFailure(f"{user.nickname} não aparece entre os participantes da viagem")
 
     def expect_ride(self, ride: dict, status: str, available_seats: Optional[int] = None) -> None:
+        """Verifica se a viagem está com o status e a quantidade de assentos disponíveis esperados."""
         self.check(ride.get("status") == status,
                    f"a viagem deveria estar {status}, está {ride.get('status')}")
         if available_seats is not None:
@@ -276,6 +295,7 @@ class SimulationWorld:
                        f"deveria ter {available_seats} vaga(s) livre(s), tem {ride.get('availableSeats')}")
 
     def expect_participant(self, ride: dict, user: SimulatedUser, status: str) -> dict:
+        """Verifica se o participante atingiu o status de participação esperado."""
         participant = self.participant(ride, user)
         self.check(participant.get("status") == status,
                    f"{user.nickname} deveria estar {status}, está {participant.get('status')}")
@@ -283,11 +303,13 @@ class SimulationWorld:
 
 
 def _place(spot: tuple) -> dict:
+    """Monta um dicionário com os dados de localização formatados para envio à API."""
     address, neighborhood, latitude, longitude = spot
     return {"address": address, "neighborhood": neighborhood, "city": "Campinas",
             "latitude": latitude, "longitude": longitude}
 
 
 def _slug(text: str) -> str:
+    """Normaliza o texto em formato slug alfanumérico ASCII."""
     ascii_text = unicodedata.normalize("NFKD", text).encode("ascii", "ignore").decode()
     return re.sub(r"[^a-z0-9]+", "-", ascii_text.lower()).strip("-")

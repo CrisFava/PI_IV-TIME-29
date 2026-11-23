@@ -3,6 +3,9 @@
 import 'package:converge/features/indicator/data/models/indicator_period.dart';
 import 'package:flutter_test/flutter_test.dart';
 
+/// Testes unitários e de widgets para indicator period.
+/// Cobre cenários como: a referência é a do período atual, no formato do backend.
+/// Os casos de teste estão descritos de forma autoexplicativa nas chamadas de [test] e [group].
 void main() {
   test('a referência é a do período atual, no formato do backend', () {
     final date = DateTime(2026, 11, 16);

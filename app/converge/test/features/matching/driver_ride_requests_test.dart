@@ -13,6 +13,9 @@ import 'package:flutter_test/flutter_test.dart';
 import '../ride/fakes/fake_ride.dart';
 import 'fakes/fake_seat_ride_repository.dart';
 
+/// Testes unitários e de widgets para driver ride requests.
+/// Cobre cenários como: pedidos que o motorista pode aceitar.
+/// Os casos de teste estão descritos de forma autoexplicativa nas chamadas de [test] e [group].
 void main() {
   late FakeSeatRideRepository rides;
   late ProviderContainer container;

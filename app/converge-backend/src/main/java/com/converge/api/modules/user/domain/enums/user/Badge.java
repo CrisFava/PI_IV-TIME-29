@@ -2,6 +2,7 @@
 
 package com.converge.api.modules.user.domain.enums.user;
 
+// Selos do usuário
 public enum Badge {
     TRUST, SUSTAINABILITY
 }

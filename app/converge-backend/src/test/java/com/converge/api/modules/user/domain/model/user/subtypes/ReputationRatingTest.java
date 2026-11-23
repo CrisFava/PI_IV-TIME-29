@@ -14,6 +14,12 @@ import java.time.LocalDateTime;
 
 import static org.assertj.core.api.Assertions.assertThat;
 
+/**
+ * Testes unitários para {@link ReputationRating}.
+ * Valida cenários como: Motorista que cumpre os critérios de confiança vira HIGH e grava média, total e data; Motorista com média abaixo de 4.2 fica MEDIUM; Motorista sem viagens suficientes fica MEDIUM mesmo com nota alta.
+ * <p>
+ * Os métodos de teste estão bem explicativos através de suas anotações {@code @DisplayName}.
+ */
 class ReputationRatingTest {
 
     private static final LocalDateTime NOW = LocalDateTime.of(2026, 11, 20, 10, 0);

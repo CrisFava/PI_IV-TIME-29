@@ -11,6 +11,14 @@ import com.converge.api.shared.presentation.exception.ErrorCode;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
 
+/**
+ * Caso de uso que busca os detalhes de um lugar (endereço, coordenadas etc.)
+ * a partir do identificador dele (placeId) em um serviço de mapas.
+ *
+ * Não acessa o provedor diretamente: delega ao MapsGateway, que esconde qual
+ * serviço de mapas está por trás. Se o lugar não for encontrado, lança
+ * PLACE_NOT_FOUND.
+ */
 @Service
 @RequiredArgsConstructor
 public class GetPlaceDetailsUseCase implements UseCase<PlaceDetailsCommand, PlaceDetails> {

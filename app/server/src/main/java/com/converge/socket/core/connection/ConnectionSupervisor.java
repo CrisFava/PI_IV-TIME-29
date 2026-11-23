@@ -14,6 +14,11 @@ import java.io.ObjectInputStream;
 import java.io.ObjectOutputStream;
 import java.net.Socket;
 
+/**
+ * Thread supervisora dedicada ao ciclo de vida e comunicação de um cliente socket específico.
+ * Inicializa os streams de I/O, processa mensagens recebidas, despacha requisições para o
+ * {@link HandlerRegistry} e trata a desconexão ou fechamento da conexão.
+ */
 public class ConnectionSupervisor extends Thread {
 
     private final Socket socket;
@@ -21,6 +26,14 @@ public class ConnectionSupervisor extends Thread {
     private final HandlerRegistry handlerRegistry;
     private ClientConnection clientConnection;
 
+    /**
+     * Cria um novo supervisor de conexão associado a um socket de cliente aceito.
+     *
+     * @param socket socket TCP da conexão estabelecida com o cliente
+     * @param clientRegistry registro de clientes onde a conexão será mantida
+     * @param handlerRegistry catálogo de handlers para despacho de mensagens
+     * @throws IllegalArgumentException se algum dos parâmetros for nulo
+     */
     public ConnectionSupervisor(Socket socket, ClientRegistry clientRegistry, HandlerRegistry handlerRegistry) {
         if (socket == null) {
             throw new IllegalArgumentException("Socket cannot be null");
@@ -39,6 +52,9 @@ public class ConnectionSupervisor extends Thread {
         this.handlerRegistry = handlerRegistry;
     }
 
+    /**
+     * Executa o loop principal de recepção de mensagens, despacho aos handlers e envio de respostas.
+     */
     @Override
     public void run() {
         ObjectOutputStream transmitter;

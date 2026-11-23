@@ -32,6 +32,12 @@ import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.verify;
 
+/**
+ * Testes unitários para {@link RouteRepositoryImpl}.
+ * Valida cenários como: findActiveNear: filtra tipo, status ACTIVE, dias e raio esférico na origem e no destino; findActiveNear: devolve o que o banco encontrou.
+ * <p>
+ * Os métodos de teste estão bem explicativos através de suas anotações {@code @DisplayName}.
+ */
 @ExtendWith(MockitoExtension.class)
 class RouteRepositoryImplTest {
 

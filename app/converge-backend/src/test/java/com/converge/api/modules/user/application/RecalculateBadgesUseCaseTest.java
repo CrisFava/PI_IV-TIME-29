@@ -51,6 +51,12 @@ import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.verifyNoInteractions;
 import static org.mockito.Mockito.when;
 
+/**
+ * Testes unitários para {@link RecalculateBadgesUseCase}.
+ * Valida cenários como: Deve conceder o selo de confiança a quem cumpre os critérios, sem regravar o usuário; Deve conceder o selo de sustentabilidade com 50 kg de CO2 evitado; Não deve conceder o selo de sustentabilidade abaixo de 50 kg.
+ * <p>
+ * Os métodos de teste estão bem explicativos através de suas anotações {@code @DisplayName}.
+ */
 @ExtendWith(MockitoExtension.class)
 class RecalculateBadgesUseCaseTest {
 

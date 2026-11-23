@@ -6,6 +6,9 @@ import 'package:flutter_dotenv/flutter_dotenv.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:google_maps_flutter/google_maps_flutter.dart';
 
+/// Testes unitários e de widgets para google maps service.
+/// Cobre cenários como: GoogleMapsService - Routes e Geocoding Visual.
+/// Os casos de teste estão descritos de forma autoexplicativa nas chamadas de [test] e [group].
 void main() {
   group('GoogleMapsService - Routes e Geocoding Visual', () {
     late Dio mockDio;

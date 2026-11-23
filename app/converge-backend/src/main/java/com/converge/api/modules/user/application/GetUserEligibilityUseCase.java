@@ -14,6 +14,14 @@ import org.springframework.stereotype.Service;
 
 import java.time.LocalDateTime;
 
+/**
+ * Caso de uso que consulta a situação de elegibilidade de um usuário.
+ *
+ * Apenas junta, em um UserEligibilityDTO, os fatos sobre o
+ * usuário (conta ativa, vínculo acadêmico verificado, bloqueio por dívida, CNH
+ * válida e chave PIX cadastrada). Quem interpreta esses fatos e lança os erros
+ * é o RideEligibility, do módulo de carona.
+ */
 @Service
 @RequiredArgsConstructor
 public class GetUserEligibilityUseCase implements UseCase<String, UserEligibilityDTO> {

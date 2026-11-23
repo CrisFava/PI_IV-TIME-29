@@ -30,6 +30,12 @@ import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.anyString;
 import static org.mockito.Mockito.when;
 
+/**
+ * Testes unitários para {@link RegisterCompletedRideUseCase}.
+ * Valida cenários como: Uma viagem deve entrar na semana, no mês, no semestre e no acumulado da plataforma; Cada participante deve receber a viagem no seu papel e a sua fração do CO2; A soma do CO2 dos participantes deve bater com o CO2 da plataforma.
+ * <p>
+ * Os métodos de teste estão bem explicativos através de suas anotações {@code @DisplayName}.
+ */
 @ExtendWith(MockitoExtension.class)
 @MockitoSettings(strictness = Strictness.LENIENT)
 class RegisterCompletedRideUseCaseTest {

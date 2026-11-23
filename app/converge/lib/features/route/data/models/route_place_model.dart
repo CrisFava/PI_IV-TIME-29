@@ -2,6 +2,7 @@
 
 import 'package:flutter/foundation.dart';
 
+/// Representação de um ponto de origem ou destino de um trajeto.
 @immutable
 class RoutePlaceModel {
   final String address;

@@ -5,6 +5,9 @@ import 'package:flutter_test/flutter_test.dart';
 
 import 'fakes/fake_matches.dart';
 
+/// Testes unitários e de widgets para match model.
+/// Cobre cenários como: lê a combinação do backend com o veículo e a próxima data, sem próxima data, não dá para pedir a vaga.
+/// Os casos de teste estão descritos de forma autoexplicativa nas chamadas de [test] e [group].
 void main() {
   test('lê a combinação do backend com o veículo e a próxima data', () {
     final match = MatchModel.fromJson(fakeMatchJson());

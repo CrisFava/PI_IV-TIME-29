@@ -3,6 +3,9 @@
 import 'package:converge/core/utils/currency_formatter.dart';
 import 'package:flutter_test/flutter_test.dart';
 
+/// Testes unitários e de widgets para currency formatter.
+/// Cobre cenários como: CurrencyFormatter.format, CurrencyFormatter.parse.
+/// Os casos de teste estão descritos de forma autoexplicativa nas chamadas de [test] e [group].
 void main() {
   group('CurrencyFormatter.format', () {
     test('usa vírgula nos centavos e sempre duas casas', () {

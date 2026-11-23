@@ -50,6 +50,9 @@ Future<List<int>> _pumpSheet(
 bool _isSubmitEnabled(WidgetTester tester) =>
     tester.widget<FilledButton>(find.byKey(_submitKey)).onPressed != null;
 
+/// Testes unitários e de widgets para ride schedule step sheet.
+/// Cobre cenários como: passageiro.
+/// Os casos de teste estão descritos de forma autoexplicativa nas chamadas de [test] e [group].
 void main() {
   group('passageiro', () {
     testWidgets('sem horário, "Revisar pedido" fica desligado e a tela explica o motivo', (

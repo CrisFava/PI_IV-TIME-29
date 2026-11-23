@@ -26,6 +26,13 @@ public class SustainabilityHandler implements RequestHandler<SustainabilityReque
 
     private static final double CO2_KG_ABSORBED_PER_TREE_YEAR = 22.0;
 
+    /**
+     * Executa o cálculo de métricas de sustentabilidade ambiental para uma viagem compartilhada.
+     *
+     * @param request requisição contendo distância percorrida, consumo médio, tipo de energia e passageiros efetivos
+     * @return resposta contendo carros evitados, energia economizada, CO₂ evitado e árvores equivalentes
+     * @throws ServerException se a requisição for nula
+     */
     @Override
     public SustainabilityResponse execute(SustainabilityRequest request) throws ServerException {
         if (request == null) {
@@ -40,11 +47,25 @@ public class SustainabilityHandler implements RequestHandler<SustainabilityReque
         return new SustainabilityResponse(carsAvoided, energySaved, co2AvoidedKg, equivalentTrees);
     }
 
+    /**
+     * Estima a quantidade de veículos individuais potencialmente retirados de circulação no trânsito.
+     *
+     * @param effectivePassengers quantidade de passageiros que efetivamente participaram da carona
+     * @return número de carros evitados (mínimo zero)
+     */
     // Cada passageiro efetivo = um carro a menos na rua.
     private static int carsAvoided(int effectivePassengers) {
         return Math.max(0, effectivePassengers);
     }
 
+    /**
+     * Calcula a quantidade de energia (combustível em litros ou eletricidade em kWh) economizada pelo compartilhamento.
+     *
+     * @param distanceKm distância da viagem em quilômetros
+     * @param averageConsumption consumo médio do veículo (km/L ou km/kWh)
+     * @param carsAvoided quantidade de carros individuais evitados
+     * @return total de energia poupada
+     */
     // Cada carro evitado faria a mesma distância com o mesmo consumo médio do veículo da carona.
     private static double energySaved(double distanceKm, Double averageConsumption, int carsAvoided) {
         if (distanceKm <= 0 || averageConsumption == null || averageConsumption <= 0 || carsAvoided <= 0) {
@@ -53,6 +74,13 @@ public class SustainabilityHandler implements RequestHandler<SustainabilityReque
         return carsAvoided * distanceKm / averageConsumption;
     }
 
+    /**
+     * Calcula a emissão de CO₂ evitada em quilogramas a partir da energia economizada e do fator de emissão da fonte energética.
+     *
+     * @param energySaved quantidade de energia poupada (L ou kWh)
+     * @param energySource tipo da fonte de energia (GASOLINE, ETHANOL, DIESEL ou ELECTRIC)
+     * @return total de CO₂ evitado em quilogramas
+     */
     private static double co2AvoidedKg(double energySaved, String energySource) {
         if (energySaved <= 0 || energySource == null) {
             return 0.0;
@@ -67,6 +95,12 @@ public class SustainabilityHandler implements RequestHandler<SustainabilityReque
         return energySaved * factor;
     }
 
+    /**
+     * Converte o volume de CO₂ evitado em quantidade equivalente de árvores necessárias para absorver tal emissão em um ano.
+     *
+     * @param co2AvoidedKg quantidade de CO₂ evitado em quilogramas
+     * @return quantidade equivalente de árvores
+     */
     private static double equivalentTrees(double co2AvoidedKg) {
         if (co2AvoidedKg <= 0) {
             return 0.0;

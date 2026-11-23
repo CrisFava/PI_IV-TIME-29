@@ -11,9 +11,18 @@ import java.util.List;
  */
 public final class PolylineDecoder {
 
+    /**
+     * Construtor privado para evitar instanciação de classe utilitária.
+     */
     private PolylineDecoder() {
     }
 
+    /**
+     * Decodifica uma string de polyline codificada do Google em uma lista de coordenadas geográficas.
+     *
+     * @param encoded string da polyline codificada
+     * @return lista de pares [latitude, longitude] decodificados
+     */
     public static List<double[]> decode(String encoded) {
         List<double[]> points = new ArrayList<>();
         if (encoded == null || encoded.isEmpty()) {
@@ -39,7 +48,13 @@ public final class PolylineDecoder {
         return points;
     }
 
-    // Devolve {valor, próxima posição}
+    /**
+     * Extrai o próximo valor numérico e o índice correspondente da polyline.
+     *
+     * @param encoded string codificada
+     * @param start índice inicial de leitura
+     * @return array contendo [valor, proximaPosicao]
+     */
     private static int[] nextValue(String encoded, int start) {
         int result = 0;
         int shift = 0;

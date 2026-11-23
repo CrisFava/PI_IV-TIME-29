@@ -18,6 +18,12 @@ import java.util.Set;
 
 import static org.assertj.core.api.Assertions.assertThat;
 
+/**
+ * Testes unitários para {@link RideFuel}.
+ * Valida cenários como: recordFuel deve gravar a energia da viagem sem perder pedágio e estacionamento.
+ * <p>
+ * Os métodos de teste estão bem explicativos através de suas anotações {@code @DisplayName}.
+ */
 class RideFuelTest {
 
     private Place place(String address) {

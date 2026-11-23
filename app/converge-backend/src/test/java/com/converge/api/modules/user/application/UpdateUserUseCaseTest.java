@@ -32,6 +32,12 @@ import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.verifyNoInteractions;
 import static org.mockito.Mockito.when;
 
+/**
+ * Testes unitários para {@link UpdateUserUseCase}.
+ * Valida cenários como: Deve conferir o CPF da chave PIX no servidor ao editar o perfil; Não deve conferir CPF quando a chave PIX é de outro tipo; CPF recusado pelo servidor impede a edição do perfil.
+ * <p>
+ * Os métodos de teste estão bem explicativos através de suas anotações {@code @DisplayName}.
+ */
 @ExtendWith(MockitoExtension.class)
 class UpdateUserUseCaseTest {
 

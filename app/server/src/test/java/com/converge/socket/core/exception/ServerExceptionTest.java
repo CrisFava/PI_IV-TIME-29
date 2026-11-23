@@ -9,6 +9,12 @@ import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertNull;
 import static org.junit.jupiter.api.Assertions.assertSame;
 
+/**
+ * Testes unitários para {@link ServerException}.
+ * Valida a criação e propagação de exceções da camada de socket, códigos de erro e encapsulamento de causas encadeadas.
+ * <p>
+ * Os métodos de teste estão bem explicativos através de suas anotações {@code @DisplayName}.
+ */
 class ServerExceptionTest {
 
     @Test

@@ -17,6 +17,12 @@ import static org.junit.jupiter.api.Assertions.assertNull;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
+/**
+ * Testes unitários para {@link HandlerRegistry}.
+ * Valida o catálogo e despacho dinâmico de handlers de negócio, além da interceptação de exceções e erros de protocolo.
+ * <p>
+ * Os métodos de teste estão bem explicativos através de suas anotações {@code @DisplayName}.
+ */
 class HandlerRegistryTest {
 
     private static class PingRequest extends Message {

@@ -38,6 +38,12 @@ import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
+/**
+ * Testes unitários para {@link UserQueryUseCases}.
+ * Valida cenários como: Usuário ativo, verificado e em dia pode participar de caronas, mas não oferecer sem CNH; Vínculo acadêmico não verificado impede participar; Usuário bloqueado por dívida não pode participar, mas dívida vencida ainda não bloqueada pode.
+ * <p>
+ * Os métodos de teste estão bem explicativos através de suas anotações {@code @DisplayName}.
+ */
 @ExtendWith(MockitoExtension.class)
 class UserQueryUseCasesTest {
 

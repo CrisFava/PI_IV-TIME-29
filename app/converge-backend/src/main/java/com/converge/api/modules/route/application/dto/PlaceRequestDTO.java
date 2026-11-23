@@ -6,6 +6,7 @@ import jakarta.annotation.Nullable;
 import jakarta.validation.constraints.NotBlank;
 import jakarta.validation.constraints.NotNull;
 
+// Dados de requisição para cadastro de endereço e coordenadas de um local
 public record PlaceRequestDTO(
         @NotBlank(message = "Informe o endereço.")
         String address,

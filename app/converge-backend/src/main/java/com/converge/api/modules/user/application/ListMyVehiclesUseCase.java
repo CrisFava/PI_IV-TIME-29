@@ -10,6 +10,7 @@ import org.springframework.stereotype.Service;
 
 import java.util.List;
 
+// Caso de uso para listar os veículos de um usuário
 @Service
 @RequiredArgsConstructor
 public class ListMyVehiclesUseCase implements UseCase<String, List<Vehicle>> {

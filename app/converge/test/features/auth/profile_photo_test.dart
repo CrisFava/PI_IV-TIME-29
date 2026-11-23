@@ -19,6 +19,7 @@ import 'fakes/fake_auth_repository.dart';
 import 'fakes/fake_auth_service.dart';
 import 'fakes/fake_user.dart';
 
+/// Implementação fake de [ProfilePhotoStorageService] para testes de upload e remoção de foto de perfil.
 class _FakeProfilePhotoStorageService implements ProfilePhotoStorageService {
   String? lastFirebaseUid;
   String? lastFileName;
@@ -40,6 +41,9 @@ class _FakeProfilePhotoStorageService implements ProfilePhotoStorageService {
   }
 }
 
+/// Testes unitários e de widgets para profile photo.
+/// Cobre cenários como: FirebaseProfilePhotoStorageService.buildStoragePath, AuthController.updateProfilePhoto.
+/// Os casos de teste estão descritos de forma autoexplicativa nas chamadas de [test] e [group].
 void main() {
   group('FirebaseProfilePhotoStorageService.buildStoragePath', () {
     test('monta o caminho profile/{firebaseUid}/pictures/{arquivo.ext}', () {

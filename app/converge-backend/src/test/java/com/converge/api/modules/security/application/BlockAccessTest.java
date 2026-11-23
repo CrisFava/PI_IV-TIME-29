@@ -17,6 +17,12 @@ import static org.assertj.core.api.Assertions.assertThat;
 import static org.mockito.Mockito.verifyNoInteractions;
 import static org.mockito.Mockito.when;
 
+/**
+ * Testes unitários para {@link BlockAccess}.
+ * Valida cenários como: O bloqueio vale nos dois sentidos: quem o usuário bloqueou e quem o bloqueou (RF47); Sem usuário não há bloqueios e o banco nem é consultado; isBlockedBetween vale nos dois sentidos.
+ * <p>
+ * Os métodos de teste estão bem explicativos através de suas anotações {@code @DisplayName}.
+ */
 @ExtendWith(MockitoExtension.class)
 class BlockAccessTest {
 

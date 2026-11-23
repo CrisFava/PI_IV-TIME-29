@@ -4,6 +4,9 @@ import 'package:converge/core/widgets/sheet_drag_to_dismiss.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 
+/// Testes unitários e de widgets para sheet drag to dismiss.
+/// Cobre cenários como: arrastar um pouco para baixo não fecha, arrastar abaixo do menor encaixe fecha uma vez.
+/// Os casos de teste estão descritos de forma autoexplicativa nas chamadas de [test] e [group].
 void main() {
   Future<void> pumpSheet(WidgetTester tester, VoidCallback onDismiss) {
     return tester.pumpWidget(

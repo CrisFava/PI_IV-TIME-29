@@ -2,6 +2,7 @@
 
 import 'package:flutter/foundation.dart';
 
+/// Detalhes geográficos e cadastrais de um local selecionado (endereço e coordenadas).
 @immutable
 class PlaceDetailsModel {
   final String address;

@@ -10,6 +10,9 @@ import 'package:flutter_test/flutter_test.dart';
 import '../vehicle/fakes/fake_signed_in_auth_controller.dart';
 import 'fakes/fake_user.dart';
 
+/// Testes unitários e de widgets para become driver controller.
+/// Cobre cenários como: nova tentativa sem mudanças não reenvia nada nem reativa o papel, nova tentativa com PIX e CNH alterados grava os novos dados.
+/// Os casos de teste estão descritos de forma autoexplicativa nas chamadas de [test] e [group].
 void main() {
   late FakeSignedInAuthController auth;
   late ProviderContainer container;

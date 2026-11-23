@@ -20,6 +20,7 @@ import '../widgets/register_step_email.dart';
 import '../widgets/register_step_profile.dart';
 import '../widgets/register_sticky_footer.dart';
 
+/// Página de cadastro de novos usuários em 3 etapas guiadas (e-mail, perfil e segurança acadêmica).
 class RegisterPage extends ConsumerStatefulWidget {
   const RegisterPage({super.key});
 

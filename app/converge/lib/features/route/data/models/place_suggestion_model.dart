@@ -2,6 +2,7 @@
 
 import 'package:flutter/foundation.dart';
 
+/// Sugestão de autocompletar de endereço retornada na busca de locais.
 @immutable
 class PlaceSuggestionModel {
   final String placeId;

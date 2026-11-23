@@ -34,7 +34,16 @@ import lombok.EqualsAndHashCode;
 import lombok.Getter;
 import lombok.NoArgsConstructor;
 
-
+/**
+ * Entidade de veículo (coleção "vehicles" no MongoDB).
+ *
+ * Representa um veículo cadastrado por um motorista: modelo, placa, RENAVAM,
+ * cor, tipo, capacidade, fontes de energia e se está ativo. Concentra as regras
+ * de validação do cadastro: capacidade por tipo de veículo, fontes de energia
+ * sem repetição e faixas aceitáveis de consumo e de preço. O mesmo usuário não
+ * pode ter duas placas iguais (índice único userId + licensePlate).
+ * A remoção é lógica: o veículo só fica inativo (active = false).
+ */
 @Document(collection = "vehicles")
 @NoArgsConstructor(access = AccessLevel.PROTECTED)
 @Getter
@@ -91,6 +100,10 @@ public class Vehicle {
     private LocalDateTime updatedAt;
 
 
+    // Lugares de um carro comum, contando o motorista
+    private static final int MAX_CAR_CAPACITY = 7;
+
+
     public Vehicle (
             String userId,
             @Nullable String nickname,
@@ -106,6 +119,14 @@ public class Vehicle {
         this.applyVehicleData(nickname, model, licensePlate, renavam, color, type, totalCapacity, fuelSources);
     }
 
+    /**
+     * Valida e aplica os dados do veículo. Primeiro valida tudo (capacidade,
+     * fontes de energia e faixas de consumo e preço) e só depois altera os
+     * campos, então um erro de validação não deixa o objeto pela metade.
+     * Normaliza o RENAVAM (só dígitos) e a placa (sem hífen, maiúscula) e
+     * substitui a lista de fontes de energia pela nova.
+     * É usado tanto pelo construtor quanto pelo update.
+     */
     private void applyVehicleData(
             @Nullable String nickname,
             String model,
@@ -132,17 +153,29 @@ public class Vehicle {
         this.fuelSources.addAll(fuelSources);
     }
 
+    /**
+     * Normaliza o RENAVAM removendo tudo que não é dígito. Se vier nulo, vira
+     * texto vazio.
+     */
     private String normalizeRenavam(String renavam) {
         return renavam == null ? "" : renavam.replaceAll("\\D", "");
     }
 
+    /**
+     * Normaliza a placa: remove o hífen, tira espaços nas pontas e põe em
+     * maiúsculas (ex.: "abc-1234" vira "ABC1234").
+     */
     private String normalizeLicensePlate(String licensePlate) {
         return licensePlate.replace("-", "").trim().toUpperCase();
     }
 
-    // Lugares de um carro comum, contando o motorista
-    private static final int MAX_CAR_CAPACITY = 7;
 
+    /**
+     * Valida a capacidade de lugares: entre 1 e 15 para qualquer veículo, no
+     * máximo 2 para moto (piloto + 1 passageiro) e no máximo 7 para carros
+     * comuns. Mais de 7 lugares só para van ou "outro" (OTHER).
+     * Lança BAD_REQUEST no campo totalCapacity se alguma regra falhar.
+     */
     private void validateCapacity(VehicleType type, int totalCapacity) {
         if (totalCapacity < 1 || totalCapacity > 15) {
             throw new ApplicationException(
@@ -171,6 +204,10 @@ public class Vehicle {
         }
     }
 
+    /**
+     * Valida a lista de fontes de energia: precisa ter pelo menos uma e não pode
+     * repetir o mesmo tipo de energia. Lança BAD_REQUEST no campo fuelSources.
+     */
     private void validateFuelSources(List<FuelSource> fuelSources) {
         if (fuelSources == null || fuelSources.isEmpty()) {
             throw new ApplicationException(
@@ -192,6 +229,14 @@ public class Vehicle {
         }
     }
 
+    /**
+     * Confere, para cada fonte de energia, se o consumo médio e o preço estão
+     * em faixas plausíveis, para barrar erros de digitação. O consumo é
+     * comparado com a faixa do tipo de veículo (ver consumptionRange). O preço
+     * deve ficar entre R$ 0,30 e R$ 3,00 para elétrico (por kWh) e entre
+     * R$ 3,00 e R$ 12,00 para as demais fontes (por litro).
+     * Lança BAD_REQUEST no campo fuelSources se algo estiver fora da faixa.
+     */
     private void validateFuelRanges(VehicleType type, List<FuelSource> fuelSources) {
         for (FuelSource fuel : fuelSources) {
             double[] consumption = consumptionRange(type, fuel.consumptionUnit());
@@ -223,6 +268,11 @@ public class Vehicle {
         }
     }
 
+    /**
+     * Devolve a faixa [mínimo, máximo] de consumo aceita para o tipo de veículo
+     * e a unidade (km/kWh se elétrico, km/litro nos demais casos). Motos aceitam
+     * consumos maiores que carros, e "outro" tem a faixa mais ampla.
+     */
     private double[] consumptionRange(VehicleType type, ConsumptionUnit unit) {
         boolean electric = unit == ConsumptionUnit.KM_PER_KWH;
 
@@ -234,10 +284,19 @@ public class Vehicle {
         };
     }
 
+    /**
+     * Devolve as fontes de energia como lista somente leitura. A lista só muda
+     * pelo construtor ou pelo update.
+     */
     public List<FuelSource> getFuelSources() {
         return Collections.unmodifiableList(this.fuelSources);
     }
 
+    /**
+     * Atualiza os dados do veículo com as mesmas validações do cadastro.
+     * Também é usado pelo CreateVehicleUseCase para reaproveitar um veículo
+     * inativo com a mesma placa.
+     */
     public void update(
             @Nullable String nickname,
             String model,
@@ -251,14 +310,24 @@ public class Vehicle {
         this.applyVehicleData(nickname, model, licensePlate, renavam, color, type, totalCapacity, fuelSources);
     }
 
+    /**
+     * Desativa o veículo (exclusão lógica, os dados continuam salvos).
+     */
     public void deactivate() {
         this.active = false;
     }
 
+    /**
+     * Reativa um veículo que estava inativo.
+     */
     public void reactivate() {
         this.active = true;
     }
 
+
+    /**
+     * Diz se o veículo pertence ao usuário informado.
+     */
     public boolean isOwnedBy(String userId) {
         return this.userId.equals(userId);
     }

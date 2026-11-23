@@ -1,5 +1,6 @@
 // Autor: Allan Giovanni Matias Paes - RA 25008211
 
+/// Categorias de Carteira Nacional de Habilitação (CNH) aceitas pela plataforma.
 enum DriverLicenseCategory {
   a,
   b,
@@ -16,6 +17,7 @@ enum DriverLicenseCategory {
   String get label => toJson();
 }
 
+/// Dados de entrada para submissão e validação de CNH do motorista.
 class DriverLicenseInput {
   final String number;
   final DriverLicenseCategory category;

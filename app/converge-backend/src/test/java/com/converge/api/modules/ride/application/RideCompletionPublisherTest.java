@@ -42,6 +42,12 @@ import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
+/**
+ * Testes unitários para {@link RideCompletionPublisher}.
+ * Valida cenários como: Deve publicar a viagem concluída com os passageiros efetivos, a distância do trajeto e o veículo; Sem trajeto nem veículo, deve usar a linha reta e deixar o combustível vazio; Com o combustível gravado na viagem, não deve consultar o veículo atual.
+ * <p>
+ * Os métodos de teste estão bem explicativos através de suas anotações {@code @DisplayName}.
+ */
 @ExtendWith(MockitoExtension.class)
 class RideCompletionPublisherTest {
 

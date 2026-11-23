@@ -7,6 +7,12 @@ import org.junit.jupiter.api.Test;
 
 import static org.assertj.core.api.Assertions.assertThat;
 
+/**
+ * Testes unitários para {@link Place}.
+ * Valida cenários como: Deve gravar o GeoJsonPoint como [longitude, latitude]; Deve devolver as mesmas coordenadas que recebeu.
+ * <p>
+ * Os métodos de teste estão bem explicativos através de suas anotações {@code @DisplayName}.
+ */
 class PlaceTest {
 
     @Test

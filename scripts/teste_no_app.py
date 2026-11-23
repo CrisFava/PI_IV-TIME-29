@@ -45,16 +45,39 @@ POLL_SECONDS = 5
 
 
 def log(message: str) -> None:
+    """Registra uma mensagem no console com timestamp atual no formato HH:MM:SS.
+
+    Args:
+        message: Texto informativo a ser exibido.
+    """
     print(f"[{datetime.now():%H:%M:%S}] {message}", flush=True)
 
 
 def load_state() -> dict:
+    """Carrega o arquivo JSON de estado da preparação (.teste_no_app.json).
+
+    Retorna o dicionário com metadados dos robôs e conta do app, ou encerra
+    a execução com erro se a preparação não tiver sido executada previamente.
+
+    Returns:
+        dict contendo 'runId', 'emails', e dados das contas criadas.
+    """
     if not STATE_FILE.is_file():
         sys.exit("Rode antes: python3 scripts/teste_no_app.py preparar")
     return json.loads(STATE_FILE.read_text(encoding="utf-8"))
 
 
 def sign_in(api: ApiClient, key: str, email: str) -> str:
+    """Autentica um usuário via Firebase Auth REST API e obtém seu idToken.
+
+    Args:
+        api: Instância do cliente HTTP de simulação.
+        key: Chave de API do Firebase.
+        email: E-mail da conta a autenticar.
+
+    Returns:
+        idToken JWT do Firebase Auth.
+    """
     response = api.call("POST", f"{FIREBASE_AUTH_URL}/accounts:signInWithPassword?key={key}",
                         body={"email": email, "password": PASSWORD, "returnSecureToken": True})
     token = (response.body or {}).get("idToken")
@@ -64,12 +87,36 @@ def sign_in(api: ApiClient, key: str, email: str) -> str:
 
 
 def expect(response, what: str):
+    """Valida se uma resposta da API foi bem-sucedida, disparando exceção se houver erro.
+
+    Args:
+        response: Instância de ApiResponse.
+        what: Descrição da ação esperada para composição da mensagem de falha.
+
+    Returns:
+        Conteúdo extraído em response.data.
+
+    Raises:
+        SimulationFailure: Se a resposta HTTP contiver código de erro.
+    """
     if not response.ok:
         raise SimulationFailure(f"{what}: {response.describe()}")
     return response.data
 
 
 def route_body(kind: str, departure: datetime, extra: dict) -> dict:
+    """Monta o payload JSON de criação de rota para oferta ou busca.
+
+    Utiliza os pontos de origem e destino padrão PUC-Campinas definidos no módulo.
+
+    Args:
+        kind: Tipo da rota ("OFFER" para oferta de motorista, "SEARCH" para busca de passageiro).
+        departure: Data e hora programadas para a partida.
+        extra: Dicionário com campos adicionais (ex.: vehicleId, totalSeats, etc.).
+
+    Returns:
+        dict formatado conforme o DTO CreateRouteCommand do backend.
+    """
     return {
         "type": kind,
         "origin": ORIGIN,
@@ -86,6 +133,16 @@ def route_body(kind: str, departure: datetime, extra: dict) -> dict:
 # ---------------------------------------------------------------------------------- preparar
 
 def prepare(api: ApiClient, key: str, connection: str, database: str) -> None:
+    """Cria a conta do app e os dois robôs (motorista e passageira) no Firebase e MongoDB.
+
+    Salva os identificadores no arquivo local .teste_no_app.json para uso posterior.
+
+    Args:
+        api: Cliente HTTP apontando para o backend.
+        key: Chave de API do Firebase.
+        connection: String de conexão com o MongoDB.
+        database: Nome do banco de dados no MongoDB.
+    """
     run_id = uuid.uuid4().hex
     emails = [
         f"sim.{run_id}.1.conta-do-app@converge-sim.test",
@@ -133,7 +190,18 @@ def prepare(api: ApiClient, key: str, connection: str, database: str) -> None:
 # ---------------------------------------------------------------------------------- robô motorista
 
 def run_driver_bot(api: ApiClient, key: str, minutes: int, ride_minutes: int) -> None:
-    """A conta do app é a PASSAGEIRA: o robô oferece, aceita, inicia, cobra na chegada e encerra."""
+    """Executa o robô no papel de MOTORISTA quando a conta do app for a passageira.
+
+    O robô publica a carona, aceita pedidos de vaga entrantes, aguarda a janela
+    permitida de início, inicia a viagem, confirma a chegada após o tempo configurado
+    e encerra a corrida.
+
+    Args:
+        api: Cliente HTTP configurado para o backend.
+        key: Chave de API do Firebase.
+        minutes: Minutos até a saída programada da carona.
+        ride_minutes: Duração em minutos antes de confirmar chegada dos passageiros.
+    """
     state = load_state()
     token = sign_in(api, key, state["motorista"]["email"])
     vehicles = expect(api.get("/vehicles", token), "listar o carro do robô") or []
@@ -210,7 +278,19 @@ def runs_on(route: dict, day: date) -> bool:
 
 
 def run_passenger_bot(api: ApiClient, key: str, connection: str, database: str, pay_after: int) -> None:
-    """A conta do app é a MOTORISTA: o robô pede vaga na carona que ela publicou e informa o pagamento."""
+    """Executa o robô no papel de PASSAGEIRA quando a conta do app for a motorista.
+
+    O robô busca ativamente no MongoDB a carona publicada pelo app para a data de hoje,
+    solicita vaga na carona, aguarda o aceite/início pelo motorista e, ao receber
+    a confirmação de chegada, notifica o pagamento ('Já paguei').
+
+    Args:
+        api: Cliente HTTP configurado para o backend.
+        key: Chave de API do Firebase.
+        connection: String de conexão com o MongoDB.
+        database: Nome do banco de dados no MongoDB.
+        pay_after: Segundos de espera após a chegada para sinalizar pagamento.
+    """
     state = load_state()
     token = sign_in(api, key, state["passageiro"]["email"])
     my_id = state["passageiro"]["id"]
@@ -269,6 +349,14 @@ def run_passenger_bot(api: ApiClient, key: str, connection: str, database: str, 
 # ---------------------------------------------------------------------------------- limpar
 
 def clean(api: ApiClient, key: str, connection: str, database: str) -> None:
+    """Remove as contas de simulação do Firebase Auth e exclui o arquivo de estado local.
+
+    Args:
+        api: Cliente HTTP configurado para o backend.
+        key: Chave de API do Firebase.
+        connection: String de conexão com o MongoDB.
+        database: Nome do banco de dados no MongoDB.
+    """
     state = load_state()
     with MongoClient(connection, serverSelectionTimeoutMS=10_000) as client:
         world = SimulationWorld(api, key, client[database][verificar_usuario.USERS_COLLECTION],
@@ -283,6 +371,11 @@ def clean(api: ApiClient, key: str, connection: str, database: str) -> None:
 
 
 def main() -> int:
+    """Ponto de entrada CLI para o script de testes manuais integrados ao app mobile.
+
+    Returns:
+        Código de saída do processo (0 em caso de sucesso).
+    """
     parser = argparse.ArgumentParser(description="Teste manual no app com um robô fazendo a outra ponta da corrida.")
     parser.add_argument("acao", choices=["preparar", "motorista", "passageiro", "limpar"])
     parser.add_argument("--api", default=DEFAULT_API, help=f"URL da API (padrão: {DEFAULT_API})")

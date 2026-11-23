@@ -38,6 +38,12 @@ import static org.mockito.Mockito.times;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
+/**
+ * Testes unitários para {@link MongoUserPaymentStandingWriter}.
+ * Valida cenários como: Deve somar 1 em overdueRidesCount e devolver o novo total; Deve devolver vazio quando o usuário não existe; Deve tirar 1 de overdueRidesCount só quando o total é maior que 0.
+ * <p>
+ * Os métodos de teste estão bem explicativos através de suas anotações {@code @DisplayName}.
+ */
 @ExtendWith(MockitoExtension.class)
 class MongoUserPaymentStandingWriterTest {
 

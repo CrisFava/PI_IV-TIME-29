@@ -10,6 +10,9 @@ import 'package:flutter_test/flutter_test.dart';
 import 'fakes/fake_auth_repository.dart';
 import 'fakes/fake_auth_service.dart';
 
+/// Testes unitários e de widgets para register email check.
+/// Cobre cenários como: bloqueia avanço no passo 1 e exibe erro quando e-mail já está cadastrado, avança para o passo 2 quando e-mail está disponível.
+/// Os casos de teste estão descritos de forma autoexplicativa nas chamadas de [test] e [group].
 void main() {
   testWidgets(
     'bloqueia avanço no passo 1 e exibe erro quando e-mail já está cadastrado',

@@ -9,6 +9,12 @@ import org.junit.jupiter.api.Test;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.within;
 
+/**
+ * Testes unitários para {@link SocketSustainabilityGateway}.
+ * Valida cenários como: Sem servidor, deve calcular carros evitados, energia, CO2 e árvores de uma viagem a gasolina; Sem servidor, deve usar o fator de cada fonte de energia; Sem servidor, dado faltando ou inválido deve dar zero em vez de falhar.
+ * <p>
+ * Os métodos de teste estão bem explicativos através de suas anotações {@code @DisplayName}.
+ */
 class SocketSustainabilityGatewayTest {
 
     // Porta 1 fechada: o adaptador cai no handler local, sem depender de servidor rodando.

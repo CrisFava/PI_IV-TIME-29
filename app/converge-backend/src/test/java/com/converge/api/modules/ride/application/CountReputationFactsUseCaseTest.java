@@ -22,6 +22,12 @@ import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
+/**
+ * Testes unitários para {@link CountReputationFactsUseCase}.
+ * Valida cenários como: Deve buscar as viagens a partir de since, contar com o counter e fechar o stream.
+ * <p>
+ * Os métodos de teste estão bem explicativos através de suas anotações {@code @DisplayName}.
+ */
 @ExtendWith(MockitoExtension.class)
 class CountReputationFactsUseCaseTest {
 

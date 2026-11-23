@@ -27,6 +27,12 @@ import static org.mockito.ArgumentMatchers.anyCollection;
 import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.when;
 
+/**
+ * Testes unitários para {@link RideRequestHistory}.
+ * Valida cenários como: Deve devolver os trajetos dos motoristas que recusaram o passageiro em viagens em aberto; Deve devolver os passageiros recusados nas viagens em aberto do trajeto do motorista.
+ * <p>
+ * Os métodos de teste estão bem explicativos através de suas anotações {@code @DisplayName}.
+ */
 @ExtendWith(MockitoExtension.class)
 class RideRequestHistoryTest {
 

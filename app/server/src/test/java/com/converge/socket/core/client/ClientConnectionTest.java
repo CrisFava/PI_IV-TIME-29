@@ -27,6 +27,12 @@ import static org.junit.jupiter.api.Assertions.assertSame;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
+/**
+ * Testes unitários para {@link ClientConnection}.
+ * Valida o envio, recepção e inspeção (peek) de mensagens serializadas, concorrência via semáforo e fechamento idempotente da conexão de cliente.
+ * <p>
+ * Os métodos de teste estão bem explicativos através de suas anotações {@code @DisplayName}.
+ */
 class ClientConnectionTest {
 
     private static ObjectInputStream createObjectInputStream(Object... objects) throws IOException {

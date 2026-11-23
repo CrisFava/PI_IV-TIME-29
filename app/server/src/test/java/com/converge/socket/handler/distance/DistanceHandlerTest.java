@@ -13,6 +13,12 @@ import static org.junit.jupiter.api.Assertions.assertNotEquals;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
+/**
+ * Testes unitários para {@link DistanceHandler}.
+ * Valida o cálculo em lote de distâncias geodésicas utilizando a fórmula de Haversine entre múltiplos pontos geográficos.
+ * <p>
+ * Os métodos de teste estão bem explicativos através de suas anotações {@code @DisplayName}.
+ */
 class DistanceHandlerTest {
 
     // Um grau de arco no raio de 6371 km: 6371 * pi / 180.

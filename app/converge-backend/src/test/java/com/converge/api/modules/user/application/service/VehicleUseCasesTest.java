@@ -49,6 +49,12 @@ import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
+/**
+ * Testes unitários para {@link VehicleUseCases}.
+ * Valida cenários como: Quem não é motorista não pode cadastrar veículo; Motorista deve cadastrar veículo com a placa normalizada; Não deve cadastrar duas vezes a mesma placa ativa para o mesmo dono.
+ * <p>
+ * Os métodos de teste estão bem explicativos através de suas anotações {@code @DisplayName}.
+ */
 @ExtendWith(MockitoExtension.class)
 class VehicleUseCasesTest {
 

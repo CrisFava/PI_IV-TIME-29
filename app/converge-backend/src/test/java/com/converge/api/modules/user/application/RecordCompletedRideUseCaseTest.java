@@ -33,6 +33,12 @@ import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.verifyNoInteractions;
 import static org.mockito.Mockito.when;
 
+/**
+ * Testes unitários para {@link RecordCompletedRideUseCase}.
+ * Valida cenários como: Deve contar a viagem para o motorista e para cada passageiro no papel certo; Deve ignorar usuário inexistente e seguir com os demais; Falha ao gravar um usuário não impede a contagem dos outros.
+ * <p>
+ * Os métodos de teste estão bem explicativos através de suas anotações {@code @DisplayName}.
+ */
 @ExtendWith(MockitoExtension.class)
 class RecordCompletedRideUseCaseTest {
 

@@ -25,6 +25,12 @@ import java.util.stream.Stream;
 
 import static org.assertj.core.api.Assertions.assertThat;
 
+/**
+ * Testes unitários para {@link ReputationFactsCounter}.
+ * Valida cenários como: Deve contar a viagem concluída dentro da janela para o motorista e para cada passageiro; Deve contar a viagem concluída exatamente 90 dias atrás; Não deve contar a viagem concluída um segundo antes do início da janela.
+ * <p>
+ * Os métodos de teste estão bem explicativos através de suas anotações {@code @DisplayName}.
+ */
 class ReputationFactsCounterTest {
 
     private static final LocalDateTime NOW = LocalDateTime.of(2026, 11, 20, 12, 0);

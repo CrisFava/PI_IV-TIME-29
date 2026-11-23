@@ -38,6 +38,12 @@ import static org.mockito.Mockito.times;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
+/**
+ * Testes unitários para {@link IdempotencyFilter}.
+ * Valida cenários como: Deve armazenar resposta e fingerprint no primeiro POST com Idempotency-Key e retornar resposta em cache no replay; Deve retornar 400 Bad Request quando Idempotency-Key é reutilizada com corpo ou query diferente; Deve preservar reserva como UNKNOWN_OUTCOME se falhar ao salvar resposta concluída após mutação.
+ * <p>
+ * Os métodos de teste estão bem explicativos através de suas anotações {@code @DisplayName}.
+ */
 @ExtendWith(MockitoExtension.class)
 class IdempotencyFilterTest {
 

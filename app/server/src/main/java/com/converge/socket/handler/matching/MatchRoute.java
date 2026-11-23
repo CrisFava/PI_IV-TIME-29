@@ -38,6 +38,24 @@ public class MatchRoute implements Serializable {
     // Caminho do motorista pelas ruas (polyline do Google). Null: usa a linha reta origem → destino.
     private final String encodedPolyline;
 
+    /**
+     * Construtor para rota sem polyline codificada (utiliza trajeto em linha reta entre origem e destino).
+     *
+     * @param routeId identificador único do trajeto
+     * @param userId identificador do usuário proprietário do trajeto
+     * @param originLat latitude de origem
+     * @param originLng longitude de origem
+     * @param destinationLat latitude de destino
+     * @param destinationLng longitude de destino
+     * @param departureTime horário de saída no formato HH:mm
+     * @param weekDays conjunto de dias da semana em que a viagem ocorre
+     * @param maxDetourKm desvio máximo tolerado em quilômetros (apenas para oferta)
+     * @param totalSeats total de vagas no veículo (apenas para oferta)
+     * @param availableSeats vagas disponíveis para carona (apenas para oferta)
+     * @param routeDistanceKm distância total do trajeto em quilômetros (apenas para oferta)
+     * @param energyCostPerKm custo de combustível/energia por quilômetro (apenas para oferta)
+     * @param fixedCosts custos fixos somados (pedágio e estacionamento)
+     */
     public MatchRoute(
             String routeId,
             String userId,
@@ -58,6 +76,25 @@ public class MatchRoute implements Serializable {
                 maxDetourKm, totalSeats, availableSeats, routeDistanceKm, energyCostPerKm, fixedCosts, null);
     }
 
+    /**
+     * Construtor completo para rota com polyline codificada da rota pelas ruas.
+     *
+     * @param routeId identificador único do trajeto
+     * @param userId identificador do usuário proprietário do trajeto
+     * @param originLat latitude de origem
+     * @param originLng longitude de origem
+     * @param destinationLat latitude de destino
+     * @param destinationLng longitude de destino
+     * @param departureTime horário de saída no formato HH:mm
+     * @param weekDays conjunto de dias da semana em que a viagem ocorre
+     * @param maxDetourKm desvio máximo tolerado em quilômetros
+     * @param totalSeats total de vagas no veículo
+     * @param availableSeats vagas disponíveis para carona
+     * @param routeDistanceKm distância total do trajeto em quilômetros
+     * @param energyCostPerKm custo de combustível/energia por quilômetro
+     * @param fixedCosts custos fixos somados
+     * @param encodedPolyline linha poligonal codificada representando o trajeto geográfico
+     */
     public MatchRoute(
             String routeId,
             String userId,
@@ -95,6 +132,19 @@ public class MatchRoute implements Serializable {
         this.encodedPolyline = encodedPolyline;
     }
 
+    /**
+     * Cria uma rota simplificada representando a procura de um passageiro (SEARCH).
+     *
+     * @param routeId identificador do trajeto
+     * @param userId identificador do passageiro
+     * @param originLat latitude de embarque
+     * @param originLng longitude de embarque
+     * @param destinationLat latitude de desembarque
+     * @param destinationLng longitude de desembarque
+     * @param departureTime horário desejado de saída (HH:mm)
+     * @param weekDays dias da semana desejados
+     * @return instância de {@link MatchRoute} configurada para procura
+     */
     public static MatchRoute search(
             String routeId,
             String userId,
@@ -109,6 +159,7 @@ public class MatchRoute implements Serializable {
                 departureTime, weekDays, null, null, null, null, null, null);
     }
 
+    // Getters e setters
     public String getRouteId() {
         return routeId;
     }

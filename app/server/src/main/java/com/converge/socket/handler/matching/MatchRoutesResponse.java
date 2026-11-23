@@ -17,10 +17,16 @@ public class MatchRoutesResponse extends Message {
 
     private final ArrayList<MatchResult> results;
 
+    /**
+     * Cria a resposta com as combinações compatíveis encontradas.
+     *
+     * @param results lista de resultados compatíveis já ordenados por relevância
+     */
     public MatchRoutesResponse(List<MatchResult> results) {
         this.results = results == null ? new ArrayList<>() : new ArrayList<>(results);
     }
 
+    // Getters e setters
     public List<MatchResult> getResults() {
         return results;
     }

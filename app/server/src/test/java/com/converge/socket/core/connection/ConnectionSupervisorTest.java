@@ -23,6 +23,12 @@ import static org.junit.jupiter.api.Assertions.assertInstanceOf;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
+/**
+ * Testes unitários para {@link ConnectionSupervisor}.
+ * Valida a thread supervisora responsável por gerenciar streams de comunicação de um cliente específico, processar mensagens e despachar aos handlers.
+ * <p>
+ * Os métodos de teste estão bem explicativos através de suas anotações {@code @DisplayName}.
+ */
 class ConnectionSupervisorTest {
 
     private static class EchoRequest extends Message {

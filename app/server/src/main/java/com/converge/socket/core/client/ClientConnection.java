@@ -14,6 +14,11 @@ import java.net.Socket;
 import java.net.SocketException;
 import java.util.concurrent.Semaphore;
 
+/**
+ * Encapsula a conexão de um cliente socket TCP com buffer de inspeção (peek) e fechamento de streams e socket.
+ * A leitura de mensagens (input) requer um único leitor e não é geralmente thread-safe, enquanto o método
+ * {@link #send(Message)} serializa as operações de escrita concorrentes por meio de semáforo.
+ */
 public class ClientConnection {
 
     private final Socket socket;
@@ -24,6 +29,14 @@ public class ClientConnection {
     private final Semaphore mutex = new Semaphore(1, true);
     private volatile boolean closed = false;
 
+    /**
+     * Inicializa uma nova conexão de cliente encapsulando o socket e seus respectivos streams.
+     *
+     * @param socket socket TCP da conexão
+     * @param receiver stream de entrada para recepção de objetos serializados
+     * @param transmitter stream de saída para envio de objetos serializados
+     * @throws ServerException se algum dos parâmetros fornecidos for nulo
+     */
     public ClientConnection(Socket socket, ObjectInputStream receiver, ObjectOutputStream transmitter)
             throws ServerException {
         if (socket == null) {
@@ -41,7 +54,12 @@ public class ClientConnection {
         this.transmitter = transmitter;
     }
 
-    // send = receba()
+    /**
+     * Envia uma mensagem serializada para o cliente através do stream de saída.
+     *
+     * @param message objeto de mensagem a ser transmitido
+     * @throws ServerException se a conexão estiver fechada ou houver falha de I/O na transmissão
+     */
     public void send(Message message) throws ServerException {
         if (closed || socket.isClosed()) {
             throw new ServerException(ServerErrorCode.CLIENT_DISCONNECTED, "Cannot send message: connection is closed");
@@ -57,6 +75,12 @@ public class ClientConnection {
         }
     }
 
+    /**
+     * Inspeciona a próxima mensagem do stream sem consumi-la, mantendo-a em buffer.
+     *
+     * @return a próxima mensagem recebida do cliente
+     * @throws ServerException se o cliente desconectar ou ocorrer erro de leitura
+     */
     public Message peek() throws ServerException {
         try {
             mutex.acquireUninterruptibly();
@@ -73,7 +97,12 @@ public class ClientConnection {
         }
     }
 
-    // envie()
+    /**
+     * Lê e consome a próxima mensagem enviada pelo cliente através do stream de entrada.
+     *
+     * @return a mensagem recebida e consumida
+     * @throws ServerException se o cliente desconectar ou ocorrer erro de leitura
+     */
     public Message receive() throws ServerException {
         try {
             if (this.nextMessage == null) {
@@ -90,6 +119,11 @@ public class ClientConnection {
     }
 
     // adeus()
+    /**
+     * Fecha de forma atômica e idempotente a conexão do cliente, liberando streams e socket.
+     *
+     * @throws ServerException se ocorrer erro ao encerrar os recursos
+     */
     public void close() throws ServerException {
         if (closed) {
             return;
@@ -123,6 +157,8 @@ public class ClientConnection {
             );
         }
     }
+
+    // Getters e setters
 
     public boolean isClosed() {
         return closed || socket.isClosed();

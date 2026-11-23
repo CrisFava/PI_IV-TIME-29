@@ -10,6 +10,9 @@ import 'package:flutter_test/flutter_test.dart';
 
 import '../matching/fakes/fake_matching_route_repository.dart';
 
+/// Testes unitários e de widgets para offer route controller.
+/// Cobre cenários como: a mesma carona já publicada (409): o erro chega ao motorista.
+/// Os casos de teste estão descritos de forma autoexplicativa nas chamadas de [test] e [group].
 void main() {
   late FakeMatchingRouteRepository routes;
   late ProviderContainer container;

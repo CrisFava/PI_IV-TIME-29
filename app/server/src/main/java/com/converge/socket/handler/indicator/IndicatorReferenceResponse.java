@@ -14,9 +14,16 @@ public class IndicatorReferenceResponse extends Message {
 
     private final String[] references;
 
+    /**
+     * Cria a resposta contendo as referências temporais calculadas na mesma ordem do pedido.
+     *
+     * @param references vetor de strings contendo as referências geradas
+     */
     public IndicatorReferenceResponse(String[] references) {
         this.references = references;
     }
+
+    // Getters e setters
 
     public String[] getReferences() {
         return references;

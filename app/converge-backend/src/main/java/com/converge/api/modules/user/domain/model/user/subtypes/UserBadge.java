@@ -8,6 +8,13 @@ import jakarta.validation.constraints.PastOrPresent;
 
 import java.time.LocalDateTime;
 
+/**
+ * Selo (badge) conquistado por um usuário (value object imutável).
+ *
+ * Liga um tipo de selo (enum Badge) ao momento em que foi concedido. Uma lista
+ * de UserBadge forma o histórico de conquistas do usuário, que aparece na
+ * resposta do perfil (ver getBadges no UserMapper).
+ */
 public record UserBadge(
         @NotNull
         Badge badge,

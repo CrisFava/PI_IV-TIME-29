@@ -13,6 +13,7 @@ import com.converge.api.modules.user.domain.model.user.subtypes.UserBadge;
 import java.time.LocalDateTime;
 import java.util.Set;
 
+// Dados de resposta com os detalhes do usuário criado
 public record CreateUserResponseDTO(
         String id,
         String firebaseUid,

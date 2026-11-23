@@ -2,9 +2,7 @@
 
 package com.converge.api.modules.user.domain.enums.user;
 
-import lombok.RequiredArgsConstructor;
-
-@RequiredArgsConstructor
+// Tipo de verificação do usuário
 public enum VerificationMethod {
     INSTITUTIONAL_EMAIL, DOCUMENT;
 }

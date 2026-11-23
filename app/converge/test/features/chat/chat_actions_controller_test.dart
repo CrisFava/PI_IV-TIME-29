@@ -17,6 +17,9 @@ import '../ride/fakes/fake_ride_repository.dart';
 import 'fakes/fake_chat_repository.dart';
 import 'fakes/fake_chat_user.dart';
 
+/// Testes unitários e de widgets para chat actions controller.
+/// Cobre cenários como: sendText, viagem.
+/// Os casos de teste estão descritos de forma autoexplicativa nas chamadas de [test] e [group].
 void main() {
   const thread = ChatThreadRef(
     chatRoomId: 'ride_ride-1',

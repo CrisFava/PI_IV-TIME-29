@@ -14,6 +14,12 @@ import org.junit.jupiter.params.provider.ValueSource;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 
+/**
+ * Testes unitários para {@link PixKeyType}.
+ * Valida cenários como: CPF válido é normalizado para só dígitos, com ou sem máscara; CPF curto, longo, com letras ou vazio é recusado (os dígitos verificadores ficam com o servidor); Celular com DDD é normalizado para +55DDDNÚMERO, com ou sem máscara.
+ * <p>
+ * Os métodos de teste estão bem explicativos através de suas anotações {@code @DisplayName}.
+ */
 class PixKeyTypeTest {
 
     @ParameterizedTest(name = "CPF \"{0}\" vira {1}")

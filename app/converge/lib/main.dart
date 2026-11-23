@@ -8,6 +8,8 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'app_widget.dart';
 import 'firebase_options.dart';
 
+/// Ponto de entrada principal do aplicativo Converge Mobile.
+/// Inicializa os bindings do Flutter, variáveis de ambiente (.env), Firebase e Riverpod.
 Future<void> main() async {
   WidgetsFlutterBinding.ensureInitialized();
 

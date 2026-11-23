@@ -10,6 +10,9 @@ import 'package:flutter_test/flutter_test.dart';
 
 import 'fakes/fake_review_repository.dart';
 
+/// Testes unitários e de widgets para ride reviews controller.
+/// Cobre cenários como: modelos.
+/// Os casos de teste estão descritos de forma autoexplicativa nas chamadas de [test] e [group].
 void main() {
   late FakeReviewRepository reviews;
   late ProviderContainer container;

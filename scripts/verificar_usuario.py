@@ -78,6 +78,7 @@ def setting(name: str, env_file: dict, default=None):
 
 
 def find_user(users, email: str):
+    """Localiza o documento do usuário pelo e-mail da conta ou pelo e-mail institucional."""
     # Aceita tanto o e-mail da conta quanto o institucional, sem diferenciar maiúsculas.
     exact = re.compile(f"^{re.escape(email.strip())}$", re.IGNORECASE)
     return users.find_one({"$or": [
@@ -122,12 +123,14 @@ def build_update(user: dict, only: str, now: datetime):
 
 
 def describe(user: dict) -> str:
+    """Gera uma string formatada com os status do vínculo acadêmico e da CNH do usuário."""
     academic = (user.get("academicRecord") or {}).get("status", "-")
     license_status = (user.get("driverLicense") or {}).get("status", "-")
     return f"vínculo acadêmico: {academic} | CNH: {license_status}"
 
 
 def parse_args():
+    """Analisa as opções de linha de comando para a verificação individual de usuário."""
     parser = argparse.ArgumentParser(
         description="Marca a CNH e o vínculo acadêmico de um usuário como VERIFIED no MongoDB.")
     parser.add_argument("email", help="E-mail da conta ou e-mail institucional do usuário")
@@ -142,6 +145,7 @@ def parse_args():
 
 
 def main() -> int:
+    """Ponto de entrada: conecta ao MongoDB e atualiza os documentos do usuário informado."""
     args = parse_args()
     env_file = read_env_file(args.env)
 

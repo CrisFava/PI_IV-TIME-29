@@ -17,6 +17,12 @@ import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.verifyNoInteractions;
 import static org.mockito.Mockito.when;
 
+/**
+ * Testes unitários para {@link PaymentOverdueScheduler}.
+ * Valida cenários como: Ligado, deve chamar o caso de uso com a hora atual; Desligado, não deve fazer nada; Erro do caso de uso não deve derrubar o job.
+ * <p>
+ * Os métodos de teste estão bem explicativos através de suas anotações {@code @DisplayName}.
+ */
 @ExtendWith(MockitoExtension.class)
 class PaymentOverdueSchedulerTest {
 

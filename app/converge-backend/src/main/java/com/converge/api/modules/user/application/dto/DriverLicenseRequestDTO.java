@@ -10,6 +10,7 @@ import java.time.LocalDateTime;
 import com.converge.api.modules.user.domain.enums.user.DriverLicenseCategory;
 
 
+// Dados de requisição para cadastro de CNH
 public record DriverLicenseRequestDTO (
 
     @NotBlank(message = "Número da CNH é obrigatório")

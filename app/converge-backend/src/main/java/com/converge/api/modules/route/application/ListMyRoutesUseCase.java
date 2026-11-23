@@ -12,6 +12,12 @@ import org.springframework.stereotype.Service;
 import java.time.LocalDateTime;
 import java.util.List;
 
+/**
+ * Caso de uso que lista os trajetos (Route) de um usuário.
+ *
+ * Devolve os trajetos que não estão inativos e que ainda não "passaram".
+ * Trajetos de um dia só cujo horário já ficou para trás são escondidos da lista.
+ */
 @Service
 @RequiredArgsConstructor
 public class ListMyRoutesUseCase implements UseCase<String, List<Route>> {
@@ -22,7 +28,7 @@ public class ListMyRoutesUseCase implements UseCase<String, List<Route>> {
     public List<Route> execute(String userId) {
         LocalDateTime now = LocalDateTime.now(RouteAccess.APP_ZONE);
 
-        // Caronas de um dia só cujo horário já passou não aparecem mais
+        // Caronas de um dia só cujo horário já passou não aparecem
         return routeRepository.findByUserIdAndStatusNot(userId, RouteStatus.INACTIVE).stream()
                 .filter(route -> !route.isPast(now))
                 .toList();

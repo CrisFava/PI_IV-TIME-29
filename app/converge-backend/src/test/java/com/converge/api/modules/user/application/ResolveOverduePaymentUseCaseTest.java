@@ -21,6 +21,12 @@ import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.verifyNoInteractions;
 import static org.mockito.Mockito.when;
 
+/**
+ * Testes unitários para {@link ResolveOverduePaymentUseCase}.
+ * Valida cenários como: Ao pagar a última dívida (total chega a 0), deve regularizar e desbloquear; Ainda com dívida (total 1), não deve regularizar nem desbloquear; Sem dívida para tirar (já estava em 0 ou usuário inexistente), não deve regularizar.
+ * <p>
+ * Os métodos de teste estão bem explicativos através de suas anotações {@code @DisplayName}.
+ */
 @ExtendWith(MockitoExtension.class)
 class ResolveOverduePaymentUseCaseTest {
 

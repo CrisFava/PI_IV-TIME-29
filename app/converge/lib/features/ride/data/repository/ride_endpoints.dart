@@ -1,5 +1,6 @@
 // Autor: Cristian Eduardo Fava - RA 25000636
 
+/// Endpoints do módulo de ciclo de vida de caronas, paradas e pagamentos (`/api/v1/rides`).
 abstract final class RideEndpoints {
   static const String rides = '/rides';
   static const String request = '/rides/request';

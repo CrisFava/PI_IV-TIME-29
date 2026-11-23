@@ -7,6 +7,7 @@ import com.converge.api.shared.presentation.exception.ErrorCode;
 
 import java.util.Set;
 
+// Formato de resposta de erro
 public record ErrorResponse(
     ErrorCode code,
     String message,

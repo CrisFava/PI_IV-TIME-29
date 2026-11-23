@@ -13,6 +13,7 @@ import '../../../ride/data/models/ride_model.dart';
 import '../../../ride/data/models/ride_stop_type.dart';
 import '../../../ride/presentation/widgets/trip_panel.dart';
 
+/// Painel flutuante de controle ativo de viagem para motoristas (embarque, desembarque e encerramento).
 class HomeTripModeOverlay extends ConsumerWidget {
   final RideModel ride;
   final double bottomPadding;

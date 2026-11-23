@@ -23,6 +23,12 @@ import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertInstanceOf;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
+/**
+ * Testes de integração interclasse para comunicação TCP Socket cliente-servidor.
+ * Valida o ciclo completo de envio de requisições, despacho para handlers, retorno de respostas e tratamento de mensagens inválidas ou sem handler.
+ * <p>
+ * Os métodos de teste estão bem explicativos através de suas anotações {@code @DisplayName}.
+ */
 class ServerInterClassIntegrationTest {
 
     @Test

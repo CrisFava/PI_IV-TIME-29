@@ -11,6 +11,12 @@ import java.time.LocalDateTime;
 
 import static org.assertj.core.api.Assertions.assertThat;
 
+/**
+ * Testes unitários para {@link DriverLicense}.
+ * Valida cenários como: CNH que vence hoje ainda vale o dia inteiro, mesmo com a data vindo à meia-noite; CNH que venceu ontem está vencida e vira EXPIRED; Só a CNH verificada vira EXPIRED: recusada e em análise mantêm o status.
+ * <p>
+ * Os métodos de teste estão bem explicativos através de suas anotações {@code @DisplayName}.
+ */
 class DriverLicenseTest {
 
     private static final LocalDateTime NOW = LocalDateTime.of(2026, 12, 10, 9, 0);

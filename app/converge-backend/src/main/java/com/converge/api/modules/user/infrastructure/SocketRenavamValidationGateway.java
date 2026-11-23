@@ -25,7 +25,6 @@ public class SocketRenavamValidationGateway implements RenavamValidationGateway 
     private final String host;
     private final int port;
 
-    @Autowired
     public SocketRenavamValidationGateway() {
         this(SocketClient.DEFAULT_HOST, SocketClient.DEFAULT_PORT);
     }

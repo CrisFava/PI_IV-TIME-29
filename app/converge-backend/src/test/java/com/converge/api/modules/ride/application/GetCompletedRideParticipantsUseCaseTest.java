@@ -29,6 +29,12 @@ import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
+/**
+ * Testes unitários para {@link GetCompletedRideParticipantsUseCase}.
+ * Valida cenários como: Deve devolver o motorista e só os passageiros que efetivamente foram; Viagem que ainda não começou deve devolver vazio; Viagem em andamento: só quem já desceu entra (pode avaliar sem esperar os outros).
+ * <p>
+ * Os métodos de teste estão bem explicativos através de suas anotações {@code @DisplayName}.
+ */
 @ExtendWith(MockitoExtension.class)
 class GetCompletedRideParticipantsUseCaseTest {
 

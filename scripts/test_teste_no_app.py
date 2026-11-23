@@ -1,4 +1,9 @@
-"""Regressões locais: nenhuma chamada ao Firebase ou Mongo real."""
+"""Testes de regressão locais para teste_no_app.py.
+
+Simula interações com Firebase Auth e MongoDB utilizando mocks, garantindo
+que a criação, retenção de estado e limpeza de contas funcionem corretamente
+sem realizar chamadas de rede reais ou tocar em bancos de dados.
+"""
 import json
 import tempfile
 import unittest
@@ -13,7 +18,10 @@ from simulation.simulation_world import SimulationWorld
 
 
 class PreparationTest(unittest.TestCase):
+    """Testa o fluxo de preparação de contas para testes manuais no aplicativo."""
+
     def setUp(self):
+        """Configura ambiente temporário de teste e isola chamadas externas."""
         self.directory = tempfile.TemporaryDirectory()
         self.addCleanup(self.directory.cleanup)
         self.state = Path(self.directory.name) / 'state.json'
@@ -21,6 +29,7 @@ class PreparationTest(unittest.TestCase):
         self.mongo = self.enterContext(patch.object(app, 'MongoClient'))
 
     def test_failure_retains_cleanup_emails_before_first_account(self):
+        """Garante que falhas antes da primeira conta ainda preservem a lista de e-mails para limpeza."""
         api = MagicMock()
         api.call.return_value = ApiResponse(503, {})
         with self.assertRaises(SimulationFailure):
@@ -35,6 +44,7 @@ class PreparationTest(unittest.TestCase):
         self.assertEqual(self.state.read_bytes(), previous)
 
     def test_registration_and_approval_failures_retain_cleanup(self):
+        """Valida que falhas durante registro, aprovação ou cadastro de veículo retenham os e-mails para limpeza."""
         for stage in ('registration', 'approval', 'vehicle'):
             with self.subTest(stage=stage):
                 self.state.unlink(missing_ok=True)
@@ -51,6 +61,7 @@ class PreparationTest(unittest.TestCase):
                 self.assertIn(api.call.call_args.kwargs['body']['email'], json.loads(self.state.read_text())['emails'])
 
     def test_success_emails_match_accounts(self):
+        """Verifica se os e-mails registrados no estado batem com os papéis criados (app, motorista, passageiro)."""
         api = MagicMock()
         api.call.return_value = ApiResponse(200, {'localId': 'uid', 'idToken': 'token'})
         api.post.return_value = ApiResponse(200, {'data': {'id': 'id'}})
@@ -60,6 +71,7 @@ class PreparationTest(unittest.TestCase):
         self.assertEqual(state['emails'], [state[role]['email'] for role in ('app', 'motorista', 'passageiro')])
 
     def test_clean_keeps_state_on_failure_and_removes_on_success(self):
+        """Garante que o arquivo de estado seja mantido se a limpeza falhar e removido em caso de sucesso."""
         self.state.write_text(json.dumps({'runId': 'run', 'emails': ['unregistered@test']}))
         with patch.object(app, 'SimulationWorld') as world, patch('builtins.print'):
             world.return_value.delete_accounts_of_run.return_value = ([], ['unregistered@test'])
@@ -73,7 +85,10 @@ class PreparationTest(unittest.TestCase):
 
 
 class CleanupTest(unittest.TestCase):
+    """Testa a lógica de limpeza e deleção de contas de teste."""
+
     def test_only_explicit_absence_or_successful_deletion_resolves_account(self):
+        """Verifica que uma conta só é dada como resolvida se não existir ou se for deletada com sucesso."""
         cases = [
             (ApiResponse(400, {'error': {'message': 'EMAIL_NOT_FOUND'}}), None, []),
             (ApiResponse(400, {'error': {'message': 'INVALID_LOGIN_CREDENTIALS'}}), None, ['orphan@test']),

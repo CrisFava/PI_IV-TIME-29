@@ -13,6 +13,15 @@ import org.springframework.stereotype.Component;
 
 import java.util.List;
 
+/**
+ * Mapper do módulo de veículos.
+ *
+ * Converte entre os DTOs da API e o modelo de domínio: transforma o pedido de
+ * cadastro de veículo (CreateVehicleRequestDTO) em entidade Vehicle, e a entidade
+ * Vehicle na resposta da API (VehicleResponseDTO). Também converte as fontes de
+ * energia do veículo. Não tem regra de negócio, só mapeamento, com uma exceção
+ * pequena: a unidade de consumo é definida aqui (ver unitFor).
+ */
 @Component
 public class VehicleMapper {
 

@@ -8,6 +8,7 @@ import com.converge.api.shared.application.UseCase;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
 
+// Caso de uso para pegar um veículo próprio
 @Service
 @RequiredArgsConstructor
 public class GetVehicleUseCase implements UseCase<VehicleRefCommand, Vehicle> {

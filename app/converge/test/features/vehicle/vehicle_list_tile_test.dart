@@ -6,6 +6,9 @@ import 'package:converge/features/vehicle/presentation/widgets/vehicle_list_tile
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 
+/// Testes unitários e de widgets para vehicle list tile.
+/// Cobre cenários como: tocar no cartão abre os detalhes; não há lixeira no card.
+/// Os casos de teste estão descritos de forma autoexplicativa nas chamadas de [test] e [group].
 void main() {
   const onix = VehicleModel(
     id: 'vehicle-1',

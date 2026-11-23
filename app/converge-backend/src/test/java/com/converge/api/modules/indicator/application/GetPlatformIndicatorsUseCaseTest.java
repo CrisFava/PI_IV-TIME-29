@@ -23,6 +23,12 @@ import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.mockito.Mockito.verifyNoInteractions;
 import static org.mockito.Mockito.when;
 
+/**
+ * Testes unitários para {@link GetPlatformIndicatorsUseCase}.
+ * Valida cenários como: Deve recusar quando o período é nulo; Com referência: deve devolver o documento daquele período; Com referência sem dados: deve devolver zerado com a referência pedida, sem erro.
+ * <p>
+ * Os métodos de teste estão bem explicativos através de suas anotações {@code @DisplayName}.
+ */
 @ExtendWith(MockitoExtension.class)
 class GetPlatformIndicatorsUseCaseTest {
 

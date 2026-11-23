@@ -39,6 +39,7 @@ def _ride_with_passengers(world: SimulationWorld, seats: int, *nicknames: str):
 
 
 def happy_path(world: SimulationWorld) -> None:
+    """Cenário de caminho feliz: matching, solicitação, aceite, embarque, chegada, cobrança e pagamento."""
     driver = world.create_driver("Motorista")
     driver_route = world.offer_route(driver, seats=3)
     ana = world.create_passenger("Ana")
@@ -121,6 +122,7 @@ def happy_path(world: SimulationWorld) -> None:
 
 
 def partial_no_show(world: SimulationWorld) -> None:
+    """Cenário com ausência (no-show) de um dos passageiros e conclusão com o passageiro presente."""
     driver, (ana, bruno), ride_id = _ride_with_passengers(world, 3, "Ana", "Bruno")
 
     world.step("Motorista inicia e marca o Bruno como ausente")
@@ -143,6 +145,7 @@ def partial_no_show(world: SimulationWorld) -> None:
 
 
 def everyone_absent(world: SimulationWorld) -> None:
+    """Cenário onde o único passageiro não comparece e a viagem é cancelada ao ser concluída."""
     driver, (ana,), ride_id = _ride_with_passengers(world, 3, "Ana")
 
     world.step("Motorista inicia e a única passageira não aparece")
@@ -156,6 +159,7 @@ def everyone_absent(world: SimulationWorld) -> None:
 
 
 def invalid_transitions(world: SimulationWorld) -> None:
+    """Cenário que valida a rejeição de transições inválidas no ciclo de vida da carona e avaliações."""
     driver, (ana,), ride_id = _ride_with_passengers(world, 3, "Ana")
 
     world.step("Concluir antes de iniciar")
@@ -188,6 +192,7 @@ def invalid_transitions(world: SimulationWorld) -> None:
 
 
 def leave_and_cancel(world: SimulationWorld) -> None:
+    """Cenário de desistência de vaga pelo passageiro e cancelamento da carona pelo motorista."""
     driver, (ana,), ride_id = _ride_with_passengers(world, 3, "Ana")
 
     world.step("Ana desiste antes da saída: a vaga volta e a viagem não pode iniciar")
@@ -208,6 +213,7 @@ def leave_and_cancel(world: SimulationWorld) -> None:
 
 
 def full_and_rejected(world: SimulationWorld) -> None:
+    """Cenário de rejeição de pedido de vaga e bloqueio de novos pedidos após lotação do veículo."""
     driver = world.create_driver("Motorista")
     driver_route = world.offer_route(driver, seats=1)
     ana = world.create_passenger("Ana")
@@ -230,6 +236,7 @@ def full_and_rejected(world: SimulationWorld) -> None:
 
 
 def matching_filters(world: SimulationWorld) -> None:
+    """Cenário de validação dos filtros do algoritmo de matching (distância, bloqueios e compatibilidade)."""
     near = world.create_driver("Motorista perto")
     near_route = world.offer_route(near, seats=3)
     second = world.create_driver("Segundo motorista perto")
@@ -290,6 +297,7 @@ def matching_filters(world: SimulationWorld) -> None:
 
 
 def itinerary_with_stops(world: SimulationWorld) -> None:
+    """Cenário que valida o itinerário gerado com paradas ordenadas de embarque e desembarque."""
     driver = world.create_driver("Motorista")
     driver_route = world.offer_route(driver, seats=3)
     ana = world.create_passenger("Ana")

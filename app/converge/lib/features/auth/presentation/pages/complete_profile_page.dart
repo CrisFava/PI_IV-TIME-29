@@ -11,6 +11,7 @@ import '../../state/auth_controller.dart';
 import '../../state/inputs/profile_input.dart';
 import '../../state/session/auth_session.dart';
 
+/// Tela para conclusão de cadastro obrigatório com dados pessoais e acadêmicos.
 class CompleteProfilePage extends ConsumerStatefulWidget {
   const CompleteProfilePage({super.key});
 

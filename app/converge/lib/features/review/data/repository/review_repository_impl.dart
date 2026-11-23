@@ -12,10 +12,12 @@ import '../models/review_model.dart';
 import 'review_endpoints.dart';
 import 'review_repository.dart';
 
+/// Provedor global da instância de [ReviewRepository].
 final reviewRepositoryProvider = Provider<ReviewRepository>(
   (ref) => ReviewRepositoryImpl(ref.watch(dioProvider)),
 );
 
+/// Implementação do repositório de avaliações entre usuários (motoristas e passageiros).
 class ReviewRepositoryImpl implements ReviewRepository {
   final Dio _dio;
 

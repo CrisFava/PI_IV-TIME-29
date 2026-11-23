@@ -23,6 +23,12 @@ import static com.converge.api.modules.ride.application.RideItineraryPlannerTest
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.mockito.Mockito.when;
 
+/**
+ * Testes unitários para {@link ListRideHistoryUseCase}.
+ * Valida cenários como: Passageiro vê o próprio trecho e o que pagou; motorista vê o custo e o que recebeu; só viagens terminadas; O histórico traz o início e o fim reais da viagem.
+ * <p>
+ * Os métodos de teste estão bem explicativos através de suas anotações {@code @DisplayName}.
+ */
 @ExtendWith(MockitoExtension.class)
 class ListRideHistoryUseCaseTest {
 

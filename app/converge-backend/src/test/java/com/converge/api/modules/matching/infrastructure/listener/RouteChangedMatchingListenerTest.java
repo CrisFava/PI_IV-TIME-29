@@ -14,6 +14,12 @@ import static org.assertj.core.api.Assertions.assertThatCode;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
+/**
+ * Testes unitários para {@link RouteChangedMatchingListener}.
+ * Valida cenários como: Deve invalidar os resultados do trajeto alterado; Uma falha ao invalidar não pode impedir a edição do trajeto.
+ * <p>
+ * Os métodos de teste estão bem explicativos através de suas anotações {@code @DisplayName}.
+ */
 @ExtendWith(MockitoExtension.class)
 class RouteChangedMatchingListenerTest {
 

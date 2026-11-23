@@ -16,6 +16,13 @@ public class ValidateRenavamHandler implements RequestHandler<ValidateRenavamReq
 
     private static final int[] WEIGHTS = {3, 2, 9, 8, 7, 6, 5, 4, 3, 2};
 
+    /**
+     * Valida o número de RENAVAM fornecido na requisição utilizando o algoritmo do módulo 11.
+     *
+     * @param request requisição contendo a string com o código RENAVAM do veículo
+     * @return resposta com o status de validade, número normalizado e mensagem explicativa
+     * @throws ServerException se a requisição for nula
+     */
     @Override
     public ValidateRenavamResponse execute(ValidateRenavamRequest request) throws ServerException {
         if (request == null) {

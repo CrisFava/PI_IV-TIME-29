@@ -30,6 +30,12 @@ import java.util.Set;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.mockito.Mockito.when;
 
+/**
+ * Testes unitários para {@link RideMapper}.
+ * Valida cenários como: Motorista vê todos os participantes, com todos os dados e nomes; Passageiro confirmado vê os próprios dados completos, o motorista e nada dos pendentes, recusados ou cancelados; Passageiro pendente vê só nome, papel e status dos confirmados, sem endereços nem valores.
+ * <p>
+ * Os métodos de teste estão bem explicativos através de suas anotações {@code @DisplayName}.
+ */
 class RideMapperTest {
 
     private static final String DRIVER = "driver-123";

@@ -13,6 +13,9 @@ class _TestRequestHandler extends RequestInterceptorHandler {
   }
 }
 
+/// Testes unitários e de widgets para idempotency interceptor.
+/// Cobre cenários como: injeta Idempotency-Key UUID v4 em requisicoes $method, reaproveita Idempotency-Key existente em retries.
+/// Os casos de teste estão descritos de forma autoexplicativa nas chamadas de [test] e [group].
 void main() {
   final uuidV4Pattern = RegExp(
     r'^[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$',

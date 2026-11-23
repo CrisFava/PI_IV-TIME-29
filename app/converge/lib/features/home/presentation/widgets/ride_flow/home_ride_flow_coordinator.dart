@@ -15,6 +15,7 @@ import 'ride_place_step_sheet.dart';
 import 'ride_route_preview_card.dart';
 import 'ride_schedule_step_sheet.dart';
 
+/// Coordenador do fluxo visual de carona (seleção de embarque, destino, horários e estimativas).
 class HomeRideFlowCoordinator extends ConsumerWidget {
   final PassengerRideStep step;
   final bool isDriver;

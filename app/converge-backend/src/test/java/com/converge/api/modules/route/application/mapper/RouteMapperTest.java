@@ -19,6 +19,12 @@ import java.util.Set;
 
 import static org.assertj.core.api.Assertions.assertThat;
 
+/**
+ * Testes unitários para {@link RouteMapper}.
+ * Valida cenários como: Deve converter PlaceRequestDTO em Place mantendo latitude e longitude; Deve mapear CreateRouteRequestDTO para Route com o dono vindo do token; Deve mapear Route para RouteResponseDTO com coordenadas separadas.
+ * <p>
+ * Os métodos de teste estão bem explicativos através de suas anotações {@code @DisplayName}.
+ */
 class RouteMapperTest {
 
     private final RouteMapper mapper = new RouteMapper();

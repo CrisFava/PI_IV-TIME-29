@@ -64,6 +64,12 @@ import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
+/**
+ * Testes unitários para {@link RideUseCases}.
+ * Valida cenários como: O motorista deve cancelar a própria viagem sem penalidade quando não há passageiros confirmados; Cancelar viagem com passageiros confirmados deve notificar, penalizar motorista e gravar auditoria; Cancelar viagem deve isolar falhas nas etapas de penalidade, auditoria e notificação.
+ * <p>
+ * Os métodos de teste estão bem explicativos através de suas anotações {@code @DisplayName}.
+ */
 @ExtendWith(MockitoExtension.class)
 class RideUseCasesTest {
 

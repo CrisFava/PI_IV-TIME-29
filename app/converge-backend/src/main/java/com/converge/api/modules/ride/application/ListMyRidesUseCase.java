@@ -11,6 +11,8 @@ import org.springframework.stereotype.Service;
 import java.util.Comparator;
 import java.util.List;
 
+
+// Listar caronas do usuário
 @Service
 @RequiredArgsConstructor
 public class ListMyRidesUseCase implements UseCase<String, List<Ride>> {

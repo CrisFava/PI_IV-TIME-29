@@ -16,10 +16,12 @@ import '../models/user_model.dart';
 import 'auth_endpoints.dart';
 import 'auth_repository.dart';
 
+/// Provedor global da instância de [AuthRepository].
 final authRepositoryProvider = Provider<AuthRepository>(
   (ref) => AuthRepositoryImpl(ref.watch(dioProvider)),
 );
 
+/// Implementação do repositório de autenticação e perfil de usuário utilizando Dio.
 class AuthRepositoryImpl implements AuthRepository {
   final Dio _dio;
 

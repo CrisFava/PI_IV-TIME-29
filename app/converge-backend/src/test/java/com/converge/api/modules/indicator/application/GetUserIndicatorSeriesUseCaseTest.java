@@ -21,6 +21,12 @@ import java.util.List;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.mockito.Mockito.when;
 
+/**
+ * Testes unitários para {@link GetUserIndicatorSeriesUseCase}.
+ * Valida cenários como: Série dos últimos meses, do mais antigo ao mais recente, com zero nos meses sem viagem.
+ * <p>
+ * Os métodos de teste estão bem explicativos através de suas anotações {@code @DisplayName}.
+ */
 @ExtendWith(MockitoExtension.class)
 class GetUserIndicatorSeriesUseCaseTest {
 

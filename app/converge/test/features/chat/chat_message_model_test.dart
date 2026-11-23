@@ -4,6 +4,9 @@ import 'package:converge/features/chat/data/models/chat_message_model.dart';
 import 'package:converge/features/chat/data/models/chat_message_type.dart';
 import 'package:flutter_test/flutter_test.dart';
 
+/// Testes unitários e de widgets para chat message model.
+/// Cobre cenários como: ChatMessageModel.fromMap, ChatMessageModel.toMap.
+/// Os casos de teste estão descritos de forma autoexplicativa nas chamadas de [test] e [group].
 void main() {
   group('ChatMessageModel.fromMap', () {
     test('lê uma mensagem de texto do Realtime Database', () {

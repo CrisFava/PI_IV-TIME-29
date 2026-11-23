@@ -12,10 +12,12 @@ import '../validation/vehicle_validator.dart';
 import 'vehicle_endpoints.dart';
 import 'vehicle_repository.dart';
 
+/// Provedor global da instância de [VehicleRepository].
 final vehicleRepositoryProvider = Provider<VehicleRepository>(
   (ref) => VehicleRepositoryImpl(ref.watch(dioProvider)),
 );
 
+/// Implementação do repositório de gerenciamento e cadastro de veículos do motorista.
 class VehicleRepositoryImpl implements VehicleRepository {
   final Dio _dio;
 

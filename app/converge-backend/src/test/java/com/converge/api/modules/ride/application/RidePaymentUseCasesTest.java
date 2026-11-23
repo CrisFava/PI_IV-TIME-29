@@ -50,6 +50,12 @@ import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.verifyNoInteractions;
 import static org.mockito.Mockito.when;
 
+/**
+ * Testes unitários para {@link RidePaymentUseCases}.
+ * Valida cenários como: O motorista deve solicitar o pagamento e receber o Pix Copia e Cola com a sua chave e o valor; Se o código PIX não puder ser gerado, a cobrança não deve ser gravada; Motorista sem chave PIX não pode solicitar pagamento.
+ * <p>
+ * Os métodos de teste estão bem explicativos através de suas anotações {@code @DisplayName}.
+ */
 @ExtendWith(MockitoExtension.class)
 class RidePaymentUseCasesTest {
 

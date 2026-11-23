@@ -1,5 +1,6 @@
 // Autor: Cristian Eduardo Fava - RA 25000636
 
+/// Rotas nomeadas e mapeamentos de navegação do aplicativo.
 abstract class AppRoutes {
   static const String splash = '/splash';
   static const String welcome = '/welcome';

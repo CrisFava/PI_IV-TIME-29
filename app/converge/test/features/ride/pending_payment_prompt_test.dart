@@ -12,6 +12,9 @@ import 'package:flutter_test/flutter_test.dart';
 import 'fakes/fake_ride.dart';
 import 'fakes/fake_ride_repository.dart';
 
+/// Testes unitários e de widgets para pending payment prompt.
+/// Cobre cenários como: com cobrança em aberto, o pagamento abre sozinho e o "Já paguei" fecha, sem "Depois": o pagamento não fecha tocando fora, só com o "Já paguei".
+/// Os casos de teste estão descritos de forma autoexplicativa nas chamadas de [test] e [group].
 void main() {
   late FakeRideRepository rides;
 

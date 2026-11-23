@@ -25,6 +25,12 @@ import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.verifyNoInteractions;
 import static org.mockito.Mockito.when;
 
+/**
+ * Testes unitários para {@link GetUserIndicatorsUseCase}.
+ * Valida cenários como: Deve recusar quando o usuário é nulo ou vazio; Deve recusar quando o período é nulo; Com referência: deve devolver o documento daquele período.
+ * <p>
+ * Os métodos de teste estão bem explicativos através de suas anotações {@code @DisplayName}.
+ */
 @ExtendWith(MockitoExtension.class)
 class GetUserIndicatorsUseCaseTest {
 

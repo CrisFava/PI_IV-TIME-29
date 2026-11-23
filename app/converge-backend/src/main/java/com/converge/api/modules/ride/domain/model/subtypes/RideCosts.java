@@ -10,6 +10,16 @@ import jakarta.validation.constraints.PositiveOrZero;
 
 import java.math.BigDecimal;
 
+/**
+ * Registro dos custos de uma carona (value object imutável).
+ *
+ * Guarda os dados usados no cálculo do rateio: distâncias, o combustível e o
+ * consumo considerados, o preço da energia no momento, o custo de energia, pedágio,
+ * estacionamento, o custo total e o valor total dividido entre os passageiros.
+ * Os campos de cálculo são opcionais (@Nullable) porque só ficam preenchidos depois
+ * que a carona é feita e os custos são apurados; pedágio e estacionamento são
+ * obrigatórios e nunca nulos (o mínimo é zero).
+ */
 public record RideCosts(
         @Nullable
         @PositiveOrZero

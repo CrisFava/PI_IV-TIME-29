@@ -3,6 +3,10 @@
 package com.converge.socket.core.exception;
 
 
+/**
+ * Códigos padronizados de erro utilizados na camada de rede e protocolo socket.
+ * Mapeia erros de conexão, I/O, mensagens e exceções internas com mensagens padrão.
+ */
 public enum ServerErrorCode {
     PORT_IN_USE("PORT_IN_USE", "The specified server port is invalid or already in use."),
     CONNECTION_ERROR("CONNECTION_ERROR", "Failed to establish or accept socket connection."),
@@ -18,11 +22,18 @@ public enum ServerErrorCode {
     private final String code;
     private final String defaultMessage;
 
+    /**
+     * Construtor do enum de código de erro.
+     *
+     * @param code código textual padronizado
+     * @param defaultMessage mensagem explicativa padrão associada ao código
+     */
     ServerErrorCode(String code, String defaultMessage) {
         this.code = code;
         this.defaultMessage = defaultMessage;
     }
 
+    // Getters e setters
 
     public String getCode() {
         return code;
@@ -32,6 +43,11 @@ public enum ServerErrorCode {
         return defaultMessage;
     }
 
+    /**
+     * Retorna o código textual padronizado do erro.
+     *
+     * @return código do erro em formato String
+     */
     @Override
     public String toString() {
         return code;

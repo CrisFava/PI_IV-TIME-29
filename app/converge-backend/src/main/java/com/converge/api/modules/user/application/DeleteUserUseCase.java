@@ -9,6 +9,7 @@ import com.converge.api.shared.application.UserUtils;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
 
+// Caso de uso para deletar (desativar) um usuário
 @Service
 @RequiredArgsConstructor
 public class DeleteUserUseCase implements UseCase<String, Void> {

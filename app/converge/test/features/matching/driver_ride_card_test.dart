@@ -7,6 +7,9 @@ import 'package:flutter_test/flutter_test.dart';
 
 import '../ride/fakes/fake_ride.dart';
 
+/// Testes unitários e de widgets para driver ride card.
+/// Cobre cenários como: sem confirmados, explica que precisa aceitar alguém.
+/// Os casos de teste estão descritos de forma autoexplicativa nas chamadas de [test] e [group].
 void main() {
   Future<List<String>> pumpCard(WidgetTester tester, RideModel ride) async {
     final pressed = <String>[];

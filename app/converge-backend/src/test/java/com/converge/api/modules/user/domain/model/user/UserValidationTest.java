@@ -28,6 +28,12 @@ import java.util.Set;
 
 import static org.assertj.core.api.Assertions.assertThat;
 
+/**
+ * Testes unitários para {@link UserValidation}.
+ * Valida cenários como: Deve validar com sucesso quando todos os campos obrigatórios forem válidos; Deve falhar quando o firebaseUid estiver em branco; Deve falhar quando o nome for menor que 3 caracteres.
+ * <p>
+ * Os métodos de teste estão bem explicativos através de suas anotações {@code @DisplayName}.
+ */
 class UserValidationTest {
 
     private static Validator validator;

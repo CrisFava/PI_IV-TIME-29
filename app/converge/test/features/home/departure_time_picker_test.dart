@@ -17,6 +17,9 @@ Future<void> _pump(WidgetTester tester, {DateTime? current}) => tester.pumpWidge
   ),
 );
 
+/// Testes unitários e de widgets para departure time picker.
+/// Cobre cenários como: arredondar para a roda de 5 em 5, roda de horário.
+/// Os casos de teste estão descritos de forma autoexplicativa nas chamadas de [test] e [group].
 void main() {
   group('arredondar para a roda de 5 em 5', () {
     test('sobe para o próximo múltiplo de 5 e tira os segundos', () {

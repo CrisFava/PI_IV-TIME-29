@@ -15,6 +15,7 @@ import com.converge.api.modules.user.domain.enums.user.PixKeyType;
 
 import lombok.RequiredArgsConstructor;
 
+// Caso de uso para atualizar o usuário
 @Service
 @RequiredArgsConstructor 
 public class UpdateUserUseCase implements UseCase<UpdateUserCommand, User>{

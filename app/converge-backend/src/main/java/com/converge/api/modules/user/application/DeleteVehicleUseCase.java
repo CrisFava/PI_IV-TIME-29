@@ -9,6 +9,8 @@ import com.converge.api.shared.application.UseCase;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
 
+
+// Caso de uso para deletar (desativar) um veículo
 @Service
 @RequiredArgsConstructor
 public class DeleteVehicleUseCase implements UseCase<VehicleRefCommand, Void> {

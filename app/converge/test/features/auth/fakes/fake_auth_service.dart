@@ -6,6 +6,7 @@ import 'package:converge/core/services/auth/auth_exception.dart';
 import 'package:converge/core/services/auth/auth_service.dart';
 import 'package:converge/core/services/auth/auth_user.dart';
 
+/// Estrutura e dados fake em memória para suporte a testes unitários e de widgets.
 class FakeAuthService implements AuthService {
   final _changes = StreamController<AuthUser?>.broadcast();
   AuthUser? _current;

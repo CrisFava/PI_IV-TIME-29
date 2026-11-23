@@ -14,10 +14,12 @@ import '../models/route_response_model.dart';
 import 'route_endpoints.dart';
 import 'route_repository.dart';
 
+/// Provedor global da instância de [RouteRepository].
 final routeRepositoryProvider = Provider<RouteRepository>(
   (ref) => RouteRepositoryImpl(ref.watch(dioProvider)),
 );
 
+/// Implementação do repositório de rotas, autocompletar de locais e estimativas de distância e tempo.
 class RouteRepositoryImpl implements RouteRepository {
   final Dio _dio;
 

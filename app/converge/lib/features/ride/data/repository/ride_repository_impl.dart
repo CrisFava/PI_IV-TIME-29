@@ -12,10 +12,12 @@ import '../models/ride_preview_model.dart';
 import 'ride_endpoints.dart';
 import 'ride_repository.dart';
 
+/// Provedor global da instância de [RideRepository].
 final rideRepositoryProvider = Provider<RideRepository>(
   (ref) => RideRepositoryImpl(ref.watch(dioProvider)),
 );
 
+/// Implementação do repositório de caronas, solicitações, paradas e fluxo de pagamento.
 class RideRepositoryImpl implements RideRepository {
   final Dio _dio;
 

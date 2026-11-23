@@ -26,6 +26,12 @@ import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.when;
 
+/**
+ * Testes unitários para {@link PreviewPassengerRideUseCase}.
+ * Valida cenários como: Mostra o caminho de agora, o caminho com o passageiro e o desvio, sem aceitar ninguém.
+ * <p>
+ * Os métodos de teste estão bem explicativos através de suas anotações {@code @DisplayName}.
+ */
 @ExtendWith(MockitoExtension.class)
 class PreviewPassengerRideUseCaseTest {
 

@@ -16,7 +16,15 @@ import java.util.Map;
 import java.util.Objects;
 import java.util.Set;
 import java.util.stream.Collectors;
-
+/**
+ * Serviço que transforma caronas (entidade Ride) em respostas prontas para a API
+ * (RideResponseDTO), do ponto de vista de quem está olhando.
+ *
+ * Para montar a resposta, busca em lote o que a entidade sozinha não tem: os nomes
+ * dos usuários que o visualizador pode ver e, quando ele é o motorista, o horário
+ * de saída que cada passageiro escolheu no próprio trajeto. Fazer isso em lote
+ * (uma consulta para todas as caronas) evita uma consulta por carona.
+ */
 @Service
 @RequiredArgsConstructor
 public class RideViewService {
@@ -26,10 +34,21 @@ public class RideViewService {
     private final RideMapper rideMapper;
     private final RouteAccess routeAccess;
 
+    /**
+     * Monta a resposta de uma única carona para o usuário logado.
+     * Reaproveita o viewAll passando uma lista com um só item.
+     */
     public RideResponseDTO view(Ride ride, String firebaseUid) {
-        return viewAll(List.of(ride), firebaseUid).get(0);
+        return viewAll(List.of(ride), firebaseUid).getFirst();
     }
 
+    /**
+     * Monta a resposta de várias caronas para o usuário logado.
+     * Descobre o id do visualizador, coleta os ids de usuários que ele tem
+     * permissão de ver e busca os nomes de todos de uma vez. Para as caronas em
+     * que ele é o motorista, também busca o horário de saída escolhido por cada
+     * passageiro. No fim, o mapper converte cada carona em DTO usando esses dados.
+     */
     public List<RideResponseDTO> viewAll(List<Ride> rides, String firebaseUid) {
         String viewerId = rideAccess.currentUserId(firebaseUid);
 

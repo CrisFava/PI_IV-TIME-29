@@ -23,12 +23,15 @@ class ApiClient:
         self.timeout_seconds = timeout_seconds
 
     def get(self, path: str, token: Optional[str] = None, params: Optional[dict] = None) -> ApiResponse:
+        """Executa uma requisição GET para o endpoint informado com token e parâmetros opcionais."""
         return self.call("GET", self._url(path, params), token)
 
     def post(self, path: str, token: Optional[str] = None, body: Optional[dict] = None) -> ApiResponse:
+        """Executa uma requisição POST com payload JSON e cabeçalho de idempotência."""
         return self.call("POST", self._url(path), token, body)
 
     def call(self, method: str, url: str, token: Optional[str] = None, body: Optional[dict] = None) -> ApiResponse:
+        """Dispara uma chamada HTTP genérica com suporte a Bearer token e chave de idempotência."""
         headers = {"Accept": "application/json"}
         payload = None
 
@@ -52,11 +55,13 @@ class ApiClient:
             raise SimulationFailure(f"A conexão com {url} caiu: {error!r}") from error
 
     def _url(self, path: str, params: Optional[dict] = None) -> str:
+        """Monta a URL absoluta unindo a base_url com o caminho e parâmetros de query string."""
         url = f"{self.base_url}/{path.lstrip('/')}"
         return f"{url}?{urlencode(params)}" if params else url
 
 
 def _json_or_none(raw: bytes) -> Optional[dict]:
+    """Decodifica os bytes da resposta em um dicionário JSON, ou None se inválido/vazio."""
     if not raw:
         return None
     try:

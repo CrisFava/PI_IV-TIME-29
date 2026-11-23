@@ -2,6 +2,7 @@
 
 package com.converge.api.modules.user.domain.enums.vehicle;
 
+// Tipo de um veículo
 public enum VehicleType {
     HATCH,
     SEDAN,

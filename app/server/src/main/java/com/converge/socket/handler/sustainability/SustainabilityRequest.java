@@ -21,12 +21,22 @@ public class SustainabilityRequest extends Message {
     private final String energySource;
     private final int effectivePassengers;
 
+    /**
+     * Cria uma requisição para cálculo de sustentabilidade com os dados da viagem compartilhada.
+     *
+     * @param distanceKm distância total percorrida na viagem em quilômetros
+     * @param averageConsumption consumo médio do veículo (km/L ou km/kWh)
+     * @param energySource tipo de fonte energética (GASOLINE, ETHANOL, DIESEL ou ELECTRIC)
+     * @param effectivePassengers quantidade de passageiros efetivos no veículo
+     */
     public SustainabilityRequest(double distanceKm, Double averageConsumption, String energySource, int effectivePassengers) {
         this.distanceKm = distanceKm;
         this.averageConsumption = averageConsumption;
         this.energySource = energySource;
         this.effectivePassengers = effectivePassengers;
     }
+
+    // Getters e setters
 
     public double getDistanceKm() {
         return distanceKm;

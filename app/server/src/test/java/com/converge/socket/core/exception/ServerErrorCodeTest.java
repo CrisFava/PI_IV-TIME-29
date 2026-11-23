@@ -9,6 +9,12 @@ import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
 
+/**
+ * Testes unitários para o enum {@link ServerErrorCode}.
+ * Valida os códigos padronizados de erro e suas respectivas mensagens descritivas padrão.
+ * <p>
+ * Os métodos de teste estão bem explicativos através de suas anotações {@code @DisplayName}.
+ */
 class ServerErrorCodeTest {
 
     @Test

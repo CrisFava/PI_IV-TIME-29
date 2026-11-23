@@ -20,6 +20,13 @@ public class DistanceHandler implements RequestHandler<DistanceRequest, Distance
     private static final double MAX_LATITUDE = 90.0;
     private static final double MAX_LONGITUDE = 180.0;
 
+    /**
+     * Executa o cálculo de distância geodésica em lote para os pares de pontos informados.
+     *
+     * @param request requisição contendo a matriz de pares de coordenadas (origem e destino)
+     * @return resposta com o vetor de distâncias calculadas em quilômetros
+     * @throws ServerException se a requisição for nula, exceder o limite de pares ou contiver coordenadas inválidas
+     */
     @Override
     public DistanceResponse execute(DistanceRequest request) throws ServerException {
         if (request == null) {
@@ -42,6 +49,13 @@ public class DistanceHandler implements RequestHandler<DistanceRequest, Distance
         return new DistanceResponse(distances);
     }
 
+    /**
+     * Valida se um par de coordenadas contém 4 valores e se estão dentro dos limites geográficos aceitáveis.
+     *
+     * @param pair vetor contendo [latOrigem, lonOrigem, latDestino, lonDestino]
+     * @param index índice do par no lote para identificação de erros
+     * @throws ServerException se o formato ou os valores forem inválidos
+     */
     private void validatePair(double[] pair, int index) throws ServerException {
         if (pair == null || pair.length != 4) {
             throw new ServerException(ServerErrorCode.INVALID_MESSAGE,
@@ -53,6 +67,15 @@ public class DistanceHandler implements RequestHandler<DistanceRequest, Distance
         validateRange(pair[3], MAX_LONGITUDE, "Longitude", index);
     }
 
+    /**
+     * Valida se um valor de coordenada geográfica está dentro do intervalo permitido [-limite, +limite].
+     *
+     * @param value valor da coordenada a ser verificado
+     * @param limit limite máximo permitido (90 para latitude, 180 para longitude)
+     * @param name nome da coordenada (Latitude ou Longitude)
+     * @param index índice do par para mensagem de erro
+     * @throws ServerException se o valor estiver fora dos limites ou for NaN
+     */
     // A negação cobre também NaN, que falha em qualquer comparação.
     private void validateRange(double value, double limit, String name, int index) throws ServerException {
         if (!(value >= -limit && value <= limit)) {
@@ -61,6 +84,15 @@ public class DistanceHandler implements RequestHandler<DistanceRequest, Distance
         }
     }
 
+    /**
+     * Calcula a distância geodésica em linha reta (em quilômetros) entre dois pontos usando a fórmula de Haversine.
+     *
+     * @param latFrom latitude do ponto de origem em graus
+     * @param lonFrom longitude do ponto de origem em graus
+     * @param latTo latitude do ponto de destino em graus
+     * @param lonTo longitude do ponto de destino em graus
+     * @return distância calculada em quilômetros
+     */
     private double distanceKm(double latFrom, double lonFrom, double latTo, double lonTo) {
         double deltaLat = latFrom - latTo;
         double deltaLon = lonFrom - lonTo;

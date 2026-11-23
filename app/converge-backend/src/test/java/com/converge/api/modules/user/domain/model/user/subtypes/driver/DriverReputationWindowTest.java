@@ -10,6 +10,12 @@ import java.time.LocalDateTime;
 
 import static org.assertj.core.api.Assertions.assertThat;
 
+/**
+ * Testes unitários para {@link DriverReputationWindow}.
+ * Valida cenários como: Deve trocar a janela e manter a média e as avaliações; Deve voltar o level a LOW quando a nova janela estoura o limite de cancelamentos; Deve sair de LOW quando a penalidade deixa a janela.
+ * <p>
+ * Os métodos de teste estão bem explicativos através de suas anotações {@code @DisplayName}.
+ */
 class DriverReputationWindowTest {
 
     private static final LocalDateTime BEFORE = LocalDateTime.of(2026, 11, 1, 3, 0);

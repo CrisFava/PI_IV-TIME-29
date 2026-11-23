@@ -19,6 +19,12 @@ import static org.assertj.core.api.Assertions.assertThat;
 import static org.mockito.Mockito.verifyNoInteractions;
 import static org.mockito.Mockito.when;
 
+/**
+ * Testes unitários para {@link ListRouteMatchingsUseCase}.
+ * Valida cenários como: Trajeto de procura lista os motoristas compatíveis; Trajeto de oferta lista os passageiros compatíveis (N passageiros x 1 motorista).
+ * <p>
+ * Os métodos de teste estão bem explicativos através de suas anotações {@code @DisplayName}.
+ */
 @ExtendWith(MockitoExtension.class)
 class ListRouteMatchingsUseCaseTest {
 

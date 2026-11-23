@@ -59,10 +59,12 @@ def build_user_update(user: dict, only: str, now: datetime):
 
 
 def label(user: dict) -> str:
+    """Retorna o nome e e-mail formatados do usuário para listagem em terminal."""
     return f"{user.get('name') or '(sem nome)'} <{user.get('email') or '-'}>"
 
 
 def parse_args():
+    """Analisa os argumentos de linha de comando para a verificação em lote."""
     parser = argparse.ArgumentParser(
         description="Marca a CNH e o vínculo acadêmico de todos os usuários como VERIFIED no MongoDB.")
     parser.add_argument("--somente", choices=["cnh", "estudante"],
@@ -81,6 +83,7 @@ def parse_args():
 
 
 def confirm(total: int, database: str) -> bool:
+    """Solicita confirmação interativa do usuário antes de realizar a atualização em lote."""
     try:
         answer = input(f"\nVerificar {total} usuário(s) no banco {database}? [s/N] ")
     except EOFError:
@@ -89,6 +92,7 @@ def confirm(total: int, database: str) -> bool:
 
 
 def main() -> int:
+    """Ponto de entrada: localiza e atualiza em lote todos os usuários com documentos pendentes."""
     args = parse_args()
     env_file = verificar_usuario.read_env_file(args.env)
 

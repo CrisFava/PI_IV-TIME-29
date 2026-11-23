@@ -25,6 +25,12 @@ import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.verifyNoInteractions;
 import static org.mockito.Mockito.when;
 
+/**
+ * Testes unitários para {@link CreateBlockUseCase}.
+ * Valida cenários como: Deve bloquear um usuário que existe e ainda não está bloqueado; Bloquear de novo devolve o bloqueio que já existe, sem salvar outro; Dois pedidos ao mesmo tempo: o índice único barra o segundo e devolve o primeiro.
+ * <p>
+ * Os métodos de teste estão bem explicativos através de suas anotações {@code @DisplayName}.
+ */
 @ExtendWith(MockitoExtension.class)
 class CreateBlockUseCaseTest {
 

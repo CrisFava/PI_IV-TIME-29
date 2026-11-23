@@ -16,6 +16,11 @@ import com.converge.socket.handler.math.MathOperationRequest;
 import java.io.IOException;
 import java.net.ServerSocket;
 
+/**
+ * Coordena o ciclo de vida do servidor socket TCP.
+ * Responsável por inicializar o {@link ServerSocket}, delegar conexões para o {@link ConnectionAcceptor},
+ * manter o registro de conexões ativas e efetuar o encerramento gracioso da aplicação.
+ */
 public class SocketServer {
 
     public static final int DEFAULT_PORT = 3000;
@@ -28,23 +33,44 @@ public class SocketServer {
     private ConnectionAcceptor connectionAcceptor;
     private volatile boolean running = false;
 
+    /**
+     * Cria uma instância do servidor socket utilizando a porta padrão (3000).
+     */
     public SocketServer() {
         this(DEFAULT_PORT);
     }
 
+    /**
+     * Cria uma instância do servidor socket vinculada à porta especificada.
+     *
+     * @param port porta TCP na qual o servidor irá escutar conexões
+     */
     public SocketServer(int port) {
         this.port = port;
         this.clientRegistry = new ClientRegistry();
         this.handlerRegistry = new HandlerRegistry();
     }
 
-
+    /**
+     * Registra um handler de negócio associado a uma classe específica de mensagem de requisição.
+     *
+     * @param <T> tipo da mensagem de requisição
+     * @param <R> tipo da mensagem de resposta
+     * @param requestClass classe do objeto de requisição a ser interceptado
+     * @param handler instância do handler que processará a requisição
+     * @return a própria instância de SocketServer para chamadas encadeadas
+     */
     public <T extends Message, R extends Message> SocketServer registerHandler(
             Class<T> requestClass, RequestHandler<T, R> handler) {
         this.handlerRegistry.register(requestClass, handler);
         return this;
     }
 
+    /**
+     * Inicializa o servidor socket, vinculando o ServerSocket à porta e disparando a thread de aceitação.
+     *
+     * @throws ServerException se a porta já estiver em uso ou se ocorrer erro de I/O na inicialização
+     */
     public synchronized void start() throws ServerException {
         if (running) {
             return;
@@ -65,6 +91,9 @@ public class SocketServer {
         this.running = true;
     }
 
+    /**
+     * Encerra graciosamente o servidor socket, fechando o ServerSocket, notificando e desconectando clientes.
+     */
     public synchronized void stop() {
         if (!running) {
             return;
@@ -90,6 +119,8 @@ public class SocketServer {
             }
         }
     }
+
+    // Getters e setters
 
     public boolean isRunning() {
         return running;

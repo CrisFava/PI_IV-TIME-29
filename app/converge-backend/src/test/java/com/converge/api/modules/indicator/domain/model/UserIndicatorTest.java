@@ -12,6 +12,12 @@ import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.within;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 
+/**
+ * Testes unitários para {@link UserIndicator}.
+ * Valida cenários como: Deve nascer zerado para o usuário e o período; Total de viagens deve somar os dois papéis e árvores devem ser CO2 / 22; Deve recusar usuário, período ou referência ausentes.
+ * <p>
+ * Os métodos de teste estão bem explicativos através de suas anotações {@code @DisplayName}.
+ */
 class UserIndicatorTest {
 
     private static ApplicationException errorOf(Runnable action) {

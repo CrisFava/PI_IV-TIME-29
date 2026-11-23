@@ -2,6 +2,7 @@
 
 import 'package:flutter_dotenv/flutter_dotenv.dart';
 
+/// Configurações globais de conexão com a API e parâmetros do app.
 abstract class AppConfig {
   static const String appName = 'Converge';
 

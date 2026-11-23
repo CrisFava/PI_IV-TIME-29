@@ -10,6 +10,12 @@ import org.junit.jupiter.api.Test;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 
+/**
+ * Testes unitários para {@link SustainabilityHandler}.
+ * Valida o cálculo de métricas de sustentabilidade ambiental, incluindo CO₂ evitado, veículos retirados e árvores equivalentes.
+ * <p>
+ * Os métodos de teste estão bem explicativos através de suas anotações {@code @DisplayName}.
+ */
 class SustainabilityHandlerTest {
 
     private static final double DELTA = 1e-9;

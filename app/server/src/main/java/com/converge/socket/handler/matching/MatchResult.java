@@ -30,6 +30,20 @@ public class MatchResult implements Serializable {
     // Teto do passageiro: metade do custo da rota com o desvio. Null nas mesmas condições da estimativa
     private final BigDecimal maxAmount;
 
+    /**
+     * Cria um resultado de compatibilidade calculado entre um trajeto de oferta e um de procura.
+     *
+     * @param driverRouteId identificador da rota do motorista
+     * @param passengerRouteId identificador da rota do passageiro
+     * @param driverId identificador do usuário motorista
+     * @param passengerId identificador do usuário passageiro
+     * @param compatibilityScore índice de compatibilidade calculado entre 0 e 1
+     * @param calculatedDetourKm desvio adicional calculado em quilômetros
+     * @param scheduleDifferenceMin diferença absoluta em minutos entre os horários de saída
+     * @param compatibleDays conjunto de dias da semana em comum entre as rotas
+     * @param estimatedCostPerPassenger estimativa de custo por passageiro considerando o desvio
+     * @param maxAmount teto máximo cobrável do passageiro
+     */
     public MatchResult(
             String driverRouteId,
             String passengerRouteId,
@@ -56,6 +70,7 @@ public class MatchResult implements Serializable {
         this.maxAmount = maxAmount;
     }
 
+    // Getters e setters
     public String getDriverRouteId() {
         return driverRouteId;
     }

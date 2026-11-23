@@ -17,6 +17,12 @@ import java.util.List;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.mockito.Mockito.when;
 
+/**
+ * Testes unitários para {@link ListReviewsReceivedUseCase}.
+ * Valida cenários como: Deve listar as avaliações recebidas pelo usuário no papel pedido; Deve devolver lista vazia quando o usuário não recebeu avaliações.
+ * <p>
+ * Os métodos de teste estão bem explicativos através de suas anotações {@code @DisplayName}.
+ */
 @ExtendWith(MockitoExtension.class)
 class ListReviewsReceivedUseCaseTest {
 

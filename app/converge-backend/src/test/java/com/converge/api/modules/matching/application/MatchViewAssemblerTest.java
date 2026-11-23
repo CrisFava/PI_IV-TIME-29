@@ -28,6 +28,12 @@ import static org.mockito.ArgumentMatchers.anyCollection;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.when;
 
+/**
+ * Testes unitários para {@link MatchViewAssembler}.
+ * Valida cenários como: Visão do passageiro: nome, nota média, trajeto, vagas e veículo do motorista; Visão do motorista: dados do passageiro, sem vagas nem veículo.
+ * <p>
+ * Os métodos de teste estão bem explicativos através de suas anotações {@code @DisplayName}.
+ */
 @ExtendWith(MockitoExtension.class)
 class MatchViewAssemblerTest {
 

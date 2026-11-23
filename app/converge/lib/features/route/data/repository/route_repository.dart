@@ -19,6 +19,7 @@ abstract class RouteRepository {
     String? sessionToken,
   });
 
+
   /// Salva um novo trajeto (oferta ou pedido de carona) no backend.
   Future<RouteResponseModel> createRoute(CreateRouteRequest request);
 

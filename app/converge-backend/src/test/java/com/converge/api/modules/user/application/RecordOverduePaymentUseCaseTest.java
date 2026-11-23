@@ -23,6 +23,12 @@ import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.verifyNoInteractions;
 import static org.mockito.Mockito.when;
 
+/**
+ * Testes unitários para {@link RecordOverduePaymentUseCase}.
+ * Valida cenários como: A primeira dívida deve deixar o usuário com pagamento em atraso (HAS_OVERDUE), sem bloquear; Ao chegar no limite de dívidas, deve bloquear o usuário; Acima do limite, também deve bloquear.
+ * <p>
+ * Os métodos de teste estão bem explicativos através de suas anotações {@code @DisplayName}.
+ */
 @ExtendWith(MockitoExtension.class)
 class RecordOverduePaymentUseCaseTest {
 

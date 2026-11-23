@@ -2,7 +2,7 @@
 
 package com.converge.api.modules.user.domain.enums.user;
 
-
+// Cargos de participação dentro do app
 public enum ParticipationRole {
     PASSENGER, DRIVER
 }

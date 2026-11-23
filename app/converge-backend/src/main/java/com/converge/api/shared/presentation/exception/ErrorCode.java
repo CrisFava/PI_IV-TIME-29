@@ -5,6 +5,14 @@ package com.converge.api.shared.presentation.exception;
 import lombok.Getter;
 import org.springframework.http.HttpStatus;
 
+/**
+ * Catálogo dos códigos de erro da API.
+ *
+ * Cada código está ligado a um status HTTP. O ApplicationException carrega um
+ * ErrorCode, e o GlobalExceptionHandler (e o IdempotencyResponseWriter) usam
+ * getStatus() para montar a resposta. O app deve decidir o que fazer pelo código
+ * (ex.: RIDE_CONFLICT), e não pelo texto da mensagem.
+ */
 @Getter
 public enum ErrorCode {
     BAD_REQUEST(HttpStatus.BAD_REQUEST),

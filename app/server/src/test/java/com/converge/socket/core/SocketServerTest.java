@@ -26,6 +26,12 @@ import static org.junit.jupiter.api.Assertions.assertSame;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
+/**
+ * Testes unitários para {@link SocketServer}.
+ * Valida o ciclo de vida do servidor socket TCP, vinculação de portas, inicialização, parada graciosa e registro de handlers.
+ * <p>
+ * Os métodos de teste estão bem explicativos através de suas anotações {@code @DisplayName}.
+ */
 class SocketServerTest {
 
     private static class UppercaseRequest extends Message {

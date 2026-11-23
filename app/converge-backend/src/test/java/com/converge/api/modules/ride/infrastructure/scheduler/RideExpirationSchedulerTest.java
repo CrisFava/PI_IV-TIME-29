@@ -18,6 +18,12 @@ import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
+/**
+ * Testes unitários para {@link RideExpirationScheduler}.
+ * Valida cenários como: processPendingRequestTimeouts deve invocar o caso de uso com timestamp atual; processDepartureExpirations deve invocar o caso de uso com timestamp atual.
+ * <p>
+ * Os métodos de teste estão bem explicativos através de suas anotações {@code @DisplayName}.
+ */
 @ExtendWith(MockitoExtension.class)
 class RideExpirationSchedulerTest {
 

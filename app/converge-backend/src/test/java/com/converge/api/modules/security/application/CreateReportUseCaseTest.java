@@ -32,6 +32,12 @@ import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.verifyNoInteractions;
 import static org.mockito.Mockito.when;
 
+/**
+ * Testes unitários para {@link CreateReportUseCase}.
+ * Valida cenários como: Deve registrar a denúncia como PENDING com o autor vindo do usuário logado; Não deve aceitar denúncia contra si mesmo; Não deve aceitar denúncia contra usuário inexistente.
+ * <p>
+ * Os métodos de teste estão bem explicativos através de suas anotações {@code @DisplayName}.
+ */
 @ExtendWith(MockitoExtension.class)
 class CreateReportUseCaseTest {
 

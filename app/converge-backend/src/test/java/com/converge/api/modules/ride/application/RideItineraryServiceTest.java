@@ -28,6 +28,12 @@ import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.verifyNoInteractions;
 import static org.mockito.Mockito.when;
 
+/**
+ * Testes unitários para {@link RideItineraryService}.
+ * Valida cenários como: Grava as paradas, a rota do Google passando por elas e a chegada pelo tempo da rota; Se a rota falhar, guarda as paradas sem o desenho e não derruba o aceite.
+ * <p>
+ * Os métodos de teste estão bem explicativos através de suas anotações {@code @DisplayName}.
+ */
 @ExtendWith(MockitoExtension.class)
 class RideItineraryServiceTest {
 

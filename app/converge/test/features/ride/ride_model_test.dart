@@ -11,6 +11,9 @@ import 'package:flutter_test/flutter_test.dart';
 
 import 'fakes/fake_ride.dart';
 
+/// Testes unitários e de widgets para ride model.
+/// Cobre cenários como: RideModel.fromJson, RideModel.passengersWithSeat.
+/// Os casos de teste estão descritos de forma autoexplicativa nas chamadas de [test] e [group].
 void main() {
   group('RideModel.fromJson', () {
     test('lê os campos principais da viagem', () {

@@ -39,6 +39,12 @@ import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.verifyNoInteractions;
 import static org.mockito.Mockito.when;
 
+/**
+ * Testes unitários para {@link RecordReviewRatingUseCase}.
+ * Valida cenários como: Deve gravar média e total só no papel de motorista; Deve gravar média e total só no papel de passageiro; Deve arredondar a média para 2 casas.
+ * <p>
+ * Os métodos de teste estão bem explicativos através de suas anotações {@code @DisplayName}.
+ */
 @ExtendWith(MockitoExtension.class)
 class RecordReviewRatingUseCaseTest {
 

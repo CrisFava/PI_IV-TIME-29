@@ -21,6 +21,13 @@ public class MatchRoutesRequest extends Message {
     private final MatchRoute route;
     private final ArrayList<MatchRoute> candidates;
 
+    /**
+     * Cria uma requisição de matching entre um trajeto principal e seus candidatos.
+     *
+     * @param mode modo de compatibilidade (passageiro procurando motoristas ou motorista procurando passageiros)
+     * @param route trajeto base a ser comparado
+     * @param candidates lista de trajetos candidatos do papel complementar
+     */
     public MatchRoutesRequest(MatchMode mode, MatchRoute route, List<MatchRoute> candidates) {
         this.mode = mode;
         this.route = route;
@@ -28,6 +35,7 @@ public class MatchRoutesRequest extends Message {
         this.candidates = candidates == null ? new ArrayList<>() : new ArrayList<>(candidates);
     }
 
+    // Getters e setters
     public MatchMode getMode() {
         return mode;
     }

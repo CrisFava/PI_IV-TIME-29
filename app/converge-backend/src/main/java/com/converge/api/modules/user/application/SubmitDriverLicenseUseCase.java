@@ -11,6 +11,7 @@ import com.converge.api.shared.application.UserUtils;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
 
+// Caso de uso para enviar uma carteira de motorista ao banco.
 @Service
 @RequiredArgsConstructor
 public class SubmitDriverLicenseUseCase implements UseCase<SubmitDriverLicenseCommand, User> {

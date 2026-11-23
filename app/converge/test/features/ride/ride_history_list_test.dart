@@ -83,6 +83,9 @@ Future<void> _pumpHistory(
   await tester.pumpAndSettle();
 }
 
+/// Testes unitários e de widgets para ride history list.
+/// Cobre cenários como: horário.
+/// Os casos de teste estão descritos de forma autoexplicativa nas chamadas de [test] e [group].
 void main() {
   testWidgets(
     'mostra a viagem com data, trajeto, carro, pessoas e o valor pago',

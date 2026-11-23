@@ -10,6 +10,7 @@ import com.converge.api.modules.user.domain.enums.user.ParticipationRole;
 import java.math.BigDecimal;
 import java.time.LocalDateTime;
 
+// Resposta do participante, o que o app vai ver para cada participante da viagem
 public record ParticipantResponseDTO(
         String userId,
         String name,

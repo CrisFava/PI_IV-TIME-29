@@ -33,6 +33,12 @@ import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
+/**
+ * Testes unitários para {@link ManageRouteUseCases}.
+ * Valida cenários como: Deve listar apenas os trajetos não excluídos do usuário; Deve buscar o trajeto do usuário; Deve atualizar os dados do trajeto e salvar.
+ * <p>
+ * Os métodos de teste estão bem explicativos através de suas anotações {@code @DisplayName}.
+ */
 @ExtendWith(MockitoExtension.class)
 class ManageRouteUseCasesTest {
 

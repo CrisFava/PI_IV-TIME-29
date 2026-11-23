@@ -19,6 +19,12 @@ import static org.assertj.core.api.Assertions.assertThat;
 import static org.mockito.Mockito.verifyNoInteractions;
 import static org.mockito.Mockito.when;
 
+/**
+ * Testes unitários para {@link ListBlocksUseCase}.
+ * Valida cenários como: Deve listar os bloqueados com o nome de cada um; Sem bloqueios devolve lista vazia sem buscar nomes.
+ * <p>
+ * Os métodos de teste estão bem explicativos através de suas anotações {@code @DisplayName}.
+ */
 @ExtendWith(MockitoExtension.class)
 class ListBlocksUseCaseTest {
 

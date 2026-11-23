@@ -15,6 +15,12 @@ import java.util.Optional;
 import static com.converge.api.modules.route.application.FakeMapsGateway.GOOGLE_ROUTE;
 import static org.assertj.core.api.Assertions.assertThat;
 
+/**
+ * Testes unitários para {@link RouteGeometryService}.
+ * Valida cenários como: Deve usar a rota do Google quando ela existir; Deve usar o Haversine, sem polyline, quando o Google não encontrar rota; Deve usar o Haversine, sem polyline, quando o Google estiver fora do ar.
+ * <p>
+ * Os métodos de teste estão bem explicativos através de suas anotações {@code @DisplayName}.
+ */
 class RouteGeometryServiceTest {
 
     private static final Coordinates HOME_COORDINATES = new Coordinates(-22.9056, -47.0608);

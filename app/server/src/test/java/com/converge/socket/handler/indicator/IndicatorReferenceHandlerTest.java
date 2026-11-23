@@ -14,6 +14,12 @@ import static org.junit.jupiter.api.Assertions.assertArrayEquals;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 
+/**
+ * Testes unitários para {@link IndicatorReferenceHandler}.
+ * Valida a geração de códigos de referência temporal para agrupamentos de indicadores (semanal, mensal, semestral e total).
+ * <p>
+ * Os métodos de teste estão bem explicativos através de suas anotações {@code @DisplayName}.
+ */
 class IndicatorReferenceHandlerTest {
 
     private final IndicatorReferenceHandler handler = new IndicatorReferenceHandler();

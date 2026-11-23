@@ -12,6 +12,12 @@ import java.util.Optional;
 
 import static org.assertj.core.api.Assertions.assertThat;
 
+/**
+ * Testes unitários para {@link MatchingRouteFactory}.
+ * Valida cenários como: Oferta: leva desvio, vagas, custo por km do veículo e pedágio + estacionamento; Oferta sem veículo encontrado fica sem custo por km; Procura: só localização, horário e dias, sem campos de oferta.
+ * <p>
+ * Os métodos de teste estão bem explicativos através de suas anotações {@code @DisplayName}.
+ */
 class MatchingRouteFactoryTest {
 
     private final MatchingRouteFactory factory = new MatchingRouteFactory();

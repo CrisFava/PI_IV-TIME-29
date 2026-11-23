@@ -8,6 +8,7 @@ import com.converge.api.shared.application.UseCase;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
 
+// Caso de uso para verificar a disponibilidade de um email.
 @Service
 @RequiredArgsConstructor
 public class CheckEmailAvailabilityUseCase implements UseCase<String, EmailAvailabilityResponseDTO> {

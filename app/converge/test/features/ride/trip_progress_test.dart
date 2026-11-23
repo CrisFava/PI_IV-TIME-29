@@ -50,6 +50,9 @@ RideModel _ride({
   return RideModel.fromJson(json);
 }
 
+/// Testes unitários e de widgets para trip progress.
+/// Cobre cenários como: a próxima etapa avança quando o motorista confirma quem entrou, quem desce no mesmo ponto forma uma etapa só.
+/// Os casos de teste estão descritos de forma autoexplicativa nas chamadas de [test] e [group].
 void main() {
   test('a próxima etapa avança quando o motorista confirma quem entrou', () {
     final before = TripProgress.of(_ride());

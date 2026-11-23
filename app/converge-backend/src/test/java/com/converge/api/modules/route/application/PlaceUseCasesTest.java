@@ -15,6 +15,12 @@ import static com.converge.api.modules.route.application.FakeMapsGateway.PUC_SUG
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 
+/**
+ * Testes unitários para {@link PlaceUseCases}.
+ * Valida cenários como: Deve devolver as sugestões do serviço de mapas; Não deve chamar o serviço de mapas para textos com menos de 3 caracteres; Deve devolver os detalhes do lugar.
+ * <p>
+ * Os métodos de teste estão bem explicativos através de suas anotações {@code @DisplayName}.
+ */
 class PlaceUseCasesTest {
 
     private FakeMapsGateway mapsGateway;

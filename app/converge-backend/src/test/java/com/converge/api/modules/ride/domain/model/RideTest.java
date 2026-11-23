@@ -32,6 +32,12 @@ import java.util.Set;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
+/**
+ * Testes unitários para {@link Ride}.
+ * Valida cenários como: Pedidos param 5 min antes da saída; iniciar só de 5 min antes a 5 min depois; Viagem não iniciada é cancelada: confirmados saem sem penalidade e pedidos expiram; Viagem nova deve nascer aguardando confirmação e com as vagas todas livres.
+ * <p>
+ * Os métodos de teste estão bem explicativos através de suas anotações {@code @DisplayName}.
+ */
 class RideTest {
 
     private final LocalDateTime tomorrow = LocalDateTime.now().plusDays(1);

@@ -43,6 +43,12 @@ import static org.springframework.test.web.servlet.request.MockMvcRequestBuilder
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
+/**
+ * Testes unitários para {@link ReportController}.
+ * Valida cenários como: POST /reports deve denunciar em nome do usuário logado e responder 201 com status PENDING; POST /reports ignora reporterId do corpo: vale o usuário do token; POST /reports sem motivo deve responder 400 sem chamar o caso de uso.
+ * <p>
+ * Os métodos de teste estão bem explicativos através de suas anotações {@code @DisplayName}.
+ */
 @ExtendWith(MockitoExtension.class)
 class ReportControllerTest {
 

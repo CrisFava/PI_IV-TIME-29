@@ -11,6 +11,14 @@ import com.converge.api.modules.route.domain.model.subtypes.Coordinates;
 import com.converge.api.modules.route.domain.model.subtypes.Place;
 import org.springframework.stereotype.Component;
 
+/**
+ * Mapper do módulo de trajetos (route).
+ *
+ * Faz a conversão entre os DTOs da API e o modelo de domínio: transforma o
+ * pedido de criação de trajeto (CreateRouteRequestDTO) em entidade Route, e a
+ * entidade Route na resposta da API (RouteResponseDTO). Também converte o
+ * endereço (Place) nos dois sentidos. Não tem regra de negócio, só mapeamento.
+ */
 @Component
 public class RouteMapper {
 
