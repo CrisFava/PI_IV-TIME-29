@@ -8,7 +8,7 @@ Ferramentas para testar o Converge sem precisar sair de casa nem fazer cadastros
 | `verificar_usuario.py` | Marca a CNH e o vínculo acadêmico de um usuário como `VERIFIED`, buscando pelo e-mail |
 | `verificar_todos_usuarios.py` | Faz o mesmo para todos os usuários do banco de uma vez |
 | `simular_corrida.py` | Percorre corridas inteiras contra o backend rodando e confere cada resposta |
-| `teste_no_app.py` | Prepara um teste manual no app: cria uma conta para o simulador e um robô que faz a outra ponta da corrida |
+| `teste_no_app.py` | Teste manual no app com 3 robôs: primeiro eles pedem vaga na sua carona, depois um deles dirige e os outros vão junto |
 
 Os testes **mockados** (sem banco e sem API) ficam no backend, em
 `app/converge-backend/src/test/java/com/converge/api/modules/ride/application/RideJourneyTest.java`.
@@ -116,23 +116,44 @@ python scripts/verificar_todos_usuarios.py --banco converge-testes
 
 ## `teste_no_app.py`
 
-Para testar a corrida **no app**, no simulador, com uma conta só. A outra ponta da corrida é um
-robô que age pela API no tempo certo das regras de horário: o pedido de vaga vale até 5 min antes
-da saída, o início de 5 min antes a 5 min depois, e um pedido expira em 3 min sem resposta.
+Para testar a corrida **no app** com a sua conta. O script cria 3 robôs (Ana, Bruno e Carla) que
+fazem a outra ponta da corrida pela API, em duas fases:
 
 ```bash
-python scripts/teste_no_app.py preparar     # cria a conta do app e os dois robôs (mostra e-mail e senha)
-python scripts/teste_no_app.py motorista    # o app é a PASSAGEIRA: o robô oferece, aceita, inicia, cobra e encerra
-python scripts/teste_no_app.py passageiro   # o app é o MOTORISTA: a robô pede vaga na carona publicada e paga
-python scripts/teste_no_app.py limpar       # apaga as contas do Firebase
+python scripts/teste_no_app.py                                       # fase 1: vale qualquer carona nova
+python scripts/teste_no_app.py --motorista voce@puccampinas.edu.br   # fase 1: só a sua carona
+python scripts/teste_no_app.py --limpar 1123134501                   # apaga contas e dados da execução
 ```
 
-- A carona usa os trajetos padrão do app: PUC-Campinas - Portaria Principal → Campus II (Saúde).
-- `motorista`: a carona do robô sai em 15 min (`--minutos`); depois de iniciada, ele confirma a
-  chegada em 3 min (`--duracao`), o que emite a cobrança, e encerra a viagem.
-- `passageiro`: espera a conta do app publicar uma carona (até 10 min), pede vaga e, depois da
-  cobrança, informa o pagamento em 30 s (`--pagar-depois`).
-- As contas ficam em `scripts/.teste_no_app.json` (fora do Git). A senha é a mesma da simulação.
+**Fase 1: você é o motorista.**
+
+1. Publique no app uma carona Campus I → Campus II que sai **nos próximos 6 min** (`--janela`). O
+   pedido de vaga só vale até 5 min antes da saída, então publique rápido: com saída daqui a 6 min,
+   sobra cerca de 1 min para os robôs pedirem.
+2. Os 3 robôs pedem vaga assim que a carona aparece, ao mesmo tempo.
+3. No app: aceite os pedidos (expiram em 3 min sem resposta), inicie a viagem (a partir de 5 min
+   antes da saída), marque "Entrou", confirme a chegada de cada um e encerre. Cada robô informa o
+   pagamento ("Já paguei") alguns segundos depois de a cobrança chegar (`--pagar-depois`).
+4. Quando a fase acaba, o script espera um **Enter**. O Enter também pula a fase 1 a qualquer momento.
+
+**Fase 2: a Ana é a motorista.**
+
+1. A Ana publica uma carona Campus I → Campus II que sai daqui a 6 min (`--minutos`), com 3 vagas.
+2. Bruno e Carla pedem vaga, e a Ana aceita todos os pedidos, inclusive o seu se você pedir pelo app.
+3. **Enter**: a Ana inicia a viagem e marca "Entrou" para todos. Se a janela de início (5 min antes da
+   saída) ainda não abriu, ela espera abrir.
+4. **Enter** de novo: a Ana confirma a chegada de todos (o que emite as cobranças) e encerra a viagem.
+   Bruno e Carla informam o pagamento.
+
+- Os pontos de embarque dos robôs ficam a até 3 km do Campus I, e os de descida a até 3 km do
+  Campus II. O script confere essas distâncias antes de começar e avisa se a sua carona da fase 1
+  sai ou chega a mais de 3 km dos campi.
+- Sem `--motorista`, vale a primeira carona publicada por qualquer pessoa depois que o script começou.
+  No `converge-dev`, que é compartilhado, prefira passar o seu e-mail.
+- No fim, o script mostra o e-mail de cada robô (a senha é a da simulação) e o comando para apagar.
+- `--limpar <execução>` apaga as contas do Firebase e o que a execução gravou no Mongo (usuários,
+  trajetos, notificações, chaves de idempotência etc.). Viagens com gente de fora (a sua carona, ou a
+  da Ana se você foi junto) não são apagadas, e os robôs que aparecem nelas continuam em `users`.
 
 ---
 
@@ -216,7 +237,7 @@ o chat e o pagamento na interface.
 
 ### Qual banco usar
 
-A simulação **grava de verdade** no banco que o backend está usando: pessoas `[SIM] ...`, carros,
+A simulação **grava de verdade** no banco que o backend está usando: pessoas com e-mail `sim.<execução>...@converge-sim.test`, carros,
 trajetos, viagens, avaliações e indicadores. O ideal é usar um banco só para isso, passando o mesmo
 nome para o backend e para o script:
 

@@ -207,7 +207,7 @@ Todo cadastro nasce com o vínculo acadêmico `PENDING` e a CNH `UNDER_REVIEW`, 
 python scripts/verificar_usuario.py aluno@puccampinas.edu.br
 ```
 
-Veja o [`scripts/README.md`](scripts/README.md) para os demais scripts, como a simulação de corridas completas contra a API (`simular_corrida.py`) e o teste manual no app com um robô fazendo a outra ponta (`teste_no_app.py`).
+Veja o [`scripts/README.md`](scripts/README.md) para os demais scripts, como a simulação de corridas completas contra a API (`simular_corrida.py`) e o teste manual no app com robôs fazendo a outra ponta da corrida (`teste_no_app.py`).
 
 ---
 
