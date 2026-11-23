@@ -10,6 +10,7 @@ import '../../../matching/presentation/widgets/driver_suggestion_alert.dart';
 import '../../../matching/presentation/widgets/incoming_ride_request_alert.dart';
 import '../../../matching/state/incoming_ride_request_controller.dart';
 import '../../../matching/state/passenger_match_controller.dart';
+import '../../../matching/state/ride_cancellation_notice_controller.dart';
 import 'passenger_ride_step.dart';
 
 class HomeRideAlertsOverlay extends ConsumerStatefulWidget {
@@ -102,6 +103,21 @@ class _HomeRideAlertsOverlayState extends ConsumerState<HomeRideAlertsOverlay> {
       );
     }
 
+    // Os dois lados: a carona ou a vaga cancelada pelo outro (um aviso por vez)
+    final cancellation = ref
+        .watch(rideCancellationNoticeProvider)
+        .firstOrNull;
+    final showCancellation =
+        cancellation != null &&
+        _isNotifying(cancellation.key, onScreen: false);
+    if (cancellation != null && !showCancellation) {
+      Future.microtask(
+        () => ref
+            .read(rideCancellationNoticeProvider.notifier)
+            .dismiss(cancellation.key),
+      );
+    }
+
     // Passageiro: o motorista aceitou o pedido
     final accepted = widget.acceptedNotice;
     final showAccepted =
@@ -115,12 +131,36 @@ class _HomeRideAlertsOverlayState extends ConsumerState<HomeRideAlertsOverlay> {
       duration: const Duration(milliseconds: 250),
       child: Column(
         key: ValueKey(
+          '${showCancellation ? cancellation.key : ''}|'
           '${showAccepted ? accepted.key : ''}|'
           '${showRequest ? requestKey : ''}|${showMatch ? matchKey : ''}',
         ),
         mainAxisSize: MainAxisSize.min,
         crossAxisAlignment: CrossAxisAlignment.stretch,
         children: [
+          if (showCancellation) ...[
+            InAppNotificationCard(
+              key: const ValueKey('ride_cancellation_notification'),
+              icon: Icons.event_busy_rounded,
+              title: cancellation.title,
+              message: cancellation.message,
+              onTap: () {
+                _dismissNotification(cancellation.key);
+                ref
+                    .read(rideCancellationNoticeProvider.notifier)
+                    .dismiss(cancellation.key);
+                if (!cancellation.forDriver) widget.onOpenRidesAsPassenger();
+              },
+              onDismiss: () {
+                _dismissNotification(cancellation.key);
+                ref
+                    .read(rideCancellationNoticeProvider.notifier)
+                    .dismiss(cancellation.key);
+              },
+            ),
+            if (showAccepted || showRequest || showMatch)
+              const SizedBox(height: 8),
+          ],
           if (showAccepted) ...[
             InAppNotificationCard(
               key: const ValueKey('ride_accepted_notification'),
