@@ -12,10 +12,12 @@ import '../models/report_model.dart';
 import 'security_endpoints.dart';
 import 'security_repository.dart';
 
+/// Provedor global da instância de [SecurityRepository].
 final securityRepositoryProvider = Provider<SecurityRepository>(
   (ref) => SecurityRepositoryImpl(ref.watch(dioProvider)),
 );
 
+/// Implementação do repositório de segurança para bloqueio de usuários e denúncias.
 class SecurityRepositoryImpl implements SecurityRepository {
   final Dio _dio;
 

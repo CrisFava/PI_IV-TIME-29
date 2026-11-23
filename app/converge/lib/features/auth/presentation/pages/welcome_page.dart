@@ -6,6 +6,7 @@ import 'package:go_router/go_router.dart';
 import '../../../../app_routes.dart';
 import '../../../../core/config/styles.dart';
 
+/// Tela de boas-vindas exibida para usuários não autenticados com opções de login e cadastro.
 class WelcomePage extends StatelessWidget {
   const WelcomePage({super.key});
 

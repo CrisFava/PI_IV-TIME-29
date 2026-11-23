@@ -1,5 +1,6 @@
 // Autor: Allan Giovanni Matias Paes - RA 25008211
 
+/// Tipos de chave Pix suportados para cadastro de recebimento do motorista.
 enum PixKeyType {
   cpf('CPF', 'CPF'),
   email('EMAIL', 'E-mail'),

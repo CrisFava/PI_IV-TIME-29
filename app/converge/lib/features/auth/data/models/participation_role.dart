@@ -1,5 +1,6 @@
 // Autor: Cristian Eduardo Fava - RA 25000636
 
+/// Papéis de participação do usuário no ecossistema do Converge (passageiro e/ou motorista).
 enum ParticipationRole {
   passenger,
   driver;

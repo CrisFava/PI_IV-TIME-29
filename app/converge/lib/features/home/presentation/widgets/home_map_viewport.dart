@@ -14,6 +14,7 @@ import 'home_real_map_background.dart';
 import 'passenger_ride_step.dart';
 import 'trip_layers_calculator.dart';
 
+/// Componente de mapa interativo da tela inicial exibindo rotas, paradas e motoristas compatíveis.
 class HomeMapViewport extends ConsumerStatefulWidget {
   final bool isDriverMode;
   final PassengerRideStep passengerStep;

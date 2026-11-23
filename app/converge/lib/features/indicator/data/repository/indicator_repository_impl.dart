@@ -13,10 +13,12 @@ import '../models/user_indicator_model.dart';
 import 'indicator_endpoints.dart';
 import 'indicator_repository.dart';
 
+/// Provedor global da instância de [IndicatorRepository].
 final indicatorRepositoryProvider = Provider<IndicatorRepository>(
   (ref) => IndicatorRepositoryImpl(ref.watch(dioProvider)),
 );
 
+/// Implementação do repositório de indicadores de sustentabilidade individuais e da plataforma.
 class IndicatorRepositoryImpl implements IndicatorRepository {
   final Dio _dio;
 

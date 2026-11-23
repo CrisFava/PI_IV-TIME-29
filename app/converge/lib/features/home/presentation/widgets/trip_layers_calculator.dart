@@ -8,6 +8,7 @@ import '../../../ride/presentation/widgets/trip_panel.dart';
 import '../../../ride/state/trip_progress.dart';
 import 'home_real_map_background.dart';
 
+/// Utilitário para cálculo e cache de polylines e pontos de parada em camadas no mapa.
 class TripLayersCalculator {
   static final Map<String, List<LatLng>> _legPointsCache = {};
   static String? _itineraryPolylineCache;

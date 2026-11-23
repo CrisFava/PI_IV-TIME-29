@@ -8,6 +8,7 @@ import 'app_router.dart';
 import 'core/config/app_config.dart';
 import 'core/config/styles.dart';
 
+/// Widget raiz do aplicativo com configurações de tema, rotas e localização.
 class AppWidget extends ConsumerWidget {
   const AppWidget({super.key});
 

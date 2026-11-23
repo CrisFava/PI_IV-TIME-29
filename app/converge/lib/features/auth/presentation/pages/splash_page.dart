@@ -7,6 +7,7 @@ import '../../../../core/config/styles.dart';
 import '../../state/auth_action_controller.dart';
 import '../../state/auth_controller.dart';
 
+/// Tela de splash inicial que aguarda a resolução do estado de autenticação do usuário.
 class SplashPage extends ConsumerWidget {
   const SplashPage({super.key});
 

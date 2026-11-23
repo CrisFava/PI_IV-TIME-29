@@ -9,6 +9,7 @@ import '../../../../core/config/styles.dart';
 import '../../../../core/utils/validators.dart';
 import '../../state/auth_action_controller.dart';
 
+/// Tela de recuperação de senha por e-mail institucional.
 class ForgotPasswordPage extends ConsumerStatefulWidget {
   const ForgotPasswordPage({super.key});
 

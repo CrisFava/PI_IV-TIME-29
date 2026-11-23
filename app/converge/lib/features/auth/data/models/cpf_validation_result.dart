@@ -1,5 +1,6 @@
 // Autor: Allan Giovanni Matias Paes - RA 25008211
 
+/// Resultado da validação de CPF retornada pelo serviço de autenticação/validação.
 class CpfValidationResult {
   final bool valid;
   final String? formattedCpf;

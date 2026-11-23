@@ -10,10 +10,12 @@ import '../models/match_model.dart';
 import 'matching_endpoints.dart';
 import 'matching_repository.dart';
 
+/// Provedor global da instância de [MatchingRepository].
 final matchingRepositoryProvider = Provider<MatchingRepository>(
   (ref) => MatchingRepositoryImpl(ref.watch(dioProvider)),
 );
 
+/// Implementação do repositório de busca e matching de trajetos compatíveis via API.
 class MatchingRepositoryImpl implements MatchingRepository {
   final Dio _dio;
 

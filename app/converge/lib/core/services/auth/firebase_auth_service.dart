@@ -6,6 +6,7 @@ import 'auth_service.dart';
 import 'auth_exception.dart';
 import 'auth_user.dart';
 
+/// Implementação do serviço [AuthService] integrado ao Firebase Authentication.
 class FirebaseAuthService implements AuthService {
   final fb.FirebaseAuth _auth;
 
