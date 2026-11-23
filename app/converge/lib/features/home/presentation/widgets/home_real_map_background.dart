@@ -1,0 +1,916 @@
+// Autor: Allan Giovanni Matias Paes - RA 25008211
+
+import 'dart:math' as math;
+import 'dart:ui' as ui;
+
+import 'package:converge/features/home/presentation/widgets/home_map_background.dart';
+import 'package:flutter/foundation.dart';
+import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
+import 'package:google_maps_flutter/google_maps_flutter.dart';
+
+import '../../../../core/config/styles.dart';
+import '../../../../core/services/maps/map_marker_icons.dart';
+import '../../../../core/services/maps/map_styles.dart';
+import '../../../../core/utils/currency_formatter.dart';
+import '../../../matching/data/models/match_model.dart';
+import 'campus_spots.dart';
+
+/// Tipo de pino central para o modo de arrasto estilo Uber
+enum CentralPinType { destination, pickup }
+
+/// ============================================================================
+/// COMPONENTE: HomeRealMapBackground (Google Maps Monocromático & Elegante)
+/// ============================================================================
+/// 1. Mapa com estilização monocromática elegante (Google Maps JSON).
+/// 2. Destino: bolinha quadriculada, remetendo à chegada.
+/// 3. Origem: bolinha preta opaca, remetendo à origem.
+/// 4. Motorista: carrinho preto filled.
+/// 5. Seleção: pino monocromático preto não totalmente filled (vazado no centro).
+/// ============================================================================
+class HomeRealMapBackground extends StatefulWidget {
+  final bool isDriverMode;
+
+  /// O ponto de partida é onde o passageiro espera o motorista: ícone de pessoa
+  /// (o mesmo dos embarques), em vez da bolinha de partida.
+  final bool pickupIsPassengerSpot;
+  final bool showDrivers;
+
+  /// Motoristas compatíveis (matching), marcados no ponto de partida de cada um.
+  final List<MatchModel> availableDrivers;
+  final MatchModel? acceptedDriver;
+  final LatLng? pickupLocation;
+  final LatLng? destinationLocation;
+  final String pickupAddress;
+  final String destinationAddress;
+  final bool showTrajectory;
+  final List<LatLng>? tripRoutePoints;
+  final List<LatLng>? driverApproachRoutePoints;
+
+  /// Viagem em andamento em trechos: o atual forte, os próximos apagados.
+  /// Quando vem, substitui o [tripRoutePoints].
+  final List<TripMapLeg>? tripLegs;
+
+  /// As paradas da viagem em andamento (cada uma com a bandeira de fim).
+  final List<TripMapStop> tripStops;
+
+  // Modo arrasto de mapa estilo Uber com pino fixo
+  final bool isDraggingPin;
+  final CentralPinType centralPinType;
+  final ValueChanged<LatLng>? onCameraCenterChanged;
+
+  final ValueChanged<MatchModel>? onDriverSelected;
+  final VoidCallback? onMapTap;
+  final String universityName;
+
+  /// Altura coberta por um painel na parte de baixo: o enquadramento usa só a área visível.
+  final double bottomPadding;
+
+  const HomeRealMapBackground({
+    super.key,
+    required this.isDriverMode,
+    this.pickupIsPassengerSpot = false,
+    this.showDrivers = false,
+    this.availableDrivers = const [],
+    this.acceptedDriver,
+    this.pickupLocation,
+    this.destinationLocation,
+    this.pickupAddress = '',
+    this.destinationAddress = '',
+    this.showTrajectory = false,
+    this.tripRoutePoints,
+    this.driverApproachRoutePoints,
+    this.isDraggingPin = false,
+    this.centralPinType = CentralPinType.destination,
+    this.onCameraCenterChanged,
+    this.onDriverSelected,
+    this.onMapTap,
+    this.universityName = 'PUC-Campinas',
+    this.bottomPadding = 0,
+    this.tripLegs,
+    this.tripStops = const [],
+  });
+
+  @override
+  State<HomeRealMapBackground> createState() => _HomeRealMapBackgroundState();
+}
+
+class _HomeRealMapBackgroundState extends State<HomeRealMapBackground> {
+  GoogleMapController? _mapController;
+  final bool _hasMapInitError = false;
+  LatLng? _currentCameraTarget;
+
+  // Cache estático dos marcadores customizados desenhados no canvas
+  static BitmapDescriptor? _originDotIcon;
+  static BitmapDescriptor? _destinationDotIcon;
+  static BitmapDescriptor? _blackCarIcon;
+  static BitmapDescriptor? _nextStopIcon;
+  static BitmapDescriptor? _laterStopIcon;
+  static BitmapDescriptor? _nextPickupIcon;
+  static BitmapDescriptor? _laterPickupIcon;
+
+  @override
+  void initState() {
+    super.initState();
+    _initCustomMonochromeIcons();
+  }
+
+  Future<void> _initCustomMonochromeIcons() async {
+    try {
+      final origin = _originDotIcon ?? await _generateOriginDotDescriptor();
+      final dest =
+          _destinationDotIcon ?? await _generateDestinationDotDescriptor();
+      final car = _blackCarIcon ?? await _generateBlackCarDescriptor();
+      _nextStopIcon ??= await MapMarkerIcons.flag();
+      _laterStopIcon ??= await MapMarkerIcons.flag(highlighted: false);
+      _nextPickupIcon ??= await MapMarkerIcons.pickup();
+      _laterPickupIcon ??= await MapMarkerIcons.pickup(highlighted: false);
+      _originDotIcon = origin;
+      _destinationDotIcon = dest;
+      _blackCarIcon = car;
+      if (mounted) {
+        setState(() {});
+      }
+    } catch (e) {
+      debugPrint('Erro ao gerar ícones monocromáticos: $e');
+    }
+  }
+
+  void _onMapCreated(GoogleMapController controller) {
+    _mapController = controller;
+    _adjustCameraForCurrentState();
+  }
+
+  @override
+  void didUpdateWidget(covariant HomeRealMapBackground oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    // Começou a escolher no mapa: a câmera vai até o ponto atual, para o
+    // endereço mostrado ser o que está sob o pino
+    if (widget.isDraggingPin &&
+        (!oldWidget.isDraggingPin ||
+            widget.centralPinType != oldWidget.centralPinType)) {
+      final target = widget.centralPinType == CentralPinType.destination
+          ? widget.destinationLocation
+          : widget.pickupLocation;
+      if (target != null) {
+        _mapController?.animateCamera(CameraUpdate.newLatLng(target));
+      }
+      return;
+    }
+    // A câmera só se move quando aparece algo novo (um ponto, um caminho, o próximo
+    // trecho). Fechar um painel ou limpar o rascunho não mexe no mapa
+    bool appeared(Object? now, Object? before) => now != null && now != before;
+    if (appeared(widget.pickupLocation, oldWidget.pickupLocation) ||
+        appeared(widget.destinationLocation, oldWidget.destinationLocation) ||
+        appeared(widget.acceptedDriver, oldWidget.acceptedDriver) ||
+        appeared(widget.tripRoutePoints, oldWidget.tripRoutePoints) ||
+        appeared(
+          widget.driverApproachRoutePoints,
+          oldWidget.driverApproachRoutePoints,
+        ) ||
+        (widget.showTrajectory && !oldWidget.showTrajectory) ||
+        appeared(_currentLegKey(widget), _currentLegKey(oldWidget))) {
+      _adjustCameraForCurrentState();
+      return;
+    }
+
+    // Só a margem de baixo mudou (um painel abriu ou fechou): o centro do mapa
+    // anda metade da diferença; compensa para a imagem ficar onde estava
+    final paddingDelta = oldWidget.bottomPadding - widget.bottomPadding;
+    if (paddingDelta != 0) {
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        _mapController?.moveCamera(CameraUpdate.scrollBy(0, paddingDelta / 2));
+      });
+    }
+  }
+
+  // O motorista aparece no ponto de partida do trajeto dele
+  static LatLng _driverPosition(MatchModel driver) =>
+      LatLng(driver.origin.latitude, driver.origin.longitude);
+
+  // Muda quando a viagem passa para o próximo trecho
+  static String? _currentLegKey(HomeRealMapBackground map) {
+    final legs = map.tripLegs;
+    if (legs == null) return null;
+    final current = legs.where((leg) => leg.isCurrent).firstOrNull;
+    return current == null || current.points.isEmpty
+        ? null
+        : '${current.points.first}-${current.points.last}';
+  }
+
+  void _adjustCameraForCurrentState() {
+    if (_mapController == null) return;
+
+    // Viagem em andamento: enquadra o trecho atual (até a próxima parada)
+    final currentLeg = widget.tripLegs
+        ?.where((leg) => leg.isCurrent && leg.points.isNotEmpty)
+        .firstOrNull;
+    if (widget.showTrajectory && currentLeg != null) {
+      _animateToBounds(currentLeg.points);
+      return;
+    }
+
+    // Se o motorista aceitou, enquadra motorista, embarque e destino
+    if (widget.acceptedDriver != null && widget.pickupLocation != null) {
+      final points = <LatLng>[
+        _driverPosition(widget.acceptedDriver!),
+        widget.pickupLocation!,
+      ];
+      if (widget.destinationLocation != null) {
+        points.add(widget.destinationLocation!);
+      }
+      _animateToBounds(points);
+      return;
+    }
+
+    // Se há trajeto entre embarque e destino
+    if (widget.showTrajectory &&
+        widget.pickupLocation != null &&
+        widget.destinationLocation != null) {
+      // Sem abrir a janela do destino: partida e destino já estão no painel
+      _animateToBounds([widget.pickupLocation!, widget.destinationLocation!]);
+      return;
+    }
+
+    if (widget.pickupLocation != null && !widget.isDraggingPin) {
+      _mapController?.animateCamera(
+        CameraUpdate.newLatLng(widget.pickupLocation!),
+      );
+    }
+  }
+
+  void _animateToBounds(List<LatLng> points) {
+    if (points.isEmpty) return;
+
+    double minLat = points.first.latitude;
+    double maxLat = points.first.latitude;
+    double minLng = points.first.longitude;
+    double maxLng = points.first.longitude;
+
+    for (final p in points) {
+      minLat = math.min(minLat, p.latitude);
+      maxLat = math.max(maxLat, p.latitude);
+      minLng = math.min(minLng, p.longitude);
+      maxLng = math.max(maxLng, p.longitude);
+    }
+
+    _mapController?.animateCamera(
+      CameraUpdate.newLatLngBounds(
+        LatLngBounds(
+          southwest: LatLng(minLat, minLng),
+          northeast: LatLng(maxLat, maxLng),
+        ),
+        85.0,
+      ),
+    );
+  }
+
+  void _recenterMap() {
+    HapticFeedback.lightImpact();
+    final target = widget.pickupLocation ?? campusCoordinates;
+    _mapController?.animateCamera(
+      CameraUpdate.newCameraPosition(
+        CameraPosition(target: target, zoom: 15.0),
+      ),
+    );
+  }
+
+  Set<Marker> _buildMarkers() {
+    final markers = <Marker>{};
+
+    // 1. Marcador de Origem (Bolinha preta opaca remetendo a "origem")
+    final isDraggingPickup =
+        widget.isDraggingPin && widget.centralPinType == CentralPinType.pickup;
+    if (!isDraggingPickup) {
+      final pickupPos = widget.pickupLocation ?? campusCoordinates;
+      final pickupTitle = widget.pickupAddress.isNotEmpty
+          ? 'Origem: ${widget.pickupAddress}'
+          : 'Origem: Ponto de Embarque';
+
+      markers.add(
+        Marker(
+          markerId: const MarkerId('pickup_marker'),
+          position: pickupPos,
+          icon:
+              (widget.pickupIsPassengerSpot ? _nextPickupIcon : null) ??
+              _originDotIcon ??
+              BitmapDescriptor.defaultMarkerWithHue(BitmapDescriptor.hueViolet),
+          anchor: const Offset(0.5, 0.5),
+          infoWindow: InfoWindow(
+            title: pickupTitle,
+            snippet: 'Ponto de partida da viagem',
+          ),
+        ),
+      );
+    }
+
+    // 2. Marcador de Destino (Bolinha quadriculada remetendo à chegada)
+    final isDraggingDest =
+        widget.isDraggingPin &&
+        widget.centralPinType == CentralPinType.destination;
+    if (widget.destinationLocation != null && !isDraggingDest) {
+      final destTitle = widget.destinationAddress.isNotEmpty
+          ? 'Destino: ${widget.destinationAddress}'
+          : 'Destino Selecionado';
+
+      markers.add(
+        Marker(
+          markerId: const MarkerId('destination_marker'),
+          position: widget.destinationLocation!,
+          // Bandeira de chegada, o mesmo padrão em todos os mapas com percurso.
+          // Na viagem em andamento fica cinza como as outras paradas que faltam;
+          // só fica preta quando é o próximo lugar (todas as paradas feitas)
+          icon:
+              (widget.tripLegs != null && widget.tripStops.isNotEmpty
+                  ? _laterStopIcon
+                  : _nextStopIcon) ??
+              _destinationDotIcon ??
+              BitmapDescriptor.defaultMarkerWithHue(BitmapDescriptor.hueRed),
+          anchor: const Offset(0.5, 0.5),
+          infoWindow: InfoWindow(
+            title: destTitle,
+            snippet: 'Ponto de chegada da viagem',
+          ),
+        ),
+      );
+    }
+
+    // Na viagem em andamento só o trajeto aparece: sem pinos nas paradas
+
+    // 3. Marcador do Motorista Aceito (Carrinho preto filled)
+    if (widget.acceptedDriver != null) {
+      final driver = widget.acceptedDriver!;
+      markers.add(
+        Marker(
+          markerId: MarkerId('accepted_driver_${driver.driverRouteId}'),
+          position: _driverPosition(driver),
+          icon:
+              _blackCarIcon ??
+              BitmapDescriptor.defaultMarkerWithHue(BitmapDescriptor.hueAzure),
+          anchor: const Offset(0.5, 0.5),
+          infoWindow: InfoWindow(
+            title: '${driver.otherUserName} (carona confirmada)',
+            snippet: driver.vehicle?.description ?? driver.origin.address,
+          ),
+        ),
+      );
+    }
+    // 4. Marcadores de Motoristas Disponíveis (Carrinho preto filled)
+    else if (!widget.isDriverMode && widget.showDrivers) {
+      for (final driver in widget.availableDrivers) {
+        markers.add(
+          Marker(
+            markerId: MarkerId(driver.driverRouteId),
+            position: _driverPosition(driver),
+            icon:
+                _blackCarIcon ??
+                BitmapDescriptor.defaultMarkerWithHue(
+                  BitmapDescriptor.hueAzure,
+                ),
+            anchor: const Offset(0.5, 0.5),
+            infoWindow: InfoWindow(
+              title: '${driver.otherUserName} • ${driver.compatibilityLabel}',
+              snippet: driver.estimatedCostPerPassenger == null
+                  ? 'Sai às ${driver.departureTime}'
+                  : 'Sai às ${driver.departureTime} • ${CurrencyFormatter.format(driver.estimatedCostPerPassenger!)}',
+              onTap: () => widget.onDriverSelected?.call(driver),
+            ),
+            onTap: () => widget.onDriverSelected?.call(driver),
+          ),
+        );
+      }
+    }
+
+    // Paradas da viagem em andamento: a próxima em destaque, as outras apagadas
+    for (var i = 0; i < widget.tripStops.length; i++) {
+      final stop = widget.tripStops[i];
+      markers.add(
+        Marker(
+          markerId: MarkerId('trip_stop_$i'),
+          position: stop.position,
+          anchor: const Offset(0.5, 0.5),
+          zIndexInt: stop.isNext ? 3 : 2,
+          // Embarque com a pessoa; desembarque com a bandeira de chegada
+          icon:
+              (stop.isPickup
+                  ? (stop.isNext ? _nextPickupIcon : _laterPickupIcon)
+                  : stop.isNext
+                  ? _nextStopIcon
+                  : _laterStopIcon) ??
+              BitmapDescriptor.defaultMarker,
+          infoWindow: InfoWindow(title: stop.title),
+        ),
+      );
+    }
+    return markers;
+  }
+
+  Set<Polyline> _buildPolylines() {
+    final polylines = <Polyline>{};
+
+    // 1. Rota do Motorista até o Ponto de Embarque (EM CINZA CLARO ELEGANTE)
+    if (widget.acceptedDriver != null && widget.pickupLocation != null) {
+      final approachPoints = widget.driverApproachRoutePoints;
+      if (approachPoints != null && approachPoints.isNotEmpty) {
+        polylines.add(
+          Polyline(
+            polylineId: const PolylineId('driver_approach_route'),
+            points: approachPoints,
+            color: AppColors.driverApproachRoute, // Cinza claro elegante
+            width: 5,
+            startCap: Cap.roundCap,
+            endCap: Cap.roundCap,
+            jointType: JointType.round,
+          ),
+        );
+      }
+    }
+
+    // 2. Viagem em andamento em trechos: o atual forte; os próximos, ligados e apagados
+    final legs = widget.tripLegs;
+    if (widget.showTrajectory && legs != null && legs.isNotEmpty) {
+      for (var i = 0; i < legs.length; i++) {
+        final leg = legs[i];
+        if (leg.points.isEmpty) continue;
+        polylines.add(
+          Polyline(
+            polylineId: PolylineId('trip_leg_$i'),
+            points: leg.points,
+            color: leg.isCurrent ? AppColors.primary : AppColors.routeUpcoming,
+            width: leg.isCurrent ? 6 : 4,
+            zIndex: leg.isCurrent ? 2 : 1,
+            startCap: Cap.roundCap,
+            endCap: Cap.roundCap,
+            jointType: JointType.round,
+          ),
+        );
+      }
+      return polylines;
+    }
+
+    // 3. Rota Principal da Viagem (Origem → Destino) em Preto Monocromático
+    if (widget.showTrajectory &&
+        widget.pickupLocation != null &&
+        widget.destinationLocation != null) {
+      final mainTripPoints = widget.tripRoutePoints;
+      if (mainTripPoints != null && mainTripPoints.isNotEmpty) {
+        polylines.add(
+          Polyline(
+            polylineId: const PolylineId('ride_active_route'),
+            points: mainTripPoints,
+            color: AppColors.primary, // Preto monocromático elegante
+            width: 5,
+            startCap: Cap.roundCap,
+            endCap: Cap.roundCap,
+            jointType: JointType.round,
+          ),
+        );
+      }
+    }
+
+    return polylines;
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final isUnsupportedPlatform =
+        kIsWeb ||
+        (defaultTargetPlatform != TargetPlatform.android &&
+            defaultTargetPlatform != TargetPlatform.iOS);
+
+    if (_hasMapInitError || isUnsupportedPlatform) {
+      return Stack(
+        children: [
+          Positioned.fill(
+            child: HomeMapBackground(
+              universityName: widget.universityName,
+              onMapTap: widget.onMapTap,
+            ),
+          ),
+          _buildRecenterFab(),
+        ],
+      );
+    }
+
+    return Stack(
+      children: [
+        Positioned.fill(
+          child: GoogleMap(
+            style: monochromeMapStyle,
+            initialCameraPosition: CameraPosition(
+              target: widget.pickupLocation ?? campusCoordinates,
+              zoom: 15.0,
+            ),
+            onMapCreated: _onMapCreated,
+            padding: EdgeInsets.only(bottom: widget.bottomPadding),
+            onTap: (_) => widget.onMapTap?.call(),
+            onCameraMove: (pos) {
+              _currentCameraTarget = pos.target;
+            },
+            onCameraIdle: () {
+              if (_currentCameraTarget != null && widget.isDraggingPin) {
+                widget.onCameraCenterChanged?.call(_currentCameraTarget!);
+              }
+            },
+            myLocationEnabled: false,
+            myLocationButtonEnabled: false,
+            zoomControlsEnabled: false,
+            compassEnabled: false,
+            mapToolbarEnabled: false,
+            trafficEnabled: false,
+            markers: _buildMarkers(),
+            polylines: _buildPolylines(),
+          ),
+        ),
+
+        // Pino Central Fixo estilo Uber:
+        // Monocromático preto e NÃO totalmente filled (vazado no centro)
+        // A ponta do pino fica exatamente no centro da câmera: o mesmo padding do
+        // mapa e o pino subindo metade da própria altura
+        if (widget.isDraggingPin)
+          Positioned.fill(
+            child: IgnorePointer(
+              child: Padding(
+                padding: EdgeInsets.only(bottom: widget.bottomPadding),
+                child: Center(
+                  child: FractionalTranslation(
+                    translation: const Offset(0, -0.5),
+                    child: _UberStyleCentralPin(
+                      type: widget.centralPinType,
+                      address:
+                          widget.centralPinType == CentralPinType.destination
+                          ? widget.destinationAddress
+                          : widget.pickupAddress,
+                    ),
+                  ),
+                ),
+              ),
+            ),
+          ),
+
+        _buildRecenterFab(),
+      ],
+    );
+  }
+
+  Widget _buildRecenterFab() {
+    // Logo acima da navbar: ela fica 16 px acima da base (ou da área segura) e tem 66 px
+    final safeBottom = MediaQuery.paddingOf(context).bottom;
+    final dockTop = (safeBottom > 0 ? safeBottom : 16.0) + 66;
+
+    return Positioned(
+      right: 16,
+      bottom: dockTop + 12,
+      child: Material(
+        color: AppColors.cardBackground,
+        elevation: 4,
+        shadowColor: Colors.black.withValues(alpha: 0.15),
+        shape: const CircleBorder(),
+        child: InkWell(
+          customBorder: const CircleBorder(),
+          onTap: _recenterMap,
+          child: Container(
+            width: 44,
+            height: 44,
+            alignment: Alignment.center,
+            decoration: BoxDecoration(
+              shape: BoxShape.circle,
+              border: Border.all(color: AppColors.borderSubtle, width: 1),
+            ),
+            child: const Icon(
+              Icons.my_location_rounded,
+              size: 20,
+              color: AppColors.textPrimary,
+            ),
+          ),
+        ),
+      ),
+    );
+  }
+
+  // --- GERADORES DE BITMAP DESCRIPTOR NO CANVAS ---
+
+  /// Bolinha preta opaca remetendo a "origem"
+  static Future<BitmapDescriptor> _generateOriginDotDescriptor() async {
+    const size = 64.0;
+    final recorder = ui.PictureRecorder();
+    final canvas = Canvas(recorder, const Rect.fromLTWH(0, 0, size, size));
+    const center = Offset(size / 2, size / 2);
+
+    // Sombra suave
+    final shadowPaint = Paint()
+      ..color = Colors.black.withValues(alpha: 0.28)
+      ..maskFilter = const MaskFilter.blur(BlurStyle.normal, 4);
+    canvas.drawCircle(center + const Offset(0, 2), 16, shadowPaint);
+
+    // Borda/halo externa branca
+    final haloPaint = Paint()
+      ..color = Colors.white
+      ..style = PaintingStyle.fill;
+    canvas.drawCircle(center, 16, haloPaint);
+
+    // Bolinha preta opaca principal (AppColors.primary)
+    final dotPaint = Paint()
+      ..color = AppColors.primary
+      ..style = PaintingStyle.fill;
+    canvas.drawCircle(center, 12, dotPaint);
+
+    // Centro branco fino para contraste e estilo de pino de partida
+    final innerDot = Paint()
+      ..color = Colors.white
+      ..style = PaintingStyle.fill;
+    canvas.drawCircle(center, 3.5, innerDot);
+
+    final picture = recorder.endRecording();
+    final image = await picture.toImage(size.toInt(), size.toInt());
+    final bytes = await image.toByteData(format: ui.ImageByteFormat.png);
+    return BitmapDescriptor.bytes(bytes!.buffer.asUint8List());
+  }
+
+  /// Destino: o inverso da partida (bolinha branca com borda e centro pretos)
+  static Future<BitmapDescriptor> _generateDestinationDotDescriptor() async {
+    const size = 64.0;
+    final recorder = ui.PictureRecorder();
+    final canvas = Canvas(recorder, const Rect.fromLTWH(0, 0, size, size));
+    const center = Offset(size / 2, size / 2);
+
+    // Sombra suave
+    final shadowPaint = Paint()
+      ..color = AppColors.primary.withValues(alpha: 0.28)
+      ..maskFilter = const MaskFilter.blur(BlurStyle.normal, 4);
+    canvas.drawCircle(center + const Offset(0, 2), 16, shadowPaint);
+
+    // Anel preto
+    canvas.drawCircle(center, 16, Paint()..color = AppColors.primary);
+
+    // Miolo branco
+    canvas.drawCircle(center, 11, Paint()..color = AppColors.cardBackground);
+
+    // Centro preto
+    canvas.drawCircle(center, 5, Paint()..color = AppColors.primary);
+
+    final picture = recorder.endRecording();
+    final image = await picture.toImage(size.toInt(), size.toInt());
+    final bytes = await image.toByteData(format: ui.ImageByteFormat.png);
+    return BitmapDescriptor.bytes(bytes!.buffer.asUint8List());
+  }
+
+  /// Carrinho preto filled
+  static Future<BitmapDescriptor> _generateBlackCarDescriptor() async {
+    const size = 64.0;
+    final recorder = ui.PictureRecorder();
+    final canvas = Canvas(recorder, const Rect.fromLTWH(0, 0, size, size));
+    const center = Offset(size / 2, size / 2);
+
+    // Sombra suave sob o badge do veículo
+    final shadowPaint = Paint()
+      ..color = Colors.black.withValues(alpha: 0.28)
+      ..maskFilter = const MaskFilter.blur(BlurStyle.normal, 4);
+    canvas.drawCircle(center + const Offset(0, 2), 18, shadowPaint);
+
+    // Badge circular branco para contraste garantido sobre ruas
+    final badgePaint = Paint()
+      ..color = Colors.white
+      ..style = PaintingStyle.fill;
+    canvas.drawCircle(center, 18, badgePaint);
+
+    final badgeBorder = Paint()
+      ..color = AppColors.borderSubtle
+      ..style = PaintingStyle.stroke
+      ..strokeWidth = 1.2;
+    canvas.drawCircle(center, 18, badgeBorder);
+
+    // Ícone do carrinho preto filled usando Icons.directions_car_rounded
+    final textPainter = TextPainter(textDirection: TextDirection.ltr);
+    textPainter.text = TextSpan(
+      text: String.fromCharCode(Icons.directions_car_rounded.codePoint),
+      style: const TextStyle(
+        fontSize: 24,
+        fontFamily: 'MaterialIcons',
+        color: AppColors.primary,
+      ),
+    );
+    textPainter.layout();
+    textPainter.paint(
+      canvas,
+      Offset(
+        center.dx - (textPainter.width / 2),
+        center.dy - (textPainter.height / 2),
+      ),
+    );
+
+    final picture = recorder.endRecording();
+    final image = await picture.toImage(size.toInt(), size.toInt());
+    final bytes = await image.toByteData(format: ui.ImageByteFormat.png);
+    return BitmapDescriptor.bytes(bytes!.buffer.asUint8List());
+  }
+}
+
+/// ============================================================================
+/// PINO CENTRAL FIXO: MONOCROMÁTICO PRETO NÃO TOTALMENTE FILLED
+/// ============================================================================
+/// Pino fixo do centro com o balão do endereço em cima. A ponta do pino é a
+/// base do widget (o mapa sobe o widget metade da altura para ela ficar no centro).
+class _UberStyleCentralPin extends StatelessWidget {
+  final CentralPinType type;
+  final String address;
+
+  const _UberStyleCentralPin({required this.type, this.address = ''});
+
+  @override
+  Widget build(BuildContext context) {
+    final isDest = type == CentralPinType.destination;
+    final typeName = isDest ? 'Destino' : 'Partida';
+    final displayText = address.isNotEmpty ? '$typeName: $address' : typeName;
+
+    return Column(
+      mainAxisSize: MainAxisSize.min,
+      children: [
+        // Balão monocromático acima do pino
+        Container(
+          constraints: const BoxConstraints(maxWidth: 270),
+          padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 7),
+          decoration: BoxDecoration(
+            color: AppColors.dockBackground,
+            borderRadius: BorderRadius.circular(16),
+            border: Border.all(color: AppColors.borderSubtle, width: 0.8),
+            boxShadow: [
+              BoxShadow(
+                color: AppColors.primary.withValues(alpha: 0.30),
+                blurRadius: 14,
+                offset: const Offset(0, 4),
+              ),
+            ],
+          ),
+          child: Row(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              _MiniPlaceIcon(isDestination: isDest),
+              const SizedBox(width: 8),
+              Flexible(
+                child: Text(
+                  displayText,
+                  style: const TextStyle(
+                    color: AppColors.textLight,
+                    fontSize: 12,
+                    fontWeight: FontWeight.w700,
+                  ),
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                ),
+              ),
+            ],
+          ),
+        ),
+        const SizedBox(height: 6),
+        const _MonochromeHollowPin(size: 46),
+      ],
+    );
+  }
+}
+
+/// Ícone pequeno do balão, sobre fundo escuro: partida (bolinha clara com centro
+/// escuro) ou destino (anel claro com centro claro), como os marcadores do mapa.
+class _MiniPlaceIcon extends StatelessWidget {
+  final bool isDestination;
+
+  const _MiniPlaceIcon({required this.isDestination});
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      width: 14,
+      height: 14,
+      decoration: BoxDecoration(
+        color: isDestination ? AppColors.dockBackground : AppColors.textLight,
+        shape: BoxShape.circle,
+        border: Border.all(color: AppColors.textLight, width: 2),
+      ),
+      alignment: Alignment.center,
+      child: Container(
+        width: isDestination ? 4 : 7,
+        height: isDestination ? 4 : 7,
+        decoration: BoxDecoration(
+          color: isDestination ? AppColors.textLight : AppColors.primary,
+          shape: BoxShape.circle,
+        ),
+      ),
+    );
+  }
+}
+
+/// Widget de pino monocromático preto não totalmente filled (vazado no centro)
+class _MonochromeHollowPin extends StatelessWidget {
+  final double size;
+
+  const _MonochromeHollowPin({this.size = 46});
+
+  @override
+  Widget build(BuildContext context) {
+    return CustomPaint(
+      size: Size(size * 0.72, size),
+      painter: _HollowPinPainter(),
+    );
+  }
+}
+
+class _HollowPinPainter extends CustomPainter {
+  @override
+  void paint(Canvas canvas, Size size) {
+    final width = size.width;
+    final height = size.height;
+    final headRadius = width / 2;
+    final headCenter = Offset(width / 2, headRadius);
+
+    // 1. Sombra sob a ponta do pino no solo
+    final groundShadow = Paint()
+      ..color = Colors.black.withValues(alpha: 0.28)
+      ..maskFilter = const MaskFilter.blur(BlurStyle.normal, 3);
+    canvas.drawOval(
+      Rect.fromCenter(
+        center: Offset(width / 2, height + 2),
+        width: 14,
+        height: 5,
+      ),
+      groundShadow,
+    );
+
+    // 2. Traçado do pino tipo gota em preto monocromático (AppColors.primary)
+    final pinPath = Path();
+    pinPath.moveTo(width / 2, height);
+    pinPath.cubicTo(
+      width * 0.08,
+      height * 0.65,
+      0,
+      headRadius * 1.4,
+      0,
+      headRadius,
+    );
+    pinPath.arcToPoint(
+      Offset(width, headRadius),
+      radius: Radius.circular(headRadius),
+      clockwise: true,
+    );
+    pinPath.cubicTo(
+      width,
+      headRadius * 1.4,
+      width * 0.92,
+      height * 0.65,
+      width / 2,
+      height,
+    );
+    pinPath.close();
+
+    final fillPaint = Paint()
+      ..color = AppColors.primary
+      ..style = PaintingStyle.fill;
+    canvas.drawPath(pinPath, fillPaint);
+
+    // 3. ABERTURA VAZADA / NÃO TOTALMENTE FILLED
+    // Centro vazado em branco/abertura circular elegante
+    final hollowCenterPaint = Paint()
+      ..color = Colors.white
+      ..style = PaintingStyle.fill;
+    canvas.drawCircle(headCenter, headRadius * 0.44, hollowCenterPaint);
+
+    // Ponto central de precisão
+    final innerDotPaint = Paint()
+      ..color = AppColors.primary
+      ..style = PaintingStyle.fill;
+    canvas.drawCircle(headCenter, headRadius * 0.16, innerDotPaint);
+  }
+
+  @override
+  bool shouldRepaint(covariant CustomPainter oldDelegate) => false;
+}
+
+/// Um trecho do caminho da viagem em andamento.
+@immutable
+class TripMapLeg {
+  final List<LatLng> points;
+
+  /// O trecho que está sendo feito agora (até a próxima parada).
+  final bool isCurrent;
+
+  const TripMapLeg({required this.points, required this.isCurrent});
+}
+
+/// Uma parada da viagem em andamento no mapa.
+@immutable
+class TripMapStop {
+  final LatLng position;
+  final String title;
+
+  /// É a próxima parada (fica em destaque).
+  final bool isNext;
+
+  /// Embarque: pessoa. Desembarque: bandeira de chegada.
+  final bool isPickup;
+
+  const TripMapStop({
+    required this.position,
+    required this.title,
+    required this.isNext,
+    this.isPickup = false,
+  });
+}

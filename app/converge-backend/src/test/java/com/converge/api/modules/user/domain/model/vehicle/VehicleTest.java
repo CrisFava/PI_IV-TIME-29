@@ -1,0 +1,175 @@
+// Autor: Sara Fernandes Monteiro - RA 25024107
+
+package com.converge.api.modules.user.domain.model.vehicle;
+
+import com.converge.api.modules.user.domain.enums.vehicle.ConsumptionUnit;
+import com.converge.api.modules.user.domain.enums.vehicle.EnergySource;
+import com.converge.api.modules.user.domain.enums.vehicle.VehicleType;
+import com.converge.api.modules.user.domain.model.vehicle.subtypes.FuelSource;
+import com.converge.api.shared.presentation.exception.ApplicationException;
+
+import org.junit.jupiter.api.DisplayName;
+import org.junit.jupiter.api.Test;
+
+import java.math.BigDecimal;
+import java.util.List;
+
+import static org.assertj.core.api.Assertions.assertThat;
+import static org.assertj.core.api.Assertions.assertThatThrownBy;
+
+/**
+ * Testes unitários para {@link Vehicle}.
+ * Valida cenários como: Deve guardar a placa em maiúsculas e sem hífen; Deve guardar o RENAVAM só com os dígitos; Moto não pode ter mais de 2 lugares.
+ * <p>
+ * Os métodos de teste estão bem explicativos através de suas anotações {@code @DisplayName}.
+ */
+class VehicleTest {
+
+    private List<FuelSource> gasolineOnly() {
+        return List.of(
+                new FuelSource(EnergySource.GASOLINE, 12.0, ConsumptionUnit.KM_PER_LITER, new BigDecimal("5.89"))
+        );
+    }
+
+    @Test
+    @DisplayName("Deve guardar a placa em maiúsculas e sem hífen")
+    void shouldNormalizeLicensePlate() {
+        Vehicle vehicle = new Vehicle(
+                "user-123",
+                "Gol Azul",
+                "Volkswagen Gol",
+                "abc-1234",
+                "14283256656",
+                "Azul",
+                VehicleType.HATCH,
+                5,
+                gasolineOnly()
+        );
+
+        assertThat(vehicle.getLicensePlate()).isEqualTo("ABC1234");
+    }
+
+    @Test
+    @DisplayName("Deve guardar o RENAVAM só com os dígitos")
+    void shouldNormalizeRenavam() {
+        Vehicle vehicle = new Vehicle(
+                "user-123", "Gol Azul", "Volkswagen Gol", "ABC1234", "142.832.566-56", "Azul",
+                VehicleType.HATCH, 5, gasolineOnly()
+        );
+
+        assertThat(vehicle.getRenavam()).isEqualTo("14283256656");
+    }
+
+    @Test
+    @DisplayName("Moto não pode ter mais de 2 lugares")
+    void shouldFailWhenMotorcycleHasTooManySeats() {
+        assertThatThrownBy(() -> new Vehicle(
+                "user-123",
+                null,
+                "Honda CG",
+                "XYZ1A23",
+                "14283256656",
+                "Preta",
+                VehicleType.MOTORCYCLE,
+                3,
+                gasolineOnly()
+        )).isInstanceOf(ApplicationException.class);
+    }
+
+    @Test
+    @DisplayName("Não pode haver duas fontes de energia iguais")
+    void shouldFailWhenFuelSourcesAreDuplicated() {
+        List<FuelSource> duplicated = List.of(
+                new FuelSource(EnergySource.GASOLINE, 12.0, ConsumptionUnit.KM_PER_LITER, new BigDecimal("5.89")),
+                new FuelSource(EnergySource.GASOLINE, 9.0, ConsumptionUnit.KM_PER_LITER, new BigDecimal("5.50"))
+        );
+
+        assertThatThrownBy(() -> new Vehicle(
+                "user-123", "Gol Azul", "Volkswagen Gol", "ABC1234", "14283256656", "Azul",
+                VehicleType.HATCH, 5, duplicated
+        )).isInstanceOf(ApplicationException.class);
+    }
+
+    @Test
+    @DisplayName("Carro comum vai até 7 lugares; mais que isso só van ou outro")
+    void shouldLimitCarsToSevenSeats() {
+        List<FuelSource> gasoline = List.of(
+                new FuelSource(EnergySource.GASOLINE, 12.0, ConsumptionUnit.KM_PER_LITER, new BigDecimal("5.89"))
+        );
+
+        assertThatThrownBy(() -> new Vehicle(
+                "user-123", "Gol Azul", "Volkswagen Gol", "ABC1234", "14283256656", "Azul",
+                VehicleType.HATCH, 8, gasoline
+        )).isInstanceOf(ApplicationException.class);
+
+        Vehicle sevenSeats = new Vehicle(
+                "user-123", "SUV", "Chevrolet Spin", "ABC1234", "14283256656", "Prata",
+                VehicleType.SUV, 7, gasoline
+        );
+        assertThat(sevenSeats.getTotalCapacity()).isEqualTo(7);
+    }
+
+    @Test
+    @DisplayName("Consumo fora da faixa do tipo de veículo deve ser recusado")
+    void shouldFailWhenConsumptionIsOutOfRange() {
+        List<FuelSource> tooEfficient = List.of(
+                new FuelSource(EnergySource.GASOLINE, 40.0, ConsumptionUnit.KM_PER_LITER, new BigDecimal("5.89"))
+        );
+
+        assertThatThrownBy(() -> new Vehicle(
+                "user-123", "Gol Azul", "Volkswagen Gol", "ABC1234", "14283256656", "Azul",
+                VehicleType.HATCH, 5, tooEfficient
+        )).isInstanceOf(ApplicationException.class);
+    }
+
+    @Test
+    @DisplayName("Preço de energia fora da faixa deve ser recusado")
+    void shouldFailWhenEnergyPriceIsOutOfRange() {
+        List<FuelSource> tooCheap = List.of(
+                new FuelSource(EnergySource.GASOLINE, 12.0, ConsumptionUnit.KM_PER_LITER, new BigDecimal("1.00"))
+        );
+
+        assertThatThrownBy(() -> new Vehicle(
+                "user-123", "Gol Azul", "Volkswagen Gol", "ABC1234", "14283256656", "Azul",
+                VehicleType.HATCH, 5, tooCheap
+        )).isInstanceOf(ApplicationException.class);
+    }
+
+    @Test
+    @DisplayName("Carro flex com gasolina e etanol dentro das faixas deve ser aceito")
+    void shouldAcceptFlexVehicle() {
+        List<FuelSource> flex = List.of(
+                new FuelSource(EnergySource.GASOLINE, 12.0, ConsumptionUnit.KM_PER_LITER, new BigDecimal("5.89")),
+                new FuelSource(EnergySource.ETHANOL, 8.5, ConsumptionUnit.KM_PER_LITER, new BigDecimal("4.20"))
+        );
+
+        Vehicle vehicle = new Vehicle(
+                "user-123", "Gol Azul", "Volkswagen Gol", "ABC1234", "14283256656", "Azul",
+                VehicleType.HATCH, 5, flex
+        );
+
+        assertThat(vehicle.getFuelSources()).hasSize(2);
+    }
+
+    @Test
+    @DisplayName("Deve desativar o veículo")
+    void shouldDeactivateVehicle() {
+        Vehicle vehicle = new Vehicle(
+                "user-123",
+                "Gol Azul",
+                "Volkswagen Gol",
+                "abc-1234",
+                "14283256656",
+                "Azul",
+                VehicleType.HATCH,
+                5,
+                gasolineOnly()
+        );
+
+        assertThat(vehicle.isActive()).isTrue();
+
+        vehicle.deactivate();
+
+        assertThat(vehicle.isActive()).isFalse();
+    }
+}

@@ -1,0 +1,315 @@
+# Autor: Cristian Eduardo Fava - RA 25000636
+
+from __future__ import annotations
+
+import random
+import time
+import re
+import unicodedata
+from datetime import date, datetime, timedelta, timezone
+from typing import Optional
+
+import verificar_usuario
+from simulation.api_client import ApiClient
+from simulation.api_response import ApiResponse
+from simulation.simulated_user import SimulatedUser
+from simulation.simulation_failure import SimulationFailure
+
+FIREBASE_AUTH_URL = "https://identitytoolkit.googleapis.com/v1"
+PASSWORD = "Simulacao#2026"
+WEEK_DAYS = ["MONDAY", "TUESDAY", "WEDNESDAY", "THURSDAY", "FRIDAY", "SATURDAY", "SUNDAY"]
+# Regras de horário da viagem: o pedido de vaga só vale até 5 min antes da saída, e o "Iniciar
+# trajeto" só de 5 min antes a 5 min depois. Cada oferta sai uns 7 min depois de criada: dá tempo de
+# pedir e aceitar, e o "iniciar" espera a janela abrir (START_WINDOW antes da saída).
+DEPARTURE_LEAD = timedelta(minutes=6)
+START_WINDOW = timedelta(minutes=5)
+TRIP_DURATION = timedelta(minutes=40)
+
+CAMPUS = ("PUC-Campinas Campus I", "Parque das Universidades", -22.8338, -47.0519)
+DRIVER_ORIGIN = ("Av. Francisco Glicério, 1000", "Centro", -22.9064, -47.0616)
+PASSENGER_ORIGINS = [
+    ("Rua Coronel Quirino, 900", "Cambuí", -22.8955, -47.0525),
+    ("Av. Heitor Penteado, 1200", "Taquaral", -22.8732, -47.0558),
+    ("Rua Dr. Sampaio Ferraz, 500", "Guanabara", -22.8890, -47.0700),
+]
+
+
+class SimulationWorld:
+    """
+    Monta o "mundo" de um cenário pela API de verdade: contas no Firebase, cadastro, aprovação
+    da CNH e do vínculo acadêmico no Mongo, carro e trajetos. Também guarda os atalhos que os
+    cenários usam para agir como cada pessoa e conferir o resultado.
+    """
+
+    def __init__(self, api: ApiClient, firebase_api_key: str, users_collection, run_id: str,
+                 ride_date: date):
+        self.api = api
+        self.firebase_api_key = firebase_api_key
+        self.users_collection = users_collection
+        self.run_id = run_id
+        self.ride_date = ride_date
+        self.week_day = WEEK_DAYS[ride_date.weekday()]
+        self.departure = datetime.combine(ride_date, datetime.min.time())
+        self.created_users: list[SimulatedUser] = []
+        self._sequence = 0
+
+    # ------------------------------------------------------------------ narração e conferência
+
+    @staticmethod
+    def step(description: str) -> None:
+        """Imprime uma etapa narrativa do cenário de simulação."""
+        print(f"    · {description}")
+
+    @staticmethod
+    def check(condition: bool, message: str) -> None:
+        """Valida uma condição de negócio, lançando SimulationFailure se for falsa."""
+        if not condition:
+            raise SimulationFailure(message)
+
+    @staticmethod
+    def expect_ok(response: ApiResponse, what: str):
+        """Assegura que a chamada à API teve sucesso e retorna seu campo 'data'."""
+        if not response.ok:
+            raise SimulationFailure(f"{what}: esperava sucesso, veio {response.describe()}")
+        return response.data
+
+    @staticmethod
+    def expect_error(response: ApiResponse, what: str, code: Optional[str] = None) -> None:
+        """Assegura que a chamada à API falhou conforme o esperado (opcionalmente checando o código)."""
+        if response.ok:
+            raise SimulationFailure(f"{what}: esperava erro{f' {code}' if code else ''}, mas deu certo")
+        if code and response.error_code != code:
+            raise SimulationFailure(f"{what}: esperava {code}, veio {response.describe()}")
+        print(f"      recusado como esperado ({response.describe()})")
+
+    # ------------------------------------------------------------------ pessoas
+
+    def create_driver(self, nickname: str) -> SimulatedUser:
+        """Cria conta no Firebase, registra perfil de motorista na API, aprova documentos e cadastra veículo."""
+        driver = self._create_user(nickname, is_driver=True)
+        vehicle = self.expect_ok(self.api.post("/vehicles", driver.token, {
+            "nickname": "Carro da simulação",
+            "model": "Volkswagen Gol",
+            "licensePlate": f"SIM{random.randint(0, 9)}{random.choice('ABCDEFGHJ')}{random.randint(10, 99)}",
+            "color": "Prata",
+            # RENAVAM obrigatório desde o cadastro de carros; este tem o dígito verificador válido
+            "renavam": "14283256656",
+            "type": "HATCH",
+            "totalCapacity": 4,
+            "fuelSources": [{"energySource": "GASOLINE", "averageConsumption": 12.0, "currentEnergyPrice": 6.29}],
+        }), f"cadastrar o carro de {nickname}")
+        driver.vehicle_id = vehicle["id"]
+        return driver
+
+    def create_passenger(self, nickname: str) -> SimulatedUser:
+        """Cria conta no Firebase, registra perfil de passageiro na API e aprova vínculo acadêmico."""
+        return self._create_user(nickname, is_driver=False)
+
+    def _create_user(self, nickname: str, is_driver: bool) -> SimulatedUser:
+        """Registra a conta no Firebase Auth e cria o perfil de usuário na API Converge."""
+        self._sequence += 1
+        email = f"sim.{self.run_id}.{self._sequence}.{_slug(nickname)}@converge-sim.test"
+
+        # O Firebase responde o JSON direto, sem o envelope {success, data} do backend.
+        response = self.api.call(
+            "POST", f"{FIREBASE_AUTH_URL}/accounts:signUp?key={self.firebase_api_key}",
+            body={"email": email, "password": PASSWORD, "returnSecureToken": True},
+        )
+        account = response.body or {}
+        if not response.ok or "idToken" not in account:
+            raise SimulationFailure(f"criar a conta de {nickname} no Firebase: {response.describe()}")
+        user = SimulatedUser(nickname, email, PASSWORD, account["localId"], account["idToken"])
+        self.created_users.append(user)
+
+        body = {
+            "firebaseUid": user.firebase_uid,
+            "name": nickname,
+            "email": email,
+            "phone": "(19) 99999-0000",
+            "participationRoles": ["PASSENGER", "DRIVER"] if is_driver else ["PASSENGER"],
+            "academicRecord": {
+                "university": "PUC-Campinas",
+                "course": "Engenharia de Software",
+                "enrollmentNumber": f"SIM{self.run_id}{self._sequence:02d}",
+                "institutionalEmail": email,
+            },
+        }
+        if is_driver:
+            body["driverLicense"] = {"number": f"{random.randint(10**10, 10**11 - 1)}", "category": "B",
+                                     "expiresAt": "2031-01-01T00:00:00"}
+            body["pixKey"] = email
+            body["pixKeyType"] = "EMAIL"
+
+        user.id = self.expect_ok(self.api.post("/users", user.token, body), f"cadastrar {nickname}")["id"]
+        self._approve_documents(user, is_driver)
+        return user
+
+    def _approve_documents(self, user: SimulatedUser, is_driver: bool) -> None:
+        """Aprova diretamente no MongoDB o vínculo acadêmico e a CNH do usuário de teste."""
+        document = verificar_usuario.find_user(self.users_collection, user.email)
+        self.check(document is not None,
+                   f"{user.nickname} não apareceu no Mongo: o script e o backend estão no mesmo banco?")
+
+        changes, warnings = verificar_usuario.build_update(
+            document, None if is_driver else "estudante", datetime.now(timezone.utc))
+        self.check(not warnings, f"não deu para aprovar {user.nickname}: {' '.join(warnings)}")
+        self.users_collection.update_one({"_id": document["_id"]}, {"$set": changes})
+
+    def delete_firebase_accounts(self) -> list:
+        """Apaga as contas criadas nesta execução e devolve os e-mails que não deu para apagar."""
+        leftovers = []
+        for user in self.created_users:
+            try:
+                response = self.api.call("POST", f"{FIREBASE_AUTH_URL}/accounts:delete?key={self.firebase_api_key}",
+                                         body={"idToken": user.token})
+                if not response.ok:
+                    leftovers.append(user.email)
+            except SimulationFailure:
+                leftovers.append(user.email)
+        return leftovers
+
+    def delete_accounts_of_run(self, run_id: str, emails: Optional[list[str]] = None) -> tuple:
+        """Apaga as contas de uma execução anterior (que caiu antes de limpar), achadas pelo Mongo."""
+        prefix = re.compile(f"^sim\\.{re.escape(run_id)}\\.")
+        deleted, leftovers = [], []
+
+        accounts = set(emails or [])
+        accounts.update(document["email"] for document in
+                        self.users_collection.find({"email": prefix}, {"email": 1}))
+        for email in sorted(accounts):
+            try:
+                login = self.api.call("POST", f"{FIREBASE_AUTH_URL}/accounts:signInWithPassword"
+                                              f"?key={self.firebase_api_key}",
+                                      body={"email": email, "password": PASSWORD, "returnSecureToken": True})
+                token = (login.body or {}).get("idToken")
+                if not login.ok or not token:
+                    if login.status == 400 and login.error_message == "EMAIL_NOT_FOUND":
+                        continue
+                    leftovers.append(email)
+                    continue
+                response = self.api.call("POST", f"{FIREBASE_AUTH_URL}/accounts:delete?key={self.firebase_api_key}",
+                                         body={"idToken": token})
+                (deleted if response.ok else leftovers).append(email)
+            except SimulationFailure:
+                leftovers.append(email)
+
+        return deleted, leftovers
+
+    # ------------------------------------------------------------------ trajetos e pedidos
+
+    def offer_route(self, driver: SimulatedUser, seats: int, origin: tuple = DRIVER_ORIGIN) -> str:
+        """Cria e agenda um trajeto de oferta (motorista) com capacidade de assentos."""
+        self._schedule_next_departure()
+        return self._create_route(driver, {
+            "type": "OFFER",
+            "vehicleId": driver.vehicle_id,
+            "origin": _place(origin),
+            "maxDetourKm": 5.0,
+            "totalSeats": seats,
+            "toll": 0,
+            "parking": 0,
+        })
+
+    def search_route(self, passenger: SimulatedUser) -> str:
+        """Cria um trajeto de procura (passageiro) partindo de um dos pontos residenciais."""
+        origin = PASSENGER_ORIGINS[self._sequence % len(PASSENGER_ORIGINS)]
+        return self._create_route(passenger, {"type": "SEARCH", "origin": _place(origin)})
+
+    def _create_route(self, user: SimulatedUser, fields: dict) -> str:
+        """Submete uma requisição de cadastro de trajeto à API."""
+        body = {
+            "destination": _place(CAMPUS),
+            "departureTime": self.departure.strftime("%H:%M"),
+            "estimatedArrivalTime": (self.departure + TRIP_DURATION).strftime("%H:%M"),
+            "weekDays": [self.week_day],
+            **fields,
+        }
+        route = self.expect_ok(self.api.post("/routes", user.token, body), f"criar o trajeto de {user.nickname}")
+        return route["id"]
+
+    def _schedule_next_departure(self) -> None:
+        """A próxima oferta (e as procuras que vierem depois dela) sai daqui a poucos minutos, hoje."""
+        departure = (datetime.now() + DEPARTURE_LEAD).replace(second=0, microsecond=0) + timedelta(minutes=1)
+        self.departure = departure
+        self.ride_date = departure.date()
+        self.week_day = WEEK_DAYS[departure.weekday()]
+
+    def request_seat(self, passenger: SimulatedUser, driver_route_id: str, passenger_route_id: str) -> ApiResponse:
+        """Envia requisição de solicitação de vaga do passageiro para o trajeto do motorista."""
+        return self.api.post("/rides/request", passenger.token, {
+            "driverRouteId": driver_route_id,
+            "passengerRouteId": passenger_route_id,
+            "date": self.ride_date.isoformat(),
+        })
+
+    # ------------------------------------------------------------------ viagem
+
+    def ride(self, user: SimulatedUser, ride_id: str) -> dict:
+        """Obtém os detalhes da carona pela API a partir do usuário autenticado."""
+        return self.expect_ok(self.api.get(f"/rides/{ride_id}", user.token),
+                              f"{user.nickname} consultar a viagem")
+
+    def ride_action(self, user: SimulatedUser, ride_id: str, action: str,
+                    body: Optional[dict] = None, expect_success: bool = True) -> ApiResponse:
+        """Dispara uma ação de controle da carona (ex: start, complete, cancel, leave)."""
+        # Só um início que deve dar certo espera a janela abrir; o que deve ser recusado vai na hora
+        if action == "start" and expect_success:
+            self._wait_for_start_window()
+        return self.api.post(f"/rides/{ride_id}/{action}", user.token, body)
+
+    def _wait_for_start_window(self) -> None:
+        """Aguarda a janela de horário de início da carona abrir."""
+        opens_at = self.departure - START_WINDOW + timedelta(seconds=5)
+        wait = (opens_at - datetime.now()).total_seconds()
+        if wait > 0:
+            print(f"      (esperando {wait:.0f} s até a janela de início abrir)", flush=True)
+            time.sleep(wait)
+
+    def passenger_action(self, driver: SimulatedUser, ride_id: str, passenger: SimulatedUser,
+                         action: str, body: Optional[dict] = None) -> ApiResponse:
+        """Executa uma ação direcionada a um passageiro da carona (ex: accept, reject, no-show)."""
+        return self.api.post(f"/rides/{ride_id}/passengers/{passenger.id}/{action}", driver.token, body)
+
+    def payment(self, user: SimulatedUser, ride_id: str, passenger: SimulatedUser,
+                action: str = "", body: Optional[dict] = None) -> ApiResponse:
+        """Consulta ou executa uma ação de cobrança/pagamento para o passageiro."""
+        path = f"/rides/{ride_id}/passengers/{passenger.id}/payment" + (f"/{action}" if action else "")
+        if action:
+            return self.api.post(path, user.token, body)
+        return self.api.get(path, user.token)
+
+    @staticmethod
+    def participant(ride: dict, user: SimulatedUser) -> dict:
+        """Encontra o registro do participante correspondente ao usuário no payload da viagem."""
+        for participant in ride.get("participants") or []:
+            if participant.get("userId") == user.id:
+                return participant
+        raise SimulationFailure(f"{user.nickname} não aparece entre os participantes da viagem")
+
+    def expect_ride(self, ride: dict, status: str, available_seats: Optional[int] = None) -> None:
+        """Verifica se a viagem está com o status e a quantidade de assentos disponíveis esperados."""
+        self.check(ride.get("status") == status,
+                   f"a viagem deveria estar {status}, está {ride.get('status')}")
+        if available_seats is not None:
+            self.check(ride.get("availableSeats") == available_seats,
+                       f"deveria ter {available_seats} vaga(s) livre(s), tem {ride.get('availableSeats')}")
+
+    def expect_participant(self, ride: dict, user: SimulatedUser, status: str) -> dict:
+        """Verifica se o participante atingiu o status de participação esperado."""
+        participant = self.participant(ride, user)
+        self.check(participant.get("status") == status,
+                   f"{user.nickname} deveria estar {status}, está {participant.get('status')}")
+        return participant
+
+
+def _place(spot: tuple) -> dict:
+    """Monta um dicionário com os dados de localização formatados para envio à API."""
+    address, neighborhood, latitude, longitude = spot
+    return {"address": address, "neighborhood": neighborhood, "city": "Campinas",
+            "latitude": latitude, "longitude": longitude}
+
+
+def _slug(text: str) -> str:
+    """Normaliza o texto em formato slug alfanumérico ASCII."""
+    ascii_text = unicodedata.normalize("NFKD", text).encode("ascii", "ignore").decode()
+    return re.sub(r"[^a-z0-9]+", "-", ascii_text.lower()).strip("-")

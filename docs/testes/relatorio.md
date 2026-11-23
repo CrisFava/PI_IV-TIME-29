@@ -1,0 +1,640 @@
+# Atividade de FTTVS
+
+## Teste do Servidor JAVA PI IV
+
+- **RA:** 25008211 **NOME:** Allan Giovanni Matias Paes
+- **RA:** 25000636 **NOME:** Cristian Eduardo Fava
+- **RA:** 25003068 **NOME:** Daniela Mikie Kikuchi Gonçalves
+- **RA:** 25001650 **NOME:** Gustavo Alves de Siqueira Costa
+- **RA:** 25024107 **NOME:** Sara Fernandes Monteiro
+
+---
+
+## Parte I - Explicar o propósito, arquitetura e estrutura das classes do servidor de sua aplicação
+
+### a) Nome e descrição sucinta do que faz o projeto da Equipe
+
+- **Nome do Projeto:** **Converge** (Módulo: **Servidor Java de Sockets TCP** — `app/server`)
+- **Descrição Sucinta:**
+  O **Converge** é uma plataforma que conecta estudantes universitários da PUC-Campinas com rotas e horários compatíveis para compartilhamento diário de caronas, substituindo grupos informais por um ecossistema com verificação acadêmica institucional, chat em tempo real, avaliações mútuas, controle de inadimplência e indicadores de sustentabilidade (CO₂ evitado).
+
+  O submódulo **`app/server`** consiste em um **servidor TCP de alta performance desenvolvido em Java 21 puro**, sem dependência de frameworks externos de rede. Ele implementa comunicação orientada a conexão via sockets com serialização nativa de objetos Java (`ObjectInputStream` / `ObjectOutputStream`), concorrência multithreaded (thread-per-client com supervisores dedicados e semáforos) e arquitetura modular orientada a despachantes de requisições (`HandlerRegistry` e `RequestHandler`).
+
+  **Propósito no ecossistema:** O servidor atua como o motor de processamento desacoplado do backend Spring Boot, sendo responsável por cálculos determinísticos e intensivos da aplicação:
+  1. **Matching de Trajetos (`MatchRoutesHandler`):** Cálculo geoespacial multidimensional de compatibilidade entre ofertas e procuras, proximidade de polylines codificadas, tolerâncias de horários e sobreposição de rotas.
+  2. **Cálculo de Custos e Rateio (`RideCostHandler`):** Estimativa do custo total da viagem (energia, consumo médio, pedágios, estacionamento), cálculo de desvios gerados por passageiros, fixação de tetos protetivos (`maxAmount`) e divisão justa de despesas exclusivamente entre passageiros efetivos com compensação de centavos ao motorista.
+  3. **Indicadores de Sustentabilidade (`SustainabilityHandler`):** Cálculo de CO₂ evitado, carros individuais retirados do trânsito e árvores equivalentes.
+  4. **Emissão de Cobrança PIX (`PixPayloadHandler`):** Montagem do payload EMVCo (BR Code) e cálculo de redundância cíclica CRC16 para QR Codes estáticos.
+  5. **Validações de Documentos e Geodésia:** Validação algorítmica de CPF (`ValidateCpfHandler`), validação de dígitos verificadores de RENAVAM via módulo 11 (`ValidateRenavamHandler`), cálculo de distâncias esféricas de Haversine em lote (`DistanceHandler`) e referências de períodos ISO (`IndicatorReferenceHandler`).
+
+---
+
+### b) Diagrama que ilustre a arquitetura e a estrutura do servidor JAVA
+
+> **Arquivo do Diagrama Mermaid:** [arquitetura_servidor.mermaid](file:///E:/PIs/PI_IV_ES_TIME_29/docs/testes/diagramas/arquitetura_servidor.mermaid)
+
+#### Estrutura Arquitetural do Servidor TCP (`app/server`)
+
+O diagrama de arquitetura modela a separação em camadas e o fluxo de dados entre clientes e o subsistema de sockets:
+
+| Camada | Componentes Principais | Papel e Responsabilidades |
+| :----- | :--------------------- | :------------------------ |
+| **1. Clientes Externos** | `SocketClient`, Backend Spring Boot (`app/backend`) | Abrem conexões TCP via Sockets, estabelecem handshake de `ObjectInputStream`/`ObjectOutputStream` e transmitem instâncias serializadas de subclasses de `Message`. |
+| **2. Escuta & Conexões** | `SocketServer`, `ConnectionAcceptor`, `ConnectionSupervisor`, `ClientConnection`, `ClientRegistry` | `SocketServer` gerencia o ciclo de vida (`start()`, `stop()`). O `ConnectionAcceptor` escuta novos clientes em loop assíncrono. Cada conexão aceita dispara um `ConnectionSupervisor` (thread dedicada). `ClientConnection` encapsula streams de I/O com mutex de concorrência e buffer `peek()`. `ClientRegistry` mantém controle thread-safe de clientes ativos. |
+| **3. Roteamento & Protocolo** | `HandlerRegistry`, `RequestHandler<T, R>`, `Message` | `HandlerRegistry` mapeia dinamicamente tipos de mensagem (`Class<? extends Message>`) ao respectivo handler. Retorna `ErrorResponse` em falhas ou mensagens não cadastradas sem derrubar o socket. |
+| **4. Handlers de Negócio** | `RideCostHandler`, `MatchRoutesHandler`, `PixPayloadHandler`, `SustainabilityHandler`, etc. | Unidades puras de computação de domínio que implementam `RequestHandler<T, R>`, isoladas de sockets, responsáveis pelas regras financeiras, geodésicas e operacionais de caronas. |
+
+---
+
+### c) Modelo UML de cada uma das classes e interfaces definidas - Nome, Atributos e Métodos
+
+> **Arquivo do Diagrama Mermaid:** [classes_detalhadas.mermaid](file:///E:/PIs/PI_IV_ES_TIME_29/docs/testes/diagramas/classes_detalhadas.mermaid)
+
+#### Especificação Detalhada das Classes, Atributos e Métodos
+
+A tabela abaixo consolida as classes e interfaces do servidor socket TCP, especificando visibilidade, atributos e métodos conforme a modelagem UML:
+
+| Pacote / Módulo | Classe / Interface | Atributos Principais | Métodos Principais |
+| :-------------- | :----------------- | :------------------- | :----------------- |
+| `protocol` | **`Message`** | `- long serialVersionUID$` | `+ clone(): Object` |
+| `protocol` | **`DisconnectRequest`** | `- long serialVersionUID$`<br/>`- String reason` | `+ DisconnectRequest()`<br/>`+ DisconnectRequest(String reason)`<br/>`+ getReason(): String`<br/>`+ toString(): String` |
+| `protocol` | **`ServerShutdownNotification`** | `- long serialVersionUID$`<br/>`- String reason` | `+ ServerShutdownNotification()`<br/>`+ ServerShutdownNotification(String reason)`<br/>`+ getReason(): String`<br/>`+ toString(): String` |
+| `protocol` | **`ErrorResponse`** | `- long serialVersionUID$`<br/>`- String errorCode`<br/>`- String errorMessage` | `+ ErrorResponse(ServerErrorCode errorCode)`<br/>`+ ErrorResponse(ServerErrorCode errorCode, String errorMessage)`<br/>`+ ErrorResponse(String errorCode, String errorMessage)`<br/>`+ getErrorCode(): String`<br/>`+ getErrorMessage(): String`<br/>`+ toString(): String` |
+| `exception` | **`ServerErrorCode`** *(enum)* | `- String code`<br/>`- String defaultMessage` | Constantes: `PORT_IN_USE`, `CONNECTION_ERROR`, `DISCONNECTION_ERROR`, `TRANSMISSION_ERROR`, `RECEPTION_ERROR`, `CLIENT_DISCONNECTED`, `INVALID_MESSAGE`, `STREAM_INITIALIZATION_ERROR`, `INTERNAL_SERVER_ERROR`, `SERVER_SHUTDOWN`<br/>`+ getCode(): String`<br/>`+ getDefaultMessage(): String`<br/>`+ toString(): String` |
+| `exception` | **`ServerException`** | `- ServerErrorCode errorCode` | `+ ServerException(ServerErrorCode errorCode)`<br/>`+ ServerException(ServerErrorCode errorCode, String message)`<br/>`+ ServerException(ServerErrorCode errorCode, String message, Throwable cause)`<br/>`+ ServerException(ServerErrorCode errorCode, Throwable cause)`<br/>`+ getErrorCode(): ServerErrorCode`<br/>`+ getErrorCodeString(): String`<br/>`+ getMessage(): String` |
+| `core` | **`RequestHandler<T, R>`** *(interface)* | *(nenhum)* | `+ execute(T request)*: R` |
+| `core.handler` | **`HandlerRegistry`** | `- Map<Class<? extends Message>, RequestHandler<?, ?>> handlers` | `+ register(Class<T> requestClass, RequestHandler<T, ?> handler): void`<br/>`+ dispatch(Message request): Message` |
+| `core.client` | **`ClientConnection`** | `- Socket socket`<br/>`- ObjectInputStream receiver`<br/>`- ObjectOutputStream transmitter`<br/>`- Message nextMessage`<br/>`- Semaphore mutex`<br/>`- volatile boolean closed` | `+ ClientConnection(Socket socket, ObjectInputStream in, ObjectOutputStream out)`<br/>`+ send(Message message): void`<br/>`+ peek(): Message`<br/>`+ receive(): Message`<br/>`+ close(): void`<br/>`+ isClosed(): boolean` |
+| `core.client` | **`ClientRegistry`** | `- List<ClientConnection> clients` | `+ add(ClientConnection client): void`<br/>`+ remove(ClientConnection client): void`<br/>`+ getAll(): List<ClientConnection>`<br/>`+ getActiveCount(): int`<br/>`+ broadcast(Message message): void`<br/>`+ closeAll(Message notification): void` |
+| `core.connection` | **`ConnectionAcceptor`** | `- ServerSocket serverSocket`<br/>`- ClientRegistry clientRegistry`<br/>`- HandlerRegistry handlerRegistry` | `+ ConnectionAcceptor(ServerSocket ss, ClientRegistry cr, HandlerRegistry hr)`<br/>`+ run(): void` |
+| `core.connection` | **`ConnectionSupervisor`** | `- Socket socket`<br/>`- ClientRegistry clientRegistry`<br/>`- HandlerRegistry handlerRegistry`<br/>`- ClientConnection clientConnection` | `+ ConnectionSupervisor(Socket s, ClientRegistry cr, HandlerRegistry hr)`<br/>`+ run(): void` |
+| `core` | **`SocketServer`** | `+ int DEFAULT_PORT$`<br/>`- int port`<br/>`- ClientRegistry clientRegistry`<br/>`- HandlerRegistry handlerRegistry`<br/>`- ServerSocket serverSocket`<br/>`- ConnectionAcceptor connectionAcceptor`<br/>`- boolean running` | `+ SocketServer()`<br/>`+ SocketServer(int port)`<br/>`+ registerHandler(Class<T> clazz, RequestHandler<T, ?> handler): SocketServer`<br/>`+ start(): void`<br/>`+ stop(): void`<br/>`+ isRunning(): boolean`<br/>`+ getPort(): int`<br/>`+ getClientRegistry(): ClientRegistry`<br/>`+ getHandlerRegistry(): HandlerRegistry` |
+| `handler.ride` | **`RideCostHandler`** | *(nenhum atributo de estado mutável)* | `+ execute(RideCostRequest request): RideCostResponse`<br/>`- confirmationQuote(RideCostRequest req): RideCostResponse`<br/>`- costSharing(RideCostRequest req): RideCostResponse`<br/>`- detourKm(RideCostRequest req): double`<br/>`- routeCost(double dist, RideCostRequest req): BigDecimal`<br/>`- energyCost(double dist, RideCostRequest req): BigDecimal`<br/>`- validateRequest(RideCostRequest req): void` |
+| `handler.ride` | **`RideCostRequest`** | `- long serialVersionUID$`<br/>`- Operation operation`<br/>`- double baseDistanceKm`<br/>`- Double legOriginToBoardingKm`<br/>`- Double legBoardingToDropOffKm`<br/>`- Double legDropOffToDestinationKm`<br/>`- double averageConsumption`<br/>`- BigDecimal currentEnergyPrice`<br/>`- BigDecimal toll`<br/>`- BigDecimal parking`<br/>`- List<PassengerCostInput> passengers` | `+ forConfirmationQuote(...)$: RideCostRequest`<br/>`+ forCostSharing(...)$: RideCostRequest`<br/>`+ getOperation(): Operation`<br/>`+ getBaseDistanceKm(): double`<br/>`+ getCurrentEnergyPrice(): BigDecimal`<br/>`+ getPassengers(): List<PassengerCostInput>` |
+| `handler.ride` | **`RideCostResponse`** | `- long serialVersionUID$`<br/>`- double detourGeneratedKm`<br/>`- BigDecimal maxAmount`<br/>`- double baseDistanceKm`<br/>`- double totalDistanceKm`<br/>`- BigDecimal energyCost`<br/>`- BigDecimal totalCost`<br/>`- BigDecimal totalShared`<br/>`- Map<String, BigDecimal> sharesByPassenger` | `+ forConfirmationQuote(...)$: RideCostResponse`<br/>`+ forCostSharing(...)$: RideCostResponse`<br/>`+ getDetourGeneratedKm(): double`<br/>`+ getMaxAmount(): BigDecimal`<br/>`+ getTotalCost(): BigDecimal`<br/>`+ getSharesByPassenger(): Map<String, BigDecimal>` |
+
+---
+
+### d) Modelo de Classes UML, contendo as classes de (c), associações e heranças
+
+> **Arquivo do Diagrama Mermaid:** [modelo_classes.mermaid](file:///E:/PIs/PI_IV_ES_TIME_29/docs/testes/diagramas/modelo_classes.mermaid)
+
+#### Mapeamento de Relacionamentos (Herança, Realização, Agregação e Associação)
+
+O diagrama de modelo de classes sintetiza os relacionamentos estruturais e comportamentais do sistema:
+
+| Tipo de Relacionamento | Elementos Envolvidos | Descrição e Multiplicidade |
+| :--------------------- | :------------------- | :------------------------- |
+| **Herança (`extends`)** | `Message` $\leftarrow$ `DisconnectRequest`, `ServerShutdownNotification`, `ErrorResponse`, `RideCostRequest`, `RideCostResponse` | Hierarquia de protocolo polimórfico baseada em serialização Java (`java.io.Serializable`). |
+| **Herança (`extends`)** | `Exception` $\leftarrow$ `ServerException` | Exceção verificada de domínio tipada com enum `ServerErrorCode`. |
+| **Herança (`extends`)** | `Thread` $\leftarrow$ `ConnectionAcceptor`, `ConnectionSupervisor` | Modelo de concorrência multithreaded (1 thread de accept contínua + 1 thread dedicada de supervisor por socket cliente). |
+| **Realização (`implements`)** | `RequestHandler<T, R>` $\leftarrow$ `RideCostHandler` | Contrato genérico de execução assíncrona de requisições sem acoplamento a rede. |
+| **Composição Forte (`*--`)** | `SocketServer` $\rightarrow$ `ClientRegistry`, `HandlerRegistry`, `ConnectionAcceptor` | O ciclo de vida dos registros e da thread de accept é gerenciado e estritamente subordinado à instância do servidor. |
+| **Composição Forte (`*--`)** | `ConnectionSupervisor` $\rightarrow$ `ClientConnection` | Cada supervisor instancia e encapsula exclusivamente a conexão de um cliente durante sua vida ativa. |
+| **Agregação (`o--`)** | `ClientRegistry` $\rightarrow$ `ClientConnection` | Gerenciamento de coleção thread-safe de conexões ativas (`ArrayList` com blocos sincronizados). |
+| **Agregação (`o--`)** | `HandlerRegistry` $\rightarrow$ `RequestHandler` | Tabela hash de despacho (`ConcurrentHashMap`) associando classe da mensagem ao handler de execução. |
+| **Dependência / Uso (`..>`)** | `RideCostHandler` $\rightarrow$ `RideCostRequest`, `RideCostResponse`, `ServerException` | O handler consome requisições de carona, calcula desvios/rateios, produz respostas e dispara exceções de validação. |
+| **Dependência / Uso (`..>`)** | `SocketServer` $\rightarrow$ `ServerShutdownNotification` | Notificação em broadcast emitida a todos os clientes conectados ao invocar `server.stop()`. |
+
+---
+
+## Parte II - Aplicar as técnicas de Teste OO e automatizar os testes:
+
+### e) INTRACLASSE em JUNIT de pelo menos duas classes do Domínio da Aplicação do Servidor desenvolvido
+
+Classes selecionadas para o teste intraclasse e justificativa das técnicas segundo as diretrizes de Teste OO:
+
+1. **`RideCostHandler`**: Responsável pelas regras matemáticas de desvio, cálculo de consumo de combustível, proteção de teto (`maxAmount`) e rateio de despesas entre múltiplos passageiros.
+   - **Técnica de Particionamento:** **CATEGORIAS DE MÉTODOS (Cálculos de Negócio)**. Conforme a diretriz da disciplina, como a classe não possui estado relevante, mas concentra métodos que realizam cálculos complexos e críticos (`confirmationQuote`, `costSharing`, `detourKm`, `routeCost`, `energyCost` e `validateRequest`), aplica-se o particionamento por categoria de métodos de cálculo, associando classes de equivalência e análise de valores limite aos parâmetros de cada categoria.
+2. **`ClientConnection`**: Responsável pelo encapsulamento do canal de comunicação TCP, controle de concorrência com semáforo, buffering de leitura antecipada (`peek`) e ciclo de vida de fechamento.
+   - **Técnica de Particionamento:** **ESTADOS (Ciclo de Vida da Conexão)**. Conforme a diretriz da disciplina, como a classe possui máquina de estados relevante (transições entre estado Aberto, Em Espera, Bufferizado/Peek, Consumido e Fechado/Idempotente), aplica-se o particionamento por transições de estado.
+
+| Classe | Particionamento adotado | Sequências de ativação INTRACLASSE (1 sequência por linha) |
+| :----- | :---------------------- | :--------------------------------------------------------- |
+| **1) `RideCostHandler`** | **CATEGORIAS DE MÉTODOS (Cálculos de Desvio, Rateio e Validação)** | *Categoria 1 (Orçamento de Confirmação e Desvio):* `execute(confirmationQuote)` com trechos válidos $\rightarrow$ validação de `detourGeneratedKm` e `maxAmount` (`shouldComputeDetourAndMaxAmount`) |
+| | | *Categoria 1 (Valores Limite):* `execute(confirmationQuote)` sem trechos (`null`) $\rightarrow$ desvio zero e teto igual à rota original (`shouldHaveNoDetourWhenLegsAreMissing`) |
+| | | *Categoria 1 (Destino Coincidente):* `execute(confirmationQuote)` com passageiro descendo no mesmo destino $\rightarrow$ desvio zero e teto original (`shouldHaveNoDetourWhenPassengerGetsOffAtTheSameDestination`) |
+| | | *Categoria 1 (Compensação):* `execute(confirmationQuote)` com desvio negativo compensado $\rightarrow$ clamp em 0.0 (`shouldNeverReturnNegativeDetour`) |
+| | | *Categoria 1 (Valores Opcionais):* `execute(confirmationQuote)` sem pedágio e sem estacionamento (`null`) $\rightarrow$ tratados como zero (`shouldTreatMissingTollAndParkingAsZero`) |
+| | | *Categoria 1 (Arredondamento):* `execute(confirmationQuote)` com distância fracionária $\rightarrow$ arredondamento do custo para 2 casas antes do teto (`shouldRoundRouteCostBeforeComputingTheMaximum`) |
+| | | *Categoria 2 (Rateio Múltiplo e Divisão):* `execute(costSharing)` com múltiplos passageiros (2 passageiros) e despesas $\rightarrow$ divisão igualitária truncada em centavos exclusivamente entre os passageiros (`shouldSplitCostEquallyBetweenPassengersOnly`) |
+| | | *Categoria 2 (Travas de Teto Contratado):* `execute(costSharing)` onde a cota excede o teto contratado (`maxAmount`) $\rightarrow$ trava no teto e redistribuição/absorção do excedente pelo motorista (`shouldCapPassengerShareAtMaxAmount`) |
+| | | *Categoria 2 (Centavos Residuais):* `execute(costSharing)` com divisão inexata em centavos (pedágio R$ 7,01) $\rightarrow$ truncamento e centavo residual atribuído ao motorista (`shouldLeaveTheRemainingCentsToTheDriver`) |
+| | | *Categoria 2 (Caso Limite sem Passageiros):* `execute(costSharing)` sem passageiros (lista vazia) $\rightarrow$ motorista arca com o total sem divisão por zero e cotas vazias (`shouldChargeNobodyWhenThereAreNoPassengers`) |
+| | | *Categoria 3 (Validação Operacional):* `execute(...)` com consumo médio zerado, negativo ou NaN $\rightarrow$ lançamento de `ServerException` (`shouldRejectInvalidConsumption`) |
+| | | *Categoria 3 (Validação de Parâmetros de Domínio):* `execute(...)` com distância negativa, preço nulo, requisição nula, trechos ou desvios não finitos, teto negativo ou passageiro duplicado $\rightarrow$ lançamento de `ServerException` (`shouldRejectNonFiniteLegs`, `shouldRejectNegativeMaxAmount`, etc.) |
+| **2) `ClientConnection`** | **ESTADOS (Ciclo de Vida e I/O)** | *Validação de Construtor:* `ClientConnection(socket, receiver, transmitter)` com referências nulas $\rightarrow$ validação e lançamento de `ServerException` (`shouldValidateNullConstructorArguments`) |
+| | | *Estado Inicial Aberto:* `ClientConnection(socket, in, out)` $\rightarrow$ `send(msg)` no estado Aberto $\rightarrow$ mensagem transmitida com sucesso (`shouldSendSerializedMessage`) |
+| | | *Transição Aberto $\rightarrow$ Bufferizado:* `ClientConnection()` $\rightarrow$ `peek()` $\rightarrow$ cacheamento de mensagem em `nextMessage` sem consumo (`shouldCacheMessageOnPeekAndConsumeOnReceive`) |
+| | | *Estado Bufferizado Idempotente:* `ClientConnection()` $\rightarrow$ `peek()` sucessivo $\rightarrow$ retorno idêntico da mesma instância em cache via `assertSame` (`shouldCacheMessageOnPeekAndConsumeOnReceive`) |
+| | | *Transição Bufferizado $\rightarrow$ Consumido:* `ClientConnection()` $\rightarrow$ `receive()` após `peek()` $\rightarrow$ entrega do objeto cacheado e invalidação do cache (`shouldCacheMessageOnPeekAndConsumeOnReceive`) |
+| | | *Transição para Final de Fluxo (EOF):* `ClientConnection()` $\rightarrow$ `peek()` ou `receive()` no final de fluxo (EOF) $\rightarrow$ transição para desconexão com `CLIENT_DISCONNECTED` (`shouldThrowClientDisconnectedOnEof`) |
+| | | *Desserialização de Tipo Inesperado:* `ClientConnection()` $\rightarrow$ `peek()` ou `receive()` lendo objeto que não é `Message` $\rightarrow$ lançamento de `RECEPTION_ERROR` (`shouldThrowReceptionErrorOnUnexpectedObjectType`) |
+| | | *Falha de I/O na Transmissão:* `ClientConnection()` $\rightarrow$ `send(msg)` com falha no output stream $\rightarrow$ lançamento de `TRANSMISSION_ERROR` (`shouldThrowTransmissionErrorWhenWriteFails`) |
+| | | *Transição Aberto $\rightarrow$ Fechado:* `ClientConnection()` $\rightarrow$ `close()` $\rightarrow$ fechamento atômico de socket e streams e `isClosed() == true` (`shouldCloseResourcesAndBeIdempotent`) |
+| | | *Estado Fechado Idempotente:* `ClientConnection()` $\rightarrow$ `close()` repetido $\rightarrow$ idempotência (nenhuma operação redundante executada) (`shouldCloseResourcesAndBeIdempotent`) |
+| | | *Operação Proibida no Estado Fechado:* `ClientConnection()` $\rightarrow$ `send(msg)` no estado Fechado ou com socket fechado $\rightarrow$ bloqueio com `ServerException(CLIENT_DISCONNECTED)` (`shouldThrowClientDisconnectedWhenSendingOnClosedConnection`) |
+| | | *Falha ao Fechar Recurso:* `ClientConnection()` $\rightarrow$ `close()` com socket que falha ao fechar $\rightarrow$ lançamento de `DISCONNECTION_ERROR` mantendo conexão fechada (`shouldThrowDisconnectionErrorWhenClosingResourceFails`) |
+
+---
+
+#### Tabela de Falhas, Anomalias e Melhorias (Intraclasse)
+
+| Falha/Anomalias                      | Descrição e Localização do Defeito                                                                                                                                                          | Possível Causa / Correção Adotada                                                                                                                                                                               |
+| :----------------------------------- | :------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ | :-------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| **Divisão por Zero sem passageiros** | Em `RideCostHandler.costSharing()`, se a lista de passageiros viesse vazia, ocorria risco de `ArithmeticException` ao dividir pelo total de passageiros.                                    | **Correção:** Implementado `BigDecimal.valueOf(Math.max(1, request.getPassengers().size()))`, atribuindo todo o custo à cota do motorista e evitando divisão por zero.                                          |
+| **Fechamento redundante de Streams** | Em `ClientConnection.close()`, se o método fosse chamado mais de uma vez em condições de corrida, os streams de I/O eram fechados repetidamente gerando ruído de log e exceptions espúrias. | **Correção:** Introduzida flag atômica `volatile boolean closed`. Ao ser acionado uma vez, marca `closed = true` e retorna imediatamente nas chamadas subsequentes, tornando o método estritamente idempotente. |
+| **Vazamento de Lock no `peek()`**    | Em `ClientConnection.peek()`, se a desserialização de stream lançasse exceção de runtime, o semáforo `mutex` corria risco de não ser liberado.                                              | **Correção:** Envolvido todo o processamento em bloco `try { mutex.acquireUninterruptibly(); ... } finally { mutex.release(); }`.                                                                               |
+
+---
+
+#### Código da Automação de Testes (Intraclasse)
+
+As suítes reais de testes unitários intraclasse estão implementadas em:
+
+- [RideCostHandlerTest.java](file:///E:/PIs/PI_IV_ES_TIME_29/app/server/src/test/java/com/converge/socket/handler/ride/RideCostHandlerTest.java)
+- [ClientConnectionTest.java](file:///E:/PIs/PI_IV_ES_TIME_29/app/server/src/test/java/com/converge/socket/core/client/ClientConnectionTest.java)
+
+Abaixo estão trechos representativos extraídos diretamente dessas classes:
+
+```java
+// Autor: Sara Fernandes Monteiro - RA 25024107
+// Trecho de RideCostHandlerTest.java (Particionamento por Categorias de Métodos de Cálculo)
+
+package com.converge.socket.handler.ride;
+
+import com.converge.socket.core.exception.ServerException;
+import org.junit.jupiter.api.DisplayName;
+import org.junit.jupiter.api.Test;
+
+import java.math.BigDecimal;
+import java.util.List;
+
+import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertThrows;
+
+class RideCostHandlerTest {
+
+    // Rota do motorista de 40 km; o passageiro embarca após 8 km, viaja 30 km e desce a 6 km do destino
+    private static final double BASE_DISTANCE_KM = 40.0;
+    private static final double LEG_ORIGIN_TO_BOARDING_KM = 8.0;
+    private static final double LEG_BOARDING_TO_DROP_OFF_KM = 30.0;
+    private static final double LEG_DROP_OFF_TO_DESTINATION_KM = 6.0;
+
+    // Carro faz 10 km por litro, litro a R$ 5,50, pedágio de R$ 7,00 e estacionamento de R$ 3,00
+    private static final double AVERAGE_CONSUMPTION = 10.0;
+    private static final BigDecimal ENERGY_PRICE = new BigDecimal("5.50");
+    private static final BigDecimal TOLL = new BigDecimal("7.00");
+    private static final BigDecimal PARKING = new BigDecimal("3.00");
+
+    private final RideCostHandler handler = new RideCostHandler();
+
+    private static RideCostRequest confirmationQuote() {
+        return RideCostRequest.forConfirmationQuote(
+                BASE_DISTANCE_KM,
+                LEG_ORIGIN_TO_BOARDING_KM,
+                LEG_BOARDING_TO_DROP_OFF_KM,
+                LEG_DROP_OFF_TO_DESTINATION_KM,
+                AVERAGE_CONSUMPTION,
+                ENERGY_PRICE,
+                TOLL,
+                PARKING
+        );
+    }
+
+    private static RideCostRequest quoteWith(double baseDistanceKm, double averageConsumption, BigDecimal energyPrice) {
+        return RideCostRequest.forConfirmationQuote(
+                baseDistanceKm,
+                LEG_ORIGIN_TO_BOARDING_KM,
+                LEG_BOARDING_TO_DROP_OFF_KM,
+                LEG_DROP_OFF_TO_DESTINATION_KM,
+                averageConsumption,
+                energyPrice,
+                TOLL,
+                PARKING
+        );
+    }
+
+    @Test
+    @DisplayName("Deve calcular o desvio e o valor máximo ao confirmar o passageiro")
+    void shouldComputeDetourAndMaxAmount() throws ServerException {
+        RideCostResponse response = handler.execute(confirmationQuote());
+
+        // 44 km ÷ 10 × 5,50 = 24,20 de energia; + 7,00 + 3,00 = 34,20, o custo inteiro com o desvio
+        assertEquals(4.0, response.getDetourGeneratedKm(), 0.0001);
+        assertEquals(new BigDecimal("34.20"), response.getMaxAmount());
+    }
+
+    @Test
+    @DisplayName("Deve ratear o custo igualmente só entre os passageiros, sem o motorista")
+    void shouldSplitCostEquallyBetweenPassengersOnly() throws ServerException {
+        // Passageiro 1 desvia 4 km (teto 34,20) e passageiro 2 desvia 6 km (teto 35,30)
+        RideCostRequest request = RideCostRequest.forCostSharing(
+                BASE_DISTANCE_KM,
+                AVERAGE_CONSUMPTION,
+                ENERGY_PRICE,
+                TOLL,
+                PARKING,
+                List.of(
+                        new RideCostRequest.PassengerCostInput("passenger-1", 4.0, new BigDecimal("34.20")),
+                        new RideCostRequest.PassengerCostInput("passenger-2", 6.0, new BigDecimal("35.30"))
+                )
+        );
+
+        RideCostResponse response = handler.execute(request);
+
+        // 40 + 4 + 6 = 50 km; 50 ÷ 10 × 5,50 = 27,50 de energia; + 7,00 + 3,00 = 37,50; ÷ 2 passageiros = 18,75
+        assertEquals(50.0, response.getTotalDistanceKm(), 0.0001);
+        assertEquals(new BigDecimal("27.50"), response.getEnergyCost());
+        assertEquals(new BigDecimal("37.50"), response.getTotalCost());
+        assertEquals(new BigDecimal("18.75"), response.getSharesByPassenger().get("passenger-1"));
+        assertEquals(new BigDecimal("18.75"), response.getSharesByPassenger().get("passenger-2"));
+        assertEquals(new BigDecimal("37.50"), response.getTotalShared());
+    }
+
+    @Test
+    @DisplayName("Passageiro nunca paga mais que o próprio teto, e o motorista absorve a diferença")
+    void shouldCapPassengerShareAtMaxAmount() throws ServerException {
+        // A divisão igual daria 18,75, mas o passageiro 1 tem teto de 10,00
+        RideCostRequest request = RideCostRequest.forCostSharing(
+                BASE_DISTANCE_KM,
+                AVERAGE_CONSUMPTION,
+                ENERGY_PRICE,
+                TOLL,
+                PARKING,
+                List.of(
+                        new RideCostRequest.PassengerCostInput("passenger-1", 4.0, new BigDecimal("10.00")),
+                        new RideCostRequest.PassengerCostInput("passenger-2", 6.0, new BigDecimal("35.30"))
+                )
+        );
+
+        RideCostResponse response = handler.execute(request);
+
+        // Passageiro 1 paga o teto (10,00) e o passageiro 2 a divisão igual (18,75).
+        // O motorista cobre o resto do custo de 37,50, ou seja, 8,75, e o custo inteiro continua rateado.
+        assertEquals(new BigDecimal("10.00"), response.getSharesByPassenger().get("passenger-1"));
+        assertEquals(new BigDecimal("18.75"), response.getSharesByPassenger().get("passenger-2"));
+        assertEquals(new BigDecimal("37.50"), response.getTotalShared());
+    }
+
+    @Test
+    @DisplayName("Deve recusar consumo zero, negativo ou inválido")
+    void shouldRejectInvalidConsumption() {
+        assertThrows(ServerException.class, () -> handler.execute(quoteWith(BASE_DISTANCE_KM, 0.0, ENERGY_PRICE)));
+        assertThrows(ServerException.class, () -> handler.execute(quoteWith(BASE_DISTANCE_KM, -10.0, ENERGY_PRICE)));
+        assertThrows(ServerException.class, () -> handler.execute(quoteWith(BASE_DISTANCE_KM, Double.NaN, ENERGY_PRICE)));
+    }
+}
+```
+
+```java
+// Autor: Allan Giovanni Matias Paes - RA 25008211
+// Trecho de ClientConnectionTest.java (Transições de Estados: Aberto, Peek, Receive e Close)
+
+package com.converge.socket.core.client;
+
+import com.converge.socket.core.exception.ServerErrorCode;
+import com.converge.socket.core.exception.ServerException;
+import com.converge.socket.core.protocol.DisconnectRequest;
+import com.converge.socket.core.protocol.Message;
+import com.converge.socket.core.protocol.ServerShutdownNotification;
+import org.junit.jupiter.api.DisplayName;
+import org.junit.jupiter.api.Test;
+
+import java.io.ByteArrayInputStream;
+import java.io.ByteArrayOutputStream;
+import java.io.IOException;
+import java.io.ObjectInputStream;
+import java.io.ObjectOutputStream;
+import java.net.Socket;
+import java.util.concurrent.atomic.AtomicBoolean;
+import java.util.concurrent.atomic.AtomicInteger;
+
+import static org.junit.jupiter.api.Assertions.*;
+
+class ClientConnectionTest {
+
+    private static ObjectInputStream createObjectInputStream(Object... objects) throws IOException {
+        ByteArrayOutputStream baos = new ByteArrayOutputStream();
+        try (ObjectOutputStream oos = new ObjectOutputStream(baos)) {
+            for (Object obj : objects) {
+                oos.writeObject(obj);
+            }
+            oos.flush();
+        }
+        return new ObjectInputStream(new ByteArrayInputStream(baos.toByteArray()));
+    }
+
+    private static class DummySocket extends Socket {
+        private final AtomicBoolean closed = new AtomicBoolean(false);
+
+        @Override
+        public boolean isClosed() {
+            return closed.get();
+        }
+
+        @Override
+        public synchronized void close() throws IOException {
+            closed.set(true);
+        }
+    }
+
+    @Test
+    @DisplayName("peek deve manter a mensagem em cache até receive consumi-la")
+    void shouldCacheMessageOnPeekAndConsumeOnReceive() throws Exception {
+        DisconnectRequest first = new DisconnectRequest("primeira");
+        ServerShutdownNotification second = new ServerShutdownNotification("segunda");
+
+        ClientConnection connection = new ClientConnection(
+                new DummySocket(),
+                createObjectInputStream(first, second),
+                new ObjectOutputStream(new ByteArrayOutputStream())
+        );
+
+        Message peeked1 = connection.peek();
+        Message peeked2 = connection.peek();
+        assertSame(peeked1, peeked2);
+        assertEquals("primeira", assertInstanceOf(DisconnectRequest.class, peeked1).getReason());
+
+        Message received1 = connection.receive();
+        assertSame(peeked1, received1);
+
+        Message received2 = connection.receive();
+        assertEquals("segunda", assertInstanceOf(ServerShutdownNotification.class, received2).getReason());
+    }
+
+    @Test
+    @DisplayName("close deve fechar recursos, atualizar isClosed e ser idempotente")
+    void shouldCloseResourcesAndBeIdempotent() throws Exception {
+        DummySocket socket = new DummySocket();
+        AtomicInteger receiverCloses = new AtomicInteger(0);
+        AtomicInteger transmitterCloses = new AtomicInteger(0);
+
+        ByteArrayOutputStream serializedEmpty = new ByteArrayOutputStream();
+        try (ObjectOutputStream oos = new ObjectOutputStream(serializedEmpty)) {
+            oos.flush();
+        }
+        ObjectInputStream trackingReceiver = new ObjectInputStream(
+                new ByteArrayInputStream(serializedEmpty.toByteArray())
+        ) {
+            @Override
+            public void close() throws IOException {
+                receiverCloses.incrementAndGet();
+                super.close();
+            }
+        };
+        ObjectOutputStream trackingTransmitter = new ObjectOutputStream(new ByteArrayOutputStream()) {
+            @Override
+            public void close() throws IOException {
+                transmitterCloses.incrementAndGet();
+                super.close();
+            }
+        };
+
+        ClientConnection connection = new ClientConnection(socket, trackingReceiver, trackingTransmitter);
+
+        assertFalse(connection.isClosed());
+
+        connection.close();
+        assertTrue(connection.isClosed());
+        assertTrue(socket.isClosed());
+        assertEquals(1, receiverCloses.get());
+        assertEquals(1, transmitterCloses.get());
+
+        // Segunda chamada não deve fechar os streams novamente nem lançar exceção
+        connection.close();
+        assertTrue(connection.isClosed());
+        assertEquals(1, receiverCloses.get());
+        assertEquals(1, transmitterCloses.get());
+    }
+
+    @Test
+    @DisplayName("send em conexão fechada ou com socket fechado deve lançar CLIENT_DISCONNECTED")
+    void shouldThrowClientDisconnectedWhenSendingOnClosedConnection() throws Exception {
+        DummySocket socket = new DummySocket();
+        ObjectInputStream receiver = createObjectInputStream();
+        ObjectOutputStream transmitter = new ObjectOutputStream(new ByteArrayOutputStream());
+        ClientConnection connection = new ClientConnection(socket, receiver, transmitter);
+
+        connection.close();
+
+        ServerException afterClose = assertThrows(
+                ServerException.class,
+                () -> connection.send(new DisconnectRequest())
+        );
+        assertEquals(ServerErrorCode.CLIENT_DISCONNECTED, afterClose.getErrorCode());
+
+        DummySocket preClosedSocket = new DummySocket();
+        preClosedSocket.close();
+        ClientConnection withClosedSocket = new ClientConnection(
+                preClosedSocket,
+                createObjectInputStream(),
+                new ObjectOutputStream(new ByteArrayOutputStream())
+        );
+
+        ServerException onClosedSocket = assertThrows(
+                ServerException.class,
+                () -> withClosedSocket.send(new DisconnectRequest())
+        );
+        assertEquals(ServerErrorCode.CLIENT_DISCONNECTED, onClosedSocket.getErrorCode());
+    }
+}
+```
+
+---
+
+### f) INTERCLASSE em JUNIT
+
+Simulação ponta a ponta da camada de serviço do servidor TCP Socket, exercitando a colaboração entre `SocketServer`, `ConnectionAcceptor`, `ConnectionSupervisor`, `ClientRegistry`, `HandlerRegistry` e o `RequestHandler`.
+
+#### Cenário NORMAL
+
+**Descrição do que faz:**
+Um cliente TCP conecta ao `SocketServer` escutando em porta efêmera. O `ConnectionAcceptor` aceita o socket e dispara um `ConnectionSupervisor`, que realiza o handshake dos Object Streams, instancia a `ClientConnection` e a adiciona ao `ClientRegistry`. O cliente envia um `RideCostRequest` serializado para cálculo de custos. O supervisor lê a mensagem, aciona o `HandlerRegistry.dispatch()`, que roteia para o `RideCostHandler.execute()`. A resposta `RideCostResponse` é calculada e devolvida via stream de volta ao cliente. Em seguida, o cliente envia `DisconnectRequest` e o supervisor finaliza e limpa a conexão do registro graciosamente.
+
+| Nome do Serviço Principal                                                                                              | Sequências INTERCLASSES para testar Cenário Solicitado                                                                                   |
+| :--------------------------------------------------------------------------------------------------------------------- | :--------------------------------------------------------------------------------------------------------------------------------------- |
+| **Ciclo Completo de Atendimento de Requisição de Carona via TCP Sockets (`SocketServer.start()` & `RideCostHandler`)** | 1. `SocketServer(0).registerHandler(RideCostRequest.class, rideCostHandler).start()`                                                     |
+|                                                                                                                        | 2. `Socket.connect(localhost, server.getPort())` $\rightarrow$ `ConnectionAcceptor.accept()`                                             |
+|                                                                                                                        | 3. `ConnectionSupervisor.start()` $\rightarrow$ instanciação de `ObjectOutputStream` e `ObjectInputStream`                               |
+|                                                                                                                        | 4. `ClientRegistry.add(clientConnection)`                                                                                                |
+|                                                                                                                        | 5. Cliente envia `RideCostRequest.forCostSharing(...)`                                                                                   |
+|                                                                                                                        | 6. `ConnectionSupervisor` $\rightarrow$ `ClientConnection.receive()` $\rightarrow$ `HandlerRegistry.dispatch(request)`                   |
+|                                                                                                                        | 7. `HandlerRegistry` $\rightarrow$ `RideCostHandler.execute(request)` $\rightarrow$ calcula e retorna `RideCostResponse`                 |
+|                                                                                                                        | 8. `ConnectionSupervisor` $\rightarrow$ `ClientConnection.send(response)` $\rightarrow$ escrita no socket                                |
+|                                                                                                                        | 9. Cliente faz `ObjectInputStream.readObject()` e valida cotas calculadas                                                                |
+|                                                                                                                        | 10. Cliente envia `DisconnectRequest()` $\rightarrow$ `ConnectionSupervisor` encerra e executa `ClientRegistry.remove(clientConnection)` |
+
+---
+
+#### Cenário Alternativo ou de Erro
+
+**Descrição do que faz:**
+O cliente TCP conecta com sucesso, mas envia uma mensagem não cadastrada no catálogo do servidor (ou uma requisição com parâmetros ilegais que dispara `ServerException`). O `ConnectionSupervisor` recebe o objeto e despacha para `HandlerRegistry.dispatch()`. O registro detecta a ausência de handler associado (ou captura a exceção de negócio) e constrói dinamicamente uma resposta `ErrorResponse` com o código `INVALID_MESSAGE` e a mensagem explicativa, transmitindo-a ao cliente sem derrubar a thread do servidor e mantendo o socket íntegro para operações seguintes.
+
+| Nome do Serviço Principal                                                                            | Sequências INTERCLASSES para testar Cenário Solicitado                                                                           |
+| :--------------------------------------------------------------------------------------------------- | :------------------------------------------------------------------------------------------------------------------------------- |
+| **Interceptação e Tratamento de Mensagem Inválida ou Não Registrada (`HandlerRegistry.dispatch()`)** | 1. `SocketServer(0).start()` (sem handler cadastrado para a classe base `Message`)                                               |
+|                                                                                                      | 2. `Socket.connect(localhost, server.getPort())` $\rightarrow$ Handshake de streams concluído                                    |
+|                                                                                                      | 3. Cliente envia objeto `Message` não mapeado em `HandlerRegistry` (ou `null`)                                                   |
+|                                                                                                      | 4. `ConnectionSupervisor` $\rightarrow$ `ClientConnection.receive()` $\rightarrow$ `HandlerRegistry.dispatch(unregisteredMsg)`   |
+|                                                                                                      | 5. `HandlerRegistry` identifica ausência de handler $\rightarrow$ constrói `ErrorResponse(ServerErrorCode.INVALID_MESSAGE, ...)` |
+|                                                                                                      | 6. `ConnectionSupervisor` $\rightarrow$ `ClientConnection.send(errorResponse)`                                                   |
+|                                                                                                      | 7. Cliente lê `ErrorResponse`, valida o código `"INVALID_MESSAGE"`                                                               |
+|                                                                                                      | 8. Servidor permanece ativo e responsivo para requisições seguintes                                                              |
+
+---
+
+#### Tabela de Falhas, Anomalias e Melhorias (Interclasse)
+
+| Falha/Anomalias                          | Descrição e Localização do Defeito                                                                                                                                                                                   | Possível Causa / Correção Adotada                                                                                                                                                                                                                        |
+| :--------------------------------------- | :------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | :------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| **Condição de Corrida na Porta Efêmera** | Nos testes de integração do servidor, o método `findFreePort()` alocava e fechava a porta antes de passar ao `SocketServer`, gerando falhas intermitentes de `PORT_IN_USE` em ambientes com concorrência de sockets. | **Correção:** Alterado o `SocketServer` para aceitar porta `0` e expor `getPort()` dinamicamente com `serverSocket.getLocalPort()`. Os testes agora conectam na porta real vinculada atomicamente pelo sistema operacional, eliminando o race condition. |
+| **Deadlock na Desconexão Abrupta**       | No teste de queda inesperada do cliente, se o socket fechasse antes de o supervisor concluir o registro, o teste podia congelar ou ler contagem inconsistente.                                                       | **Correção:** Implementado polling com timeout delimitado (`waitUntil`) aguardando a confirmação da presença do cliente no `ClientRegistry` antes de simular o desligamento forçado do socket cliente.                                                   |
+| **Timeout de Leitura no Socket Cliente** | Em caso de falha silenciosa na inicialização dos streams do supervisor, os testes clientes podiam travar indefinidamente aguardando dados.                                                                           | **Correção:** Configurado `clientSocket.setSoTimeout(3000)` em todos os clientes de teste de integração antes de abrir os streams de I/O.                                                                                                                |
+
+---
+
+#### Código da Automação de Testes (Interclasse)
+
+A suíte real de testes de integração interclasse está implementada em:
+
+- [ServerInterClassIntegrationTest.java](file:///E:/PIs/PI_IV_ES_TIME_29/app/server/src/test/java/com/converge/socket/core/ServerInterClassIntegrationTest.java)
+
+Abaixo está a implementação completa da classe:
+
+```java
+// Autor: Allan Giovanni Matias Paes - RA 25008211
+// Teste de Integração Interclasse Cliente-Servidor TCP
+
+package com.converge.socket.core;
+
+import com.converge.socket.core.exception.ServerErrorCode;
+import com.converge.socket.core.protocol.DisconnectRequest;
+import com.converge.socket.core.protocol.ErrorResponse;
+import com.converge.socket.core.protocol.Message;
+import com.converge.socket.handler.ride.RideCostHandler;
+import com.converge.socket.handler.ride.RideCostRequest;
+import com.converge.socket.handler.ride.RideCostResponse;
+import org.junit.jupiter.api.DisplayName;
+import org.junit.jupiter.api.Test;
+
+import java.io.ObjectInputStream;
+import java.io.ObjectOutputStream;
+import java.math.BigDecimal;
+import java.net.InetAddress;
+import java.net.Socket;
+import java.util.List;
+
+import static org.junit.jupiter.api.Assertions.*;
+
+class ServerInterClassIntegrationTest {
+
+    @Test
+    @DisplayName("Cenário NORMAL: Fluxo completo TCP Socket cliente -> supervisor -> handler -> resposta")
+    void testNormalExecutionFlow() throws Exception {
+        SocketServer server = new SocketServer(0);
+        server.registerHandler(RideCostRequest.class, new RideCostHandler());
+        server.start();
+
+        int port = server.getPort();
+
+        try (Socket client = new Socket(InetAddress.getLoopbackAddress(), port)) {
+            client.setSoTimeout(3000);
+            ObjectOutputStream out = new ObjectOutputStream(client.getOutputStream());
+            out.flush();
+            ObjectInputStream in = new ObjectInputStream(client.getInputStream());
+
+            // 1. Envio de requisição de negócio válida (Rateio de Custos de Carona)
+            RideCostRequest request = RideCostRequest.forCostSharing(
+                    50.0, 10.0, new BigDecimal("6.00"), BigDecimal.ZERO, BigDecimal.ZERO,
+                    List.of(new RideCostRequest.PassengerCostInput("aluno_puc", 0.0, new BigDecimal("50.00")))
+            );
+            out.writeObject(request);
+            out.flush();
+
+            // 2. Recebimento da resposta processada pelo RideCostHandler
+            Object responseObj = in.readObject();
+            RideCostResponse response = assertInstanceOf(RideCostResponse.class, responseObj);
+            assertEquals(new BigDecimal("30.00"), response.getTotalCost());
+            assertEquals(new BigDecimal("30.00"), response.getSharesByPassenger().get("aluno_puc"));
+
+            // 3. Desconexão graciosa
+            out.writeObject(new DisconnectRequest("Operação concluída com sucesso"));
+            out.flush();
+        } finally {
+            server.stop();
+        }
+    }
+
+    @Test
+    @DisplayName("Cenário ALTERNATIVO/ERRO: Envio de mensagem sem handler gera ErrorResponse sem derrubar o servidor")
+    void testAlternativeErrorFlow() throws Exception {
+        SocketServer server = new SocketServer(0);
+        server.start();
+
+        int port = server.getPort();
+
+        try (Socket client = new Socket(InetAddress.getLoopbackAddress(), port)) {
+            client.setSoTimeout(3000);
+            ObjectOutputStream out = new ObjectOutputStream(client.getOutputStream());
+            out.flush();
+            ObjectInputStream in = new ObjectInputStream(client.getInputStream());
+
+            // Envia mensagem base Message (sem handler registrado em HandlerRegistry)
+            out.writeObject(new Message());
+            out.flush();
+
+            Object responseObj = in.readObject();
+            ErrorResponse error = assertInstanceOf(ErrorResponse.class, responseObj);
+
+            assertEquals(ServerErrorCode.INVALID_MESSAGE.getCode(), error.getErrorCode());
+            assertTrue(error.getErrorMessage().contains("No handler registered"));
+
+            // Servidor permanece ativo e responsivo
+            assertTrue(server.isRunning());
+        } finally {
+            server.stop();
+        }
+    }
+}
+```
+
+---
+
+### g) Diagrama de sequência equivalente ao item (f), cenário NORMAL
+
+> **Arquivo do Diagrama no Astah:** [sequencia_cenario_normal.asta](../entrega_teste_oo/astah/sequencia_cenario_normal.asta)
+
+![Diagrama de sequência do cenário normal](../entrega_teste_oo/astah/imagens/atualizado/converge_teste_oo/Diagramas/07_Sequencia_cenario_normal.png)
+
+#### Rastreamento Passo a Passo do Cenário Interclasse Normal
+
+O fluxo do cenário de integração normal executado no teste [ServerInterClassIntegrationTest.java](../../app/server/src/test/java/com/converge/socket/core/ServerInterClassIntegrationTest.java) (método `testNormalExecutionFlow`) organiza-se em 5 fases sequenciais. O "Teste" é o próprio método de teste, que faz o papel de cliente usando um `java.net.Socket` com `ObjectOutputStream` e `ObjectInputStream`. No diagrama, as setas de ponta aberta são assíncronas: a conexão TCP, os objetos que viajam pelo socket (`RideCostRequest`, `RideCostResponse` e `DisconnectRequest`) e o `start()` que dispara as threads do `ConnectionAcceptor` e do `ConnectionSupervisor`.
+
+| Passo | Origem $\rightarrow$ Destino | Ação / Mensagem Trocada | Descrição Técnica |
+| :---- | :--------------------------- | :---------------------- | :---------------- |
+| **Fase 1** | **Inicialização do Servidor TCP** | | |
+| 1 | `Teste` $\rightarrow$ `SocketServer` | `new SocketServer(0)` | Cria o servidor com `ClientRegistry` e `HandlerRegistry` vazios. A porta 0 faz o sistema escolher uma porta livre, o que evita conflito entre testes. |
+| 2 | `Teste` $\rightarrow$ `SocketServer` | `registerHandler(RideCostRequest.class, new RideCostHandler())` | O servidor repassa o cadastro ao `HandlerRegistry.register`, que associa a classe da mensagem ao handler. |
+| 3 | `Teste` $\rightarrow$ `SocketServer` | `start()` | Abre o `ServerSocket` na porta, cria o `ConnectionAcceptor` com os dois registros e inicia a thread dele. |
+| 4 | `Teste` $\rightarrow$ `SocketServer` | `getPort()` | Devolve a porta realmente atribuída ao `ServerSocket`, usada pelo cliente para conectar. |
+| **Fase 2** | **Conexão e Handshake** | | |
+| 5 | `Teste` $\rightarrow$ `ConnectionAcceptor` | conexão TCP (`new Socket(loopback, porta)`) | O cliente abre a conexão TCP. No servidor, `serverSocket.accept()` desbloqueia e devolve o socket do cliente. |
+| 6 | `ConnectionAcceptor` $\rightarrow$ `ConnectionSupervisor` | `new ConnectionSupervisor(...)` e `start()` | Cria o supervisor com o socket, o `ClientRegistry` e o `HandlerRegistry`, e inicia uma thread dedicada a esse cliente. |
+| 7 | `ConnectionSupervisor` $\rightarrow$ `ConnectionSupervisor` | `new ObjectOutputStream(...)`, `flush()` e `new ObjectInputStream(...)` | Cria os streams de objetos, sempre a saída com `flush()` antes da entrada. O cliente faz o mesmo, para os dois lados não ficarem esperando o cabeçalho um do outro. |
+| 8 | `ConnectionSupervisor` $\rightarrow$ `ClientConnection` | `new ClientConnection(socket, receiver, transmitter)` | Cria o objeto que encapsula o socket e os streams, com `send()`, `receive()` e `close()`. |
+| 9 | `ConnectionSupervisor` $\rightarrow$ `ClientRegistry` | `add(clientConnection)` | Adiciona a conexão à lista de clientes ativos do servidor. |
+| **Fase 3** | **Transmissão e Execução da Regra de Negócio** | | |
+| 10 | `Teste` $\rightarrow$ `ClientConnection` | `RideCostRequest` (enviado com `writeObject` e `flush()`) | O cliente envia o `RideCostRequest.forCostSharing(...)` com os dados da rota e o passageiro `aluno_puc`. |
+| 11 | `ConnectionSupervisor` $\rightarrow$ `ClientConnection` | `receive()` retorna `RideCostRequest` | O supervisor lê o objeto desserializado do stream de entrada. |
+| 12 | `ConnectionSupervisor` $\rightarrow$ `HandlerRegistry` | `dispatch(RideCostRequest)` | Pede ao registro que localize o handler pela classe da mensagem. |
+| 13 | `HandlerRegistry` $\rightarrow$ `RideCostHandler` | `execute(RideCostRequest)` | O handler calcula o rateio e devolve o `RideCostResponse` (`totalCost` e cota de `aluno_puc` de 30.00). Se algo desse errado, o `dispatch` converteria o erro em `ErrorResponse`, que é o cenário alternativo. |
+| 14 | `HandlerRegistry` $\rightarrow$ `ConnectionSupervisor` | retorna `RideCostResponse` | A resposta volta ao supervisor. |
+| 15 | `ConnectionSupervisor` $\rightarrow$ `ClientConnection` | `send(RideCostResponse)` | A resposta é escrita no socket. O teste lê com `readObject()` e confere o tipo da resposta, o `totalCost` e a cota do passageiro. |
+| **Fase 4** | **Desconexão Graciosa** | | |
+| 16 | `Teste` $\rightarrow$ `ClientConnection` | `DisconnectRequest` (enviado com `writeObject` e `flush()`) | O cliente avisa que vai encerrar a sessão. |
+| 17 | `ConnectionSupervisor` $\rightarrow$ `ClientConnection` | `receive()` retorna `DisconnectRequest` | O supervisor reconhece a mensagem de encerramento e sai do laço de atendimento. O servidor não envia resposta a esse pedido. |
+| 18 | `ConnectionSupervisor` $\rightarrow$ `ClientRegistry` e `ClientConnection` | `remove(clientConnection)` e `close()` | No bloco `finally`, remove o cliente do registro e fecha os streams e o socket. A thread do supervisor termina. O `try-with-resources` do teste fecha o socket do cliente. |
+| **Fase 5** | **Encerramento do Servidor** | | |
+| 19 | `Teste` $\rightarrow$ `SocketServer` | `stop()` | Executado no `finally` do teste: fecha o `ServerSocket`, chama `clientRegistry.closeAll(ServerShutdownNotification)` (envia o aviso e fecha as conexões que ainda estiverem no registro) e espera a thread do `ConnectionAcceptor` terminar (`join(1000)`). Com o `ServerSocket` fechado, o `accept()` lança `SocketException` e o laço do `ConnectionAcceptor` acaba. |

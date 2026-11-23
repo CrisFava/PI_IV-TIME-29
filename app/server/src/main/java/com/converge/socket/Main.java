@@ -1,0 +1,104 @@
+// Autor: Allan Giovanni Matias Paes - RA 25008211
+
+package com.converge.socket;
+
+import com.converge.socket.core.SocketServer;
+import com.converge.socket.handler.cpf.ValidateCpfHandler;
+import com.converge.socket.handler.cpf.ValidateCpfRequest;
+import com.converge.socket.handler.indicator.IndicatorReferenceHandler;
+import com.converge.socket.handler.indicator.IndicatorReferenceRequest;
+import com.converge.socket.handler.matching.MatchRoutesHandler;
+import com.converge.socket.handler.matching.MatchRoutesRequest;
+import com.converge.socket.handler.math.MathOperationHandler;
+import com.converge.socket.handler.math.MathOperationRequest;
+import com.converge.socket.handler.ride.RideCostHandler;
+import com.converge.socket.handler.ride.RideCostRequest;
+import com.converge.socket.handler.sustainability.SustainabilityHandler;
+import com.converge.socket.handler.sustainability.SustainabilityRequest;
+import com.converge.socket.handler.pix.PixPayloadHandler;
+import com.converge.socket.handler.pix.PixPayloadRequest;
+import com.converge.socket.handler.renavam.ValidateRenavamHandler;
+import com.converge.socket.handler.renavam.ValidateRenavamRequest;
+import com.converge.socket.handler.distance.DistanceHandler;
+import com.converge.socket.handler.distance.DistanceRequest;
+
+import java.util.Scanner;
+
+/**
+ * Ponto de entrada principal da aplicação do servidor socket TCP.
+ * Inicializa a instância do {@link SocketServer}, registra todos os handlers de negócio
+ * e gerencia o loop de comandos administrativos via console para encerramento gracioso.
+ */
+public class Main {
+
+    /**
+     * Registra todos os handlers de regras de negócio suportados no servidor socket.
+     *
+     * @param server instância do servidor socket onde os handlers serão registrados
+     */
+    private static void registerHandlers(SocketServer server){
+        server.registerHandler(MathOperationRequest.class, new MathOperationHandler());
+        server.registerHandler(ValidateCpfRequest.class, new ValidateCpfHandler());
+        server.registerHandler(SustainabilityRequest.class, new SustainabilityHandler());
+        server.registerHandler(IndicatorReferenceRequest.class, new IndicatorReferenceHandler());
+        server.registerHandler(PixPayloadRequest.class, new PixPayloadHandler());
+        server.registerHandler(MatchRoutesRequest.class, new MatchRoutesHandler());
+        server.registerHandler(RideCostRequest.class, new RideCostHandler());
+        server.registerHandler(ValidateRenavamRequest.class, new ValidateRenavamHandler());
+        server.registerHandler(DistanceRequest.class, new DistanceHandler());
+    }
+    
+    /**
+     * Método principal que inicializa o servidor socket e processa comandos administrativos do console.
+     *
+     * @param args argumentos de linha de comando; opcionalmente a porta TCP na primeira posição
+     */
+    public static void main(String[] args) {
+        int port = SocketServer.DEFAULT_PORT;
+
+        if (args.length > 0) {
+            try {
+                port = Integer.parseInt(args[0]);
+            } catch (NumberFormatException e) {
+                System.err.println("Invalid port number: " + args[0]);
+                System.err.println("Expected usage: java -jar server.jar [PORT]");
+                return;
+            }
+        }
+
+        SocketServer server = new SocketServer(port);
+
+        // Register custom business handlers
+        registerHandlers(server);
+
+        try {
+            server.start();
+            System.out.println("Socket Server is running on port " + port);
+            System.out.println("Connected clients can execute registered business handlers.");
+            System.out.println("To stop the server gracefully, type 'stop', 'exit' or 'desativar'.\n");
+        } catch (Exception e) {
+            System.err.println("Failed to start server on port " + port + ": " + e.getMessage());
+            return;
+        }
+
+        // Console command loop for administrative shutdown
+        Scanner scanner = new Scanner(System.in);
+        while (server.isRunning()) {
+            System.out.print("> ");
+            if (!scanner.hasNextLine()) {
+                break;
+            }
+
+            String command = scanner.nextLine().trim().toLowerCase();
+
+            if (command.equals("stop") || command.equals("exit")) {
+                System.out.println("Shutting down server...");
+                server.stop();
+                System.out.println("Server successfully stopped.");
+                break;
+            } else if (!command.isEmpty()) {
+                System.err.println("Unknown command: '" + command + ". Use 'stop' to shut down.");
+            }
+        }
+    }
+}

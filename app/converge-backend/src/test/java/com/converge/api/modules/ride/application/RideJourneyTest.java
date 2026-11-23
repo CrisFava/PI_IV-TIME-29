@@ -1,0 +1,555 @@
+// Autor: Cristian Eduardo Fava - RA 25000636
+
+package com.converge.api.modules.ride.application;
+
+import com.converge.api.modules.ride.application.dto.CancelRideCommand;
+import com.converge.api.modules.ride.application.dto.CancelRideRequestDTO;
+import com.converge.api.modules.ride.application.dto.PassengerRequestCommand;
+import com.converge.api.modules.ride.application.dto.PaymentResponseDTO;
+import com.converge.api.modules.ride.application.dto.RequestPaymentCommand;
+import com.converge.api.modules.ride.application.dto.RequestPaymentRequestDTO;
+import com.converge.api.modules.ride.application.dto.RideRefCommand;
+import com.converge.api.modules.ride.domain.enums.ParticipantPaymentStatus;
+import com.converge.api.modules.ride.domain.enums.ParticipantStatus;
+import com.converge.api.modules.ride.domain.enums.RideStatus;
+import com.converge.api.modules.ride.domain.model.Ride;
+import com.converge.api.modules.ride.domain.model.subtypes.Participant;
+import com.converge.api.modules.ride.domain.model.subtypes.VehicleSnapshot;
+import com.converge.api.modules.ride.domain.repository.RideRepository;
+import com.converge.api.modules.ride.infrastructure.RideCostCalculator;
+import com.converge.api.modules.route.application.RouteAccess;
+import com.converge.api.modules.security.application.BlockAccess;
+import com.converge.api.modules.route.domain.model.subtypes.Coordinates;
+import com.converge.api.modules.route.domain.model.subtypes.Place;
+import com.converge.api.modules.user.application.GetUserPixInfoUseCase;
+import com.converge.api.modules.user.application.RecordReputationPenaltyUseCase;
+import com.converge.api.modules.user.application.dto.UserPixInfoDTO;
+import com.converge.api.modules.user.domain.enums.user.PixKeyType;
+import com.converge.api.modules.user.domain.enums.vehicle.VehicleType;
+import com.converge.api.modules.user.domain.model.user.User;
+import com.converge.api.shared.application.AuditLogService;
+import com.converge.api.shared.application.UserUtils;
+import com.converge.api.shared.presentation.exception.ApplicationException;
+import com.converge.api.shared.presentation.exception.ErrorCode;
+import org.bson.types.ObjectId;
+import org.junit.jupiter.api.BeforeEach;
+import org.junit.jupiter.api.DisplayName;
+import org.junit.jupiter.api.Test;
+import org.junit.jupiter.api.extension.ExtendWith;
+import org.junit.jupiter.api.function.Executable;
+import org.mockito.Mock;
+import org.mockito.junit.jupiter.MockitoExtension;
+import org.mockito.junit.jupiter.MockitoSettings;
+import org.mockito.quality.Strictness;
+import org.springframework.context.ApplicationEventPublisher;
+import org.springframework.test.util.ReflectionTestUtils;
+
+import java.math.BigDecimal;
+import java.time.LocalDateTime;
+import java.util.List;
+import java.util.Map;
+import java.util.Optional;
+import java.util.Set;
+
+import static org.assertj.core.api.Assertions.assertThat;
+import static org.junit.jupiter.api.Assertions.assertThrows;
+import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.ArgumentMatchers.anyString;
+import static org.mockito.Mockito.doAnswer;
+import static org.mockito.Mockito.mock;
+import static org.mockito.Mockito.never;
+import static org.mockito.Mockito.times;
+import static org.mockito.Mockito.verify;
+import static org.mockito.Mockito.when;
+
+/**
+ * Percorre a viagem inteira pelos casos de uso reais, do aceite ao pagamento, trocando só a
+ * infraestrutura (banco, cálculo de custos, PIX, indicadores) por mocks.
+ *
+ * Cada teste conta uma história com três pessoas: o motorista, a passageira Ana e o passageiro
+ * Bruno. O "usuário logado" de cada passo é escolhido pelo uid, como acontece com o token na API.
+ */
+@ExtendWith(MockitoExtension.class)
+@MockitoSettings(strictness = Strictness.LENIENT)
+class RideJourneyTest {
+
+    /** uids de quem está logado em cada passo, como viriam do token do Firebase. */
+    private static final String DRIVER_UID = "uid-motorista";
+    private static final String ANA_UID = "uid-ana";
+    private static final String BRUNO_UID = "uid-bruno";
+    /** Código PIX devolvido pelo gerador falso. */
+    private static final String FAKE_PIX = "00020126580014br.gov.bcb.pix-simulado";
+    /** Valores finais que o cálculo falso grava para cada passageiro que concluir a viagem. */
+    private static final BigDecimal ANA_FINAL_AMOUNT = new BigDecimal("12.50");
+    private static final BigDecimal BRUNO_FINAL_AMOUNT = new BigDecimal("9.80");
+
+    // A rota com paradas é testada à parte (RideItineraryServiceTest)
+    @Mock
+    private RideItineraryService rideItineraryService;
+    @Mock
+    private BlockAccess blockAccess;
+
+    @Mock
+    private UserUtils userUtils;
+
+    @Mock
+    private RideRepository rideRepository;
+
+    @Mock
+    private RideEligibility rideEligibility;
+
+    @Mock
+    private RideCostCalculator rideCostCalculator;
+
+    @Mock
+    private RecordReputationPenaltyUseCase recordReputationPenalty;
+
+    @Mock
+    private AuditLogService auditLogService;
+
+    @Mock
+    private ApplicationEventPublisher eventPublisher;
+
+    @Mock
+    private RideCompletionPublisher completionPublisher;
+
+    @Mock
+    private GetUserPixInfoUseCase getUserPixInfo;
+
+    @Mock
+    private RouteAccess routeAccess;
+
+    /** Ids (Mongo) das três pessoas e da viagem. */
+    private final ObjectId driverId = new ObjectId();
+    private final ObjectId anaId = new ObjectId();
+    private final ObjectId brunoId = new ObjectId();
+    private final ObjectId rideId = new ObjectId();
+
+    /** A viagem da história; o repositório mockado sempre devolve esta mesma instância. */
+    private Ride ride;
+
+    /** Casos de uso reais, montados no setUp com a infraestrutura mockada. */
+    private AcceptPassengerUseCase acceptPassenger;
+    private StartRideUseCase startRide;
+    private MarkNoShowUseCase markNoShow;
+    private LeaveRideUseCase leaveRide;
+    private CancelRideUseCase cancelRide;
+    private CompleteRideUseCase completeRide;
+    private RequestPaymentUseCase requestPayment;
+    private MarkPaymentAsPaidUseCase markPaymentAsPaid;
+    private ArrivePassengerUseCase arrivePassenger;
+    private ListPendingPaymentsUseCase listPendingPayments;
+    private PendingPaymentGuard pendingPaymentGuard;
+
+    /**
+     * Registra as três pessoas como usuários logáveis, faz o save devolver a própria viagem e o aceite
+     * atômico do repositório chamar o domínio, define a chave PIX do motorista e o cálculo final falso,
+     * e monta todos os casos de uso com essas peças.
+     */
+    @BeforeEach
+    void setUp() {
+        loggedUser(DRIVER_UID, driverId);
+        loggedUser(ANA_UID, anaId);
+        loggedUser(BRUNO_UID, brunoId);
+
+        when(rideRepository.save(any(Ride.class))).thenAnswer(invocation -> invocation.getArgument(0));
+        when(rideRepository.acceptPassengerAtomic(any(), any(), any(), any(), any(), any())).thenAnswer(invocation -> {
+            String passengerId = invocation.getArgument(1);
+            Double detourKm = invocation.getArgument(2);
+            BigDecimal maxAmount = invocation.getArgument(3);
+            try {
+                ride.acceptPassenger(passengerId, detourKm, maxAmount);
+                return Optional.of(ride);
+            } catch (ApplicationException ex) {
+                return Optional.empty();
+            }
+        });
+        when(getUserPixInfo.execute(driverId.toHexString()))
+                .thenReturn(new UserPixInfoDTO("Motorista Simulado", "motorista@puc-campinas.edu.br", PixKeyType.EMAIL));
+
+        // O cálculo real roda no servidor de sockets. Aqui ele só grava valores finais conhecidos
+        // para quem concluiu a viagem, o que basta para seguir até o pagamento.
+        doAnswer(invocation -> {
+            Ride completed = invocation.getArgument(0);
+            completed.applyFinalAmounts(null, Map.of(
+                    anaId.toHexString(), ANA_FINAL_AMOUNT,
+                    brunoId.toHexString(), BRUNO_FINAL_AMOUNT
+            ));
+            return null;
+        }).when(rideCostCalculator).calculateFinalShares(any(Ride.class));
+
+        RideAccess rideAccess = new RideAccess(rideRepository, userUtils);
+        RidePaymentViewService paymentView = new RidePaymentViewService(getUserPixInfo, charge -> FAKE_PIX);
+
+        acceptPassenger = new AcceptPassengerUseCase(
+                rideAccess, rideEligibility, rideCostCalculator, rideItineraryService, rideRepository, eventPublisher, blockAccess);
+        startRide = new StartRideUseCase(rideAccess, rideRepository);
+        markNoShow = new MarkNoShowUseCase(
+                rideAccess, rideCostCalculator, rideRepository, recordReputationPenalty, auditLogService);
+        leaveRide = new LeaveRideUseCase(
+                rideAccess, rideCostCalculator, rideItineraryService, rideRepository, recordReputationPenalty, auditLogService);
+        cancelRide = new CancelRideUseCase(
+                rideAccess, rideRepository, recordReputationPenalty, auditLogService, eventPublisher, mock(RouteAccess.class));
+        completeRide = new CompleteRideUseCase(
+                rideAccess, rideCostCalculator, rideRepository, completionPublisher, mock(RouteAccess.class),
+                new RidePaymentNotifier(eventPublisher));
+        requestPayment = new RequestPaymentUseCase(rideAccess, rideRepository, paymentView);
+        markPaymentAsPaid = new MarkPaymentAsPaidUseCase(rideAccess, rideRepository, paymentView, new RidePaymentNotifier(eventPublisher),
+                mock(com.converge.api.modules.user.application.ResolveOverduePaymentUseCase.class));
+        arrivePassenger = new ArrivePassengerUseCase(
+                rideAccess, rideCostCalculator, rideRepository, routeAccess, new RidePaymentNotifier(eventPublisher));
+        listPendingPayments = new ListPendingPaymentsUseCase(rideAccess, rideRepository, paymentView);
+        pendingPaymentGuard = new PendingPaymentGuard(rideRepository);
+    }
+
+    // ------------------------------------------------------------------ cenários
+
+    @Test
+    @DisplayName("Caminho feliz: dois passageiros aceitos, viagem iniciada, concluída e paga")
+    void shouldGoFromRequestToPaidRide() {
+        rideWithSeats(3);
+        requestSeat(anaId);
+        requestSeat(brunoId);
+
+        accept(anaId);
+        accept(brunoId);
+        assertThat(ride.getStatus()).isEqualTo(RideStatus.CONFIRMED);
+        assertThat(ride.getAvailableSeats()).isEqualTo(1);
+
+        start();
+        assertThat(ride.getStatus()).isEqualTo(RideStatus.IN_PROGRESS);
+
+        Ride completed = complete();
+
+        assertThat(completed.getStatus()).isEqualTo(RideStatus.COMPLETED);
+        assertThat(completed.getCompletedAt()).isNotNull();
+        assertThat(participant(driverId).getStatus()).isEqualTo(ParticipantStatus.COMPLETED);
+        assertThat(participant(anaId).getStatus()).isEqualTo(ParticipantStatus.COMPLETED);
+        assertThat(participant(brunoId).getStatus()).isEqualTo(ParticipantStatus.COMPLETED);
+        assertThat(participant(anaId).getFinalAmount()).isEqualByComparingTo(ANA_FINAL_AMOUNT);
+        verify(rideCostCalculator, times(1)).calculateFinalShares(ride);
+        verify(completionPublisher, times(1)).publish(ride);
+
+        PaymentResponseDTO charged = chargeAs(DRIVER_UID, anaId, ANA_FINAL_AMOUNT);
+        assertThat(charged.pixCopyPaste()).isEqualTo(FAKE_PIX);
+        assertThat(charged.status()).isEqualTo(ParticipantPaymentStatus.PENDING);
+
+        // "Já paguei": a própria Ana informa o pagamento, sem confirmação do motorista
+        PaymentResponseDTO paid = markPaymentAsPaid.execute(paymentRef(ANA_UID, anaId));
+        assertThat(paid.status()).isEqualTo(ParticipantPaymentStatus.PAID);
+        assertThat(paid.pixCopyPaste()).isNull();
+    }
+
+    @Test
+    @DisplayName("Chegada individual: quem desce é cobrado na hora, os demais no encerramento, e a cobrança bloqueia até o 'Já paguei'")
+    void shouldChargeOnArrivalAndBlockUntilThePassengerPays() {
+        // Na chegada, o rateio do momento dá R$ 11,00 para a Ana; no fim da viagem daria R$ 12,50
+        BigDecimal anaArrivalAmount = new BigDecimal("11.00");
+        doAnswer(invocation -> {
+            Ride riding = invocation.getArgument(0);
+            riding.applyArrivalAmount(invocation.getArgument(1), anaArrivalAmount);
+            return null;
+        }).when(rideCostCalculator).calculateArrivalShare(any(Ride.class), anyString());
+        when(rideRepository.findByParticipantsUserId(anaId.toHexString())).thenAnswer(invocation -> List.of(ride));
+        rideWithSeats(3);
+        requestSeat(anaId);
+        requestSeat(brunoId);
+        accept(anaId);
+        accept(brunoId);
+        start();
+
+        Ride afterArrival = arrivePassenger.execute(paymentRef(DRIVER_UID, anaId));
+
+        assertThat(afterArrival.getStatus()).isEqualTo(RideStatus.IN_PROGRESS);
+        assertThat(participant(anaId).getStatus()).isEqualTo(ParticipantStatus.COMPLETED);
+        assertThat(participant(anaId).getRequestedAmount()).isEqualByComparingTo(anaArrivalAmount);
+        assertThat(participant(brunoId).getStatus()).isEqualTo(ParticipantStatus.CONFIRMED);
+        verify(routeAccess).endIfOnce("route-" + anaId.toHexString());
+
+        // O pagamento em aberto aparece para a Ana com o PIX, e ela não pode pedir nem oferecer outra carona
+        assertThat(listPendingPayments.execute(ANA_UID)).singleElement().satisfies(payment -> {
+            assertThat(payment.amount()).isEqualByComparingTo(anaArrivalAmount);
+            assertThat(payment.pixCopyPaste()).isEqualTo(FAKE_PIX);
+        });
+        assertError(ErrorCode.PAYMENT_PENDING,
+                () -> pendingPaymentGuard.ensureNoPendingPayment(anaId.toHexString()));
+
+        complete();
+
+        // O Bruno, que estava a bordo, é cobrado no encerramento; a cobrança da Ana não muda
+        assertThat(participant(brunoId).getRequestedAmount()).isEqualByComparingTo(BRUNO_FINAL_AMOUNT);
+        assertThat(participant(anaId).getRequestedAmount()).isEqualByComparingTo(anaArrivalAmount);
+
+        markPaymentAsPaid.execute(paymentRef(ANA_UID, anaId));
+
+        assertThat(participant(anaId).getPaymentStatus()).isEqualTo(ParticipantPaymentStatus.PAID);
+        assertThat(listPendingPayments.execute(ANA_UID)).isEmpty();
+        pendingPaymentGuard.ensureNoPendingPayment(anaId.toHexString());
+    }
+
+    @Test
+    @DisplayName("Ausência parcial: quem faltou fica NO_SHOW, não paga e os presentes concluem")
+    void shouldCompleteWithPresentPassengersAndSkipNoShow() {
+        rideWithSeats(3);
+        requestSeat(anaId);
+        requestSeat(brunoId);
+        accept(anaId);
+        accept(brunoId);
+        start();
+
+        markNoShow.execute(new PassengerRequestCommand(rideId.toHexString(), brunoId.toHexString(), DRIVER_UID));
+        assertThat(participant(brunoId).getStatus()).isEqualTo(ParticipantStatus.NO_SHOW);
+        assertThat(ride.getAvailableSeats()).isEqualTo(2);
+        verify(recordReputationPenalty).recordPassengerNoShow(brunoId.toHexString());
+
+        complete();
+
+        assertThat(ride.getStatus()).isEqualTo(RideStatus.COMPLETED);
+        assertThat(participant(anaId).getStatus()).isEqualTo(ParticipantStatus.COMPLETED);
+        assertThat(participant(brunoId).getStatus()).isEqualTo(ParticipantStatus.NO_SHOW);
+        assertThat(participant(brunoId).getFinalAmount()).isEqualByComparingTo(BigDecimal.ZERO);
+        assertThat(participant(brunoId).getPaymentStatus()).isEqualTo(ParticipantPaymentStatus.NOT_APPLICABLE);
+        assertError(ErrorCode.BAD_REQUEST, () -> chargeAs(DRIVER_UID, brunoId, BRUNO_FINAL_AMOUNT));
+    }
+
+    @Test
+    @DisplayName("Todos ausentes: concluir encerra a viagem como CANCELLED, sem valor final nem indicadores")
+    void shouldCancelWhenEveryPassengerIsAbsent() {
+        rideWithSeats(3);
+        requestSeat(anaId);
+        accept(anaId);
+        start();
+        markNoShow.execute(new PassengerRequestCommand(rideId.toHexString(), anaId.toHexString(), DRIVER_UID));
+
+        Ride result = complete();
+
+        assertThat(result.getStatus()).isEqualTo(RideStatus.CANCELLED);
+        assertThat(result.getCompletedAt()).isNull();
+        verify(rideCostCalculator, never()).calculateFinalShares(any());
+        assertError(ErrorCode.BAD_REQUEST, () -> chargeAs(DRIVER_UID, anaId, ANA_FINAL_AMOUNT));
+    }
+
+    @Test
+    @DisplayName("Não dá para concluir uma viagem que ainda não começou")
+    void shouldNotCompleteBeforeStarting() {
+        rideWithSeats(3);
+        requestSeat(anaId);
+        accept(anaId);
+
+        assertError(ErrorCode.BAD_REQUEST, this::complete);
+
+        assertThat(ride.getStatus()).isEqualTo(RideStatus.CONFIRMED);
+        verify(rideCostCalculator, never()).calculateFinalShares(any());
+        verify(completionPublisher, never()).publish(any());
+    }
+
+    @Test
+    @DisplayName("Concluir duas vezes falha na segunda e não recalcula valores nem indicadores")
+    void shouldNotCompleteTwice() {
+        startedRideWithAna();
+        complete();
+
+        assertError(ErrorCode.BAD_REQUEST, this::complete);
+
+        verify(rideCostCalculator, times(1)).calculateFinalShares(any());
+        verify(completionPublisher, times(1)).publish(any());
+    }
+
+    @Test
+    @DisplayName("Passageiro não consegue concluir nem iniciar a viagem: para ele, ela 'não existe'")
+    void shouldNotLetPassengerStartOrComplete() {
+        rideWithSeats(3);
+        requestSeat(anaId);
+        accept(anaId);
+
+        assertError(ErrorCode.RIDE_NOT_FOUND, () -> startRide.execute(rideRef(ANA_UID)));
+        start();
+        assertError(ErrorCode.RIDE_NOT_FOUND, () -> completeRide.execute(rideRef(ANA_UID)));
+
+        assertThat(ride.getStatus()).isEqualTo(RideStatus.IN_PROGRESS);
+    }
+
+    @Test
+    @DisplayName("Depois de concluída, a viagem não volta a iniciar, não marca ausência e não pode ser cancelada")
+    void shouldFreezeRideAfterCompletion() {
+        startedRideWithAna();
+        complete();
+
+        assertError(ErrorCode.BAD_REQUEST, this::start);
+        assertError(ErrorCode.BAD_REQUEST, () -> markNoShow.execute(
+                new PassengerRequestCommand(rideId.toHexString(), anaId.toHexString(), DRIVER_UID)));
+        assertError(ErrorCode.BAD_REQUEST, () -> cancelRide.execute(cancelAs(DRIVER_UID)));
+        assertError(ErrorCode.BAD_REQUEST, () -> leaveRide.execute(cancelAs(ANA_UID)));
+
+        assertThat(ride.getStatus()).isEqualTo(RideStatus.COMPLETED);
+    }
+
+    @Test
+    @DisplayName("Passageiro que desiste antes da saída devolve a vaga e a viagem não pode mais iniciar")
+    void shouldReturnSeatWhenOnlyPassengerLeaves() {
+        rideWithSeats(3);
+        requestSeat(anaId);
+        accept(anaId);
+        assertThat(ride.getAvailableSeats()).isEqualTo(2);
+
+        leaveRide.execute(cancelAs(ANA_UID));
+
+        assertThat(participant(anaId).getStatus()).isEqualTo(ParticipantStatus.CANCELLED);
+        assertThat(ride.getAvailableSeats()).isEqualTo(3);
+        assertThat(ride.getStatus()).isEqualTo(RideStatus.AWAITING_CONFIRMATION);
+        assertError(ErrorCode.BAD_REQUEST, this::start);
+    }
+
+    @Test
+    @DisplayName("Motorista cancela antes da saída: passageiros cancelados e a viagem não inicia mais")
+    void shouldCancelRideAndItsPassengers() {
+        rideWithSeats(3);
+        requestSeat(anaId);
+        accept(anaId);
+
+        cancelRide.execute(cancelAs(DRIVER_UID));
+
+        assertThat(ride.getStatus()).isEqualTo(RideStatus.CANCELLED);
+        assertThat(participant(anaId).getStatus()).isEqualTo(ParticipantStatus.CANCELLED);
+        assertError(ErrorCode.BAD_REQUEST, this::start);
+        assertError(ErrorCode.BAD_REQUEST, this::complete);
+    }
+
+    @Test
+    @DisplayName("Uma viagem em andamento não pode ser cancelada nem abandonada pelo passageiro")
+    void shouldNotCancelOrLeaveRideInProgress() {
+        startedRideWithAna();
+
+        assertError(ErrorCode.BAD_REQUEST, () -> cancelRide.execute(cancelAs(DRIVER_UID)));
+        assertError(ErrorCode.BAD_REQUEST, () -> leaveRide.execute(cancelAs(ANA_UID)));
+
+        assertThat(ride.getStatus()).isEqualTo(RideStatus.IN_PROGRESS);
+    }
+
+    @Test
+    @DisplayName("Carro lotado: com a única vaga ocupada, o segundo passageiro não entra")
+    void shouldNotTakeSecondPassengerWhenFull() {
+        rideWithSeats(1);
+        requestSeat(anaId);
+        accept(anaId);
+
+        assertThat(ride.isFull()).isTrue();
+        assertThrows(ApplicationException.class, () -> requestSeat(brunoId));
+    }
+
+    @Test
+    @DisplayName("Pedido ainda pendente na hora da saída é recusado automaticamente e não conclui")
+    void shouldRejectPendingRequestOnStartAndKeepItOutOfCompletion() {
+        rideWithSeats(3);
+        requestSeat(anaId);
+        requestSeat(brunoId);
+        accept(anaId);
+
+        start();
+        complete();
+
+        assertThat(participant(brunoId).getStatus()).isEqualTo(ParticipantStatus.REJECTED);
+        assertThat(participant(anaId).getStatus()).isEqualTo(ParticipantStatus.COMPLETED);
+    }
+
+    // ------------------------------------------------------------------ passos
+
+    /** Faz o uid corresponder a um usuário com o id dado. */
+    private void loggedUser(String uid, ObjectId id) {
+        User user = mock(User.class);
+        when(user.getId()).thenReturn(id);
+        when(userUtils.getCurrentUser(uid)).thenReturn(user);
+    }
+
+    /** Cria a viagem do motorista para amanhã, com as vagas dadas, e a deixa disponível no repositório. */
+    private void rideWithSeats(int seats) {
+        LocalDateTime departure = LocalDateTime.now().plusDays(1);
+        ride = new Ride(
+                1,
+                driverId.toHexString(),
+                "vehicle-sim",
+                new VehicleSnapshot("Volkswagen Gol", "SIM1A23", VehicleType.HATCH, "Prata"),
+                "route-motorista",
+                place("Rua Barão de Jaguara, 1000"),
+                place("PUC-Campinas Campus I"),
+                departure,
+                departure.plusMinutes(40),
+                Set.of(departure.getDayOfWeek()),
+                seats,
+                null,
+                null
+        );
+        when(rideRepository.findById(rideId)).thenReturn(Optional.of(ride));
+    }
+
+    /** Atalho: viagem de 3 vagas com a Ana pedindo vaga, aceita e a viagem já iniciada. */
+    private void startedRideWithAna() {
+        rideWithSeats(3);
+        requestSeat(anaId);
+        accept(anaId);
+        start();
+    }
+
+    // O pedido de vaga entra direto no domínio: o caso de uso dele depende de trajetos e veículo,
+    // e já tem testes próprios em RequestRideSeatUseCaseTest.
+    private void requestSeat(ObjectId passengerId) {
+        ride.requestSeat(passengerId.toHexString(), "route-" + passengerId.toHexString(),
+                place("Rua do passageiro"), place("PUC-Campinas Campus I"));
+    }
+
+    /** O motorista aceita o pedido do passageiro. */
+    private void accept(ObjectId passengerId) {
+        acceptPassenger.execute(new PassengerRequestCommand(rideId.toHexString(), passengerId.toHexString(), DRIVER_UID));
+    }
+
+    // "Iniciar trajeto" só vale perto do horário: a viagem passa a sair agora
+    private void start() {
+        ReflectionTestUtils.setField(ride, "departureDateTime", LocalDateTime.now());
+        startRide.execute(rideRef(DRIVER_UID));
+    }
+
+    /** O motorista encerra a viagem. */
+    private Ride complete() {
+        return completeRide.execute(rideRef(DRIVER_UID));
+    }
+
+    /** "Solicitar pagamento" com o valor dado, feito por quem está logado com o uid. */
+    private PaymentResponseDTO chargeAs(String uid, ObjectId passengerId, BigDecimal amount) {
+        return requestPayment.execute(new RequestPaymentCommand(
+                rideId.toHexString(), passengerId.toHexString(), uid, new RequestPaymentRequestDTO(amount)));
+    }
+
+    /** Referência à cobrança de um passageiro, pedida por quem está logado com o uid. */
+    private PassengerRequestCommand paymentRef(String uid, ObjectId passengerId) {
+        return new PassengerRequestCommand(rideId.toHexString(), passengerId.toHexString(), uid);
+    }
+
+    /** Referência à viagem, pedida por quem está logado com o uid. */
+    private RideRefCommand rideRef(String uid) {
+        return new RideRefCommand(rideId.toHexString(), uid);
+    }
+
+    /** Cancelamento da viagem por quem está logado com o uid. */
+    private CancelRideCommand cancelAs(String uid) {
+        return new CancelRideCommand(rideId.toHexString(), uid, new CancelRideRequestDTO("Simulação"));
+    }
+
+    /** Participação do usuário na viagem; falha se ele não estiver nela. */
+    private Participant participant(ObjectId userId) {
+        return ride.getParticipants().stream()
+                .filter(participant -> participant.getUserId().equals(userId.toHexString()))
+                .findFirst()
+                .orElseThrow();
+    }
+
+    /** Lugar em Campinas com o endereço dado. */
+    private Place place(String address) {
+        return Place.of(address, "Centro", "Campinas", new Coordinates(-22.9064, -47.0616));
+    }
+
+    /** Confere que a ação é recusada com o código de erro esperado. */
+    private void assertError(ErrorCode expected, Executable action) {
+        ApplicationException error = assertThrows(ApplicationException.class, action);
+        assertThat(error.getError().code()).isEqualTo(expected);
+    }
+}

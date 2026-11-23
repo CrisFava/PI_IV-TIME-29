@@ -1,0 +1,276 @@
+# Scripts de desenvolvimento
+
+Ferramentas para testar o Converge sem precisar sair de casa nem fazer cadastros na mão.
+
+| Script | Para que serve |
+| :-- | :-- |
+| `run_servers.py` | Abre dois terminais: o servidor de sockets e, em seguida, o backend com o `.env` carregado |
+| `verificar_usuario.py` | Marca a CNH e o vínculo acadêmico de um usuário como `VERIFIED`, buscando pelo e-mail |
+| `verificar_todos_usuarios.py` | Faz o mesmo para todos os usuários do banco de uma vez |
+| `simular_corrida.py` | Percorre corridas inteiras contra o backend rodando e confere cada resposta |
+| `teste_no_app.py` | Teste manual no app com 3 robôs: primeiro eles pedem vaga na sua carona, depois um deles dirige e os outros vão junto |
+
+Os testes **mockados** (sem banco e sem API) ficam no backend, em
+`app/converge-backend/src/test/java/com/converge/api/modules/ride/application/RideJourneyTest.java`.
+Veja a seção [Testes mockados](#testes-mockados) no fim.
+
+---
+
+## Preparação (uma vez)
+
+Precisa de **Python 3.9+**.
+
+```bash
+# Na raiz do repositório
+python3 -m venv scripts/.venv
+
+# macOS / Linux
+source scripts/.venv/bin/activate
+# Windows (PowerShell)
+scripts\.venv\Scripts\Activate.ps1
+
+python -m pip install -r scripts/requirements.txt
+```
+
+Depois disso, não precisa ativar o venv toda vez: se o `python3` do sistema não tiver o `pymongo`,
+os scripts se reabrem sozinhos com o Python de `scripts/.venv`.
+
+Os dois scripts leem a conexão do Mongo do `app/converge-backend/.env`, o mesmo arquivo do backend.
+Nada mais precisa ser configurado.
+
+| Variável | Para quê | Padrão |
+| :-- | :-- | :-- |
+| `MONGODB_CONNECTION_STRING` | Conexão com o Atlas | lida do `.env` |
+| `MONGODB_DATABASE_NAME` | Banco usado | `converge-dev`, igual ao perfil `dev` do backend |
+| `FIREBASE_API_KEY` | Chave para criar as contas de teste | lida de `app/converge/lib/firebase_options.dart` |
+
+Variável definida no terminal tem prioridade sobre o `.env`. Os dois scripts **se recusam a mexer
+em banco com `prod` no nome**.
+
+---
+
+## `run_servers.py`
+
+Sobe o ambiente do backend em dois terminais novos, na ordem certa: primeiro o servidor de
+sockets (`app/server`), depois o Spring (`app/converge-backend`) com as variáveis do `.env`.
+Não precisa do venv. Funciona no Windows (cmd), no macOS (Terminal) e no Linux (gnome-terminal,
+konsole ou xterm).
+
+- Antes de tudo, instala o `app/server` no Maven local (`mvnw install -DskipTests`). O backend
+  compila contra as classes dele; com um jar antigo em `~/.m2`, ele não compila ou usa um cálculo
+  desatualizado (por exemplo, o rateio antigo).
+- Só abre o backend quando a porta 3000 do servidor de sockets responde (espera até 3 min).
+- Servidor que já está no ar não é aberto de novo: com a porta 3000 ou 8080 ocupada, usa o que
+  está rodando. Para subir com o código atual, pare o servidor antes.
+- O `.env` é lido dentro do terminal novo, então as variáveis chegam ao Spring em qualquer sistema.
+
+```bash
+python scripts/run_servers.py
+```
+
+---
+
+## `verificar_usuario.py`
+
+O backend ainda não tem tela nem endpoint para aprovar documentos: todo cadastro nasce com o
+vínculo acadêmico `PENDING` e a CNH `UNDER_REVIEW`. Sem os dois `VERIFIED`, ninguém oferece nem
+pede carona. Este script faz essa aprovação direto no banco.
+
+```bash
+python scripts/verificar_usuario.py aluno@puccampinas.edu.br                  # CNH e vínculo
+python scripts/verificar_usuario.py aluno@puccampinas.edu.br --somente cnh
+python scripts/verificar_usuario.py aluno@puccampinas.edu.br --somente estudante
+python scripts/verificar_usuario.py aluno@puccampinas.edu.br --banco converge-testes
+```
+
+- Aceita tanto o e-mail da conta quanto o institucional, sem diferenciar maiúsculas.
+- Mostra o status de antes e de depois.
+- Avisa quando a pessoa ainda não mandou a CNH, e quando a CNH já venceu. Nesse caso ela fica
+  `VERIFIED` no banco, mas o backend continua tratando como `EXPIRED`.
+- Retorna `0` se alterou, `1` se não achou o usuário ou não havia o que alterar, `2` se faltou
+  configuração.
+
+---
+
+## `verificar_todos_usuarios.py`
+
+Versão em lote do `verificar_usuario.py`: aprova a CNH e o vínculo acadêmico de **todos** os
+usuários do banco. Usa as mesmas funções e a mesma configuração do script individual.
+
+```bash
+python scripts/verificar_todos_usuarios.py                         # CNH e vínculo de todos
+python scripts/verificar_todos_usuarios.py --somente estudante
+python scripts/verificar_todos_usuarios.py --simular                # só mostra, não grava
+python scripts/verificar_todos_usuarios.py --sem-confirmar          # não pergunta antes de gravar
+python scripts/verificar_todos_usuarios.py --banco converge-testes
+```
+
+- Lista cada usuário que vai mudar, com o status de antes e os avisos (CNH vencida etc.).
+- Pede confirmação (`s`/`N`) antes de gravar, a não ser com `--sem-confirmar`.
+- Não mexe no que já está `VERIFIED`, então o `verifiedAt` original fica como estava.
+- Quem ainda não mandou a CNH só tem o vínculo acadêmico verificado.
+- Retorna `0` se alterou (ou simulou), `1` se não havia o que alterar ou foi cancelado, `2` se
+  faltou configuração.
+
+---
+
+## `teste_no_app.py`
+
+Para testar a corrida **no app** com a sua conta. O script cria 3 robôs (Ana, Bruno e Carla) que
+fazem a outra ponta da corrida pela API, em duas fases:
+
+```bash
+python scripts/teste_no_app.py                                       # fase 1: vale qualquer carona nova
+python scripts/teste_no_app.py --motorista voce@puccampinas.edu.br   # fase 1: só a sua carona
+python scripts/teste_no_app.py --limpar 1123134501                   # apaga contas e dados da execução
+```
+
+**Fase 1: você é o motorista.**
+
+1. Publique no app uma carona Campus I → Campus II que sai **nos próximos 6 min** (`--janela`). O
+   pedido de vaga só vale até 5 min antes da saída, então publique rápido: com saída daqui a 6 min,
+   sobra cerca de 1 min para os robôs pedirem.
+2. Os 3 robôs pedem vaga assim que a carona aparece, ao mesmo tempo.
+3. No app: aceite os pedidos (expiram em 3 min sem resposta), inicie a viagem (a partir de 5 min
+   antes da saída), marque "Entrou", confirme a chegada de cada um e encerre. Cada robô informa o
+   pagamento ("Já paguei") alguns segundos depois de a cobrança chegar (`--pagar-depois`).
+4. Quando a fase acaba, o script espera um **Enter**. O Enter também pula a fase 1 a qualquer momento.
+
+**Fase 2: a Ana é a motorista.**
+
+1. A Ana publica uma carona Campus I → Campus II que sai daqui a 6 min (`--minutos`), com 3 vagas.
+2. Bruno e Carla pedem vaga, e a Ana aceita todos os pedidos, inclusive o seu se você pedir pelo app.
+3. **Enter**: a Ana inicia a viagem e marca "Entrou" para todos. Se a janela de início (5 min antes da
+   saída) ainda não abriu, ela espera abrir.
+4. **Enter** de novo: a Ana confirma a chegada de todos (o que emite as cobranças) e encerra a viagem.
+   Bruno e Carla informam o pagamento.
+
+- Os pontos de embarque dos robôs ficam a até 3 km do Campus I, e os de descida a até 3 km do
+  Campus II. O script confere essas distâncias antes de começar e avisa se a sua carona da fase 1
+  sai ou chega a mais de 3 km dos campi.
+- Sem `--motorista`, vale a primeira carona publicada por qualquer pessoa depois que o script começou.
+  No `converge-dev`, que é compartilhado, prefira passar o seu e-mail.
+- No fim, o script mostra o e-mail de cada robô (a senha é a da simulação) e o comando para apagar.
+- `--limpar <execução>` apaga as contas do Firebase e o que a execução gravou no Mongo (usuários,
+  trajetos, notificações, chaves de idempotência etc.). Viagens com gente de fora (a sua carona, ou a
+  da Ana se você foi junto) não são apagadas, e os robôs que aparecem nelas continuam em `users`.
+
+---
+
+## `simular_corrida.py`
+
+### O que ele faz
+
+Para cada cenário, cria pessoas novas e percorre a viagem **pela API de verdade**, do mesmo jeito
+que o app faria:
+
+1. cria as contas no Firebase (`sim.<execução>.<n>.<nome>@converge-sim.test`);
+2. cadastra cada pessoa em `POST /users` e aprova os documentos no Mongo (usa o `verificar_usuario.py`);
+3. cadastra o carro do motorista e os trajetos de oferta e de procura para **hoje**, saindo uns 7 min
+   depois de cada oferta. O pedido de vaga só vale até 5 min antes da saída e o "Iniciar trajeto" só de
+   5 min antes a 5 min depois, então cada cenário espera cerca de 2 min antes de iniciar a viagem;
+4. executa os passos do cenário e confere status, vagas, valores, PIX, avaliações e indicadores;
+5. no fim, apaga as contas do Firebase (a não ser que você use `--manter-contas`).
+
+Cada cenário cria as próprias pessoas, então eles não dependem uns dos outros.
+
+| Cenário | O que confere |
+| :-- | :-- |
+| `caminho-feliz` | matching acha o motorista, 2 pedidos na mesma viagem, aceite, início, conclusão (`COMPLETED`, `completedAt`, valor final ≤ teto), cobrança automática com PIX, "Já paguei" da passageira (`PAID`), avaliação (e a segunda é recusada) e indicadores |
+| `ausencia-parcial` | quem falta fica `NO_SHOW` e `NOT_APPLICABLE`, a vaga volta, os presentes concluem e cobrar o ausente é recusado |
+| `todos-ausentes` | sem ninguém presente, concluir vira `CANCELLED` |
+| `transicoes-invalidas` | concluir antes de iniciar, avaliar antes de concluir, passageira iniciar ou concluir, cancelar ou sair com a viagem andando, concluir duas vezes, iniciar ou marcar ausência depois de concluída |
+| `desistencia-cancelamento` | passageira sai antes da saída (vaga volta, não dá pra iniciar) e o motorista cancela com passageiro confirmado |
+| `lotacao-recusa` | pedido recusado não pode ser refeito e carro lotado não aceita mais ninguém |
+
+### Como rodar
+
+Suba o ambiente como no README principal: **servidor de sockets** e depois o **backend**.
+
+```bash
+python scripts/simular_corrida.py --listar                       # lista os cenários
+python scripts/simular_corrida.py                                # roda todos
+python scripts/simular_corrida.py --cenario caminho-feliz        # só um
+python scripts/simular_corrida.py --cenario todos-ausentes --cenario lotacao-recusa
+python scripts/simular_corrida.py --api http://10.0.2.2:8080/api/v1   # outra URL
+```
+
+A saída mostra cada passo. Quando um erro era esperado, ela mostra também a resposta da API:
+
+```text
+▶ transicoes-invalidas: Ações fora de hora ou feitas pela pessoa errada são recusadas
+    · Ana pede vaga
+    · Motorista aceita Ana
+    · Concluir antes de iniciar
+      recusado como esperado (HTTP 400 BAD_REQUEST Esta ação só vale para uma viagem em andamento.)
+    ...
+  ✔ passou
+
+Resultado: 6/6 cenário(s) passaram.
+```
+
+Se algum cenário falhar, ele mostra o passo e o motivo e o comando termina com código `1`.
+
+Linhas com `AVISO` não reprovam o cenário, mas indicam algo incompleto:
+
+- **custo total R$ 0**: a viagem saiu sem custo calculado, em geral porque o veículo não tem
+  consumo e preço da energia. Sem valor não há cobrança, e os passos de pagamento do cenário
+  falham. O rateio divide o custo só entre os passageiros, cada um limitado ao próprio teto
+  (o custo da rota com o desvio dele).
+- **indicadores sem a viagem**: o `CompletedRidesIndicatorReconciler` reprocessa em até 15 min.
+
+### Se a simulação cair no meio
+
+As contas do Firebase são apagadas no fim de cada execução. Se o script for interrompido (Ctrl+C,
+queda de rede), use o número que aparece no topo da saída (`Simulação 1113102523 | ...`) para
+apagar as contas que sobraram:
+
+```bash
+python scripts/simular_corrida.py --limpar 1113102523
+```
+
+### Ver a corrida no app
+
+Use `--manter-contas` para não apagar as contas no fim. O script imprime os e-mails, e a senha de
+todas é `Simulacao#2026`. Faça login no app com o motorista ou com um passageiro para ver a viagem,
+o chat e o pagamento na interface.
+
+### Qual banco usar
+
+A simulação **grava de verdade** no banco que o backend está usando: pessoas com e-mail `sim.<execução>...@converge-sim.test`, carros,
+trajetos, viagens, avaliações e indicadores. O ideal é usar um banco só para isso, passando o mesmo
+nome para o backend e para o script:
+
+```bash
+# Terminal do backend
+MONGODB_DATABASE_NAME=converge-sim ./mvnw spring-boot:run
+
+# Terminal do script
+MONGODB_DATABASE_NAME=converge-sim python scripts/simular_corrida.py
+```
+
+No Windows (PowerShell), defina a variável antes de cada comando com `$env:MONGODB_DATABASE_NAME="converge-sim"`.
+
+Se o script e o backend estiverem em bancos diferentes, a simulação para logo no começo com
+"não apareceu no Mongo: o script e o backend estão no mesmo banco?".
+
+---
+
+## Testes mockados
+
+`RideJourneyTest` monta os casos de uso reais da viagem e troca só a infraestrutura por mocks:
+banco, cálculo de custos, PIX e indicadores. Ele cobre os mesmos fluxos da simulação, mas roda em
+menos de um segundo, sem backend, sem Mongo e sem Firebase. Ele também entra no `mvn test`
+normal.
+
+```bash
+cd app/converge-backend
+./mvnw test -Dtest=RideJourneyTest        # Windows: .\mvnw.cmd test -Dtest=RideJourneyTest
+```
+
+Qual usar:
+
+- **Mudou regra de negócio da viagem?** Rode o `RideJourneyTest` (e o `mvn test` completo). É rápido e não depende de nada.
+- **Quer saber se o sistema inteiro funciona junto?** Use o `simular_corrida.py`. Ele cobre o que o
+  teste mockado não alcança: controllers, segurança, serialização JSON, Mongo, servidor de sockets e
+  Firebase.

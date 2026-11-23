@@ -1,0 +1,56 @@
+// Autor: Gustavo Alves de Siqueira Costa - RA 25001650
+
+package com.converge.api.modules.route.application;
+
+import com.converge.api.modules.route.application.dto.UpdateRouteCommand;
+import com.converge.api.modules.route.application.dto.UpdateRouteRequestDTO;
+import com.converge.api.modules.route.application.gateway.RouteGeometry;
+import com.converge.api.modules.route.application.mapper.RouteMapper;
+import com.converge.api.modules.route.domain.model.Route;
+import com.converge.api.modules.route.domain.repository.RouteRepository;
+import com.converge.api.modules.route.application.event.RouteChangedEvent;
+import com.converge.api.shared.application.UseCase;
+import lombok.RequiredArgsConstructor;
+import org.springframework.context.ApplicationEventPublisher;
+import org.springframework.stereotype.Service;
+
+import java.time.LocalDateTime;
+
+@Service
+@RequiredArgsConstructor
+public class UpdateRouteUseCase implements UseCase<UpdateRouteCommand, Route> {
+
+    private final RouteAccess routeAccess;
+    private final RouteRepository routeRepository;
+    private final RouteMapper routeMapper;
+    private final RouteGeometryService routeGeometryService;
+    private final ApplicationEventPublisher eventPublisher;
+    private final OfferOverlapValidator offerOverlapValidator;
+
+    @Override
+    public Route execute(UpdateRouteCommand command) {
+        Route route = routeAccess.getOwnedRoute(command.routeId(), command.userId());
+        UpdateRouteRequestDTO request = command.request();
+        route.update(
+            request.vehicleId(), 
+            routeMapper.toPlace(request.origin()), 
+            routeMapper.toPlace(request.destination()), 
+            request.departureTime(),
+            request.estimatedArrivalTime(), 
+            request.weekDays(), 
+            request.maxDetourKm(), 
+            request.totalSeats(),
+            request.toll(),
+            request.parking()
+        );
+
+        RouteGeometry geometry = routeGeometryService.compute(route.getOrigin(), route.getDestination());
+        route.defineGeometry(geometry.distanceKm(), geometry.encodedPolyline(), geometry.durationMinutes());
+        // Depois da nova chegada estimada: o horário editado não pode se sobrepor a outra carona
+        offerOverlapValidator.validate(route, LocalDateTime.now(RouteAccess.APP_ZONE));
+
+        Route saved = routeRepository.save(route);
+        eventPublisher.publishEvent(new RouteChangedEvent(command.routeId()));
+        return saved;
+    }
+}

@@ -1,0 +1,19 @@
+// Autor: Allan Giovanni Matias Paes - RA 25008211
+
+package com.converge.api.shared.infrastructure.exception;
+
+
+import com.converge.api.shared.presentation.exception.ErrorCode;
+
+import java.util.Set;
+
+// Formato de resposta de erro
+public record ErrorResponse(
+    ErrorCode code,
+    String message,
+    Set<String> fields
+) {
+    public ErrorResponse(ErrorCode code, String message){
+        this(code, message, Set.of());
+    }
+}

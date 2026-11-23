@@ -1,0 +1,180 @@
+// Autor: Gustavo Alves de Siqueira Costa - RA 25001650
+
+package com.converge.api.modules.route.application;
+
+import com.converge.api.modules.ride.application.PendingPaymentGuard;
+import com.converge.api.modules.route.application.dto.CreateRouteCommand;
+import com.converge.api.modules.route.application.dto.CreateRouteRequestDTO;
+import com.converge.api.modules.route.application.dto.PlaceRequestDTO;
+import com.converge.api.modules.route.application.mapper.RouteMapper;
+import com.converge.api.modules.route.domain.enums.RouteStatus;
+import com.converge.api.modules.route.domain.enums.RouteType;
+import com.converge.api.modules.route.domain.model.Route;
+import com.converge.api.modules.route.domain.model.subtypes.Coordinates;
+import com.converge.api.modules.route.domain.model.subtypes.Place;
+import com.converge.api.modules.route.domain.repository.RouteRepository;
+import com.converge.api.shared.presentation.exception.ApplicationException;
+import com.converge.api.shared.presentation.exception.ErrorCode;
+import org.junit.jupiter.api.BeforeEach;
+import org.junit.jupiter.api.DisplayName;
+import org.junit.jupiter.api.Test;
+import org.junit.jupiter.api.extension.ExtendWith;
+import org.mockito.Mock;
+import org.mockito.junit.jupiter.MockitoExtension;
+
+import java.time.DayOfWeek;
+import java.util.List;
+import java.util.Set;
+
+import static org.assertj.core.api.Assertions.assertThat;
+import static org.junit.jupiter.api.Assertions.assertThrows;
+import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.ArgumentMatchers.anyCollection;
+import static org.mockito.ArgumentMatchers.anyString;
+import static org.mockito.ArgumentMatchers.eq;
+import static org.mockito.ArgumentMatchers.isNull;
+import static org.mockito.Mockito.doThrow;
+import static org.mockito.Mockito.never;
+import static org.mockito.Mockito.verify;
+import static org.mockito.Mockito.when;
+
+/**
+ * Testes unitários para {@link CreateRouteUseCase}.
+ * Valida cenários como: Deve salvar o trajeto com o dono vindo do command; Com o pagamento de uma carona em aberto, não dá para cadastrar trajeto, de oferta ou de procura; Deve consultar duplicados com os dados do trajeto.
+ * <p>
+ * Os métodos de teste estão bem explicativos através de suas anotações {@code @DisplayName}.
+ */
+@ExtendWith(MockitoExtension.class)
+class CreateRouteUseCaseTest {
+
+    @Mock
+    private RouteRepository routeRepository;
+
+    @Mock
+    private PendingPaymentGuard pendingPaymentGuard;
+
+    private CreateRouteUseCase createRouteUseCase;
+
+    @BeforeEach
+    void setUp() {
+        createRouteUseCase = new CreateRouteUseCase(
+                routeRepository, new RouteMapper(), new RouteGeometryService(new FakeMapsGateway(), new FakeDistanceGateway()),
+                new OfferOverlapValidator(routeRepository),
+                pendingPaymentGuard
+        );
+    }
+
+    private CreateRouteCommand offerCommand() {
+        CreateRouteRequestDTO request = new CreateRouteRequestDTO(
+                RouteType.OFFER,
+                "vehicle-456",
+                new PlaceRequestDTO("Rua Barão de Jaguara, 1000", "Centro", "Campinas", -22.9056, -47.0608),
+                new PlaceRequestDTO("Rod. Dom Pedro I, km 136", null, "Campinas", -22.8337, -47.0524),
+                "07:00",
+                "07:40",
+                Set.of(DayOfWeek.MONDAY, DayOfWeek.FRIDAY), null, null,
+                2.0,
+                3,
+                null,
+                null
+        );
+        return new CreateRouteCommand("user-123", request);
+    }
+
+    private void noDuplicate() {
+        when(routeRepository.existsLiveDuplicate(
+                anyString(), any(), anyString(), anyString(), anyString(), any(), anyCollection(), anyCollection()
+        )).thenReturn(false);
+    }
+
+    @Test
+    @DisplayName("Deve salvar o trajeto com o dono vindo do command")
+    void shouldCreateRoute() {
+        noDuplicate();
+        when(routeRepository.save(any(Route.class))).thenAnswer(invocation -> invocation.getArgument(0));
+
+        Route route = createRouteUseCase.execute(offerCommand());
+
+        assertThat(route.getUserId()).isEqualTo("user-123");
+        assertThat(route.getType()).isEqualTo(RouteType.OFFER);
+        assertThat(route.getRouteDistanceKm()).isEqualTo(FakeMapsGateway.GOOGLE_ROUTE.distanceKm());
+        assertThat(route.getEncodedPolyline()).isEqualTo(FakeMapsGateway.GOOGLE_ROUTE.encodedPolyline());
+        verify(routeRepository).save(route);
+    }
+
+    @Test
+    @DisplayName("Com o pagamento de uma carona em aberto, não dá para cadastrar trajeto, de oferta ou de procura")
+    void shouldRejectRouteWithPendingPayment() {
+        doThrow(new ApplicationException(ErrorCode.PAYMENT_PENDING, "Pagamento em aberto."))
+                .when(pendingPaymentGuard).ensureNoPendingPayment("user-123");
+
+        ApplicationException exception = assertThrows(ApplicationException.class,
+                () -> createRouteUseCase.execute(offerCommand()));
+
+        assertThat(exception.getError().code()).isEqualTo(ErrorCode.PAYMENT_PENDING);
+        verify(routeRepository, never()).save(any(Route.class));
+    }
+
+    @Test
+    @DisplayName("Deve consultar duplicados com os dados do trajeto")
+    void shouldCheckDuplicatesWithRouteData() {
+        noDuplicate();
+        when(routeRepository.save(any(Route.class))).thenAnswer(invocation -> invocation.getArgument(0));
+
+        createRouteUseCase.execute(offerCommand());
+
+        verify(routeRepository).existsLiveDuplicate(
+                eq("user-123"),
+                eq(RouteType.OFFER),
+                eq("Rua Barão de Jaguara, 1000"),
+                eq("Rod. Dom Pedro I, km 136"),
+                eq("07:00"),
+                isNull(),
+                eq(Set.of(DayOfWeek.MONDAY, DayOfWeek.FRIDAY)),
+                anyCollection()
+        );
+    }
+
+    @Test
+    @DisplayName("Motorista não cria uma carona que se sobrepõe a outra no mesmo dia")
+    void shouldRejectOfferOverlappingAnother() {
+        noDuplicate();
+        when(routeRepository.save(any(Route.class))).thenAnswer(invocation -> invocation.getArgument(0));
+        Place elsewhere = Place.of("Outro endereço", null, "Campinas", new Coordinates(-22.90, -47.06));
+
+        // A nova vai das 07:00 às 07:40. Uma das 06:30 às 07:10 ainda está em andamento
+        Route stillDriving = new Route("user-123", "vehicle-456", RouteType.OFFER, elsewhere, elsewhere,
+                "06:30", "07:10", Set.of(DayOfWeek.MONDAY), 2.0, 3);
+        when(routeRepository.findByUserIdAndStatusNot("user-123", RouteStatus.INACTIVE))
+                .thenReturn(List.of(stillDriving));
+
+        ApplicationException ex = assertThrows(ApplicationException.class,
+                () -> createRouteUseCase.execute(offerCommand()));
+        assertThat(ex.getError().code()).isEqualTo(ErrorCode.ROUTE_ALREADY_EXISTS);
+        assertThat(ex.getError().message()).contains("06:30").contains("07:10");
+
+        // Uma que sai às 07:40, quando a nova chega, não se sobrepõe (ex.: a volta)
+        Route afterArrival = new Route("user-123", "vehicle-456", RouteType.OFFER, elsewhere, elsewhere,
+                "07:40", "08:20", Set.of(DayOfWeek.MONDAY), 2.0, 3);
+        when(routeRepository.findByUserIdAndStatusNot("user-123", RouteStatus.INACTIVE))
+                .thenReturn(List.of(afterArrival));
+
+        assertThat(createRouteUseCase.execute(offerCommand()).getDepartureTime()).isEqualTo("07:00");
+    }
+
+    @Test
+    @DisplayName("Deve lançar ROUTE_ALREADY_EXISTS e não salvar quando já houver trajeto igual ativo")
+    void shouldRejectDuplicatedRoute() {
+        when(routeRepository.existsLiveDuplicate(
+                anyString(), any(), anyString(), anyString(), anyString(), any(), anyCollection(), anyCollection()
+        )).thenReturn(true);
+
+        ApplicationException ex = assertThrows(
+                ApplicationException.class,
+                () -> createRouteUseCase.execute(offerCommand())
+        );
+
+        assertThat(ex.getError().code()).isEqualTo(ErrorCode.ROUTE_ALREADY_EXISTS);
+        verify(routeRepository, never()).save(any());
+    }
+}

@@ -1,0 +1,26 @@
+// Autor: Gustavo Alves de Siqueira Costa - RA 25001650
+
+package com.converge.api.modules.route.application.dto;
+
+import jakarta.annotation.Nullable;
+import jakarta.validation.constraints.NotBlank;
+import jakarta.validation.constraints.NotNull;
+
+// Dados de requisição para cadastro de endereço e coordenadas de um local
+public record PlaceRequestDTO(
+        @NotBlank(message = "Informe o endereço.")
+        String address,
+
+        @Nullable
+        String neighborhood,
+
+        @NotBlank(message = "Informe a cidade.")
+        String city,
+
+        @NotNull(message = "Informe a latitude do endereço.")
+        Double latitude,
+
+        @NotNull(message = "Informe a longitude do endereço.")
+        Double longitude
+) {
+}

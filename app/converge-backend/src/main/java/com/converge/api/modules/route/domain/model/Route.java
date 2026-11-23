@@ -1,0 +1,430 @@
+// Autor: Gustavo Alves de Siqueira Costa - RA 25001650
+
+package com.converge.api.modules.route.domain.model;
+
+import com.converge.api.modules.route.domain.enums.RecurrenceType;
+import com.converge.api.modules.route.domain.enums.RouteStatus;
+import com.converge.api.modules.route.domain.enums.RouteType;
+import com.converge.api.modules.route.domain.model.subtypes.Place;
+import com.converge.api.shared.presentation.exception.ApplicationException;
+import com.converge.api.shared.presentation.exception.ErrorCode;
+import jakarta.annotation.Nullable;
+import jakarta.validation.Valid;
+import jakarta.validation.constraints.NotBlank;
+import jakarta.validation.constraints.NotEmpty;
+import jakarta.validation.constraints.NotNull;
+import jakarta.validation.constraints.Pattern;
+import lombok.AccessLevel;
+import lombok.EqualsAndHashCode;
+import lombok.Getter;
+import lombok.NoArgsConstructor;
+import org.bson.types.ObjectId;
+import org.springframework.data.annotation.CreatedDate;
+import org.springframework.data.annotation.Id;
+import org.springframework.data.annotation.LastModifiedDate;
+import org.springframework.data.mongodb.core.index.Indexed;
+import org.springframework.data.mongodb.core.mapping.Document;
+
+import java.time.DayOfWeek;
+import java.time.LocalDate;
+import java.time.LocalDateTime;
+import java.time.LocalTime;
+import java.time.format.DateTimeFormatter;
+import java.util.ArrayList;
+import java.util.HashSet;
+import java.util.List;
+import java.util.Set;
+import java.math.BigDecimal;
+import java.math.RoundingMode;
+
+@Document(collection = "routes")
+@NoArgsConstructor(access = AccessLevel.PROTECTED)
+@Getter
+@EqualsAndHashCode(onlyExplicitlyIncluded = true)
+public class Route {
+
+    private static final String TIME_PATTERN = "^([01]\\d|2[0-3]):[0-5]\\d$";
+
+    // Tempo mínimo considerado para uma viagem ao checar se duas caronas se sobrepõem
+    // (rota muito curta ou chegada estimada sem o Google)
+    public static final int MIN_TRIP_MINUTES = 15;
+
+    private static final int MINUTES_PER_DAY = 24 * 60;
+
+    @Id
+    @EqualsAndHashCode.Include
+    private ObjectId id;
+
+    @NotBlank
+    @Indexed
+    private String userId;
+
+    @Nullable
+    private String vehicleId;
+
+    @NotNull
+    @Indexed
+    private RouteType type;
+
+    @NotNull
+    @Valid
+    private Place origin;
+
+    @NotNull
+    @Valid
+    private Place destination;
+
+    @NotBlank
+    @Pattern(regexp = TIME_PATTERN)
+    private String departureTime;
+
+    @NotBlank
+    @Pattern(regexp = TIME_PATTERN)
+    private String estimatedArrivalTime;
+
+    // Sem final: o Spring Data não preenche campo final ao ler do Mongo, e os dias voltavam vazios.
+    @NotEmpty
+    @Indexed
+    private Set<DayOfWeek> weekDays = new HashSet<>();
+
+    // ONCE: vale só na data; WEEKLY: toda semana nos weekDays.
+    // Trajetos gravados antes deste campo existir ficam com o padrão WEEKLY.
+    @NotNull
+    private RecurrenceType recurrence = RecurrenceType.WEEKLY;
+
+    // Data do trajeto ONCE (weekDays fica só com o dia dela). Null no WEEKLY.
+    @Nullable
+    @Indexed
+    private LocalDate date;
+
+    @Nullable
+    private Double maxDetourKm;
+
+    @Nullable 
+    private BigDecimal toll;
+
+    @Nullable 
+    private BigDecimal parking;
+
+    @Nullable
+    private Integer totalSeats;
+
+    @Nullable
+    private Integer availableSeats;
+
+    @Nullable
+    private Double routeDistanceKm;
+
+    // Desenho do caminho no formato do Google; null quando a distância veio do
+    // Haversine
+    @Nullable
+    private String encodedPolyline;
+
+    @NotNull
+    @Indexed
+    private RouteStatus status = RouteStatus.ACTIVE;
+
+    @CreatedDate
+    private LocalDateTime createdAt;
+
+    @LastModifiedDate
+    private LocalDateTime updatedAt;
+
+    public Route(
+            String userId,
+            @Nullable String vehicleId,
+            RouteType type,
+            Place origin,
+            Place destination,
+            String departureTime,
+            String estimatedArrivalTime,
+            Set<DayOfWeek> weekDays,
+            @Nullable Double maxDetourKm,
+            @Nullable Integer totalSeats,
+            @Nullable BigDecimal toll,
+            @Nullable BigDecimal parking) {
+        this.userId = userId;
+        this.type = type;
+
+        this.applyTripData(
+                vehicleId, origin, destination, departureTime, estimatedArrivalTime, weekDays, maxDetourKm, totalSeats, toll, parking);
+    }
+
+    // Sem pedágio e estacionamento: num OFFER eles valem 0.00
+    public Route(
+            String userId,
+            @Nullable String vehicleId,
+            RouteType type,
+            Place origin,
+            Place destination,
+            String departureTime,
+            String estimatedArrivalTime,
+            Set<DayOfWeek> weekDays,
+            @Nullable Double maxDetourKm,
+            @Nullable Integer totalSeats) {
+        this(userId, vehicleId, type, origin, destination, departureTime, estimatedArrivalTime, weekDays,
+                maxDetourKm, totalSeats, null, null);
+    }
+
+    public Set<DayOfWeek> getWeekDays() {
+        return Set.copyOf(this.weekDays);
+    }
+
+    public boolean isOwnedBy(String userId) {
+        return this.userId.equals(userId);
+    }
+
+    public void update(
+            @Nullable String vehicleId,
+            Place origin,
+            Place destination,
+            String departureTime,
+            String estimatedArrivalTime,
+            Set<DayOfWeek> weekDays,
+            @Nullable Double maxDetourKm,
+            @Nullable Integer totalSeats,
+            @Nullable BigDecimal toll,
+            @Nullable BigDecimal parking) {
+        if (this.status == RouteStatus.INACTIVE) {
+            throw new ApplicationException(ErrorCode.ROUTE_NOT_FOUND, "Route not found.");
+        }
+
+        this.applyTripData(
+                vehicleId, origin, destination, departureTime, estimatedArrivalTime, weekDays, maxDetourKm, totalSeats, toll, parking);
+
+        // A carona de um dia só continua no dia da sua data, mesmo que outros dias venham na edição
+        if (getRecurrence() == RecurrenceType.ONCE && this.date != null) {
+            this.weekDays = new HashSet<>(Set.of(this.date.getDayOfWeek()));
+        }
+    }
+
+    public void deactivate() {
+        this.status = RouteStatus.INACTIVE;
+    }
+
+    /**
+     * Define com que frequência o trajeto acontece. ONCE exige a data, que não pode
+     * ter passado, e o trajeto vale só nela. WEEKLY não tem data: usa os weekDays.
+     * Sem recorrência informada, vale WEEKLY.
+     */
+    public void schedule(@Nullable RecurrenceType recurrence, @Nullable LocalDate date, LocalDate today) {
+        RecurrenceType type = recurrence == null ? RecurrenceType.WEEKLY : recurrence;
+
+        if (type == RecurrenceType.WEEKLY) {
+            if (date != null) {
+                throw new ApplicationException(
+                        ErrorCode.BAD_REQUEST,
+                        "Uma carona semanal não tem data: ela vale nos dias da semana escolhidos.",
+                        Set.of("date")
+                );
+            }
+            this.recurrence = RecurrenceType.WEEKLY;
+            this.date = null;
+            return;
+        }
+
+        if (date == null) {
+            throw new ApplicationException(
+                    ErrorCode.BAD_REQUEST,
+                    "Informe a data da carona.",
+                    Set.of("date")
+            );
+        }
+
+        if (date.isBefore(today)) {
+            throw new ApplicationException(
+                    ErrorCode.BAD_REQUEST,
+                    "A data da carona não pode ter passado.",
+                    Set.of("date")
+            );
+        }
+
+        this.recurrence = RecurrenceType.ONCE;
+        this.date = date;
+        this.weekDays = new HashSet<>(Set.of(date.getDayOfWeek()));
+    }
+
+    // Documentos antigos podem vir sem o campo: valem como WEEKLY
+    public RecurrenceType getRecurrence() {
+        return this.recurrence == null ? RecurrenceType.WEEKLY : this.recurrence;
+    }
+
+    // Carona de um dia só cujo horário de saída já passou: some da lista e da busca.
+    // A semanal nunca passa: segue para a próxima ocorrência.
+    public boolean isPast(LocalDateTime now) {
+        return getRecurrence() == RecurrenceType.ONCE
+                && this.date != null
+                && this.date.atTime(LocalTime.parse(this.departureTime)).isBefore(now);
+    }
+
+    /**
+     * Acontece num mesmo dia que o outro trajeto: a mesma data (dois de um dia só),
+     * um dia da semana em comum (dois semanais) ou a data de um caindo num dos dias
+     * da semana do outro.
+     */
+    public boolean sharesDayWith(Route other) {
+        boolean thisOnce = getRecurrence() == RecurrenceType.ONCE && this.date != null;
+        boolean otherOnce = other.getRecurrence() == RecurrenceType.ONCE && other.date != null;
+
+        if (thisOnce && otherOnce) {
+            return this.date.equals(other.date);
+        }
+        if (thisOnce) {
+            return other.weekDays.contains(this.date.getDayOfWeek());
+        }
+        if (otherOnce) {
+            return this.weekDays.contains(other.date.getDayOfWeek());
+        }
+        return this.weekDays.stream().anyMatch(other.weekDays::contains);
+    }
+
+    /**
+     * As viagens se sobrepõem no horário: uma sai antes de a outra chegar. Cada uma
+     * vai da saída até a chegada estimada (tempo da rota do Google), com no mínimo
+     * MIN_TRIP_MINUTES. Uma pode sair exatamente quando a outra chega.
+     */
+    public boolean overlapsInTimeWith(Route other) {
+        int start = minuteOfDay(this.departureTime);
+        int otherStart = minuteOfDay(other.departureTime);
+        return start < otherStart + other.tripMinutes() && otherStart < start + tripMinutes();
+    }
+
+    // Duração da viagem pela chegada estimada (que pode passar da meia-noite)
+    public int tripMinutes() {
+        int minutes = minuteOfDay(this.estimatedArrivalTime) - minuteOfDay(this.departureTime);
+        if (minutes < 0) {
+            minutes += MINUTES_PER_DAY;
+        }
+        return Math.max(minutes, MIN_TRIP_MINUTES);
+    }
+
+    private static int minuteOfDay(String hhmm) {
+        LocalTime time = LocalTime.parse(hhmm);
+        return time.getHour() * 60 + time.getMinute();
+    }
+
+    // O trajeto acontece nesta data: no dia marcado, ou num dos dias da semana se ele se repete
+    public boolean runsOn(LocalDate day) {
+        return getRecurrence() == RecurrenceType.ONCE
+                ? day.equals(this.date)
+                : this.weekDays.contains(day.getDayOfWeek());
+    }
+
+    /**
+     * Guarda a distância e o desenho do caminho. Com o tempo de carro, a chegada
+     * estimada passa a ser a saída mais esse tempo (no lugar do valor informado).
+     */
+    public void defineGeometry(double distanceKm, @Nullable String encodedPolyline, @Nullable Integer durationMinutes) {
+        if (distanceKm < 0) {
+            throw new ApplicationException(
+                    ErrorCode.BAD_REQUEST,
+                    "Route distance cannot be negative.",
+                    Set.of("routeDistanceKm")
+            );
+        }
+
+        this.routeDistanceKm = distanceKm;
+        this.encodedPolyline = encodedPolyline;
+        if (durationMinutes != null && durationMinutes > 0) {
+            // LocalTime.plusMinutes já dá a volta na meia-noite
+            this.estimatedArrivalTime = LocalTime.parse(this.departureTime)
+                    .plusMinutes(durationMinutes)
+                    .format(DateTimeFormatter.ofPattern("HH:mm"));
+        }
+    }
+
+    // O type não entra aqui: um trajeto não muda de OFFER para SEARCH depois de
+    // criado.
+    private void applyTripData(
+            @Nullable String vehicleId,
+            Place origin,
+            Place destination,
+            String departureTime,
+            String estimatedArrivalTime,
+            Set<DayOfWeek> weekDays,
+            @Nullable Double maxDetourKm,
+            @Nullable Integer totalSeats,
+            @Nullable BigDecimal toll,
+            @Nullable BigDecimal parking) {
+        this.vehicleId = vehicleId;
+        this.origin = origin;
+        this.destination = destination;
+        this.departureTime = departureTime;
+        this.estimatedArrivalTime = estimatedArrivalTime;
+        this.weekDays.clear();
+        this.weekDays.addAll(weekDays);
+        this.maxDetourKm = maxDetourKm;
+        this.totalSeats = totalSeats;
+        this.totalSeats = totalSeats;
+        this.toll = toll;
+        this.parking = parking;
+
+
+        if (this.type == RouteType.OFFER) {
+            this.validateOfferRequirements();
+            if (this.type == RouteType.OFFER) {
+                this.validateOfferRequirements();
+                this.toll = toMoney(this.toll);
+                this.parking = toMoney(this.parking);
+            }
+
+            // Sem o módulo de caronas ainda não há vagas ocupadas; quando houver, descontar
+            // as reservadas
+            this.availableSeats = totalSeats;
+        } else {
+            this.clearOfferFields();
+        }
+    }
+
+    private void validateOfferRequirements() {
+        List<String> fields = new ArrayList<>(5);
+
+        if (this.maxDetourKm == null || this.maxDetourKm <= 0) {
+            fields.add("maxDetourKm");
+        }
+
+        if (this.totalSeats == null || this.totalSeats <= 0) {
+            fields.add("totalSeats");
+        }
+
+        if (this.vehicleId == null || this.vehicleId.isBlank()) {
+            fields.add("vehicleId");
+        }
+
+        if (this.toll != null && this.toll.signum() < 0) {
+            fields.add("toll");
+        }
+
+        if (this.parking != null && this.parking.signum() < 0) {
+            fields.add("parking");
+        }
+
+        if (!fields.isEmpty()) {
+            String message = "Offer requirements not met. Ensure vehicleId is provided, maxDetourKm and totalSeats " + "are greater than zero, and toll and parking are not negative.";
+
+            throw new ApplicationException(ErrorCode.BAD_REQUEST, message, Set.copyOf(fields));
+        }
+    }
+
+    private void clearOfferFields() {
+        // Zerar (null) vehicleId, maxDetourKm, totalSeats e availableSeats, toll, parking.
+        this.vehicleId = null;
+        this.maxDetourKm = null;
+        this.totalSeats = null;
+        this.availableSeats = null;
+        this.toll = null;
+        this.parking = null;
+    }
+    // null vira 0.00; dinheiro sempre com 2 casas
+    private static BigDecimal toMoney(@Nullable BigDecimal value) {
+        return (value == null ? BigDecimal.ZERO : value).setScale(2, RoundingMode.HALF_EVEN);
+    }
+
+    // Trajetos salvos antes destes campos existirem não têm o valor no banco: num OFFER, valem 0.00
+    public BigDecimal getToll() {
+        return type == RouteType.OFFER && toll == null ? BigDecimal.ZERO.setScale(2) : toll;
+    }
+    public BigDecimal getParking() {
+        return type == RouteType.OFFER && parking == null ? BigDecimal.ZERO.setScale(2) : parking;
+    }
+}

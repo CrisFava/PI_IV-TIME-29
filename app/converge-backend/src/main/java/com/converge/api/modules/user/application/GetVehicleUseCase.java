@@ -1,0 +1,22 @@
+// Autor: Sara Fernandes Monteiro - RA 25024107
+
+package com.converge.api.modules.user.application;
+
+import com.converge.api.modules.user.application.dto.VehicleRefCommand;
+import com.converge.api.modules.user.domain.model.vehicle.Vehicle;
+import com.converge.api.shared.application.UseCase;
+import lombok.RequiredArgsConstructor;
+import org.springframework.stereotype.Service;
+
+// Caso de uso para pegar um veículo próprio
+@Service
+@RequiredArgsConstructor
+public class GetVehicleUseCase implements UseCase<VehicleRefCommand, Vehicle> {
+
+    private final VehicleAccess vehicleAccess;
+
+    @Override
+    public Vehicle execute(VehicleRefCommand command) {
+        return vehicleAccess.getOwnedVehicle(command.vehicleId(), command.firebaseUid());
+    }
+}

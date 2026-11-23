@@ -1,0 +1,121 @@
+// Autor: Allan Giovanni Matias Paes - RA 25008211
+
+package com.converge.api.modules.user.application.mapper;
+
+import com.converge.api.modules.user.domain.enums.user.VerificationMethod;
+import com.converge.api.modules.user.domain.enums.user.VerificationStatus;
+import com.converge.api.modules.user.domain.model.user.User;
+import com.converge.api.modules.user.domain.model.user.subtypes.AcademicRecord;
+import com.converge.api.modules.user.domain.model.user.subtypes.driver.DriverLicense;
+import com.converge.api.modules.user.application.dto.AcademicRecordRequestDTO;
+import com.converge.api.modules.user.application.dto.CreateUserRequestDTO;
+import com.converge.api.modules.user.application.dto.CreateUserResponseDTO;
+import com.converge.api.modules.user.application.dto.DriverLicenseRequestDTO;
+import com.converge.api.shared.presentation.exception.ApplicationException;
+import com.converge.api.shared.presentation.exception.ErrorCode;
+import java.time.LocalDateTime;
+
+
+import org.springframework.stereotype.Component;
+
+/**
+ * Mapper do módulo de usuários.
+ *
+ * Converte entre os DTOs da API e o modelo de domínio: transforma o pedido de
+ * criação de usuário (CreateUserRequestDTO) em entidade User, e a entidade User
+ * na resposta da API (CreateUserResponseDTO). Também converte os dados
+ * acadêmicos e da CNH recebidos na requisição. Não tem regra de negócio, só
+ * mapeamento, com duas exceções pequenas: o status inicial da verificação
+ * acadêmica e o status efetivo da CNH (explicados nos métodos).
+ */
+@Component
+public class UserMapper {
+
+    public User toEntity(CreateUserRequestDTO dto) {
+        if (dto == null) {
+            return null;
+        }
+
+        return new User(
+                dto.firebaseUid(),
+                dto.name(),
+                dto.email(),
+                dto.phone(),
+                dto.photoUrl(),
+                dto.participationRoles(),
+                toAcademicRecord(dto.academicRecord()),
+                toDriverLicense(dto.driverLicense()),
+                dto.pixKey(),
+                dto.pixKeyType()
+        );
+    }
+
+    public CreateUserResponseDTO toResponse(User user) {
+        if (user == null) {
+            throw new ApplicationException(
+                    ErrorCode.USER_NOT_FOUND,
+                    "Usuário não encontrado."
+             );
+        }
+
+        return new CreateUserResponseDTO(
+                user.getId() != null ? user.getId().toHexString() : null,
+                user.getFirebaseUid(),
+                user.getName(),
+                user.getEmail(),
+                user.getPhone(),
+                user.getPhotoUrl(),
+                user.getParticipationRoles(),
+                user.getAcademicRecord(),
+                toLicenseView(user.getDriverLicense()),
+                user.getPixKey(),
+                user.getPixKeyType(),
+                user.getPaymentStanding(),
+                user.getOverdueRidesCount(),
+                user.isDefaulter(),
+                user.getDefaulterSince(),
+                user.getReputation(),
+                user.getBadges(),
+                user.isActive(),
+                user.getCreatedAt(),
+                user.getUpdatedAt()
+        );
+    }
+
+    public AcademicRecord toAcademicRecord(AcademicRecordRequestDTO dto) {
+        if (dto == null) {
+            return null;
+        }
+
+        return new AcademicRecord(
+                dto.university(),
+                dto.course(),
+                dto.enrollmentNumber(),
+                dto.institutionalEmail(),
+                dto.documentUrl(),
+                VerificationStatus.PENDING,
+                VerificationMethod.INSTITUTIONAL_EMAIL,
+                null,
+                null,
+                null
+        );
+    }
+
+    public DriverLicense toDriverLicense(DriverLicenseRequestDTO dto) {
+        if (dto == null) {
+            return null;
+        }
+
+        return new DriverLicense(
+            dto.number(),
+            dto.category(),
+            dto.expiresAt(),
+            dto.documentUrl()
+        );
+    }
+
+    private DriverLicense toLicenseView(DriverLicense license) {
+        return license == null ? null : license.withEffectiveStatus(LocalDateTime.now());
+    }
+
+}

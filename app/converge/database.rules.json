@@ -1,0 +1,32 @@
+{
+	"rules": {
+		".read": false,
+		".write": false,
+		"chats": {
+			"$chatRoomId": {
+				"$passengerId": {
+					".read": "auth != null",
+					"messages": {
+						".indexOn": ["sentAt"],
+						"$messageId": {
+							".write": "auth != null && !data.exists()",
+							".validate": "newData.hasChildren(['senderId', 'senderName', 'senderUid', 'type', 'text', 'sentAt']) && newData.child('senderUid').val() === auth.uid && newData.child('sentAt').val() === now",
+							"senderId": {
+								".validate": "newData.isString() && newData.val().length > 0 && newData.val().length <= 64"
+							},
+							"senderName": { ".validate": "newData.isString() && newData.val().length <= 120" },
+							"senderUid": { ".validate": "newData.isString()" },
+							"type": {
+								".validate": "newData.val() === 'TEXT' || newData.val() === 'PAYMENT_REQUEST' || newData.val() === 'PAYMENT_CONFIRMED' || newData.val() === 'SYSTEM'"
+							},
+							"text": { ".validate": "newData.isString() && newData.val().length <= 1000" },
+							"amount": { ".validate": "newData.isNumber() && newData.val() > 0" },
+							"sentAt": { ".validate": "newData.isNumber()" },
+							"$other": { ".validate": false }
+						}
+					}
+				}
+			}
+		}
+	}
+}

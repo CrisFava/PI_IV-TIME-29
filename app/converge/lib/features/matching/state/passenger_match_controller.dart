@@ -1,0 +1,328 @@
+// Autor: Gustavo Alves de Siqueira Costa - RA 25001650
+
+import 'dart:async';
+
+import 'package:flutter/foundation.dart' show debugPrint;
+import 'package:flutter_riverpod/flutter_riverpod.dart';
+
+import '../../../core/network/api_exception.dart';
+import '../../auth/state/auth_action_controller.dart';
+import '../../ride/data/models/participant_status.dart';
+import '../../ride/data/models/ride_model.dart';
+import '../../ride/data/repository/ride_repository.dart';
+import '../../ride/data/repository/ride_repository_impl.dart';
+import '../../route/data/models/create_route_request.dart';
+import '../../route/data/models/route_recurrence.dart';
+import '../../route/data/models/route_response_model.dart';
+import '../../route/data/repository/route_repository.dart';
+import '../../route/data/repository/route_repository_impl.dart';
+import '../data/models/match_model.dart';
+import '../data/repository/matching_repository.dart';
+import '../data/repository/matching_repository_impl.dart';
+import '../../ride/state/payment_prompt_controller.dart';
+import 'matching_viewer_provider.dart';
+import 'passenger_match_phase.dart';
+import 'passenger_match_state.dart';
+
+final passengerMatchProvider =
+    NotifierProvider.autoDispose<PassengerMatchController, PassengerMatchState>(
+      PassengerMatchController.new,
+    );
+
+/// Fluxo do passageiro antes do aceite: busca os motoristas compatíveis,
+/// pede a vaga e acompanha a viagem até o motorista aceitar ou recusar.
+class PassengerMatchController extends Notifier<PassengerMatchState> {
+  Timer? _polling;
+  int _pollGeneration = 0;
+
+  // Sem motoristas na busca: procura de novo em silêncio até aparecer um (o aviso
+  // de motorista compatível aparece sozinho quando a lista deixa de estar vazia)
+  Timer? _watching;
+  static const _watchInterval = Duration(seconds: 30);
+
+  // Trajeto de procura deste pedido que sai do matching quando o pedido é fechado sem
+  // carona aceita: o criado para ele ou um avulso reaproveitado. Um trajeto semanal
+  // reaproveitado fica, porque o passageiro o salvou para procurar carona toda semana.
+  String? _searchRouteToDiscard;
+
+  MatchingRepository get _matching => ref.read(matchingRepositoryProvider);
+  RideRepository get _rides => ref.read(rideRepositoryProvider);
+  RouteRepository get _routes => ref.read(routeRepositoryProvider);
+
+  @override
+  PassengerMatchState build() {
+    ref.onDispose(_stopPolling);
+    return const PassengerMatchState();
+  }
+
+  /// Id de um trajeto de procura com estes dados: reaproveita o que já existe
+  /// ou cria um novo. Devolve `null` (com o motivo em `notice`) se não conseguir.
+  Future<String?> prepareSearchRoute(CreateRouteRequest request) async {
+    // Reaproveitado: só sai junto com o pedido se for avulso (o _findSame exige a mesma recorrência)
+    String reused(RouteResponseModel route) {
+      if (request.recurrence == RouteRecurrence.once) {
+        _searchRouteToDiscard = route.id;
+      }
+      return route.id;
+    }
+
+    try {
+      final existing = _findSame(await _routes.listMyRoutes(), request);
+      if (existing != null) return reused(existing);
+
+      final created = await _routes.createRoute(request);
+      _searchRouteToDiscard = created.id;
+      return created.id;
+    } on ApiException catch (e) {
+      // Outro pedido salvou o mesmo trajeto no meio do caminho: usa o que ficou no banco.
+      if (e.isConflict) {
+        final saved = _findSame(await _routes.listMyRoutes(), request);
+        if (saved != null) return reused(saved);
+      }
+      // Pagamento de outra carona em aberto: o pagamento volta a aparecer
+      ref.read(paymentPromptProvider.notifier).handleBlockedAction(e);
+      state = state.copyWith(notice: e.message);
+      return null;
+    } catch (e) {
+      state = state.copyWith(notice: authErrorMessage(e));
+      return null;
+    }
+  }
+
+  RouteResponseModel? _findSame(
+    List<RouteResponseModel> routes,
+    CreateRouteRequest request,
+  ) {
+    for (final route in routes) {
+      if (route.type == request.type &&
+          route.status == 'ACTIVE' &&
+          route.origin.address == request.origin.address &&
+          route.destination.address == request.destination.address &&
+          route.departureTime == request.departureTime &&
+          route.recurrence == request.recurrence &&
+          route.date == request.date) {
+        return route;
+      }
+    }
+    return null;
+  }
+
+  /// Busca os motoristas compatíveis com o trajeto de procura.
+  Future<void> findDrivers(String searchRouteId) async {
+    _stopPolling();
+    state = PassengerMatchState(
+      phase: PassengerMatchPhase.loading,
+      searchRouteId: searchRouteId,
+    );
+
+    try {
+      final matches = await _matching.findDriversFor(searchRouteId);
+      if (state.searchRouteId != searchRouteId) return;
+      state = state.copyWith(
+        phase: PassengerMatchPhase.ready,
+        matches: matches,
+      );
+      if (matches.isEmpty) _watchForDrivers(searchRouteId);
+    } catch (e) {
+      if (state.searchRouteId != searchRouteId) return;
+      state = state.copyWith(
+        phase: PassengerMatchPhase.failed,
+        errorMessage: authErrorMessage(e),
+      );
+    }
+  }
+
+  /// O passageiro recusou o motorista sugerido no aviso: sugere o próximo.
+  void declineSuggestion(MatchModel match) {
+    state = state.copyWith(
+      declinedRouteIds: {...state.declinedRouteIds, match.driverRouteId},
+    );
+  }
+
+  /// Pede a vaga no trajeto do motorista, na próxima data em comum.
+  Future<bool> requestSeat(MatchModel match) async {
+    if (state.isBusy) return false;
+
+    final date = match.nextRideDate;
+    if (date == null) {
+      state = state.copyWith(
+        notice: 'Não há uma data próxima em comum com este motorista.',
+      );
+      return false;
+    }
+
+    state = state.copyWith(
+      phase: PassengerMatchPhase.requesting,
+      selected: match,
+      notice: null,
+    );
+
+    try {
+      final ride = await _rides.requestSeat(
+        driverRouteId: match.driverRouteId,
+        passengerRouteId: match.passengerRouteId,
+        date: date,
+      );
+      state = state.copyWith(
+        phase: PassengerMatchPhase.waiting,
+        rideId: ride.id,
+      );
+      _apply(ride);
+      if (state.phase == PassengerMatchPhase.waiting) _startPolling();
+      return true;
+    } catch (e) {
+      // Pagamento de outra carona em aberto: o pagamento volta a aparecer
+      ref.read(paymentPromptProvider.notifier).handleBlockedAction(e);
+      state = state.copyWith(
+        phase: PassengerMatchPhase.ready,
+        selected: null,
+        notice: authErrorMessage(e),
+      );
+      return false;
+    }
+  }
+
+  /// Consulta a viagem uma vez. Chamado pelo timer enquanto espera a resposta.
+  Future<void> refreshRequest() async {
+    final rideId = state.rideId;
+    if (rideId == null || state.phase != PassengerMatchPhase.waiting) return;
+
+    final generation = _pollGeneration;
+    try {
+      final ride = await _rides.getRide(rideId);
+      if (_pollGeneration != generation) return;
+      _apply(ride);
+    } catch (_) {
+      // Falha passageira de rede: tenta de novo na próxima volta do timer.
+    }
+  }
+
+  /// Desiste do pedido enquanto o motorista não respondeu.
+  Future<void> cancelRequest() async {
+    final rideId = state.rideId;
+    _stopPolling();
+
+    if (rideId != null && state.phase == PassengerMatchPhase.waiting) {
+      state = state.copyWith(isCancelling: true);
+      try {
+        await _rides.leaveRide(
+          rideId,
+          reason: 'Pedido cancelado pelo passageiro.',
+        );
+      } catch (e) {
+        state = state.copyWith(notice: authErrorMessage(e));
+      }
+    }
+
+    state = state.copyWith(
+      phase: PassengerMatchPhase.ready,
+      selected: null,
+      rideId: null,
+      isCancelling: false,
+    );
+  }
+
+  /// O aviso já foi mostrado.
+  void clearNotice() => state = state.copyWith(notice: null);
+
+  /// Volta ao início (o passageiro fechou o fluxo). O trajeto de procura avulso do
+  /// pedido é desativado, a não ser que a carona tenha sido aceita: senão o passageiro
+  /// continuaria aparecendo como disponível para os motoristas.
+  void reset() {
+    _stopPolling();
+    final searchRoute = _searchRouteToDiscard;
+    final accepted = state.phase == PassengerMatchPhase.accepted;
+    _searchRouteToDiscard = null;
+    if (searchRoute != null && !accepted) unawaited(_discardRoute(searchRoute));
+    state = const PassengerMatchState();
+  }
+
+  Future<void> _discardRoute(String routeId) async {
+    try {
+      await _routes.deleteRoute(routeId);
+    } catch (e) {
+      // Não atrapalha o passageiro: o trajeto só continua visível até ser apagado
+      debugPrint('Erro ao desativar o trajeto de procura $routeId: $e');
+    }
+  }
+
+  void _apply(RideModel ride) {
+    if (state.phase != PassengerMatchPhase.waiting || state.rideId != ride.id) {
+      return;
+    }
+
+    final viewerId = ref.read(matchingViewerIdProvider);
+    final status = viewerId == null ? null : ride.passengerOf(viewerId)?.status;
+
+    switch (status) {
+      case ParticipantStatus.confirmed || ParticipantStatus.completed:
+        _stopPolling();
+        state = state.copyWith(phase: PassengerMatchPhase.accepted);
+      case ParticipantStatus.rejected ||
+          ParticipantStatus.cancelled ||
+          ParticipantStatus.expired:
+        _stopPolling();
+        final declined = state.selected;
+        final message = status == ParticipantStatus.expired
+            ? 'O tempo limite de resposta do motorista expirou. Escolha outro motorista.'
+            : '${declined?.otherUserName ?? 'O motorista'} não pôde aceitar. Escolha outro motorista.';
+        state = state.copyWith(
+          phase: PassengerMatchPhase.ready,
+          matches: [
+            for (final match in state.matches)
+              if (match.driverRouteId != declined?.driverRouteId) match,
+          ],
+          selected: null,
+          rideId: null,
+          notice: message,
+        );
+      default:
+        break;
+    }
+  }
+
+  void _startPolling() {
+    _stopPolling();
+    _polling = Timer.periodic(
+      ref.read(matchingPollIntervalProvider),
+      (_) => refreshRequest(),
+    );
+  }
+
+  void _stopPolling() {
+    _pollGeneration++;
+    _polling?.cancel();
+    _polling = null;
+    _watching?.cancel();
+    _watching = null;
+  }
+
+  /// Busca vazia: consulta os motoristas de novo de tempos em tempos, sem mostrar
+  /// carregamento, até aparecer o primeiro (ou a busca mudar ou ser fechada).
+  void _watchForDrivers(String searchRouteId) {
+    _watching?.cancel();
+    _watching = Timer.periodic(_watchInterval, (timer) async {
+      final stillEmpty =
+          state.searchRouteId == searchRouteId &&
+          state.phase == PassengerMatchPhase.ready &&
+          state.matches.isEmpty;
+      if (!stillEmpty) {
+        timer.cancel();
+        return;
+      }
+      try {
+        final matches = await _matching.findDriversFor(searchRouteId);
+        if (!ref.mounted ||
+            state.searchRouteId != searchRouteId ||
+            state.phase != PassengerMatchPhase.ready ||
+            matches.isEmpty) {
+          return;
+        }
+        timer.cancel();
+        state = state.copyWith(matches: matches);
+      } catch (_) {
+        // Falhou desta vez: tenta de novo na próxima
+      }
+    });
+  }
+}

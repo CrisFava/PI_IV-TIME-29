@@ -1,0 +1,51 @@
+// Autor: Allan Giovanni Matias Paes - RA 25008211
+
+package com.converge.socket.handler.math;
+
+import com.converge.socket.core.protocol.Message;
+
+import java.io.Serial;
+
+/**
+ * Mensagem de requisição para execução de operação matemática aritmética básica.
+ */
+public class MathOperationRequest extends Message {
+    @Serial
+    private static final long serialVersionUID = 1L;
+
+    private final char operation;
+    private final double operandA;
+    private final double operandB;
+
+    /**
+     * Cria uma requisição de operação matemática.
+     *
+     * @param operation caractere que define a operação ('+', '-', '*', '/')
+     * @param operandA primeiro operando numérico
+     * @param operandB segundo operando numérico
+     */
+    public MathOperationRequest(char operation, double operandA, double operandB) {
+        this.operation = operation;
+        this.operandA = operandA;
+        this.operandB = operandB;
+    }
+
+    // Getters e setters
+
+    public char getOperation() {
+        return operation;
+    }
+
+    public double getOperandA() {
+        return operandA;
+    }
+
+    public double getOperandB() {
+        return operandB;
+    }
+
+    @Override
+    public String toString() {
+        return "MathOperationRequest{" + operandA + " " + operation + " " + operandB + "}";
+    }
+}

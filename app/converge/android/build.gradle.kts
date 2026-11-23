@@ -17,6 +17,12 @@ subprojects {
 }
 subprojects {
     project.evaluationDependsOn(":app")
+    if (!projectDir.canonicalPath.startsWith(rootDir.canonicalPath)) {
+        project.extensions.extraProperties.set(
+            "kotlin.incremental",
+            "false"
+        )
+    }
 }
 
 tasks.register<Delete>("clean") {

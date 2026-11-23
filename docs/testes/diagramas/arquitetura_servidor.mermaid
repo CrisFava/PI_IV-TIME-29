@@ -1,0 +1,62 @@
+%%{init: {'theme': 'base', 'themeVariables': { 'primaryColor': '#E0F2FE', 'edgeLabelBackground':'#FFFFFF', 'primaryBorderColor': '#0284C7', 'lineColor': '#0369A1', 'fontFamily': 'Segoe UI, Arial, sans-serif', 'fontSize': '14px' }}}%%
+flowchart TD
+    classDef client fill:#E0F2FE,stroke:#0284C7,stroke-width:2px,color:#0369A1,font-weight:bold;
+    classDef serverCore fill:#DCFCE7,stroke:#16A34A,stroke-width:2px,color:#15803D,font-weight:bold;
+    classDef connection fill:#FEF3C7,stroke:#D97706,stroke-width:2px,color:#B45309;
+    classDef dispatch fill:#F3E8FF,stroke:#9333EA,stroke-width:2px,color:#7E22CE;
+    classDef handler fill:#EDE9FE,stroke:#4F46E5,stroke-width:1.5px,color:#3730A3;
+
+    subgraph Cliente ["Clientes Externos (ex: Backend Spring Boot / SocketClient)"]
+        CL["Socket TCP Cliente<br/>(ObjectInputStream / ObjectOutputStream)"]:::client
+    end
+
+    subgraph ServidorJava ["Servidor Java de Sockets (app/server)"]
+        direction TB
+        SS["SocketServer<br/>(ServerSocket porta 3000 / porta 0 efêmera)"]:::serverCore
+        
+        subgraph Conexoes ["Camada de Escuta e Conexões"]
+            CA["ConnectionAcceptor<br/>(Thread de accept)"]:::connection
+            CS["ConnectionSupervisor<br/>(Thread dedicada por cliente)"]:::connection
+            CC["ClientConnection<br/>(Wrapper Socket + I/O + Mutex + Cache)"]:::connection
+            CR["ClientRegistry<br/>(Registro Thread-Safe de Clientes Ativos)"]:::connection
+        end
+
+        subgraph Despacho ["Roteamento e Protocolo"]
+            HR["HandlerRegistry<br/>(Mapeador Class<? extends Message> -> RequestHandler)"]:::dispatch
+            RH["&lt;&lt;interface&gt;&gt;<br/>RequestHandler&lt;T, R&gt;"]:::dispatch
+            MSG["Protocolo Base<br/>(Message, ErrorResponse, DisconnectRequest, ServerShutdownNotification)"]:::dispatch
+        end
+
+        subgraph HandlersNegocio ["Domínio de Handlers de Negócio"]
+            H_MATCH["MatchRoutesHandler<br/>(Geometria e Compatibilidade)"]:::handler
+            H_RIDE["RideCostHandler<br/>(Custos, Desvios e Rateio)"]:::handler
+            H_PIX["PixPayloadHandler<br/>(Payload EMVCo e CRC16)"]:::handler
+            H_SUST["SustainabilityHandler<br/>(CO₂ e Indicadores)"]:::handler
+            H_CPF["ValidateCpfHandler<br/>(Validação Algorítmica)"]:::handler
+            H_RENAVAM["ValidateRenavamHandler<br/>(Módulo 11)"]:::handler
+            H_DIST["DistanceHandler<br/>(Haversine em Lote)"]:::handler
+            H_IND["IndicatorReferenceHandler<br/>(Períodos e Metas)"]:::handler
+            H_MATH["MathOperationHandler<br/>(Operações Auxiliares)"]:::handler
+        end
+    end
+
+    CL <-->|"1. TCP Connect & Handshake de Streams"| SS
+    SS -->|"2. Inicia loop de escuta"| CA
+    CA -->|"3. accept() -> dispara supervisor"| CS
+    CS -->|"4. Cria canais de I/O"| CC
+    CS -->|"5. Registra cliente ativo"| CR
+    CS -->|"6. receive() lê Message"| CC
+    CS -->|"7. dispatch(request)"| HR
+    HR -->|"8. Roteia requisição para handler registrado"| RH
+    H_MATCH -.->|Implementa| RH
+    H_RIDE -.->|Implementa| RH
+    H_PIX -.->|Implementa| RH
+    H_SUST -.->|Implementa| RH
+    H_CPF -.->|Implementa| RH
+    H_RENAVAM -.->|Implementa| RH
+    H_DIST -.->|Implementa| RH
+    H_IND -.->|Implementa| RH
+    H_MATH -.->|Implementa| RH
+    HR -->|"9. Retorna Message resposta"| CS
+    CS -->|"10. send(response)"| CC
+    CC -->|"11. Serializa e envia via Socket"| CL

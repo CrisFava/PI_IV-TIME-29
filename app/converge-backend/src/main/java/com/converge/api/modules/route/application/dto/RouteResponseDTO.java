@@ -1,0 +1,38 @@
+// Autor: Gustavo Alves de Siqueira Costa - RA 25001650
+
+package com.converge.api.modules.route.application.dto;
+
+import com.converge.api.modules.route.domain.enums.RouteStatus;
+import com.converge.api.modules.route.domain.enums.RecurrenceType;
+import com.converge.api.modules.route.domain.enums.RouteType;
+
+import java.math.BigDecimal;
+import java.time.DayOfWeek;
+import java.time.LocalDate;
+import java.time.LocalDateTime;
+import java.util.Set;
+
+// Dados de resposta com informações completas de um trajeto
+public record RouteResponseDTO(
+        String id,
+        RouteType type,
+        RouteStatus status,
+        String vehicleId,
+        PlaceResponseDTO origin,
+        PlaceResponseDTO destination,
+        String departureTime,
+        String estimatedArrivalTime,
+        Set<DayOfWeek> weekDays,
+        RecurrenceType recurrence,
+        LocalDate date,
+        Double maxDetourKm,
+        Integer totalSeats,
+        Integer availableSeats,
+        BigDecimal toll,
+        BigDecimal parking,
+        Double routeDistanceKm,
+        String encodedPolyline,
+        LocalDateTime createdAt,
+        LocalDateTime updatedAt
+) {
+}

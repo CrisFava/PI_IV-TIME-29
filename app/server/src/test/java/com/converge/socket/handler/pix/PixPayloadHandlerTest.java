@@ -1,0 +1,132 @@
+// Autor: Cristian Eduardo Fava - RA 25000636
+
+package com.converge.socket.handler.pix;
+
+import com.converge.socket.core.exception.ServerException;
+import org.junit.jupiter.api.DisplayName;
+import org.junit.jupiter.api.Test;
+
+import java.math.BigDecimal;
+
+import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertThrows;
+import static org.junit.jupiter.api.Assertions.assertTrue;
+
+/**
+ * Testes unitários para {@link PixPayloadHandler}.
+ * Valida a geração do payload EMVCo para PIX Copia e Cola (BR Code) e cálculo de redundância cíclica CRC16-CCITT.
+ * <p>
+ * Os métodos de teste estão bem explicativos através de suas anotações {@code @DisplayName}.
+ */
+class PixPayloadHandlerTest {
+
+    /** O handler não tem estado, então uma instância serve para todos os testes. */
+    private final PixPayloadHandler handler = new PixPayloadHandler();
+
+    /**
+     * Gera o payload e devolve só o texto, para os testes conferirem os campos por substring.
+     *
+     * @param amount valor em texto, para o teste controlar as casas decimais (ex.: "10.5000")
+     */
+    private String payloadOf(String key, String amount, String name, String city) throws ServerException {
+        return handler.execute(new PixPayloadRequest(key, new BigDecimal(amount), name, city)).getPayload();
+    }
+
+    @Test
+    @DisplayName("CRC16 deve bater com o valor de verificação do CCITT-FALSE")
+    void shouldMatchCcittFalseCheckValue() {
+        // "123456789" é a entrada padrão de verificação de CRCs; 0x29B1 é o resultado do CCITT-FALSE
+        assertEquals("29B1", PixPayloadHandler.crc16("123456789"));
+    }
+
+    @Test
+    @DisplayName("Deve montar o payload com chave, valor travado, recebedor e cidade")
+    void shouldBuildPayloadWithKeyAmountReceiverAndCity() throws ServerException {
+        String payload = payloadOf("motorista@puc-campinas.edu.br", "12.5", "João da Conceição", "Campinas");
+
+        // Cada campo é id (2) + tamanho (2) + valor
+        assertTrue(payload.startsWith("000201"));
+        // Campo 26 com o GUI do PIX (subcampo 00) e a chave de 29 caracteres (subcampo 01)
+        assertTrue(payload.contains("0014br.gov.bcb.pix0129motorista@puc-campinas.edu.br"));
+        assertTrue(payload.contains("52040000"));
+        assertTrue(payload.contains("5303986"));
+        // O valor 12.5 sai sempre com 2 casas
+        assertTrue(payload.contains("540512.50"));
+        assertTrue(payload.contains("5802BR"));
+        // Nome sem acento e em maiúsculas
+        assertTrue(payload.contains("5917JOAO DA CONCEICAO"));
+        assertTrue(payload.contains("6008CAMPINAS"));
+        // Campo 62 com o txid "***" do PIX estático
+        assertTrue(payload.contains("62070503***"));
+    }
+
+    @Test
+    @DisplayName("Os 4 últimos caracteres devem ser o CRC16 do restante do payload")
+    void shouldEndWithCrcOfTheRestOfThePayload() throws ServerException {
+        String payload = payloadOf("+5519999998888", "7.00", "Maria Souza", "Campinas");
+
+        String withoutCrc = payload.substring(0, payload.length() - 4);
+        String crc = payload.substring(payload.length() - 4);
+
+        assertTrue(withoutCrc.endsWith("6304"));
+        assertEquals(PixPayloadHandler.crc16(withoutCrc), crc);
+    }
+
+    @Test
+    @DisplayName("Nome e cidade longos devem ser cortados em 25 e 15 caracteres")
+    void shouldTruncateLongNameAndCity() throws ServerException {
+        String payload = payloadOf(
+                "12345678909",
+                "10.00",
+                "Maximiliano Albuquerque de Vasconcelos Neto",
+                "São José do Rio Preto"
+        );
+
+        assertTrue(payload.contains("5925MAXIMILIANO ALBUQUERQUE D"));
+        assertTrue(payload.contains("6015SAO JOSE DO RIO"));
+    }
+
+    @Test
+    @DisplayName("Sem cidade deve usar o valor padrão")
+    void shouldUseDefaultCityWhenMissing() throws ServerException {
+        String payload = payloadOf("12345678909", "10.00", "Ana Lima", null);
+
+        assertTrue(payload.contains("6006BRASIL"));
+    }
+
+    @Test
+    @DisplayName("Deve recusar valor zerado ou negativo")
+    void shouldRejectNonPositiveAmount() {
+        assertThrows(ServerException.class, () -> payloadOf("12345678909", "0", "Ana Lima", "Campinas"));
+        assertThrows(ServerException.class, () -> payloadOf("12345678909", "-1.00", "Ana Lima", "Campinas"));
+    }
+
+    @Test
+    @DisplayName("Deve recusar valor com fração de centavo em vez de arredondar")
+    void shouldRejectFractionOfCent() {
+        assertThrows(ServerException.class, () -> payloadOf("12345678909", "10.005", "Ana Lima", "Campinas"));
+    }
+
+    @Test
+    @DisplayName("Valor com zeros sobrando nas casas decimais continua válido")
+    void shouldAcceptTrailingZeros() throws ServerException {
+        String payload = payloadOf("12345678909", "10.5000", "Ana Lima", "Campinas");
+
+        assertTrue(payload.contains("540510.50"));
+    }
+
+    @Test
+    @DisplayName("Nome sem letras latinas usa o nome padrão do recebedor")
+    void shouldUseFallbackNameWhenNothingIsLeftAfterSanitizing() throws ServerException {
+        String payload = payloadOf("12345678909", "10.00", "山田太郎", "Campinas");
+
+        assertTrue(payload.contains("5918MOTORISTA CONVERGE"));
+    }
+
+    @Test
+    @DisplayName("Deve recusar chave PIX ou nome do recebedor em branco")
+    void shouldRejectBlankKeyOrReceiverName() {
+        assertThrows(ServerException.class, () -> payloadOf(" ", "5.00", "Ana Lima", "Campinas"));
+        assertThrows(ServerException.class, () -> payloadOf("12345678909", "5.00", "  ", "Campinas"));
+    }
+}

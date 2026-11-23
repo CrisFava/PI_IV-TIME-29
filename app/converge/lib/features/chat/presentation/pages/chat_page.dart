@@ -1,0 +1,215 @@
+// Autor: Cristian Eduardo Fava - RA 25000636
+
+import 'package:flutter/material.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
+
+import '../../../../core/config/styles.dart';
+import '../../../../core/widgets/show_app_notice.dart';
+import '../../../ride/data/models/ride_status.dart';
+import '../../../ride/state/ride_providers.dart';
+import '../../../security/presentation/widgets/blocked_chat_bar.dart';
+import '../../../security/presentation/widgets/user_safety_menu.dart';
+import '../../../security/state/blocked_users_controller.dart';
+import '../../data/models/chat_conversation.dart';
+import '../../state/chat_actions_controller.dart';
+import '../../state/chat_providers.dart';
+import '../../state/chat_unread_provider.dart';
+import '../widgets/chat_composer.dart';
+import '../widgets/chat_message_list.dart';
+import '../widgets/chat_notice.dart';
+import '../widgets/chat_payment_panel.dart';
+import '../widgets/chat_ride_panel.dart';
+import '../widgets/chat_scaffold.dart';
+
+/// Conversa em grupo da viagem (RF27): o motorista e os passageiros confirmados.
+///
+/// A conversa só abre depois que o motorista aceita o passageiro. Além das
+/// mensagens, a tela mostra a viagem e, para o passageiro, o próprio pagamento
+/// (as cobranças não vão para o grupo).
+///
+/// A rota recebe a viagem e um passageiro, mas a conversa é a mesma para todos: o [passengerId] do
+/// link não muda o grupo aberto.
+class ChatPage extends ConsumerStatefulWidget {
+  /// Viagem da conversa.
+  final String rideId;
+
+  /// Passageiro que veio no link da rota.
+  final String passengerId;
+
+  const ChatPage({super.key, required this.rideId, required this.passengerId});
+
+  @override
+  ConsumerState<ChatPage> createState() => _ChatPageState();
+}
+
+/// Estado da tela: carrega a viagem, confere o acesso e monta a conversa.
+class _ChatPageState extends ConsumerState<ChatPage> {
+  /// A conversa já foi marcada como lida ao abrir (o número da navbar zera).
+  bool _markedReadOnOpen = false;
+
+  /// Mostra carregamento, erro com "Tentar novamente", aviso de chat ainda não liberado ou a conversa.
+  @override
+  Widget build(BuildContext context) {
+    final viewer = ref.watch(chatViewerProvider);
+    final ride = ref.watch(rideProvider(widget.rideId));
+
+    return ride.when(
+      loading: () => const ChatScaffold(
+        title: 'Conversa',
+        body: Center(
+          child: CircularProgressIndicator(
+            color: AppColors.primary,
+            strokeWidth: 2.8,
+          ),
+        ),
+      ),
+      error: (error, _) => ChatScaffold(
+        title: 'Conversa',
+        body: ChatNotice(
+          icon: Icons.error_outline_rounded,
+          title: 'Não foi possível abrir a conversa',
+          message: chatErrorMessage(error),
+          actionLabel: 'Tentar novamente',
+          onAction: () => ref.invalidate(rideProvider(widget.rideId)),
+        ),
+      ),
+      data: (ride) {
+        final conversation = viewer == null
+            ? null
+            // Uma conversa por viagem: o grupo, seja quem for o passageiro do link
+            : ChatConversation.ofRide(ride, viewer.id).firstOrNull;
+
+        if (viewer == null || conversation == null) {
+          return const ChatScaffold(
+            title: 'Conversa',
+            body: ChatNotice(
+              icon: Icons.lock_rounded,
+              title: 'Chat ainda não liberado',
+              message: 'A conversa é liberada quando o motorista aceita o pedido de carona.',
+            ),
+          );
+        }
+
+        return _buildConversation(conversation, viewer.firebaseUid);
+      },
+    );
+  }
+
+  /// Monta a conversa liberada: painel da viagem, painel de pagamento (só para o passageiro), lista de
+  /// mensagens e campo de envio (ou o aviso de bloqueio). Também marca as mensagens como lidas e
+  /// recarrega a viagem quando chega um aviso de outro participante.
+  Widget _buildConversation(ChatConversation conversation, String viewerUid) {
+    final thread = conversation.thread;
+    final messages = ref.watch(chatMessagesProvider(thread));
+    // Com a conversa aberta, o que chega já conta como visto (sai do número da
+    // navbar). Depois do desenho: o Riverpod não deixa mudar providers durante ele.
+    void markRead() => Future.microtask(
+      () => ref.read(chatReadProvider.notifier).markRead(thread.path),
+    );
+    ref.listen(chatMessagesProvider(thread), (_, next) {
+      if (next.hasValue) markRead();
+    });
+    // Ao abrir, com as mensagens já carregadas (sem mudança para o listen)
+    if (!_markedReadOnOpen && messages.hasValue) {
+      _markedReadOnOpen = true;
+      markRead();
+    }
+    final busy = ref.watch(chatActionsProvider(thread)).isLoading;
+    // O passageiro pode bloquear ou denunciar o motorista por aqui; o motorista faz
+    // isso com cada passageiro na carona
+    final driverId = conversation.ride.driverId;
+    final otherPartyBlocked =
+        !conversation.viewerIsDriver &&
+        ref.watch(blockedUserIdsProvider).contains(driverId);
+    final members = conversation.ride.seatedPassengers.length + 1;
+
+    // Um aviso do outro participante (cobrança, pagamento, início ou fim da
+    // viagem) significa que o estado mudou na API: recarrega o que a tela mostra.
+    // Olha todas as mensagens novas, porque uma atualização pode trazer várias.
+    ref.listen(chatMessagesProvider(thread), (previous, next) {
+      final before = previous?.value;
+      final after = next.value;
+      // Na primeira carga a tela já busca o estado atual da API.
+      if (before == null || after == null) return;
+
+      final seen = {for (final message in before) message.id};
+      final stateChanged = after.any(
+        (message) =>
+            !seen.contains(message.id) &&
+            message.type.changesRideState &&
+            !message.isSentBy(viewerUid),
+      );
+      if (!stateChanged) return;
+
+      ref.invalidate(ridePaymentProvider(thread.passenger));
+      ref.invalidate(rideProvider(thread.rideId));
+      // A lista de viagens também muda: é por ela que a Home abre a avaliação
+      // quando o motorista conclui a viagem.
+      ref.invalidate(myRidesProvider);
+    });
+
+    ref.listen(chatActionsProvider(thread), (previous, next) {
+      if (next.hasError && !next.isLoading) _showError(next.error!);
+    });
+
+    return ChatScaffold(
+      title: conversation.viewerIsDriver
+          ? 'Grupo da carona'
+          : 'Carona com ${conversation.ride.driverName}',
+      subtitle:
+          '$members pessoas: ${[conversation.ride.driverName, for (final p in conversation.ride.seatedPassengers) p.displayName].join(', ')}',
+      actions: [
+        if (!conversation.viewerIsDriver)
+          UserSafetyMenu(
+            userId: driverId,
+            userName: conversation.ride.driverName,
+            rideId: thread.rideId,
+          ),
+      ],
+      body: Column(
+        children: [
+          ChatRidePanel(conversation: conversation),
+          // O pagamento é de cada passageiro: só ele vê o dele
+          if (!conversation.viewerIsDriver)
+            ChatPaymentPanel(conversation: conversation),
+          Expanded(
+            child: messages.when(
+              loading: () => const Center(
+                child: CircularProgressIndicator(
+                  color: AppColors.primary,
+                  strokeWidth: 2.8,
+                ),
+              ),
+              error: (error, _) => ChatNotice(
+                icon: Icons.cloud_off_rounded,
+                title: 'Chat indisponível',
+                message: chatErrorMessage(error),
+                actionLabel: 'Tentar novamente',
+                onAction: () => ref.invalidate(chatMessagesProvider(thread)),
+              ),
+              data: (messages) => ChatMessageList(
+                messages: messages,
+                viewerUid: viewerUid,
+                rideFinished: conversation.ride.status == RideStatus.completed,
+              ),
+            ),
+          ),
+          if (otherPartyBlocked)
+            const BlockedChatBar()
+          else
+            ChatComposer(
+              enabled: !busy,
+              onSend: ref.read(chatActionsProvider(thread).notifier).sendText,
+            ),
+        ],
+      ),
+    );
+  }
+
+  /// Mostra o erro de uma ação do chat num aviso rápido.
+  void _showError(Object error) => showAppNotice(
+    context,
+    chatErrorMessage(error),
+    type: AppNoticeType.error,
+  );
+}

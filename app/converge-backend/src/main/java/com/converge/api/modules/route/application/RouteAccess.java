@@ -1,0 +1,121 @@
+// Autor: Gustavo Alves de Siqueira Costa - RA 25001650
+
+package com.converge.api.modules.route.application;
+
+import com.converge.api.modules.route.domain.enums.RecurrenceType;
+import com.converge.api.modules.route.domain.enums.RouteStatus;
+import com.converge.api.modules.route.domain.enums.RouteType;
+import com.converge.api.modules.route.domain.model.Route;
+import com.converge.api.modules.route.domain.model.subtypes.Coordinates;
+import com.converge.api.modules.route.domain.repository.RouteRepository;
+import com.converge.api.shared.presentation.exception.ApplicationException;
+import com.converge.api.shared.presentation.exception.ErrorCode;
+import lombok.RequiredArgsConstructor;
+import org.bson.types.ObjectId;
+import org.springframework.stereotype.Component;
+
+import java.time.DayOfWeek;
+import java.time.LocalDate;
+import java.time.ZoneId;
+import java.util.Collection;
+import java.util.HashMap;
+import java.util.List;
+import java.util.Map;
+import java.util.Optional;
+import java.util.Set;
+
+/**
+ * Porta de leitura de trajetos para este módulo e para os outros (ex.: ride),
+ * que não devem acessar o RouteRepository diretamente.
+ * Qualquer falha vira 404, para a API não revelar quais ids existem.
+ */
+@Component
+@RequiredArgsConstructor
+public class RouteAccess {
+
+    // Fuso oficial da aplicação: é nele que "hoje" e os horários HH:mm valem
+    public static final ZoneId APP_ZONE = ZoneId.of("America/Sao_Paulo");
+
+    private final RouteRepository routeRepository;
+
+    /**
+     * Horário de saída (HH:mm) de cada trajeto, por id. Ids inválidos ou que não existem
+     * ficam de fora. Usado para mostrar ao motorista a hora que o passageiro escolheu.
+     */
+    public Map<String, String> departureTimesOf(Collection<String> routeIds) {
+        List<ObjectId> ids = routeIds.stream()
+                .filter(id -> id != null && ObjectId.isValid(id))
+                .map(ObjectId::new)
+                .toList();
+        if (ids.isEmpty()) {
+            return Map.of();
+        }
+        Map<String, String> times = new HashMap<>();
+        routeRepository.findAllById(ids).forEach(route -> {
+            if (route.getId() != null && route.getDepartureTime() != null) {
+                times.put(route.getId().toHexString(), route.getDepartureTime());
+            }
+        });
+        return times;
+    }
+
+    // Trajeto do próprio usuário, que não foi excluído (ACTIVE ou PAUSED)
+    public Route getOwnedRoute(String routeId, String userId) {
+        return findById(routeId)
+                .filter(route -> route.getStatus() != RouteStatus.INACTIVE)
+                .filter(route -> route.isOwnedBy(userId))
+                .orElseThrow(this::routeNotFound);
+    }
+
+    // Trajeto ativo de qualquer usuário: ofertas são públicas para o matching e para pedir vaga
+    public Route getActiveRoute(String routeId) {
+        return findById(routeId)
+                .filter(route -> route.getStatus() == RouteStatus.ACTIVE)
+                .orElseThrow(this::routeNotFound);
+    }
+
+    /**
+     * Candidatos do matching: trajetos ativos de um tipo, com pelo menos um dia em comum
+     * e com a origem e o destino a até radiusKm da origem e do destino informados.
+     */
+    public List<Route> listActiveNear(
+            RouteType type,
+            Set<DayOfWeek> weekDays,
+            Coordinates origin,
+            Coordinates destination,
+            double radiusKm
+    ) {
+        if (type == null || weekDays == null || weekDays.isEmpty() || radiusKm <= 0) {
+            return List.of();
+        }
+
+        return routeRepository.findActiveNear(
+                type, weekDays, origin, destination, radiusKm, LocalDate.now(APP_ZONE));
+    }
+
+    /**
+     * A carona de um dia só termina junto com a viagem dela (concluída ou cancelada):
+     * sai de "Minhas caronas" e da busca. A semanal continua valendo nas próximas semanas.
+     */
+    public void endIfOnce(String routeId) {
+        findById(routeId)
+                .filter(route -> route.getRecurrence() == RecurrenceType.ONCE)
+                .filter(route -> route.getStatus() == RouteStatus.ACTIVE)
+                .ifPresent(route -> {
+                    route.deactivate();
+                    routeRepository.save(route);
+                });
+    }
+
+    private Optional<Route> findById(String routeId) {
+        if (!ObjectId.isValid(routeId)) {
+            return Optional.empty();
+        }
+
+        return routeRepository.findById(new ObjectId(routeId));
+    }
+
+    private ApplicationException routeNotFound() {
+        return new ApplicationException(ErrorCode.ROUTE_NOT_FOUND, "Trajeto não encontrado.");
+    }
+}

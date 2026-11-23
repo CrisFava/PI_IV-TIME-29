@@ -1,0 +1,300 @@
+// Autor: Cristian Eduardo Fava - RA 25000636
+
+import 'package:converge/features/ride/data/models/participant_status.dart';
+import 'package:converge/features/ride/data/models/payment_status.dart';
+import 'package:converge/features/ride/data/models/ride_model.dart';
+import 'package:converge/features/ride/data/models/ride_participant_model.dart';
+import 'package:converge/features/ride/data/models/ride_stop_type.dart';
+import 'package:converge/features/ride/data/models/ride_payment_model.dart';
+import 'package:converge/features/ride/data/models/ride_status.dart';
+import 'package:flutter_test/flutter_test.dart';
+
+import 'fakes/fake_ride.dart';
+
+/// Testes unitários e de widgets para ride model.
+/// Cobre cenários como: RideModel.fromJson, RideModel.passengersWithSeat.
+/// Os casos de teste estão descritos de forma autoexplicativa nas chamadas de [test] e [group].
+void main() {
+  group('RideModel.fromJson', () {
+    test('lê os campos principais da viagem', () {
+      final ride = fakeRide();
+
+      expect(ride.id, fakeRideId);
+      expect(ride.sequentialNumber, 7);
+      expect(ride.driverId, fakeDriverId);
+      expect(ride.status, RideStatus.confirmed);
+      expect(ride.chatRoomId, 'ride_ride-1');
+      expect(ride.origin.address, 'Rua das Flores, 50');
+      expect(ride.destination.address, 'PUC-Campinas');
+      expect(ride.departureDateTime, DateTime(2026, 11, 16, 7, 30));
+      expect(ride.completedAt, isNull);
+      expect(ride.vehicleModel, 'Onix');
+      expect(ride.vehicleLicensePlate, 'ABC1D23');
+      expect(ride.participants, hasLength(2));
+      expect(ride.driverName, 'Lucas Silveira');
+    });
+
+    test('lê o itinerário: paradas na ordem, distância e rota', () {
+      final ride = RideModel.fromJson({
+        ...fakeRideJson(),
+        'itinerary': [
+          {
+            'type': 'PICKUP',
+            'passengerId': fakePassengerId,
+            'place': {
+              'address': 'Rua Coronel Quirino, 900',
+              'latitude': -22.8955,
+              'longitude': -47.0525,
+            },
+          },
+          {
+            'type': 'DROPOFF',
+            'passengerId': fakePassengerId,
+            'place': {
+              'address': 'PUC-Campinas',
+              'latitude': -22.8338,
+              'longitude': -47.0519,
+            },
+          },
+        ],
+        'itineraryDistanceKm': 14.2,
+        'itineraryPolyline': 'polyline-com-paradas',
+      });
+
+      expect(ride.itinerary.map((s) => s.type), [
+        RideStopType.pickup,
+        RideStopType.dropOff,
+      ]);
+      expect(ride.itinerary.first.place.address, 'Rua Coronel Quirino, 900');
+      expect(ride.itineraryDistanceKm, 14.2);
+      expect(ride.itineraryPolyline, 'polyline-com-paradas');
+    });
+
+    test('status desconhecido não quebra a leitura', () {
+      final ride = fakeRide(
+        status: 'NOVO_STATUS',
+        passengerStatus: 'STATUS_INEXISTENTE',
+      );
+
+      expect(ride.status, RideStatus.unknown);
+      expect(
+        ride.passengerOf(fakePassengerId)!.status,
+        ParticipantStatus.unknown,
+      );
+    });
+
+    test('lê status EXPIRED do participante corretamente', () {
+      final ride = fakeRide(passengerStatus: 'EXPIRED');
+
+      expect(
+        ride.passengerOf(fakePassengerId)!.status,
+        ParticipantStatus.expired,
+      );
+    });
+
+    test('a lista de participantes não pode ser alterada por fora', () {
+      final participants = fakeRide().participants.toList();
+      final ride = RideModel(
+        id: fakeRideId,
+        sequentialNumber: 1,
+        driverId: fakeDriverId,
+        driverRouteId: 'route-1',
+        origin: fakeRide().origin,
+        destination: fakeRide().destination,
+        departureDateTime: null,
+        completedAt: null,
+        status: RideStatus.confirmed,
+        totalSeats: 3,
+        availableSeats: 2,
+        chatRoomId: 'ride_ride-1',
+        vehicleModel: null,
+        vehicleLicensePlate: null,
+        participants: participants,
+      );
+
+      participants.clear();
+
+      expect(ride.participants, hasLength(2));
+      expect(() => ride.participants.clear(), throwsUnsupportedError);
+    });
+
+    test('JSON vazio vira uma viagem com valores neutros', () {
+      final ride = RideModel.fromJson(const {});
+
+      expect(ride.id, '');
+      expect(ride.participants, isEmpty);
+      expect(ride.chatRoomId, isNull);
+      expect(ride.driverName, 'Motorista');
+    });
+  });
+
+  group('RideModel.passengersWithSeat', () {
+    test('traz só passageiros aceitos e identificáveis', () {
+      final ride = fakeRide(
+        extraParticipants: [
+          {
+            'userId': 'passenger-2',
+            'name': 'Bruno Lima',
+            'role': 'PASSENGER',
+            'status': 'REQUESTED',
+          },
+          {
+            'userId': 'passenger-3',
+            'name': 'Carla Dias',
+            'role': 'PASSENGER',
+            'status': 'NO_SHOW',
+          },
+          // Visão básica: o backend esconde o id de quem o usuário não pode identificar.
+          {
+            'userId': null,
+            'name': 'Diego Reis',
+            'role': 'PASSENGER',
+            'status': 'CONFIRMED',
+          },
+        ],
+      );
+
+      expect(ride.passengersWithSeat.map((p) => p.userId), [fakePassengerId]);
+    });
+
+    test('passageiro que concluiu a viagem continua na lista', () {
+      final ride = fakeRide(status: 'COMPLETED', passengerStatus: 'COMPLETED');
+
+      expect(
+        ride.passengersWithSeat.single.status,
+        ParticipantStatus.completed,
+      );
+    });
+  });
+
+  group('RideModel.passengerOf', () {
+    test(
+      'prefere a participação com vaga quando a pessoa pediu mais de uma vez',
+      () {
+        final ride = fakeRide(
+          passengerStatus: 'CANCELLED',
+          extraParticipants: [
+            {
+              'userId': fakePassengerId,
+              'name': 'Ana Souza',
+              'role': 'PASSENGER',
+              'status': 'CONFIRMED',
+            },
+          ],
+        );
+
+        expect(
+          ride.passengerOf(fakePassengerId)!.status,
+          ParticipantStatus.confirmed,
+        );
+      },
+    );
+
+    test('devolve null para quem não é passageiro da viagem', () {
+      final ride = fakeRide();
+
+      expect(ride.passengerOf('desconhecido'), isNull);
+      expect(ride.passengerOf(fakeDriverId), isNull);
+    });
+  });
+
+  group('RidePaymentModel', () {
+    test('sem valor, o pagamento ainda não foi solicitado', () {
+      final payment = RidePaymentModel.fromJson(const {
+        'rideId': fakeRideId,
+        'passengerId': fakePassengerId,
+        'driverId': fakeDriverId,
+        'receiverName': 'Lucas Silveira',
+        'amount': null,
+        'status': 'PENDING',
+        'confirmedByDriver': false,
+        'pixCopyPaste': null,
+      });
+
+      expect(payment.isRequested, isFalse);
+      expect(payment.isOpen, isFalse);
+      expect(payment.isPaid, isFalse);
+    });
+
+    test('cobrança em aberto traz o valor e o código PIX', () {
+      final payment = RidePaymentModel.fromJson(const {
+        'rideId': fakeRideId,
+        'passengerId': fakePassengerId,
+        'driverId': fakeDriverId,
+        'receiverName': 'Lucas Silveira',
+        'amount': 12.5,
+        'status': 'PENDING',
+        'confirmedByDriver': false,
+        'pixCopyPaste': '000201...',
+        'requestedAt': '2026-11-16T07:00:00',
+      });
+
+      expect(payment.amount, 12.5);
+      expect(payment.isOpen, isTrue);
+      expect(payment.pixCopyPaste, '000201...');
+      expect(payment.requestedAt, DateTime(2026, 11, 16, 7));
+    });
+
+    test('pago deixa de estar em aberto', () {
+      final payment = RidePaymentModel.fromJson(const {
+        'amount': 12.5,
+        'status': 'PAID',
+        'confirmedByDriver': true,
+        'paidAt': '2026-11-16T09:00:00',
+      });
+
+      expect(payment.status, PaymentStatus.paid);
+      expect(payment.isPaid, isTrue);
+      expect(payment.isOpen, isFalse);
+    });
+  });
+
+  group('valores do rateio recebidos da API', () {
+    test('estimativa e cobrança final são independentes', () {
+      final passenger = RideParticipantModel.fromJson(const {
+        'role': 'PASSENGER',
+        'status': 'COMPLETED',
+        'estimatedAmount': 15,
+        'finalAmount': 12.5,
+        'paymentStatus': 'PENDING',
+      });
+
+      expect(passenger.estimatedAmount, 15.0);
+      expect(passenger.finalAmount, 12.5);
+      expect(passenger.paymentStatus, PaymentStatus.pending);
+    });
+
+    test('campos privados ausentes não viram cobrança de valor zero', () {
+      final passenger = RideParticipantModel.fromJson(const {
+        'role': 'PASSENGER',
+        'status': 'CONFIRMED',
+      });
+
+      expect(passenger.estimatedAmount, isNull);
+      expect(passenger.finalAmount, isNull);
+      expect(passenger.paymentStatus, isNull);
+    });
+
+    for (final status in ['PAID', 'NOT_APPLICABLE', 'NOVO_STATUS', null]) {
+      test('valor emitido com status $status não está em aberto', () {
+        final payment = RidePaymentModel.fromJson({
+          'amount': 12,
+          'status': status,
+        });
+
+        expect(payment.isRequested, isTrue);
+        expect(payment.isOpen, isFalse);
+      });
+    }
+
+    test('cobrança emitida sem PIX continua em aberto', () {
+      final payment = RidePaymentModel.fromJson(const {
+        'amount': 10,
+        'status': 'PENDING',
+      });
+
+      expect(payment.pixCopyPaste, isNull);
+      expect(payment.isOpen, isTrue);
+    });
+  });
+}

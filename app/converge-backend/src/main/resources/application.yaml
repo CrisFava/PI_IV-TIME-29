@@ -1,0 +1,34 @@
+spring:
+  application:
+    name: converge-backend
+  profiles:
+    active: dev
+  docker:
+    compose:
+      enabled: false
+  data:
+    mongodb:
+      uri: ${MONGODB_CONNECTION_STRING}
+      auto-index-creation: true
+
+google:
+  maps:
+    api-key: ${GOOGLE_MAPS_API_KEY:}
+    timeout: 5s
+
+converge:
+  ride:
+    request-timeout: 1h
+    request-timeout-check-interval: PT30S
+    departure-expiration-check-interval: PT1M
+  # Inadimplência (RF67). O job fica desligado por padrão: o banco converge-dev é compartilhado.
+  # overdue-since: cobranças pedidas antes dessa data e hora nunca viram vencidas.
+  payment:
+    overdue-enabled: ${CONVERGE_PAYMENT_OVERDUE_ENABLED:false}
+    due-after: PT5M
+    overdue-check-interval: PT1M
+    overdue-limit: 2
+    overdue-since: ${CONVERGE_PAYMENT_OVERDUE_SINCE:2026-11-20T00:00:00}
+  # Reputação: o job semanal dos selos recalcula os contadores com as viagens dos últimos N dias.
+  user:
+    reputation-window-days: 90

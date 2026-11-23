@@ -1,0 +1,304 @@
+// Autor: Sara Fernandes Monteiro - RA 25024107
+
+package com.converge.api.modules.ride.domain.model.subtypes;
+
+import com.converge.api.modules.ride.domain.enums.ParticipantPaymentStatus;
+import com.converge.api.modules.ride.domain.enums.ParticipantStatus;
+import com.converge.api.modules.route.domain.model.subtypes.Place;
+import com.converge.api.modules.user.domain.enums.user.ParticipationRole;
+import jakarta.annotation.Nullable;
+import jakarta.validation.Valid;
+import jakarta.validation.constraints.NotBlank;
+import jakarta.validation.constraints.NotNull;
+import jakarta.validation.constraints.PositiveOrZero;
+import lombok.AccessLevel;
+import lombok.Getter;
+import lombok.NoArgsConstructor;
+import org.springframework.data.mongodb.core.index.Indexed;
+
+import java.math.BigDecimal;
+import java.time.LocalDateTime;
+
+/**
+ * Subdocumento que representa a participação de um motorista ou passageiro em uma viagem.
+ */
+@NoArgsConstructor(access = AccessLevel.PROTECTED)
+@Getter
+public class Participant {
+
+    @NotBlank
+    @Indexed
+    private String userId;
+
+    @NotNull
+    private ParticipationRole role;
+
+    @Nullable
+    private String passengerRouteId;
+
+    @Nullable
+    @Valid
+    private Place boardingLocation;
+
+    @Nullable
+    @Valid
+    private Place dropOffLocation;
+
+    @Nullable
+    private Double detourGeneratedKm;
+
+    @NotNull
+    private ParticipantStatus status;
+
+    @NotNull
+    private LocalDateTime requestedAt;
+
+    @Nullable
+    private LocalDateTime respondedAt;
+
+    @Nullable
+    private String rejectionReason;
+
+    @Nullable
+    private String cancellationReason;
+
+    private boolean lateCancellation = false;
+
+    // O motorista removeu este passageiro já confirmado, o que conta na reputação dele
+    private boolean removedByDriver = false;
+
+    @NotNull
+    @PositiveOrZero
+    private BigDecimal estimatedAmount;
+
+    @NotNull
+    @PositiveOrZero
+    private BigDecimal maxAmount;
+
+    @Nullable
+    @PositiveOrZero
+    private BigDecimal finalAmount;
+
+    @NotNull
+    private ParticipantPaymentStatus paymentStatus;
+
+    // Valor combinado no chat e cobrado pelo motorista em "Solicitar pagamento"
+    @Nullable
+    @PositiveOrZero
+    private BigDecimal requestedAmount;
+
+    @Nullable
+    private LocalDateTime paymentRequestedAt;
+
+    @Nullable
+    private LocalDateTime paidAt;
+
+    @Nullable
+    private LocalDateTime confirmedAt;
+
+    // Quando o motorista confirmou que o passageiro entrou no carro
+    @Nullable
+    private LocalDateTime boardedAt;
+
+    // Quando a cobrança virou dívida vencida. Nulo = não vencida
+    @Nullable
+    private LocalDateTime overdueAt;
+
+    // Quando a dívida veio de denúncia de falta de pagamento. "Já paguei" não a desfaz
+    @Nullable
+    private LocalDateTime nonPaymentReportedAt;
+
+    @Nullable
+    private LocalDateTime cancelledAt;
+
+    @NotNull
+    private LocalDateTime updatedAt;
+
+    public static Participant driver(String userId, LocalDateTime now) {
+        Participant driver = new Participant();
+
+        driver.userId = userId;
+        driver.role = ParticipationRole.DRIVER;
+        driver.status = ParticipantStatus.CONFIRMED;
+        driver.requestedAt = now;
+        driver.respondedAt = now;
+        driver.estimatedAmount = BigDecimal.ZERO;
+        driver.maxAmount = BigDecimal.ZERO;
+        driver.paymentStatus = ParticipantPaymentStatus.NOT_APPLICABLE;
+        driver.confirmedAt = now;
+        driver.updatedAt = now;
+
+        return driver;
+    }
+
+    public void confirm(LocalDateTime now) {
+        this.status = ParticipantStatus.CONFIRMED;
+        this.respondedAt = now;
+        this.confirmedAt = now;
+        this.updatedAt = now;
+    }
+
+    public void confirm(@Nullable Double detourGeneratedKm, @Nullable BigDecimal maxAmount, LocalDateTime now) {
+        this.detourGeneratedKm = detourGeneratedKm;
+        if (maxAmount != null && maxAmount.signum() >= 0) {
+            this.maxAmount = maxAmount;
+        }
+        confirm(now);
+    }
+
+    public void reject(@Nullable String reason, LocalDateTime now) {
+        this.status = ParticipantStatus.REJECTED;
+        this.respondedAt = now;
+        this.rejectionReason = reason;
+        this.updatedAt = now;
+    }
+
+    public void expire(LocalDateTime now) {
+        this.status = ParticipantStatus.EXPIRED;
+        this.respondedAt = now;
+        this.paymentStatus = ParticipantPaymentStatus.NOT_APPLICABLE;
+        this.updatedAt = now;
+    }
+
+    public void board(LocalDateTime now) {
+        if (this.boardedAt == null) {
+            this.boardedAt = now;
+            this.updatedAt = now;
+        }
+    }
+
+    public void complete(LocalDateTime now) {
+        this.status = ParticipantStatus.COMPLETED;
+        this.updatedAt = now;
+    }
+
+    public void markNoShow(LocalDateTime now) {
+        this.status = ParticipantStatus.NO_SHOW;
+        this.finalAmount = BigDecimal.ZERO;
+        this.paymentStatus = ParticipantPaymentStatus.NOT_APPLICABLE;
+        this.updatedAt = now;
+    }
+
+    public void requestPayment(BigDecimal amount, LocalDateTime now) {
+        this.requestedAmount = amount;
+        this.paymentRequestedAt = now;
+        this.paymentStatus = ParticipantPaymentStatus.PENDING;
+        this.updatedAt = now;
+    }
+
+    /**
+     * "Já paguei": o passageiro informa que pagou a cobrança (RF41) e ela fica paga.
+     * Não há confirmação de recebimento pelo motorista.
+     */
+    public void markPaidByPassenger(LocalDateTime now) {
+        this.paymentStatus = ParticipantPaymentStatus.PAID;
+        this.paidAt = now;
+        this.updatedAt = now;
+    }
+
+    // Sem valor a cobrar (viagem sem custo calculado): não há pagamento.
+    public void waivePayment(LocalDateTime now) {
+        this.paymentStatus = ParticipantPaymentStatus.NOT_APPLICABLE;
+        this.updatedAt = now;
+    }
+
+    /**
+     * Cobrança emitida e ainda não paga. Todo passageiro nasce com o status PENDING, então o que
+     * marca a cobrança de verdade é a data em que ela foi emitida.
+     */
+    public boolean hasOpenCharge() {
+        return this.paymentRequestedAt != null && this.paymentStatus == ParticipantPaymentStatus.PENDING;
+    }
+
+    public boolean isCharged() {
+        return this.paymentRequestedAt != null;
+    }
+
+    public boolean isOverdue() {
+        return this.overdueAt != null;
+    }
+
+    // Dívida por prazo ainda em aberto. A dívida de denúncia não entra: só a moderação a desfaz
+    public boolean isOverdueOpenCharge() {
+        return hasOpenCharge() && isOverdue() && this.nonPaymentReportedAt == null;
+    }
+
+    /**
+     * Cobrança de passageiro que já terminou a viagem, não foi paga e passou do prazo.
+     * Cobranças emitidas antes de [since] nunca vencem.
+     */
+    public boolean isDueForOverdue(LocalDateTime dueLimit, LocalDateTime since) {
+        return this.role == ParticipationRole.PASSENGER
+                && this.status == ParticipantStatus.COMPLETED
+                && this.paymentStatus == ParticipantPaymentStatus.PENDING
+                && this.paymentRequestedAt != null
+                && this.requestedAmount != null
+                && this.overdueAt == null
+                && !this.paymentRequestedAt.isAfter(dueLimit)
+                && !this.paymentRequestedAt.isBefore(since);
+    }
+
+    public void cancel(@Nullable String reason, boolean late, LocalDateTime now) {
+        this.status = ParticipantStatus.CANCELLED;
+        this.cancellationReason = reason;
+        this.lateCancellation = late;
+        this.cancelledAt = now;
+        this.updatedAt = now;
+
+        if (!late) {
+            this.paymentStatus = ParticipantPaymentStatus.NOT_APPLICABLE;
+        }
+    }
+
+    public void removeByDriver(@Nullable String reason, LocalDateTime now) {
+        cancel(reason, false, now);
+        this.removedByDriver = true;
+    }
+
+    public void updateEstimatedAmount(BigDecimal candidateAmount, LocalDateTime now) {
+        if (candidateAmount == null) {
+            return;
+        }
+        this.estimatedAmount = capAtMaxAmount(candidateAmount);
+        this.updatedAt = now;
+    }
+
+    public void defineFinalAmount(BigDecimal candidateAmount, LocalDateTime now) {
+        if (candidateAmount == null) {
+            return;
+        }
+        this.finalAmount = capAtMaxAmount(candidateAmount);
+        this.updatedAt = now;
+    }
+
+    private BigDecimal capAtMaxAmount(BigDecimal amount) {
+        if (this.maxAmount != null && this.maxAmount.signum() > 0 && amount.compareTo(this.maxAmount) > 0) {
+            return this.maxAmount;
+        }
+        return amount;
+    }
+
+    public static Participant passengerRequest(
+            String userId,
+            String passengerRouteId,
+            Place boardingLocation,
+            Place dropOffLocation,
+            LocalDateTime now
+    ) {
+        Participant passenger = new Participant();
+
+        passenger.userId = userId;
+        passenger.role = ParticipationRole.PASSENGER;
+        passenger.passengerRouteId = passengerRouteId;
+        passenger.boardingLocation = boardingLocation;
+        passenger.dropOffLocation = dropOffLocation;
+        passenger.status = ParticipantStatus.REQUESTED;
+        passenger.requestedAt = now;
+        passenger.estimatedAmount = BigDecimal.ZERO;
+        passenger.maxAmount = BigDecimal.ZERO;
+        passenger.paymentStatus = ParticipantPaymentStatus.PENDING;
+        passenger.updatedAt = now;
+
+        return passenger;
+    }
+}
