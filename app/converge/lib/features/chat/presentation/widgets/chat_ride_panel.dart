@@ -20,6 +20,7 @@ import 'chat_panel_card.dart';
 /// Motorista: iniciar e concluir a viagem. Depois de concluída, os dois
 /// podem se avaliar.
 class ChatRidePanel extends ConsumerWidget {
+  /// Conversa cuja viagem é mostrada.
   final ChatConversation conversation;
 
   const ChatRidePanel({super.key, required this.conversation});
@@ -68,6 +69,9 @@ class ChatRidePanel extends ConsumerWidget {
     };
   }
 
+  /// Viagem concluída. O motorista vê só o aviso (ele avalia cada passageiro em outra tela). O
+  /// passageiro vê "Avaliar motorista", a nota que já deu ou, se as avaliações não carregarem, um
+  /// botão para tentar de novo.
   Widget _completed(BuildContext context, WidgetRef ref, String route) {
     // No grupo, o motorista avalia cada passageiro na tela de avaliação da viagem
     if (conversation.viewerIsDriver) {
@@ -141,6 +145,7 @@ class ChatRidePanel extends ConsumerWidget {
     );
   }
 
+  /// Inicia a viagem com vibração média (ação central do motorista).
   Future<void> _startRide(WidgetRef ref) async {
     HapticFeedback.mediumImpact();
     await ref
@@ -148,6 +153,8 @@ class ChatRidePanel extends ConsumerWidget {
         .startRide();
   }
 
+  /// Pede confirmação antes de concluir, porque concluir encerra a viagem para todos e emite as
+  /// cobranças de quem ainda estava a bordo.
   Future<void> _completeRide(BuildContext context, WidgetRef ref) async {
     HapticFeedback.lightImpact();
     final confirmed = await showDialog<bool>(

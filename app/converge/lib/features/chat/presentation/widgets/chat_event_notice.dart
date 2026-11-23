@@ -6,9 +6,16 @@ import '../../../../core/config/styles.dart';
 
 /// Aviso centralizado na conversa, para eventos de pagamento e da viagem.
 class ChatEventNotice extends StatelessWidget {
+  /// Ícone à esquerda do texto.
   final IconData icon;
+
+  /// Texto do aviso.
   final String text;
+
+  /// Horário já formatado; vazio para não mostrar.
   final String time;
+
+  /// Usa as cores de sucesso (verde), como no pagamento confirmado.
   final bool success;
 
   const ChatEventNotice({

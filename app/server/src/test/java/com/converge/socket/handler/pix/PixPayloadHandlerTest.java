@@ -20,8 +20,14 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
  */
 class PixPayloadHandlerTest {
 
+    /** O handler não tem estado, então uma instância serve para todos os testes. */
     private final PixPayloadHandler handler = new PixPayloadHandler();
 
+    /**
+     * Gera o payload e devolve só o texto, para os testes conferirem os campos por substring.
+     *
+     * @param amount valor em texto, para o teste controlar as casas decimais (ex.: "10.5000")
+     */
     private String payloadOf(String key, String amount, String name, String city) throws ServerException {
         return handler.execute(new PixPayloadRequest(key, new BigDecimal(amount), name, city)).getPayload();
     }
@@ -29,6 +35,7 @@ class PixPayloadHandlerTest {
     @Test
     @DisplayName("CRC16 deve bater com o valor de verificação do CCITT-FALSE")
     void shouldMatchCcittFalseCheckValue() {
+        // "123456789" é a entrada padrão de verificação de CRCs; 0x29B1 é o resultado do CCITT-FALSE
         assertEquals("29B1", PixPayloadHandler.crc16("123456789"));
     }
 
@@ -37,14 +44,19 @@ class PixPayloadHandlerTest {
     void shouldBuildPayloadWithKeyAmountReceiverAndCity() throws ServerException {
         String payload = payloadOf("motorista@puc-campinas.edu.br", "12.5", "João da Conceição", "Campinas");
 
+        // Cada campo é id (2) + tamanho (2) + valor
         assertTrue(payload.startsWith("000201"));
+        // Campo 26 com o GUI do PIX (subcampo 00) e a chave de 29 caracteres (subcampo 01)
         assertTrue(payload.contains("0014br.gov.bcb.pix0129motorista@puc-campinas.edu.br"));
         assertTrue(payload.contains("52040000"));
         assertTrue(payload.contains("5303986"));
+        // O valor 12.5 sai sempre com 2 casas
         assertTrue(payload.contains("540512.50"));
         assertTrue(payload.contains("5802BR"));
+        // Nome sem acento e em maiúsculas
         assertTrue(payload.contains("5917JOAO DA CONCEICAO"));
         assertTrue(payload.contains("6008CAMPINAS"));
+        // Campo 62 com o txid "***" do PIX estático
         assertTrue(payload.contains("62070503***"));
     }
 

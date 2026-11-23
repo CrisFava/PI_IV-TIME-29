@@ -6,6 +6,7 @@ part of '../auth_session.dart';
 /// falhou depois de a conta Firebase ser criada, ou a conta foi criada fora
 /// do app. O usuário precisa completar o perfil com [ProfileInput].
 class ProfileIncomplete extends AuthSession {
+  /// Identidade no Firebase, cujo UID e e-mail vão no cadastro.
   final AuthUser authUser;
 
   const ProfileIncomplete(this.authUser);

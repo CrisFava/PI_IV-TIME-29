@@ -23,11 +23,11 @@ final chatViewerProvider = Provider.autoDispose<UserModel?>((ref) {
   return session is Authenticated ? session.user : null;
 });
 
-/// Quanto tempo a conversa fica disponível depois da última viagem entre os dois.
+/// Quanto tempo a conversa fica disponível depois do fim da viagem.
 const chatLifetime = Duration(days: 7);
 
-/// A conversa continua aberta enquanto houver viagem em andamento ou marcada
-/// entre os dois e até [chatLifetime] depois do fim da última.
+/// A conversa continua aberta enquanto a viagem estiver marcada ou em andamento,
+/// e até [chatLifetime] depois do fim dela (a conclusão ou, sem ela, o horário de saída).
 bool isChatOpen(RideModel ride, DateTime now) {
   switch (ride.status) {
     case RideStatus.inProgress ||
@@ -40,10 +40,11 @@ bool isChatOpen(RideModel ride, DateTime now) {
   }
 }
 
-/// Conversas liberadas para o usuário logado: **uma por pessoa**, mesmo que
-/// tenham feito várias caronas juntos. A viagem de cada conversa é a mais
-/// relevante entre os dois: a em andamento, senão a próxima, senão a última.
-/// A conversa expira uma semana depois da última viagem ([isChatOpen]).
+/// Conversas liberadas para o usuário logado: **uma por sala** (o grupo de cada viagem),
+/// ordenadas pela relevância: as em andamento, depois as próximas (da mais perto) e por fim as
+/// que já terminaram (da mais recente). Viagens canceladas não têm conversa.
+/// A conversa expira uma semana depois do fim da viagem ([isChatOpen]); com a lista aberta, um
+/// timer recarrega o provider quando a primeira delas expira.
 /// Recarregue com `ref.invalidate(myRidesProvider)`.
 final conversationsProvider =
     FutureProvider.autoDispose<List<ChatConversation>>((ref) async {
@@ -86,7 +87,7 @@ final conversationsProvider =
       return open;
     });
 
-// Quando a conversa expira; nulo enquanto a viagem não terminou
+/// Quando a conversa expira; nulo enquanto a viagem não terminou.
 DateTime? _expiryOf(RideModel ride) => switch (ride.status) {
   RideStatus.inProgress ||
   RideStatus.awaitingConfirmation ||
@@ -94,8 +95,8 @@ DateTime? _expiryOf(RideModel ride) => switch (ride.status) {
   _ => (ride.completedAt ?? ride.departureDateTime)?.add(chatLifetime),
 };
 
-// Em andamento primeiro; depois as próximas (da mais perto); depois as que já
-// terminaram (da mais recente)
+/// Ordem das conversas: em andamento primeiro; depois as próximas (da mais perto); depois as que já
+/// terminaram (da mais recente).
 int _byRelevance(ChatConversation a, ChatConversation b) {
   int group(ChatConversation c) => switch (c.ride.status) {
     RideStatus.inProgress => 0,
@@ -117,6 +118,8 @@ final chatMessagesProvider = StreamProvider.autoDispose
     );
 
 /// Mensagem amigável para qualquer erro das telas de chat.
+///
+/// [ChatException] já traz a mensagem; os demais erros (API, autenticação) usam [authErrorMessage].
 String chatErrorMessage(Object error) => switch (error) {
   ChatException(:final message) => message,
   _ => authErrorMessage(error),

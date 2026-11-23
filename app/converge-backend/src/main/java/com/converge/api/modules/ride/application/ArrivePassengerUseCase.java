@@ -32,6 +32,19 @@ public class ArrivePassengerUseCase implements UseCase<PassengerRequestCommand, 
     private final RouteAccess routeAccess;
     private final RidePaymentNotifier paymentNotifier;
 
+    /**
+     * Confirma a chegada de um passageiro (RF73), tudo na mesma transação:
+     *
+     * 1. Confere que o usuário logado é o motorista da viagem.
+     * 2. Marca o passageiro como COMPLETED (a viagem precisa estar IN_PROGRESS e ele CONFIRMED).
+     * 3. Calcula o valor dele com o rateio do momento, dividido entre quem já desceu e quem ainda está a
+     *    bordo. Esse valor não muda mais no encerramento da viagem (RF38).
+     * 4. Emite a cobrança de quem concluiu e ainda não foi cobrado.
+     * 5. Depois de salvar, encerra a procura de um dia só do passageiro e notifica os cobrados (PAYMENT_DUE).
+     *
+     * @param command viagem, passageiro que desceu e firebaseUid do motorista
+     * @return a viagem salva
+     */
     @Override
     @Transactional(transactionManager = "mongoTransactionManager")
     public Ride execute(PassengerRequestCommand command) {
@@ -49,6 +62,10 @@ public class ArrivePassengerUseCase implements UseCase<PassengerRequestCommand, 
         return saved;
     }
 
+    /**
+     * Trajeto de procura do passageiro na viagem, só se ele já concluiu. Volta lista vazia (e não
+     * Optional) para encaixar direto no forEach de quem chama.
+     */
     private static List<String> passengerRouteIdOf(Ride ride, String passengerId) {
         return ride.getParticipants().stream()
                 .filter(participant -> participant.getRole() == ParticipationRole.PASSENGER)

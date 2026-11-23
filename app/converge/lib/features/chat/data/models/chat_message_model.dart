@@ -19,12 +19,20 @@ class ChatMessageModel {
   /// Uid do Firebase de quem enviou. As regras do banco garantem que é o de quem está
   /// logado, então é este campo que decide se a mensagem é minha.
   final String senderUid;
+
+  /// Nome de quem enviou, gravado junto para a conversa não precisar buscar o perfil.
   final String senderName;
+
+  /// Tipo da mensagem: texto digitado ou aviso.
   final ChatMessageType type;
+
+  /// Texto da mensagem ou do aviso.
   final String text;
 
   /// Valor da cobrança, nas mensagens de pagamento.
   final double? amount;
+
+  /// Horário do servidor do Firebase; nulo enquanto a mensagem ainda não foi confirmada pelo servidor.
   final DateTime? sentAt;
 
   const ChatMessageModel({
@@ -38,6 +46,8 @@ class ChatMessageModel {
     this.sentAt,
   });
 
+  /// Se a mensagem foi enviada pela conta com esse UID do Firebase. Mensagem sem `senderUid` nunca
+  /// é considerada de ninguém.
   bool isSentBy(String firebaseUid) =>
       senderUid.isNotEmpty && senderUid == firebaseUid;
 

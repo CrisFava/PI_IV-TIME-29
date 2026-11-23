@@ -30,6 +30,9 @@ import static org.mockito.Mockito.when;
  * Testes unitários para {@link CompletedRidesIndicatorReconciler}.
  * Valida cenários como: Deve registrar as viagens concluídas dos últimos 7 dias; Falha em uma viagem não impede o reprocessamento das outras.
  * <p>
+ * A leitura das viagens e o registro nos indicadores são mocks: o teste confere só a orquestração do job
+ * (janela de 7 dias, uma chamada por viagem e tolerância a falhas).
+ * <p>
  * Os métodos de teste estão bem explicativos através de suas anotações {@code @DisplayName}.
  */
 @ExtendWith(MockitoExtension.class)
@@ -44,6 +47,7 @@ class CompletedRidesIndicatorReconcilerTest {
     @InjectMocks
     private CompletedRidesIndicatorReconciler reconciler;
 
+    /** Viagem concluída a gasolina com um passageiro, identificada pelo rideId. */
     private RideCompletedEvent ride(String rideId) {
         return new RideCompletedEvent(
                 rideId, "driver", List.of("p1"), 12.0, "GASOLINE", 12.0, LocalDateTime.of(2026, 11, 12, 8, 0));

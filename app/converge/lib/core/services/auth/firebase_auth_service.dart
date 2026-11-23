@@ -7,17 +7,25 @@ import 'auth_exception.dart';
 import 'auth_user.dart';
 
 /// Implementação do serviço [AuthService] integrado ao Firebase Authentication.
+///
+/// Converte o `User` do SDK em [AuthUser] e todo `FirebaseAuthException` em [AuthException] com
+/// mensagem em português, para nenhuma tela depender do SDK.
 class FirebaseAuthService implements AuthService {
+  /// Instância do SDK; nos testes não é usada, porque o serviço inteiro é trocado por um falso.
   final fb.FirebaseAuth _auth;
 
   FirebaseAuthService(this._auth);
 
+  /// Repassa o stream do SDK convertendo cada usuário.
   @override
   Stream<AuthUser?> authStateChanges() => _auth.authStateChanges().map(_map);
 
+  /// Usuário atual do SDK convertido.
   @override
   AuthUser? get currentUser => _map(_auth.currentUser);
 
+  /// Pega o token do usuário atual. Com [expectedUid], confere a conta antes e depois de pedir o token,
+  /// porque o login pode trocar enquanto o pedido está em andamento.
   @override
   Future<String?> getIdToken({
     bool forceRefresh = false,
@@ -39,6 +47,7 @@ class FirebaseAuthService implements AuthService {
     return token;
   }
 
+  /// Login com o e-mail sem espaços nas pontas; a senha vai como foi digitada.
   @override
   Future<AuthUser> signIn({
     required String email,
@@ -53,6 +62,7 @@ class FirebaseAuthService implements AuthService {
     return _map(credential.user)!;
   }
 
+  /// Cria a conta com o e-mail sem espaços nas pontas.
   @override
   Future<AuthUser> signUp({
     required String email,
@@ -67,10 +77,12 @@ class FirebaseAuthService implements AuthService {
     return _map(credential.user)!;
   }
 
+  /// Pede ao Firebase o e-mail de redefinição de senha.
   @override
   Future<void> sendPasswordResetEmail(String email) =>
       _guard(() => _auth.sendPasswordResetEmail(email: email.trim()));
 
+  /// Pede ao Firebase o e-mail de verificação do usuário logado.
   @override
   Future<void> sendEmailVerification() async {
     final user = _auth.currentUser;
@@ -78,9 +90,11 @@ class FirebaseAuthService implements AuthService {
     await _guard(user.sendEmailVerification);
   }
 
+  /// Sai da conta no Firebase; o `authStateChanges` emite nulo em seguida.
   @override
   Future<void> signOut() => _auth.signOut();
 
+  /// Converte o usuário do SDK no modelo do app; nulo continua nulo.
   AuthUser? _map(fb.User? user) => user == null
       ? null
       : AuthUser(
@@ -89,6 +103,7 @@ class FirebaseAuthService implements AuthService {
           emailVerified: user.emailVerified,
         );
 
+  /// Executa a chamada ao SDK trocando `FirebaseAuthException` por [AuthException].
   Future<T> _guard<T>(Future<T> Function() action) async {
     try {
       return await action();
@@ -97,6 +112,8 @@ class FirebaseAuthService implements AuthService {
     }
   }
 
+  /// Mensagem amigável para cada código de erro do Firebase Auth. Usuário inexistente e senha errada
+  /// dão a mesma mensagem, para não revelar quais e-mails têm conta.
   static String _messageFor(String code) => switch (code) {
     'invalid-email' => 'E-mail inválido.',
     'user-disabled' => 'Esta conta foi desativada.',

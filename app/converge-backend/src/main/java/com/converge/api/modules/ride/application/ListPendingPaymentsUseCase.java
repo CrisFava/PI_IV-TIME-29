@@ -22,6 +22,13 @@ public class ListPendingPaymentsUseCase implements UseCase<String, List<PaymentR
     private final RideRepository rideRepository;
     private final RidePaymentViewService paymentView;
 
+    /**
+     * Percorre as viagens em que o usuário participa e devolve as que têm cobrança emitida e ainda
+     * PENDING para ele (RF68).
+     *
+     * @param firebaseUid uid do Firebase do usuário logado
+     * @return uma visão de pagamento por cobrança em aberto, com o Pix Copia e Cola; lista vazia se estiver em dia
+     */
     @Override
     public List<PaymentResponseDTO> execute(String firebaseUid) {
         String userId = rideAccess.currentUserId(firebaseUid);

@@ -3,6 +3,9 @@
 /// Formatação e leitura de valores em reais.
 abstract final class CurrencyFormatter {
   /// `1234.5` vira `R$ 1.234,50`.
+  ///
+  /// Sempre 2 casas, vírgula decimal e ponto a cada 3 dígitos. Negativo leva o sinal antes:
+  /// `-R$ 3,20`.
   static String format(double value) {
     final fixed = value.abs().toStringAsFixed(2);
     final separator = fixed.indexOf('.');
@@ -20,6 +23,8 @@ abstract final class CurrencyFormatter {
 
   /// Lê o que o usuário digitou (`12,5`, `12.50`, `R$ 1.234,56`).
   /// Devolve `null` quando o texto não é um valor, inclusive valores negativos.
+  ///
+  /// O resultado é arredondado para centavos.
   static double? parse(String input) {
     // Recusa antes de limpar o texto, senão "-3,20" viraria 3,20.
     if (input.contains('-')) return null;

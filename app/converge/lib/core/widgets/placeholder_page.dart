@@ -4,6 +4,7 @@ import 'package:flutter/material.dart';
 
 /// Tela provisória enquanto a interface real não é implementada.
 class PlaceholderPage extends StatelessWidget {
+  /// Texto mostrado no centro da tela.
   final String title;
 
   const PlaceholderPage(this.title, {super.key});

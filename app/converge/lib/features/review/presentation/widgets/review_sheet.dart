@@ -8,8 +8,11 @@ import '../../../../core/config/styles.dart';
 import '../../../auth/state/auth_action_controller.dart';
 import '../../state/ride_reviews_controller.dart';
 
-/// Abre o painel de avaliação de um participante de uma viagem concluída.
+/// Abre o painel de avaliação de um participante de uma viagem concluída (RF43).
 /// Devolve `true` quando a avaliação foi enviada.
+///
+/// [reviewedIsDriver] só muda o texto ("Como foi a carona com este motorista?"); o papel gravado é
+/// calculado pela API. Fechar o painel sem enviar devolve `false`.
 Future<bool> showReviewSheet(
   BuildContext context, {
   required String rideId,
@@ -35,10 +38,18 @@ Future<bool> showReviewSheet(
   return sent ?? false;
 }
 
+/// Conteúdo do painel: estrelas, comentário opcional e o botão de enviar.
 class _ReviewSheet extends ConsumerStatefulWidget {
+  /// Viagem avaliada.
   final String rideId;
+
+  /// Quem é avaliado.
   final String reviewedId;
+
+  /// Nome mostrado no título.
   final String reviewedName;
+
+  /// Se quem é avaliado foi o motorista da viagem.
   final bool reviewedIsDriver;
 
   const _ReviewSheet({
@@ -52,7 +63,9 @@ class _ReviewSheet extends ConsumerStatefulWidget {
   ConsumerState<_ReviewSheet> createState() => _ReviewSheetState();
 }
 
+/// Estado do painel: a nota escolhida, o comentário, o envio em andamento e o erro.
 class _ReviewSheetState extends ConsumerState<_ReviewSheet> {
+  /// Texto abaixo das estrelas para cada nota; a posição 0 é o convite antes de escolher.
   static const List<String> _ratingLabels = [
     'Toque nas estrelas para avaliar',
     'Muito ruim',
@@ -62,17 +75,26 @@ class _ReviewSheetState extends ConsumerState<_ReviewSheet> {
     'Excelente',
   ];
 
+  /// Comentário digitado (até 500 caracteres).
   final _commentController = TextEditingController();
+
+  /// Nota escolhida; 0 enquanto nenhuma estrela foi tocada.
   int _rating = 0;
+
+  /// Envio em andamento: estrelas, campo e botão ficam travados.
   bool _submitting = false;
+
+  /// Mensagem de erro mostrada acima do botão.
   String? _error;
 
+  /// Libera o controller do comentário.
   @override
   void dispose() {
     _commentController.dispose();
     super.dispose();
   }
 
+  /// Escolhe a nota com vibração leve e limpa o erro. Ignorado durante o envio.
   void _selectRating(int rating) {
     if (_submitting) return;
     HapticFeedback.lightImpact();
@@ -82,6 +104,8 @@ class _ReviewSheetState extends ConsumerState<_ReviewSheet> {
     });
   }
 
+  /// Envia a avaliação. Sem nota, mostra o erro sem chamar a API. Em sucesso fecha o painel com
+  /// `true`; em erro, mantém o painel aberto com a mensagem e libera para tentar de novo.
   Future<void> _submit() async {
     if (_submitting) return;
     if (_rating == 0) {

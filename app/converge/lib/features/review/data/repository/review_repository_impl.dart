@@ -19,10 +19,13 @@ final reviewRepositoryProvider = Provider<ReviewRepository>(
 
 /// Implementação do repositório de avaliações entre usuários (motoristas e passageiros).
 class ReviewRepositoryImpl implements ReviewRepository {
+  /// Cliente HTTP com os interceptors de autenticação, idempotência e erro.
   final Dio _dio;
 
   ReviewRepositoryImpl(this._dio);
 
+  /// `POST /reviews`. A API recusa avaliação repetida (`REVIEW_ALREADY_EXISTS`) e de quem não
+  /// concluiu a viagem.
   @override
   Future<ReviewModel> createReview(CreateReviewRequest request) async {
     try {
@@ -40,16 +43,19 @@ class ReviewRepositoryImpl implements ReviewRepository {
     }
   }
 
+  /// `GET /reviews/given?rideId=`.
   @override
   Future<List<ReviewModel>> listGivenInRide(String rideId) =>
       _list(ReviewEndpoints.given, {'rideId': rideId});
 
+  /// `GET /reviews/received/{userId}?role=`.
   @override
   Future<List<ReviewModel>> listReceived(
     String userId, {
     required ParticipationRole role,
   }) => _list(ReviewEndpoints.received(userId), {'role': role.toJson()});
 
+  /// GET que devolve uma lista de avaliações no envelope da API.
   Future<List<ReviewModel>> _list(
     String path,
     Map<String, dynamic> query,

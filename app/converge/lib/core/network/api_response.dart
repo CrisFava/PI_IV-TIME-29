@@ -7,6 +7,12 @@ import 'api_exception.dart';
 ///
 /// Lança [ApiException] se `success` for `false` ou se o corpo não estiver
 /// no formato esperado.
+///
+/// - `body`: o corpo já decodificado da resposta do Dio.
+/// - `fromJson`: conversor do `data` para o modelo.
+/// - `status`: status HTTP, repassado para a exceção quando `success` é `false`.
+///
+/// Um corpo fora do envelope ou um `data` que não é objeto é tratado como erro 500.
 T unwrapApiResponse<T>(
   Object? body,
   T Function(Map<String, dynamic> json) fromJson, {
@@ -26,6 +32,9 @@ T unwrapApiResponse<T>(
 }
 
 /// Extrai uma lista de itens do campo `data` no envelope `ApplicationResponse`.
+///
+/// Mesmas regras de [unwrapApiResponse], mas `data` precisa ser uma lista. Itens que não são objetos
+/// JSON são descartados em vez de derrubar a lista inteira.
 List<T> unwrapApiListResponse<T>(
   Object? body,
   T Function(Map<String, dynamic> json) fromJson, {

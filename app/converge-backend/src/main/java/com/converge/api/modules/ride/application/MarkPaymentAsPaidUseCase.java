@@ -32,6 +32,19 @@ public class MarkPaymentAsPaidUseCase implements UseCase<PassengerRequestCommand
     private final RidePaymentNotifier paymentNotifier;
     private final ResolveOverduePaymentUseCase resolveOverduePayment;
 
+    /**
+     * Marca a cobrança do passageiro como PAID.
+     *
+     * 1. Só o próprio passageiro pode informar o pagamento (NOT_ALLOWED para qualquer outro, inclusive o motorista).
+     * 2. Antes de marcar, guarda se havia cobrança aberta e quantas estavam vencidas (RF67).
+     * 3. Depois de salvar, tira uma dívida do usuário por cobrança vencida que foi paga. Uma falha nesse
+     *    passo só vai para o log: o pagamento continua valendo.
+     * 4. Avisa o motorista (PAYMENT_CONFIRMED) só se a cobrança estava aberta, então repetir o "Já paguei"
+     *    não gera aviso de novo.
+     *
+     * @param command viagem, passageiro e firebaseUid de quem informa
+     * @return a visão da cobrança já paga, sem o código PIX
+     */
     @Override
     public PaymentResponseDTO execute(PassengerRequestCommand command) {
         String userId = rideAccess.currentUserId(command.firebaseUid());

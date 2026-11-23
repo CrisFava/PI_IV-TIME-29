@@ -73,10 +73,13 @@ import static org.mockito.Mockito.when;
 @MockitoSettings(strictness = Strictness.LENIENT)
 class RideJourneyTest {
 
+    /** uids de quem está logado em cada passo, como viriam do token do Firebase. */
     private static final String DRIVER_UID = "uid-motorista";
     private static final String ANA_UID = "uid-ana";
     private static final String BRUNO_UID = "uid-bruno";
+    /** Código PIX devolvido pelo gerador falso. */
     private static final String FAKE_PIX = "00020126580014br.gov.bcb.pix-simulado";
+    /** Valores finais que o cálculo falso grava para cada passageiro que concluir a viagem. */
     private static final BigDecimal ANA_FINAL_AMOUNT = new BigDecimal("12.50");
     private static final BigDecimal BRUNO_FINAL_AMOUNT = new BigDecimal("9.80");
 
@@ -116,13 +119,16 @@ class RideJourneyTest {
     @Mock
     private RouteAccess routeAccess;
 
+    /** Ids (Mongo) das três pessoas e da viagem. */
     private final ObjectId driverId = new ObjectId();
     private final ObjectId anaId = new ObjectId();
     private final ObjectId brunoId = new ObjectId();
     private final ObjectId rideId = new ObjectId();
 
+    /** A viagem da história; o repositório mockado sempre devolve esta mesma instância. */
     private Ride ride;
 
+    /** Casos de uso reais, montados no setUp com a infraestrutura mockada. */
     private AcceptPassengerUseCase acceptPassenger;
     private StartRideUseCase startRide;
     private MarkNoShowUseCase markNoShow;
@@ -135,6 +141,11 @@ class RideJourneyTest {
     private ListPendingPaymentsUseCase listPendingPayments;
     private PendingPaymentGuard pendingPaymentGuard;
 
+    /**
+     * Registra as três pessoas como usuários logáveis, faz o save devolver a própria viagem e o aceite
+     * atômico do repositório chamar o domínio, define a chave PIX do motorista e o cálculo final falso,
+     * e monta todos os casos de uso com essas peças.
+     */
     @BeforeEach
     void setUp() {
         loggedUser(DRIVER_UID, driverId);
@@ -443,12 +454,14 @@ class RideJourneyTest {
 
     // ------------------------------------------------------------------ passos
 
+    /** Faz o uid corresponder a um usuário com o id dado. */
     private void loggedUser(String uid, ObjectId id) {
         User user = mock(User.class);
         when(user.getId()).thenReturn(id);
         when(userUtils.getCurrentUser(uid)).thenReturn(user);
     }
 
+    /** Cria a viagem do motorista para amanhã, com as vagas dadas, e a deixa disponível no repositório. */
     private void rideWithSeats(int seats) {
         LocalDateTime departure = LocalDateTime.now().plusDays(1);
         ride = new Ride(
@@ -469,6 +482,7 @@ class RideJourneyTest {
         when(rideRepository.findById(rideId)).thenReturn(Optional.of(ride));
     }
 
+    /** Atalho: viagem de 3 vagas com a Ana pedindo vaga, aceita e a viagem já iniciada. */
     private void startedRideWithAna() {
         rideWithSeats(3);
         requestSeat(anaId);
@@ -483,6 +497,7 @@ class RideJourneyTest {
                 place("Rua do passageiro"), place("PUC-Campinas Campus I"));
     }
 
+    /** O motorista aceita o pedido do passageiro. */
     private void accept(ObjectId passengerId) {
         acceptPassenger.execute(new PassengerRequestCommand(rideId.toHexString(), passengerId.toHexString(), DRIVER_UID));
     }
@@ -493,27 +508,33 @@ class RideJourneyTest {
         startRide.execute(rideRef(DRIVER_UID));
     }
 
+    /** O motorista encerra a viagem. */
     private Ride complete() {
         return completeRide.execute(rideRef(DRIVER_UID));
     }
 
+    /** "Solicitar pagamento" com o valor dado, feito por quem está logado com o uid. */
     private PaymentResponseDTO chargeAs(String uid, ObjectId passengerId, BigDecimal amount) {
         return requestPayment.execute(new RequestPaymentCommand(
                 rideId.toHexString(), passengerId.toHexString(), uid, new RequestPaymentRequestDTO(amount)));
     }
 
+    /** Referência à cobrança de um passageiro, pedida por quem está logado com o uid. */
     private PassengerRequestCommand paymentRef(String uid, ObjectId passengerId) {
         return new PassengerRequestCommand(rideId.toHexString(), passengerId.toHexString(), uid);
     }
 
+    /** Referência à viagem, pedida por quem está logado com o uid. */
     private RideRefCommand rideRef(String uid) {
         return new RideRefCommand(rideId.toHexString(), uid);
     }
 
+    /** Cancelamento da viagem por quem está logado com o uid. */
     private CancelRideCommand cancelAs(String uid) {
         return new CancelRideCommand(rideId.toHexString(), uid, new CancelRideRequestDTO("Simulação"));
     }
 
+    /** Participação do usuário na viagem; falha se ele não estiver nela. */
     private Participant participant(ObjectId userId) {
         return ride.getParticipants().stream()
                 .filter(participant -> participant.getUserId().equals(userId.toHexString()))
@@ -521,10 +542,12 @@ class RideJourneyTest {
                 .orElseThrow();
     }
 
+    /** Lugar em Campinas com o endereço dado. */
     private Place place(String address) {
         return Place.of(address, "Centro", "Campinas", new Coordinates(-22.9064, -47.0616));
     }
 
+    /** Confere que a ação é recusada com o código de erro esperado. */
     private void assertError(ErrorCode expected, Executable action) {
         ApplicationException error = assertThrows(ApplicationException.class, action);
         assertThat(error.getError().code()).isEqualTo(expected);

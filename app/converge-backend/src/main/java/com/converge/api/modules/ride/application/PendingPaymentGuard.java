@@ -21,11 +21,24 @@ public class PendingPaymentGuard {
 
     private final RideRepository rideRepository;
 
+    /**
+     * Diz se o usuário tem alguma cobrança emitida (paymentRequestedAt preenchido) ainda PENDING
+     * em qualquer viagem.
+     *
+     * @param userId id (Mongo) do usuário
+     * @return true se existe ao menos uma cobrança em aberto
+     */
     public boolean hasPendingPayment(String userId) {
         return rideRepository.findByParticipantsUserId(userId).stream()
                 .anyMatch(ride -> ride.hasOpenChargeFor(userId));
     }
 
+    /**
+     * Barra a ação quando o usuário tem cobrança em aberto (RF74). Chamado ao pedir vaga e ao cadastrar trajeto.
+     *
+     * @param userId id (Mongo) do usuário
+     * @throws ApplicationException com PAYMENT_PENDING (HTTP 422) se houver cobrança em aberto
+     */
     public void ensureNoPendingPayment(String userId) {
         if (hasPendingPayment(userId)) {
             throw new ApplicationException(

@@ -20,7 +20,10 @@ import 'chat_panel_card.dart';
 /// A cobrança é emitida sozinha no fim da viagem do passageiro, com o valor do rateio.
 /// Motorista: acompanha se o passageiro já pagou.
 /// Passageiro: o valor em aberto e o "Pagar", que abre o mesmo pagamento da Home.
+///
+/// Sem cobrança aplicável (ausente, viagem sem custo), a faixa não aparece.
 class ChatPaymentPanel extends ConsumerWidget {
+  /// Conversa cujo pagamento é mostrado.
   final ChatConversation conversation;
 
   const ChatPaymentPanel({super.key, required this.conversation});
@@ -63,6 +66,7 @@ class ChatPaymentPanel extends ConsumerWidget {
     );
   }
 
+  /// Pagamento já informado pelo passageiro ("Já paguei"), com o texto de cada lado.
   Widget _paid(RidePaymentModel payment) {
     final amount = payment.amount;
     return ChatPanelCard(
@@ -77,7 +81,7 @@ class ChatPaymentPanel extends ConsumerWidget {
     );
   }
 
-  // O motorista só acompanha: a cobrança é emitida sozinha, com o valor do rateio
+  /// Visão do motorista. Ele só acompanha: a cobrança é emitida sozinha, com o valor do rateio.
   Widget _driver(RidePaymentModel payment) {
     final amount = payment.amount;
 
@@ -96,6 +100,8 @@ class ChatPaymentPanel extends ConsumerWidget {
     );
   }
 
+  /// Visão do passageiro: antes da cobrança, explica quando ela vem; depois, mostra o valor em aberto,
+  /// o aviso de bloqueio (RF74) e o botão "Pagar", que abre a folha com o PIX.
   Widget _passenger(BuildContext context, RidePaymentModel payment) {
     final amount = payment.amount;
 

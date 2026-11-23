@@ -20,6 +20,7 @@ import 'fakes/fake_auth_repository.dart';
 import 'fakes/fake_auth_service.dart';
 import 'fakes/fake_user.dart';
 
+/// Perfil válido usado nos cadastros dos testes.
 const _profile = ProfileInput(
   name: 'Ana Souza',
   phone: '(19) 91234-5678',
@@ -35,6 +36,7 @@ void main() {
   late FakeAuthService auth;
   late FakeAuthRepository repository;
 
+  // Container do Riverpod com o Firebase e a API trocados pelos fakes; é descartado no fim do teste.
   ProviderContainer createContainer() {
     final container = ProviderContainer(
       overrides: [
@@ -307,7 +309,7 @@ void main() {
     );
   });
   group('becomeDriver', () {
-    test('promove o usu?rio autenticado a motorista com sucesso', () async {
+    test('promove o usuário autenticado a motorista com sucesso', () async {
       auth = FakeAuthService(
         initialUser: const AuthUser(
           uid: 'uid-1',
@@ -374,7 +376,7 @@ void main() {
       expect(session.user.isDriver, isTrue);
     });
 
-    test('updatePixKey atualiza chave PIX e tipo na sess?o', () async {
+    test('updatePixKey atualiza chave PIX e tipo na sessão', () async {
       auth = FakeAuthService(
         initialUser: const AuthUser(
           uid: 'uid-1',

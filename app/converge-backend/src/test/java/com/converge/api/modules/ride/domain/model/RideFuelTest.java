@@ -19,13 +19,15 @@ import java.util.Set;
 import static org.assertj.core.api.Assertions.assertThat;
 
 /**
- * Testes unitários para {@link RideFuel}.
+ * Testes unitários do registro da energia da viagem em {@link Ride} ({@code Ride.recordFuel}), que grava
+ * a fonte, o consumo e o preço usados nos custos para os indicadores não dependerem do cadastro atual do veículo.
  * Valida cenários como: recordFuel deve gravar a energia da viagem sem perder pedágio e estacionamento.
  * <p>
  * Os métodos de teste estão bem explicativos através de suas anotações {@code @DisplayName}.
  */
 class RideFuelTest {
 
+    /** Lugar em Campinas com o endereço dado. */
     private Place place(String address) {
         return Place.of(address, "Centro", "Campinas", new Coordinates(-22.9064, -47.0616));
     }

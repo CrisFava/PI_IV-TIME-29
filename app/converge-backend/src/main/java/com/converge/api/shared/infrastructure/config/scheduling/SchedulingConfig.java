@@ -6,7 +6,10 @@ import org.springframework.context.annotation.Configuration;
 import org.springframework.scheduling.annotation.EnableScheduling;
 
 /**
- * Liga as tarefas agendadas (@Scheduled), como o reprocessamento dos indicadores.
+ * Liga as tarefas agendadas (@Scheduled) da API: o reprocessamento dos indicadores
+ * (CompletedRidesIndicatorReconciler) e os demais jobs dos módulos, como o recálculo semanal dos selos,
+ * o cancelamento de viagens não iniciadas e a marcação de cobranças vencidas.
+ * Sem esta anotação, nenhum método @Scheduled roda.
  */
 @Configuration
 @EnableScheduling

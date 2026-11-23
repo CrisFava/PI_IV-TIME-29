@@ -6,10 +6,19 @@ import '../../../../core/config/styles.dart';
 
 /// Cartão da aba "Mensagens" para lista vazia ou erro ao carregar.
 class ConversationsEmptyState extends StatelessWidget {
+  /// Ícone dentro do círculo.
   final IconData icon;
+
+  /// Título em destaque.
   final String title;
+
+  /// Explicação abaixo do título.
   final String message;
+
+  /// Texto do botão; o botão só aparece com [actionLabel] e [onAction].
   final String? actionLabel;
+
+  /// O que o botão faz (ex.: tentar de novo).
   final VoidCallback? onAction;
 
   const ConversationsEmptyState({

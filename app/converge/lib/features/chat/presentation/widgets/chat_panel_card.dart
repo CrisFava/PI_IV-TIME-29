@@ -6,10 +6,19 @@ import '../../../../core/config/styles.dart';
 
 /// Faixa fixa no topo da conversa, com um ícone, um texto e as ações do momento.
 class ChatPanelCard extends StatelessWidget {
+  /// Ícone à esquerda.
   final IconData icon;
+
+  /// Linha principal.
   final String title;
+
+  /// Linha de detalhe, opcional.
   final String? subtitle;
+
+  /// Usa as cores de sucesso (ex.: pagamento feito).
   final bool success;
+
+  /// Botões mostrados embaixo do texto, quebrando linha se não couberem.
   final List<Widget> actions;
 
   const ChatPanelCard({

@@ -16,6 +16,7 @@ import '../data/repository/firebase_chat_repository.dart';
 import 'chat_providers.dart';
 import 'ride_chat_announcer.dart';
 
+/// Ações de uma conversa, uma instância por [ChatThreadRef].
 final chatActionsProvider = NotifierProvider.autoDispose
     .family<ChatActionsController, AsyncValue<void>, ChatThreadRef>(
       ChatActionsController.new,
@@ -30,14 +31,20 @@ final chatActionsProvider = NotifierProvider.autoDispose
 class ChatActionsController extends Notifier<AsyncValue<void>> {
   ChatActionsController(this.thread);
 
+  /// Conversa em que as ações acontecem.
   final ChatThreadRef thread;
 
+  /// Chamadas de viagem na API.
   RideRepository get _rides => ref.read(rideRepositoryProvider);
+
+  /// Chat em tempo real.
   ChatRepository get _chat => ref.read(chatRepositoryProvider);
 
+  /// Começa parado, sem erro.
   @override
   AsyncValue<void> build() => const AsyncData(null);
 
+  /// Envia um texto digitado. Texto vazio (ou só espaços) é ignorado e devolve `false`.
   Future<bool> sendText(String text) {
     final trimmed = text.trim();
     if (trimmed.isEmpty) return Future.value(false);
@@ -45,6 +52,7 @@ class ChatActionsController extends Notifier<AsyncValue<void>> {
     return _run(() => _send(thread, ChatMessageType.text, trimmed));
   }
 
+  /// "Iniciar trajeto" (só o motorista): inicia a viagem na API, recarrega a viagem e avisa o grupo.
   Future<bool> startRide() => _run(() async {
     final ride = await _rides.startRide(thread.rideId);
     _refreshRide();
@@ -62,10 +70,12 @@ class ChatActionsController extends Notifier<AsyncValue<void>> {
     await _announce(ride, RideChatAnnouncer.rideCompleted);
   });
 
+  /// Recarrega o pagamento do passageiro desta conversa, se o controller ainda estiver montado.
   void _refreshPayment() {
     if (ref.mounted) ref.invalidate(ridePaymentProvider(thread.passenger));
   }
 
+  /// Recarrega a viagem e a lista de viagens do usuário.
   void _refreshRide() {
     if (!ref.mounted) return;
     ref.invalidate(rideProvider(thread.rideId));
@@ -77,6 +87,7 @@ class ChatActionsController extends Notifier<AsyncValue<void>> {
       .read(rideChatAnnouncerProvider)
       .announce(ride, text, chatRoomId: thread.chatRoomId);
 
+  /// Grava uma mensagem em nome do usuário logado. Sem sessão completa, lança [ChatException].
   Future<void> _send(
     ChatThreadRef target,
     ChatMessageType type,

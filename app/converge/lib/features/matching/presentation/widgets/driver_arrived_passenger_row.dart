@@ -8,7 +8,11 @@ import '../../../ride/data/models/payment_status.dart';
 import '../../../ride/data/models/ride_participant_model.dart';
 
 /// Passageiro que já desceu, com a chegada confirmada: o motorista vê se ele já pagou.
+///
+/// O texto da direita resume a cobrança: "Pagou", "Sem cobrança", "Cobrado R$ X" ou só "Desceu"
+/// enquanto o valor ainda não chegou. Pago fica em verde.
 class DriverArrivedPassengerRow extends StatelessWidget {
+  /// Passageiro com a viagem concluída (status COMPLETED).
   final RideParticipantModel passenger;
 
   const DriverArrivedPassengerRow({super.key, required this.passenger});

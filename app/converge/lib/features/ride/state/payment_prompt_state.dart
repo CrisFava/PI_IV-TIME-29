@@ -17,5 +17,6 @@ class PaymentPromptState {
     this.markingRideId,
   });
 
+  /// Um "Já paguei" está sendo enviado.
   bool get isMarking => markingRideId != null;
 }

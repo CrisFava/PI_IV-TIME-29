@@ -10,6 +10,7 @@ import java.io.Serial;
  * Resposta com o código Pix Copia e Cola pronto para ser copiado ou desenhado como QR Code.
  */
 public class PixPayloadResponse extends Message {
+    /** Versão fixa da classe serializada, para backend e servidor compilados em momentos diferentes se entenderem. */
     @Serial
     private static final long serialVersionUID = 1L;
 
@@ -24,12 +25,12 @@ public class PixPayloadResponse extends Message {
         this.payload = payload;
     }
 
-    // Getters e setters
-
+    /** @return o Pix Copia e Cola completo, com o CRC16 no fim */
     public String getPayload() {
         return payload;
     }
 
+    /** Texto para log com o payload, útil para conferir o código gerado. */
     @Override
     public String toString() {
         return "PixPayloadResponse{payload='" + payload + "'}";

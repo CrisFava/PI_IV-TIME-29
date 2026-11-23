@@ -47,7 +47,11 @@ Future<bool?> showPaymentPromptSheet(
 }
 
 /// Pagamento da carona: o passageiro copia o PIX, paga no banco e volta para o "Já paguei".
+///
+/// Mostra o valor, o QR Code, o botão de copiar o código e o aviso de que a cobrança em aberto
+/// bloqueia novas caronas (RF74). O botão "Fechar" só aparece sem o código PIX.
 class PaymentPromptSheet extends ConsumerWidget {
+  /// Cobrança em aberto exibida no painel.
   final RidePaymentModel payment;
 
   const PaymentPromptSheet({super.key, required this.payment});
@@ -197,6 +201,8 @@ class PaymentPromptSheet extends ConsumerWidget {
     );
   }
 
+  /// "Já paguei" com vibração média. Em erro, mostra o aviso e mantém o painel aberto; em sucesso,
+  /// fecha o painel devolvendo `true`.
   Future<void> _markAsPaid(BuildContext context, WidgetRef ref) async {
     HapticFeedback.mediumImpact();
     final error = await ref

@@ -8,7 +8,12 @@ import jakarta.validation.constraints.NotNull;
 
 import java.math.BigDecimal;
 
-// Requisição do pagamento enviado pelo cliente
+/**
+ * Corpo de POST /rides/{rideId}/passengers/{passengerId}/payment/request, validado pelo Bean Validation
+ * (RNF05): o valor é obrigatório, maior que zero e tem no máximo 6 dígitos inteiros e 2 decimais.
+ *
+ * @param amount valor da cobrança em reais
+ */
 public record RequestPaymentRequestDTO(
         @NotNull(message = "Informe o valor combinado.")
         @DecimalMin(value = "0.01", message = "O valor da cobrança deve ser maior que zero.")

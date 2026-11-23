@@ -25,13 +25,22 @@ import 'session/auth_session.dart';
 import '../../../core/services/auth/auth_exception.dart';
 import '../../../core/services/auth/auth_user.dart';
 
+/// Sessão do app; o roteador observa este provider para decidir a tela.
 final authControllerProvider =
     AsyncNotifierProvider<AuthController, AuthSession>(AuthController.new);
 
 /// Dono da sessão: combina a identidade do Firebase com o perfil do backend.
+///
+/// O estado é um [AuthSession]: [Unauthenticated], [ProfileIncomplete] (conta no Firebase sem cadastro
+/// na API) ou [Authenticated] (com o perfil). Enquanto a sessão é restaurada, o estado fica carregando.
 class AuthController extends AsyncNotifier<AuthSession> {
+  /// Provedor de identidade (Firebase Auth).
   AuthService get _auth => ref.read(authServiceProvider);
+
+  /// Chamadas de usuário na API.
   AuthRepository get _repository => ref.read(authRepositoryProvider);
+
+  /// Upload da foto de perfil no Firebase Storage.
   ProfilePhotoStorageService get _photoStorage =>
       ref.read(profilePhotoStorageProvider);
 
@@ -43,6 +52,8 @@ class AuthController extends AsyncNotifier<AuthSession> {
   /// uma atualização paralela sobrescreva campos alterados por outra.
   Future<void> _profileMutationQueue = Future<void>.value();
 
+  /// Restaura a sessão ao abrir o app: espera o Firebase dizer quem está logado e, se houver alguém,
+  /// carrega o perfil da API. Também passa a ouvir logouts que acontecem fora do app.
   @override
   Future<AuthSession> build() async {
     final auth = ref.watch(authServiceProvider);
@@ -66,6 +77,8 @@ class AuthController extends AsyncNotifier<AuthSession> {
   /// Recarrega a sessão do zero (após falha na abertura do app).
   void retry() => ref.invalidateSelf();
 
+  /// Entra no Firebase e carrega o perfil. Se o perfil não puder ser carregado (erro de rede, por
+  /// exemplo), sai do Firebase de novo e repassa o erro.
   Future<void> signIn({required String email, required String password}) async {
     _sessionEpoch++;
     final user = await _auth.signIn(email: email, password: password);
@@ -252,6 +265,8 @@ class AuthController extends AsyncNotifier<AuthSession> {
     return completer.future;
   }
 
+  /// Confere que a sessão ainda é a mesma que começou a operação (mesmo epoch, mesmo usuário na API e
+  /// no Firebase) e devolve o usuário mais recente dela. Lança `session-changed` se não for.
   UserModel _assertSameAuthenticatedUser({
     required String expectedUserId,
     required String expectedFirebaseUid,
@@ -269,6 +284,8 @@ class AuthController extends AsyncNotifier<AuthSession> {
     return latest.user;
   }
 
+  /// Formata 10 ou 11 dígitos como `(19) 3123-4567` ou `(19) 91234-5678`, o formato que o backend
+  /// aceita. Qualquer outra quantidade de dígitos volta como veio, e o backend recusa.
   static String _normalizePhone(String raw) {
     final digits = raw.replaceAll(RegExp(r'\D'), '');
     if (digits.length == 11) {
@@ -309,15 +326,19 @@ class AuthController extends AsyncNotifier<AuthSession> {
   Future<bool> isEmailAvailable(String email) =>
       _repository.isEmailAvailable(email);
 
+  /// Envia o e-mail de redefinição de senha pelo Firebase.
   Future<void> sendPasswordResetEmail(String email) =>
       _auth.sendPasswordResetEmail(email);
 
+  /// Sai da conta e invalida as alterações de perfil ainda em andamento (pelo epoch).
   Future<void> signOut() async {
     _sessionEpoch++;
     await _auth.signOut();
     state = const AsyncData(Unauthenticated());
   }
 
+  /// Carrega o perfil da API para o usuário do Firebase. 404 significa que ele ainda não tem cadastro:
+  /// a sessão fica [ProfileIncomplete]. Outros erros são repassados.
   Future<AuthSession> _loadSession(AuthUser user) async {
     try {
       return Authenticated(await _repository.fetchCurrentUser());
@@ -327,6 +348,8 @@ class AuthController extends AsyncNotifier<AuthSession> {
     }
   }
 
+  /// Cria o cadastro na API com o e-mail da conta do Firebase. Em caso de erro a sessão fica
+  /// [ProfileIncomplete], para o usuário tentar de novo pela tela de completar perfil.
   Future<void> _createProfile(AuthUser user, ProfileInput profile) async {
     final email = user.email;
     if (email == null) {
@@ -359,6 +382,7 @@ class AuthController extends AsyncNotifier<AuthSession> {
     }
   }
 
+  /// Busca o perfil sem lançar erro: nulo se não existir ou se a API falhar.
   Future<UserModel?> _tryFetchCurrentUser() async {
     try {
       return await _repository.fetchCurrentUser();

@@ -11,6 +11,7 @@ import '../data/repository/chat_repository.dart';
 import '../data/repository/firebase_chat_repository.dart';
 import 'chat_providers.dart';
 
+/// Anunciador dos avisos de viagem no chat, usado pelas telas do motorista.
 final rideChatAnnouncerProvider = Provider<RideChatAnnouncer>(
   (ref) => RideChatAnnouncer(
     chat: ref.watch(chatRepositoryProvider),
@@ -24,17 +25,26 @@ final rideChatAnnouncerProvider = Provider<RideChatAnnouncer>(
 /// na hora. Por isso vale para qualquer botão do motorista (chat, home ou painel de
 /// caronas), e uma falha no chat não desfaz nem atrapalha a ação já gravada.
 class RideChatAnnouncer {
+  /// Texto do aviso de viagem iniciada.
   static const String rideStarted = 'Viagem iniciada.';
+
+  /// Texto do aviso de viagem concluída, que também lembra de avaliar.
   static const String rideCompleted =
       'Viagem concluída. Avalie como foi a carona.';
 
+  /// Repositório onde o aviso é gravado.
   final ChatRepository _chat;
+
+  /// Quem envia o aviso (o usuário logado), lido na hora do envio.
   final UserModel? Function() _viewer;
 
   RideChatAnnouncer({required this._chat, required this._viewer});
 
   /// Manda [text] no grupo da viagem (início e fim da viagem). As cobranças não vão
   /// para o chat: cada passageiro vê a dele na tela de pagamento.
+  ///
+  /// Use [chatRoomId] quando a viagem recebida ainda não traz a sala. Sem sala ou sem usuário logado,
+  /// não faz nada.
   Future<void> announce(
     RideModel ride,
     String text, {
@@ -55,6 +65,7 @@ class RideChatAnnouncer {
     );
   }
 
+  /// Grava a mensagem como aviso do usuário logado. Qualquer erro é engolido: o aviso é só um extra.
   Future<void> _send(
     String room,
     String rideId,

@@ -21,6 +21,13 @@ public class GetUserPixInfoUseCase implements UseCase<String, UserPixInfoDTO> {
 
     private final UserRepository userRepository;
 
+    /**
+     * Busca o nome, a chave PIX e o tipo da chave do usuário.
+     *
+     * @param userId id (Mongo) do usuário
+     * @return os dados de recebimento; chave e tipo podem vir nulos se ele não cadastrou PIX
+     * @throws ApplicationException com USER_NOT_FOUND se o id for inválido ou o usuário não existir
+     */
     @Override
     public UserPixInfoDTO execute(String userId) {
         if (userId == null || !ObjectId.isValid(userId)) {
@@ -32,6 +39,7 @@ public class GetUserPixInfoUseCase implements UseCase<String, UserPixInfoDTO> {
                 .orElseThrow(this::userNotFound);
     }
 
+    /** Erro padrão de usuário inexistente, usado tanto para id malformado quanto para id não encontrado. */
     private ApplicationException userNotFound() {
         return new ApplicationException(ErrorCode.USER_NOT_FOUND, "Usuário não encontrado.");
     }

@@ -24,6 +24,13 @@ public class ListRecentlyCompletedRidesUseCase implements UseCase<LocalDateTime,
     private final RideRepository rideRepository;
     private final RideCompletionPublisher completionPublisher;
 
+    /**
+     * Busca as viagens COMPLETED concluídas depois da data e converte cada uma no evento de conclusão.
+     * As que não contam para os indicadores (sem passageiro efetivo) ficam de fora.
+     *
+     * @param completedAfter início da janela (exclusivo)
+     * @return os eventos das viagens da janela
+     */
     @Override
     public List<RideCompletedEvent> execute(LocalDateTime completedAfter) {
         return rideRepository.findByStatusAndCompletedAtAfter(RideStatus.COMPLETED, completedAfter).stream()

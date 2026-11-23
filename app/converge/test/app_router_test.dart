@@ -13,6 +13,7 @@ import 'features/auth/fakes/fake_user.dart';
 /// Cobre cenários como: authRedirect.
 /// Os casos de teste estão descritos de forma autoexplicativa nas chamadas de [test] e [group].
 void main() {
+  // Conta no Firebase usada nos estados de sessão que têm usuário.
   const authUser = AuthUser(
     uid: 'uid',
     email: 'ana@puc.edu.br',

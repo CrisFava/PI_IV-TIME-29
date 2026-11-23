@@ -23,11 +23,21 @@ public class RideModuleParticipationGateway implements RideParticipationGateway 
 
     private final GetCompletedRideParticipantsUseCase getCompletedRideParticipants;
 
+    /**
+     * Pergunta ao módulo ride quem participou da viagem.
+     *
+     * @param rideId id da viagem
+     * @return a viagem com os participantes; vazio se ela não existe ou ainda não começou
+     */
     @Override
     public Optional<CompletedRide> findCompletedRide(String rideId) {
         return getCompletedRideParticipants.execute(rideId).map(this::toCompletedRide);
     }
 
+    /**
+     * Converte o DTO do módulo ride no modelo do review: o motorista entra com o papel DRIVER e cada
+     * passageiro que concluiu a viagem com o papel PASSENGER. É esse papel que vira o reviewedRole.
+     */
     private CompletedRide toCompletedRide(CompletedRideParticipantsDTO ride) {
         List<Participant> participants = new ArrayList<>();
 

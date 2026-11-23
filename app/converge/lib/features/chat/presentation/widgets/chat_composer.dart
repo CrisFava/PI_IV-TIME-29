@@ -9,7 +9,10 @@ import '../../../../core/config/styles.dart';
 ///
 /// [onSend] devolve `true` quando a mensagem foi enviada; só então o campo é limpo.
 class ChatComposer extends StatefulWidget {
+  /// Envia o texto já sem espaços nas pontas.
   final Future<bool> Function(String text) onSend;
+
+  /// Desligado enquanto outra ação da conversa está em andamento.
   final bool enabled;
 
   const ChatComposer({super.key, required this.onSend, this.enabled = true});
@@ -18,18 +21,26 @@ class ChatComposer extends StatefulWidget {
   State<ChatComposer> createState() => _ChatComposerState();
 }
 
+/// Estado do campo: o texto digitado e se um envio está em andamento.
 class _ChatComposerState extends State<ChatComposer> {
+  /// Limite de caracteres por mensagem.
   static const int _maxLength = 1000;
 
+  /// Texto digitado.
   final _controller = TextEditingController();
+
+  /// Envio em andamento: o botão vira um indicador de progresso.
   bool _sending = false;
 
+  /// Libera o controller do campo.
   @override
   void dispose() {
     _controller.dispose();
     super.dispose();
   }
 
+  /// Envia o texto com vibração leve. Ignora texto vazio e cliques repetidos durante o envio, e só
+  /// limpa o campo se a mensagem foi enviada.
   Future<void> _send() async {
     final text = _controller.text.trim();
     if (text.isEmpty || _sending || !widget.enabled) return;

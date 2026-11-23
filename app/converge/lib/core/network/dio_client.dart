@@ -10,6 +10,10 @@ import 'interceptors/error_interceptor.dart';
 import 'interceptors/idempotency_interceptor.dart';
 
 /// Cliente HTTP único da aplicação, já com os interceptors obrigatórios (RT11).
+///
+/// A URL base vem de `API_BASE_URL` no `.env`, os tempos de [AppConfig] e todo corpo vai e volta em
+/// JSON. Os repositórios recebem este [Dio] pelo provider, o que permite trocá-lo nos testes. O cliente
+/// é fechado quando o provider é descartado.
 final dioProvider = Provider<Dio>((ref) {
   final dio = Dio(
     BaseOptions(

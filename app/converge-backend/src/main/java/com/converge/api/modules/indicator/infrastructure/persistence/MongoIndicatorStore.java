@@ -33,16 +33,23 @@ import static org.springframework.data.mongodb.core.query.Criteria.where;
 @RequiredArgsConstructor
 public class MongoIndicatorStore implements IndicatorStore {
 
+    /** Coleção que marca as viagens já contabilizadas; o _id de cada documento é o próprio rideId. */
     static final String REGISTRATIONS_COLLECTION = "indicator_ride_registrations";
+    /** Campo de cada indicador com as viagens já somadas nele (trava de idempotência). */
     private static final String APPLIED_RIDE_IDS = "appliedRideIds";
 
     private final MongoTemplate mongo;
 
+    /** Procura o rideId pelo _id em indicator_ride_registrations. */
     @Override
     public boolean isRideRegistered(String rideId) {
         return mongo.exists(new Query(where("_id").is(rideId)), REGISTRATIONS_COLLECTION);
     }
 
+    /**
+     * Soma a viagem no documento do usuário (userId + period + reference) com $inc e atualiza o updatedAt.
+     * A idempotência por rideId fica em applyOnce.
+     */
     @Override
     public void addToUser(
             String rideId,
@@ -71,6 +78,10 @@ public class MongoIndicatorStore implements IndicatorStore {
         );
     }
 
+    /**
+     * Soma a viagem no documento da plataforma do período: +1 em totalRides e os km, carros e CO2 da
+     * viagem inteira. A idempotência por rideId fica em applyOnce.
+     */
     @Override
     public void addToPlatform(
             String rideId,
@@ -90,6 +101,10 @@ public class MongoIndicatorStore implements IndicatorStore {
         applyOnce(platformKey(period, reference), rideId, update, PlatformIndicator.class);
     }
 
+    /**
+     * Conta os usuários distintos com indicador no período e grava com $max: uma contagem antiga feita
+     * em paralelo nunca diminui o valor já gravado por uma mais nova.
+     */
     @Override
     public void refreshActiveUsers(IndicatorPeriod period, String reference) {
         int activeUsers = distinctUsers(where("period").is(period).and("reference").is(reference));
@@ -100,6 +115,10 @@ public class MongoIndicatorStore implements IndicatorStore {
         );
     }
 
+    /**
+     * Soma os documentos SEMESTERLY da plataforma e grava o resultado no ALL_TIME com $max, pelo mesmo
+     * motivo de refreshActiveUsers. O ALL_TIME não guarda appliedRideIds: ele é sempre derivado dos semestres.
+     */
     @Override
     public void refreshAllTime() {
         List<PlatformIndicator> semesters = mongo.find(
@@ -131,6 +150,10 @@ public class MongoIndicatorStore implements IndicatorStore {
         );
     }
 
+    /**
+     * Insere o rideId em indicator_ride_registrations. Se outra execução já o inseriu, o índice único do
+     * _id recusa a duplicata e o erro é ignorado.
+     */
     @Override
     public void markRideRegistered(String rideId) {
         try {
@@ -143,6 +166,20 @@ public class MongoIndicatorStore implements IndicatorStore {
         }
     }
 
+    /**
+     * Aplica o update só se a viagem ainda não estiver em appliedRideIds do documento e registra o rideId
+     * no mesmo update ($addToSet), de forma atômica.
+     *
+     * O upsert cria o documento quando ele ainda não existe. Se o filtro não casar porque a viagem já foi
+     * aplicada, o upsert tenta criar outro documento com a mesma chave e o índice único recusa; aí o
+     * updateFirst não encontra nada e nada muda. Se a recusa vier de outra viagem que criou o documento
+     * ao mesmo tempo, o updateFirst aplica a soma normalmente.
+     *
+     * @param key    filtro que identifica o documento (usuário ou plataforma, período e referência)
+     * @param rideId viagem que está sendo somada
+     * @param update somas a aplicar
+     * @param type   classe da entidade, que define a coleção
+     */
     private void applyOnce(Criteria key, String rideId, Update update, Class<?> type) {
         Query notYetApplied = new Query(key).addCriteria(where(APPLIED_RIDE_IDS).ne(rideId));
         update.addToSet(APPLIED_RIDE_IDS, rideId);
@@ -156,6 +193,10 @@ public class MongoIndicatorStore implements IndicatorStore {
         }
     }
 
+    /**
+     * Upsert no indicador da plataforma, tolerante à corrida de duas criações simultâneas do mesmo
+     * documento: quem perde a corrida aplica o update no documento que o outro criou.
+     */
     private void upsert(Query query, Update update) {
         try {
             mongo.upsert(query, update, PlatformIndicator.class);
@@ -164,10 +205,12 @@ public class MongoIndicatorStore implements IndicatorStore {
         }
     }
 
+    /** Quantidade de userId distintos entre os indicadores de usuário que casam com o filtro. */
     private int distinctUsers(Criteria criteria) {
         return mongo.findDistinct(new Query(criteria), "userId", UserIndicator.class, String.class).size();
     }
 
+    /** Filtro da chave única de um indicador da plataforma: período + referência. */
     private static Criteria platformKey(IndicatorPeriod period, String reference) {
         return where("period").is(period).and("reference").is(reference);
     }

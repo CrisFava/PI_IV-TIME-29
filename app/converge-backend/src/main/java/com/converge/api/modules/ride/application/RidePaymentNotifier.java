@@ -24,6 +24,12 @@ public class RidePaymentNotifier {
 
     private final ApplicationEventPublisher eventPublisher;
 
+    /**
+     * Avisa os passageiros recém-cobrados (PAYMENT_DUE) para pagarem o motorista pelo PIX.
+     *
+     * @param ride         viagem da cobrança
+     * @param passengerIds passageiros cobrados agora; lista vazia não gera aviso
+     */
     public void notifyCharged(Ride ride, List<String> passengerIds) {
         if (passengerIds.isEmpty()) {
             return;
@@ -39,6 +45,12 @@ public class RidePaymentNotifier {
                 )));
     }
 
+    /**
+     * Avisa o motorista (PAYMENT_CONFIRMED) que um passageiro informou o pagamento. Ele confere o PIX na
+     * conta dele: o app não confirma o recebimento.
+     *
+     * @param ride viagem paga
+     */
     public void notifyMarkedAsPaid(Ride ride) {
         SafeActionHandler.run(log, "publicar aviso de pagamento informado pelo passageiro",
                 () -> eventPublisher.publishEvent(new RideNotificationEvent(
@@ -50,6 +62,7 @@ public class RidePaymentNotifier {
                 )));
     }
 
+    /** Id da viagem em texto, para a notificação abrir a viagem certa; nulo numa viagem ainda não salva. */
     private String rideIdOf(Ride ride) {
         return ride.getId() != null ? ride.getId().toHexString() : null;
     }

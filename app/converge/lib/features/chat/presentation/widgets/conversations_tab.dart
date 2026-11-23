@@ -12,7 +12,10 @@ import 'conversation_tile.dart';
 import 'conversations_empty_state.dart';
 
 /// Aba "Mensagens": as conversas das caronas em que o motorista já aceitou o passageiro.
+///
+/// Puxar para baixo recarrega as viagens e, com elas, as conversas.
 class ConversationsTab extends ConsumerWidget {
+  /// Espaço no fim da lista para ela não ficar atrás da barra de navegação flutuante.
   final double bottomPadding;
 
   const ConversationsTab({super.key, required this.bottomPadding});

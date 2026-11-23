@@ -27,11 +27,18 @@ import java.time.LocalDateTime;
 @RequiredArgsConstructor
 public class CompletedRidesIndicatorReconciler {
 
+    /** Janela de busca: viagens concluídas nos últimos 7 dias. */
     static final Duration LOOKBACK = Duration.ofDays(7);
 
     private final ListRecentlyCompletedRidesUseCase listRecentlyCompletedRides;
     private final RegisterCompletedRideUseCase registerCompletedRide;
 
+    /**
+     * Roda 1 minuto depois de a API subir e, depois, a cada 15 minutos (contados do fim da rodada anterior).
+     * Passa cada viagem concluída da janela pelo RegisterCompletedRideUseCase; as já registradas são
+     * puladas lá dentro. Uma viagem que falha não interrompe as outras: ela é só contada e logada e
+     * volta a ser tentada na próxima rodada.
+     */
     @Scheduled(initialDelayString = "PT1M", fixedDelayString = "PT15M")
     public void reconcile() {
         int failures = 0;

@@ -32,8 +32,10 @@ import static org.assertj.core.api.Assertions.assertThat;
  */
 class MongoCollectionFieldsMappingTest {
 
+    /** Conversor que transforma um Document do MongoDB na entidade, do mesmo jeito que o repositório. */
     private MappingMongoConverter converter;
 
+    /** Monta o conversor como o Spring Boot faz, sem precisar de banco. */
     @BeforeEach
     void setUp() {
         // Mesma montagem que o Spring Boot faz, só que sem conectar no banco.

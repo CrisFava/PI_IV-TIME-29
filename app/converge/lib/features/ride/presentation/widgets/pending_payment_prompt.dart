@@ -19,9 +19,12 @@ class PendingPaymentPrompt extends ConsumerStatefulWidget {
       _PendingPaymentPromptState();
 }
 
+/// Estado do observador: se o painel de pagamento já está aberto.
 class _PendingPaymentPromptState extends ConsumerState<PendingPaymentPrompt> {
+  /// Painel aberto agora; evita abrir dois por cima um do outro.
   bool _open = false;
 
+  /// Ouve as cobranças em aberto e o estado do painel, e não desenha nada.
   @override
   Widget build(BuildContext context) {
     ref.listen(pendingPaymentsProvider, (_, next) => _maybeShow(next));
@@ -33,6 +36,8 @@ class _PendingPaymentPromptState extends ConsumerState<PendingPaymentPrompt> {
     return const SizedBox.shrink();
   }
 
+  /// Abre o painel com a próxima cobrança a mostrar, se houver e se nenhum estiver aberto. Depois que o
+  /// painel fecha, marca a cobrança como dispensada (fechou sem pagar) ou confere se chegou outra.
   Future<void> _maybeShow(AsyncValue<List<RidePaymentModel>> payments) async {
     // Recarregando, o valor ainda é o antigo: depois do "Já paguei", ele ainda traz a
     // cobrança que acabou de ser paga, e o pagamento abriria de novo. Com erro na
