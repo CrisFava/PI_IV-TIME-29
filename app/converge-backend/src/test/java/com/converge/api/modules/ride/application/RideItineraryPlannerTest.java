@@ -21,6 +21,12 @@ import java.util.Set;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.tuple;
 
+/**
+ * Testes unitários para {@link RideItineraryPlanner}.
+ * Valida cenários como: Busca todos os confirmados, do mais perto ao mais longe, e depois deixa cada um; Pedidos ainda não aceitos não entram no itinerário; Calcula as distâncias de cada passo numa chamada só, sem chamar par a par.
+ * <p>
+ * Os métodos de teste estão bem explicativos através de suas anotações {@code @DisplayName}.
+ */
 class RideItineraryPlannerTest {
 
     private final FakeDistanceGateway distanceGateway = new FakeDistanceGateway();

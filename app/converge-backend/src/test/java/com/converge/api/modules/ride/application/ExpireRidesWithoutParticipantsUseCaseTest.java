@@ -42,6 +42,12 @@ import static org.mockito.Mockito.times;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
+/**
+ * Testes unitários para {@link ExpireRidesWithoutParticipantsUseCase}.
+ * Valida cenários como: Deve cancelar viagem expirada sem participantes confirmados e registrar auditoria e notificacoes; Nao deve cancelar viagens quando nao houver viagens expiradas.
+ * <p>
+ * Os métodos de teste estão bem explicativos através de suas anotações {@code @DisplayName}.
+ */
 @ExtendWith(MockitoExtension.class)
 class ExpireRidesWithoutParticipantsUseCaseTest {
 

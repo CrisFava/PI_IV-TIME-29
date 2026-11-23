@@ -14,6 +14,9 @@ import '../ride/fakes/fake_ride.dart';
 import 'fakes/fake_matching_route_repository.dart';
 import 'fakes/fake_seat_ride_repository.dart';
 
+/// Testes unitários e de widgets para driver offers.
+/// Cobre cenários como: a viagem fica dentro da carona de onde saiu, e a com viagem vem antes, viagem de uma carona já cancelada continua aparecendo.
+/// Os casos de teste estão descritos de forma autoexplicativa nas chamadas de [test] e [group].
 void main() {
   late FakeMatchingRouteRepository routes;
   late FakeSeatRideRepository rides;

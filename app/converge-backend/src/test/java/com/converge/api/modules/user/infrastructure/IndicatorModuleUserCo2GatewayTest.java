@@ -18,6 +18,12 @@ import static org.assertj.core.api.Assertions.assertThat;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
+/**
+ * Testes unitários para {@link IndicatorModuleUserCo2Gateway}.
+ * Valida cenários como: Deve ler o CO2 acumulado do usuário pelo período ALL_TIME.
+ * <p>
+ * Os métodos de teste estão bem explicativos através de suas anotações {@code @DisplayName}.
+ */
 @ExtendWith(MockitoExtension.class)
 class IndicatorModuleUserCo2GatewayTest {
 

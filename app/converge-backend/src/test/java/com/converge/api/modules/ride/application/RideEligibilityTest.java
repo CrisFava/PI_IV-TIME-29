@@ -18,6 +18,12 @@ import static org.junit.jupiter.api.Assertions.assertDoesNotThrow;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.mockito.Mockito.when;
 
+/**
+ * Testes unitários para {@link RideEligibility}.
+ * Valida cenários como: Motorista sem chave PIX não pode oferecer carona (RF72); Usuário ativo, verificado e em dia pode participar; Vínculo acadêmico não verificado impede participar, citando quem foi barrado.
+ * <p>
+ * Os métodos de teste estão bem explicativos através de suas anotações {@code @DisplayName}.
+ */
 @ExtendWith(MockitoExtension.class)
 class RideEligibilityTest {
 

@@ -36,6 +36,12 @@ import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.verifyNoInteractions;
 import static org.mockito.Mockito.when;
 
+/**
+ * Testes unitários para {@link MarkOverduePaymentsUseCase}.
+ * Valida cenários como: Deve marcar a cobrança vencida e registrar a dívida do passageiro; Deve pedir ao repositório o limite do prazo e o corte configurados; Não deve marcar cobrança dentro do prazo, paga, sem valor a cobrar, anterior ao corte ou sem viagem concluída.
+ * <p>
+ * Os métodos de teste estão bem explicativos através de suas anotações {@code @DisplayName}.
+ */
 @ExtendWith(MockitoExtension.class)
 class MarkOverduePaymentsUseCaseTest {
 

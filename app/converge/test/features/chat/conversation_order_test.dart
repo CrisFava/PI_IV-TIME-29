@@ -24,6 +24,9 @@ List<String> _order(
     conversation.thread.chatRoomId,
 ];
 
+/// Testes unitários e de widgets para conversation order.
+/// Cobre cenários como: a viagem em andamento fica em cima, mesmo com mensagem antiga, o resto vem da última mensagem mais recente para a mais antiga.
+/// Os casos de teste estão descritos de forma autoexplicativa nas chamadas de [test] e [group].
 void main() {
   test('a viagem em andamento fica em cima, mesmo com mensagem antiga', () {
     final order = _order(

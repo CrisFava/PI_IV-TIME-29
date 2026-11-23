@@ -36,6 +36,12 @@ import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
+/**
+ * Testes unitários para {@link ExpirePendingRideRequestsUseCase}.
+ * Valida cenários como: Deve expirar solicitacoes mais antigas que a janela de timeout e notificar passageiros; Nao deve alterar nem salvar viagens quando nenhuma solicitacao estiver expirada; Faltando 5 min ou menos para a saída, todo pedido pendente expira, mesmo o recente.
+ * <p>
+ * Os métodos de teste estão bem explicativos através de suas anotações {@code @DisplayName}.
+ */
 @ExtendWith(MockitoExtension.class)
 class ExpirePendingRideRequestsUseCaseTest {
 

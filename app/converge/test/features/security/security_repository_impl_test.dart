@@ -11,6 +11,9 @@ import 'package:converge/features/security/data/repository/security_repository_i
 import 'package:dio/dio.dart';
 import 'package:flutter_test/flutter_test.dart';
 
+/// Testes unitários e de widgets para security repository impl.
+/// Cobre cenários como: modelos.
+/// Os casos de teste estão descritos de forma autoexplicativa nas chamadas de [test] e [group].
 void main() {
   late Dio dio;
   late SecurityRepositoryImpl repository;

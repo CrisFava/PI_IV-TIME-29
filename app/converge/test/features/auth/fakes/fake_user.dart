@@ -4,6 +4,7 @@ import 'package:converge/features/auth/data/models/academic_record_model.dart';
 import 'package:converge/features/auth/data/models/participation_role.dart';
 import 'package:converge/features/auth/data/models/user_model.dart';
 
+/// Cria uma instância fake de [UserModel] com valores pré-configurados para testes.
 UserModel fakeUser({String uid = 'uid-1', String email = 'ana@puc.edu.br'}) =>
     UserModel(
       id: 'id-1',

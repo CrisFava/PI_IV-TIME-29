@@ -16,6 +16,12 @@ import java.util.List;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.mockito.Mockito.when;
 
+/**
+ * Testes unitários para {@link ListMyReportsUseCase}.
+ * Valida cenários como: Deve listar as denúncias do usuário logado.
+ * <p>
+ * Os métodos de teste estão bem explicativos através de suas anotações {@code @DisplayName}.
+ */
 @ExtendWith(MockitoExtension.class)
 class ListMyReportsUseCaseTest {
 

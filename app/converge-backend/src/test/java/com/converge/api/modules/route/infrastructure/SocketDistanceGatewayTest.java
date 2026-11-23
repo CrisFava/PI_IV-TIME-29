@@ -20,6 +20,12 @@ import java.util.concurrent.atomic.AtomicInteger;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.within;
 
+/**
+ * Testes unitários para {@link SocketDistanceGateway}.
+ * Valida cenários como: Sem servidor, calcula localmente o valor conhecido de 1 grau de longitude no equador; Sem servidor, o lote volta na mesma ordem dos pares; Lista vazia devolve lista vazia sem procurar o servidor.
+ * <p>
+ * Os métodos de teste estão bem explicativos através de suas anotações {@code @DisplayName}.
+ */
 class SocketDistanceGatewayTest {
 
     // Porta sem ninguém ouvindo: força o caminho do handler local

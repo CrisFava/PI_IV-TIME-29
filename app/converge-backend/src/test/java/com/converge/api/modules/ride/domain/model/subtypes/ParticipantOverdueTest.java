@@ -13,6 +13,12 @@ import java.time.LocalDateTime;
 
 import static org.assertj.core.api.Assertions.assertThat;
 
+/**
+ * Testes unitários para {@link ParticipantOverdue}.
+ * Valida cenários como: Cobrança pedida exatamente no limite do prazo já venceu; Cobrança ainda dentro do prazo não vence; Cobrança paga não vence.
+ * <p>
+ * Os métodos de teste estão bem explicativos através de suas anotações {@code @DisplayName}.
+ */
 class ParticipantOverdueTest {
 
     private static final LocalDateTime NOW = LocalDateTime.of(2026, 11, 20, 12, 0);

@@ -32,6 +32,12 @@ import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.verifyNoInteractions;
 import static org.mockito.Mockito.when;
 
+/**
+ * Testes unitários para {@link UserService}.
+ * Valida cenários como: Deve criar usuário no Mongo quando dados forem válidos e únicos; Deve lançar EMAIL_ALREADY_EXISTS quando firebaseUid já estiver cadastrado; Deve buscar usuário por firebaseUid com sucesso.
+ * <p>
+ * Os métodos de teste estão bem explicativos através de suas anotações {@code @DisplayName}.
+ */
 @ExtendWith(MockitoExtension.class)
 class UserServiceTest {
 

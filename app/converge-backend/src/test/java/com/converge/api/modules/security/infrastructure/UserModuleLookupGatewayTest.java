@@ -20,6 +20,12 @@ import static org.assertj.core.api.Assertions.assertThat;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.mockito.Mockito.when;
 
+/**
+ * Testes unitários para {@link UserModuleLookupGateway}.
+ * Valida cenários como: Usuário que o módulo de usuários encontra existe; USER_NOT_FOUND do módulo de usuários vira 'não existe'; Outros erros do módulo de usuários continuam sendo lançados.
+ * <p>
+ * Os métodos de teste estão bem explicativos através de suas anotações {@code @DisplayName}.
+ */
 @ExtendWith(MockitoExtension.class)
 class UserModuleLookupGatewayTest {
 

@@ -28,6 +28,12 @@ import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
+/**
+ * Testes unitários para {@link RideCompletedIndicatorListener}.
+ * Valida cenários como: Deve repassar todos os dados da viagem concluída para a contabilização; Uma falha ao contabilizar não pode impedir a conclusão da viagem; Deve rodar só depois do commit, com fallback sem transação e fora da sessão da transação.
+ * <p>
+ * Os métodos de teste estão bem explicativos através de suas anotações {@code @DisplayName}.
+ */
 @ExtendWith(MockitoExtension.class)
 class RideCompletedIndicatorListenerTest {
 

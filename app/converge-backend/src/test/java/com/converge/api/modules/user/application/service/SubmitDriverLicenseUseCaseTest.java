@@ -34,6 +34,12 @@ import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
+/**
+ * Testes unitários para {@link SubmitDriverLicenseUseCase}.
+ * Valida cenários como: Deve guardar a CNH enviada em análise e salvar o usuário; Enviar o pedido não vira motorista: só guarda a CNH; Reenviar a CNH de quem já tem uma verificada volta para análise e tira a elegibilidade.
+ * <p>
+ * Os métodos de teste estão bem explicativos através de suas anotações {@code @DisplayName}.
+ */
 @ExtendWith(MockitoExtension.class)
 class SubmitDriverLicenseUseCaseTest {
 

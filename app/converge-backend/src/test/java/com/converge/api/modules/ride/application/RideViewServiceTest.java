@@ -32,6 +32,12 @@ import static org.mockito.Mockito.times;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
+/**
+ * Testes unitários para {@link RideViewService}.
+ * Valida cenários como: Deve buscar o nome só de quem aparece para o usuário e aplicá-lo na resposta; Na lista de viagens, os nomes são buscados uma vez só.
+ * <p>
+ * Os métodos de teste estão bem explicativos através de suas anotações {@code @DisplayName}.
+ */
 @ExtendWith(MockitoExtension.class)
 class RideViewServiceTest {
 

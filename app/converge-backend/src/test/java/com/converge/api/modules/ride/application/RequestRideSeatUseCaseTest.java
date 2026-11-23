@@ -47,6 +47,12 @@ import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.verifyNoInteractions;
 import static org.mockito.Mockito.when;
 
+/**
+ * Testes unitários para {@link RequestRideSeatUseCase}.
+ * Valida cenários como: Primeiro pedido do dia deve criar a viagem e registrar o passageiro como solicitante; Ao criar a viagem, copia o pedágio e o estacionamento do trajeto do motorista para o custo; Trajeto antigo, sem pedágio nem estacionamento, gera custo zerado.
+ * <p>
+ * Os métodos de teste estão bem explicativos através de suas anotações {@code @DisplayName}.
+ */
 @ExtendWith(MockitoExtension.class)
 class RequestRideSeatUseCaseTest {
 

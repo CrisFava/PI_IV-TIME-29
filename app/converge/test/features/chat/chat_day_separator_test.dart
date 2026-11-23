@@ -31,6 +31,9 @@ Future<void> _pump(WidgetTester tester, List<ChatMessageModel> messages) async {
   );
 }
 
+/// Testes unitários e de widgets para chat day separator.
+/// Cobre cenários como: uma etiqueta para cada dia, só quando o dia muda, conversa de um dia só tem uma etiqueta.
+/// Os casos de teste estão descritos de forma autoexplicativa nas chamadas de [test] e [group].
 void main() {
   testWidgets('uma etiqueta para cada dia, só quando o dia muda', (
     tester,

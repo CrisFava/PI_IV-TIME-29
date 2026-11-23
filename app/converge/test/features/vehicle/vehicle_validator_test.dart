@@ -8,6 +8,9 @@ import 'package:flutter_test/flutter_test.dart';
 
 import 'fakes/valid_vehicle_request.dart';
 
+/// Testes unitários e de widgets para vehicle validator.
+/// Cobre cenários como: RENAVAM.
+/// Os casos de teste estão descritos de forma autoexplicativa nas chamadas de [test] e [group].
 void main() {
   group('RENAVAM', () {
     test('aceita um número com dígito verificador correto', () {

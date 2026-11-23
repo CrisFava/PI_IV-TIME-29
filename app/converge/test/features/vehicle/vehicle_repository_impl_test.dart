@@ -7,6 +7,9 @@ import 'package:flutter_test/flutter_test.dart';
 
 import 'fakes/valid_vehicle_request.dart';
 
+/// Testes unitários e de widgets para vehicle repository impl.
+/// Cobre cenários como: dados inválidos lançam exceção sem chamar a API.
+/// Os casos de teste estão descritos de forma autoexplicativa nas chamadas de [test] e [group].
 void main() {
   test('dados inválidos lançam exceção sem chamar a API', () async {
     var requests = 0;

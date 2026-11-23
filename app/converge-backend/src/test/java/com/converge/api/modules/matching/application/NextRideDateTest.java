@@ -12,6 +12,12 @@ import java.util.Set;
 
 import static org.assertj.core.api.Assertions.assertThat;
 
+/**
+ * Testes unitários para {@link NextRideDate}.
+ * Valida cenários como: Deve usar hoje quando o dia bate e o motorista ainda não saiu; Data fixa vale em qualquer dia futuro e hoje só antes da saída; Deve pular hoje quando o horário de saída já passou.
+ * <p>
+ * Os métodos de teste estão bem explicativos através de suas anotações {@code @DisplayName}.
+ */
 class NextRideDateTest {
 
     // Quarta-feira, 11/11/2026, 06:30

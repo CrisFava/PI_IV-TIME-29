@@ -29,6 +29,12 @@ import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
+/**
+ * Testes unitários para {@link GetRideParticipantsUseCase}.
+ * Valida cenários como: Deve devolver o motorista e os passageiros aceitos, sem recusados nem pedidos pendentes; Passageiro ausente (no-show) continua como participante, para poder ser denunciado; Deve listar como cobrados só os passageiros que terminaram a viagem e receberam cobrança.
+ * <p>
+ * Os métodos de teste estão bem explicativos através de suas anotações {@code @DisplayName}.
+ */
 @ExtendWith(MockitoExtension.class)
 class GetRideParticipantsUseCaseTest {
 

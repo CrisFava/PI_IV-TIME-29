@@ -12,6 +12,12 @@ import static org.assertj.core.api.Assertions.assertThat;
 import static org.junit.jupiter.api.Assertions.assertDoesNotThrow;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 
+/**
+ * Testes unitários para {@link Review}.
+ * Valida cenários como: Deve criar a avaliação com os dados informados; Deve aceitar as notas limites 1 e 5 e comentário vazio; Deve recusar nota menor que 1 ou maior que 5.
+ * <p>
+ * Os métodos de teste estão bem explicativos através de suas anotações {@code @DisplayName}.
+ */
 class ReviewTest {
 
     private static Review reviewWithRating(int rating) {

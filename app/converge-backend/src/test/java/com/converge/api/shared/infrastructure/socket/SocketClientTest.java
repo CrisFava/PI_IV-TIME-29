@@ -23,6 +23,12 @@ import java.util.concurrent.TimeUnit;
 
 import static org.junit.jupiter.api.Assertions.*;
 
+/**
+ * Testes unitários para {@link SocketClient}.
+ * Valida cenários como: Should send math request via SocketClient and receive MathOperationResponse; Should close the socket when the server accepts but never sends the stream header.
+ * <p>
+ * Os métodos de teste estão bem explicativos através de suas anotações {@code @DisplayName}.
+ */
 public class SocketClientTest {
 
     private int testPort;

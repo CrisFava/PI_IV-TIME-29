@@ -39,6 +39,12 @@ import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
+/**
+ * Testes unitários para {@link MongoUserReputationWriter}.
+ * Valida cenários como: Penalidade do motorista deve gravar só janela, level e data, sem tocar na média e no total; Penalidade do passageiro deve gravar só janela, level e data, sem tocar na média e no total; Deve gravar só os campos de nota do motorista quando o total é mais novo.
+ * <p>
+ * Os métodos de teste estão bem explicativos através de suas anotações {@code @DisplayName}.
+ */
 @ExtendWith(MockitoExtension.class)
 class MongoUserReputationWriterTest {
 

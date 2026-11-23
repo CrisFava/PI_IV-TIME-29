@@ -65,6 +65,7 @@ def load_env(env_path: Path) -> dict:
 
 
 def backend_env_file() -> Path:
+    """Localiza o arquivo .env do backend (app/converge-backend/.env ou app/.env)."""
     env_file = BACKEND_DIR / ".env"
     return env_file if env_file.is_file() else APP_DIR / ".env"
 
@@ -153,6 +154,7 @@ def open_terminal(name: str):
 
 
 def port_open(port: int) -> bool:
+    """Testa se uma porta TCP está aberta e aceitando conexões locais (127.0.0.1)."""
     try:
         with socket.create_connection(("127.0.0.1", port), timeout=1):
             return True
@@ -161,6 +163,7 @@ def port_open(port: int) -> bool:
 
 
 def wait_for_socket_server() -> bool:
+    """Aguarda o Socket Server abrir a porta TCP configurada até o timeout limite."""
     deadline = time.monotonic() + SOCKET_WAIT_SECONDS
     while time.monotonic() < deadline:
         if port_open(SOCKET_PORT):
@@ -170,6 +173,7 @@ def wait_for_socket_server() -> bool:
 
 
 def parse_args():
+    """Analisa os argumentos de linha de comando para execução orquestrada ou modo interno."""
     parser = argparse.ArgumentParser(
         description="Abre o servidor de sockets e o backend em dois terminais, na ordem certa.")
     parser.add_argument("--executar", choices=sorted(SERVERS), help=argparse.SUPPRESS)
@@ -189,6 +193,7 @@ def install_server_module() -> bool:
 
 
 def main() -> int:
+    """Função principal: compila módulos necessários e orquestra a inicialização dos servidores."""
     args = parse_args()
     if args.executar:
         return run_server(args.executar)

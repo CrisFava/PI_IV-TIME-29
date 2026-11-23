@@ -75,6 +75,9 @@ class FakeRouteRepository implements RouteRepository {
   }
 }
 
+/// Testes unitários e de widgets para places autocomplete controller.
+/// Cobre cenários como: PlacesAutocompleteController - Debounce de 1 segundo.
+/// Os casos de teste estão descritos de forma autoexplicativa nas chamadas de [test] e [group].
 void main() {
   group('PlacesAutocompleteController - Debounce de 1 segundo', () {
     late FakeRouteRepository fakeRepository;

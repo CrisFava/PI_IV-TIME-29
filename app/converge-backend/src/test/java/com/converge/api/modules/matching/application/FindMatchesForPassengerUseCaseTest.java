@@ -41,6 +41,12 @@ import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.verifyNoInteractions;
 import static org.mockito.Mockito.when;
 
+/**
+ * Testes unitários para {@link FindMatchesForPassengerUseCase}.
+ * Valida cenários como: Deve mandar ao cálculo só os motoristas elegíveis, sem bloqueio, que não são o usuário e não o recusaram; Deve entregar ao montador os trajetos e veículos dos motoristas, para mostrar no app; Deve buscar as ofertas perto da origem e do destino do passageiro, no raio de candidatos.
+ * <p>
+ * Os métodos de teste estão bem explicativos através de suas anotações {@code @DisplayName}.
+ */
 @ExtendWith(MockitoExtension.class)
 class FindMatchesForPassengerUseCaseTest {
 

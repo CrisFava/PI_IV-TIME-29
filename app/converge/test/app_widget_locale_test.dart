@@ -7,6 +7,9 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:go_router/go_router.dart';
 
+/// Testes unitários e de widgets para app widget locale.
+/// Cobre cenários como: o app fala português: o seletor de data vem em pt-BR.
+/// Os casos de teste estão descritos de forma autoexplicativa nas chamadas de [test] e [group].
 void main() {
   testWidgets('o app fala português: o seletor de data vem em pt-BR', (
     tester,

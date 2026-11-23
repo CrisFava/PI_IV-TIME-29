@@ -28,6 +28,9 @@ const _profile = ProfileInput(
   enrollmentNumber: '2024-00123',
 );
 
+/// Testes unitários e de widgets para auth controller.
+/// Cobre cenários como: abertura do app, signIn.
+/// Os casos de teste estão descritos de forma autoexplicativa nas chamadas de [test] e [group].
 void main() {
   late FakeAuthService auth;
   late FakeAuthRepository repository;

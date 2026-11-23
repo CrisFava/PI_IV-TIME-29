@@ -22,6 +22,12 @@ import java.util.Set;
 
 import static org.assertj.core.api.Assertions.assertThat;
 
+/**
+ * Testes unitários para {@link UserRefreshReputationWindow}.
+ * Valida cenários como: Deve trocar os seis contadores da janela pelos recalculados; Deve manter as denúncias e os atrasos guardados, a média e as avaliações; Quem tinha penalidade que saiu da janela volta a cumprir os critérios do selo de confiança.
+ * <p>
+ * Os métodos de teste estão bem explicativos através de suas anotações {@code @DisplayName}.
+ */
 class UserRefreshReputationWindowTest {
 
     private static final LocalDateTime BEFORE = LocalDateTime.of(2026, 11, 1, 3, 0);

@@ -13,6 +13,12 @@ import static org.assertj.core.api.Assertions.within;
 import static org.junit.jupiter.api.Assertions.assertDoesNotThrow;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 
+/**
+ * Testes unitários para {@link PlatformIndicator}.
+ * Valida cenários como: Deve nascer zerado para o período; Deve guardar os totais e calcular árvores como CO2 / 22; ALL_TIME deve aceitar só a referência ALL_TIME.
+ * <p>
+ * Os métodos de teste estão bem explicativos através de suas anotações {@code @DisplayName}.
+ */
 class PlatformIndicatorTest {
 
     private static ApplicationException errorOf(Runnable action) {

@@ -58,6 +58,9 @@ class _FakeIndicatorRepository implements IndicatorRepository {
   Future<List<MethodologyItem>> methodology() async => const [];
 }
 
+/// Testes unitários e de widgets para indicators page.
+/// Cobre cenários como: mobilidade e ambiental mostram os números do período escolhido.
+/// Os casos de teste estão descritos de forma autoexplicativa nas chamadas de [test] e [group].
 void main() {
   testWidgets(
     'mobilidade e ambiental mostram os números do período escolhido',

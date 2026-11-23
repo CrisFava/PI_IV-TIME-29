@@ -9,6 +9,7 @@ import 'package:converge/core/services/auth/auth_user.dart';
 import 'package:dio/dio.dart';
 import 'package:flutter_test/flutter_test.dart';
 
+/// Implementação mock de [AuthService] para isolamento dos testes de interceptação.
 class _MockAuthService implements AuthService {
   String? currentToken;
   String? refreshedToken;
@@ -98,6 +99,9 @@ String _createJwt(int exp, {String uid = 'test_user'}) {
   return '$header.$payload.sig';
 }
 
+/// Testes unitários e de widgets para auth interceptor.
+/// Cobre cenários como: AuthInterceptor, vínculo com expectedUid.
+/// Os casos de teste estão descritos de forma autoexplicativa nas chamadas de [test] e [group].
 void main() {
   group('AuthInterceptor', () {
     late Dio dio;

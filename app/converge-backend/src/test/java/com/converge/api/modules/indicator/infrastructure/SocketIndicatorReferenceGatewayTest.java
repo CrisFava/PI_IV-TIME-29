@@ -12,6 +12,12 @@ import java.util.List;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
+/**
+ * Testes unitários para {@link SocketIndicatorReferenceGateway}.
+ * Valida cenários como: Sem servidor, deve devolver a referência de cada período; Na virada do ano a semana deve usar o ano ISO; Lote deve manter a ordem dos pedidos.
+ * <p>
+ * Os métodos de teste estão bem explicativos através de suas anotações {@code @DisplayName}.
+ */
 class SocketIndicatorReferenceGatewayTest {
 
     // Porta 1 fechada: o adaptador cai no handler local, sem depender de servidor rodando.

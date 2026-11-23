@@ -5,6 +5,9 @@ import 'package:converge/core/network/api_exception.dart';
 import 'package:converge/core/network/api_response.dart';
 import 'package:flutter_test/flutter_test.dart';
 
+/// Testes unitários e de widgets para api exception.
+/// Cobre cenários como: ApiException.fromResponse, unwrapApiResponse.
+/// Os casos de teste estão descritos de forma autoexplicativa nas chamadas de [test] e [group].
 void main() {
   group('ApiException.fromResponse', () {
     test('lê o error do envelope ApplicationResponse', () {

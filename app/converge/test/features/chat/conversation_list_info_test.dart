@@ -16,6 +16,9 @@ ChatMessageModel _message({required bool mine, DateTime? sentAt}) =>
       sentAt: sentAt,
     );
 
+/// Testes unitários e de widgets para conversation list info.
+/// Cobre cenários como: hora da última mensagem na lista, mensagens não lidas de uma conversa.
+/// Os casos de teste estão descritos de forma autoexplicativa nas chamadas de [test] e [group].
 void main() {
   group('hora da última mensagem na lista', () {
     final now = DateTime(2026, 11, 21, 15);

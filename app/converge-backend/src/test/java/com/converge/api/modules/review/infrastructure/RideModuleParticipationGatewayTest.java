@@ -20,6 +20,12 @@ import java.util.Optional;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.mockito.Mockito.when;
 
+/**
+ * Testes unitários para {@link RideModuleParticipationGateway}.
+ * Valida cenários como: Deve traduzir a viagem concluída em motorista e passageiros com os papéis certos; Viagem inexistente ou não concluída deve continuar vazia.
+ * <p>
+ * Os métodos de teste estão bem explicativos através de suas anotações {@code @DisplayName}.
+ */
 @ExtendWith(MockitoExtension.class)
 class RideModuleParticipationGatewayTest {
 

@@ -21,6 +21,12 @@ import java.util.Set;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
+/**
+ * Testes unitários para {@link RidePayment}.
+ * Valida cenários como: Solicitar pagamento deve gravar o valor combinado com 2 casas e deixar a cobrança pendente; O motorista pode corrigir o valor enquanto o pagamento não foi confirmado; Não deve solicitar pagamento de quem ainda não foi aceito.
+ * <p>
+ * Os métodos de teste estão bem explicativos através de suas anotações {@code @DisplayName}.
+ */
 class RidePaymentTest {
 
     private static final String PASSENGER = "passenger-456";

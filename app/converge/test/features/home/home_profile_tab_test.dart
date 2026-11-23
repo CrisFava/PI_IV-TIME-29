@@ -9,6 +9,9 @@ import 'package:flutter_test/flutter_test.dart';
 import '../chat/fakes/fake_chat_user.dart';
 import '../vehicle/fakes/fake_signed_in_auth_controller.dart';
 
+/// Testes unitários e de widgets para home profile tab.
+/// Cobre cenários como: "Sair da Conta" fica no fim do perfil, depois de "Meu impacto", "Sair da Conta" continua pedindo confirmação.
+/// Os casos de teste estão descritos de forma autoexplicativa nas chamadas de [test] e [group].
 void main() {
   testWidgets('"Sair da Conta" fica no fim do perfil, depois de "Meu impacto"', (
     tester,

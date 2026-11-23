@@ -14,6 +14,12 @@ import org.mockito.junit.jupiter.MockitoExtension;
 
 import static org.mockito.Mockito.verify;
 
+/**
+ * Testes unitários para {@link UserModuleReputationGateway}.
+ * Valida cenários como: Avaliação do motorista vai para o papel DRIVER do usuário; Avaliação do passageiro vai para o papel PASSENGER do usuário.
+ * <p>
+ * Os métodos de teste estão bem explicativos através de suas anotações {@code @DisplayName}.
+ */
 @ExtendWith(MockitoExtension.class)
 class UserModuleReputationGatewayTest {
 

@@ -21,6 +21,12 @@ import static org.assertj.core.api.Assertions.assertThat;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.when;
 
+/**
+ * Testes unitários para {@link ListRecentlyCompletedRidesUseCase}.
+ * Valida cenários como: Deve devolver os eventos das viagens concluídas, pulando as que não contam.
+ * <p>
+ * Os métodos de teste estão bem explicativos através de suas anotações {@code @DisplayName}.
+ */
 @ExtendWith(MockitoExtension.class)
 class ListRecentlyCompletedRidesUseCaseTest {
 

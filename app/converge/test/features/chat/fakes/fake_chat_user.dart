@@ -4,6 +4,7 @@ import 'package:converge/features/auth/data/models/academic_record_model.dart';
 import 'package:converge/features/auth/data/models/participation_role.dart';
 import 'package:converge/features/auth/data/models/user_model.dart';
 
+/// Cria uma instância fake de [UserModel] para simulação de participantes do chat.
 UserModel fakeChatUser({required String id, required String name}) => UserModel(
   id: id,
   firebaseUid: 'uid-$id',

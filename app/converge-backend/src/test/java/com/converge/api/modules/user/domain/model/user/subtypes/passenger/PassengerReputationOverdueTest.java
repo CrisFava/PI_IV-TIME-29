@@ -10,6 +10,12 @@ import java.time.LocalDateTime;
 
 import static org.assertj.core.api.Assertions.assertThat;
 
+/**
+ * Testes unitários para {@link PassengerReputationOverdue}.
+ * Valida cenários como: Dívida soma 1 em overdueRides e derruba o nível para LOW; Dívidas seguintes continuam somando e nada diminui o contador; Janela com overdueRides nulo conta a partir de zero.
+ * <p>
+ * Os métodos de teste estão bem explicativos através de suas anotações {@code @DisplayName}.
+ */
 class PassengerReputationOverdueTest {
 
     private static final LocalDateTime NOW = LocalDateTime.of(2026, 11, 20, 12, 0);

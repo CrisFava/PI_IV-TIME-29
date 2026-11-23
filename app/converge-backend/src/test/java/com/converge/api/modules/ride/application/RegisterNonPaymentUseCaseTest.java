@@ -25,6 +25,12 @@ import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.verifyNoInteractions;
 import static org.mockito.Mockito.when;
 
+/**
+ * Testes unitários para {@link RegisterNonPaymentUseCase}.
+ * Valida cenários como: Quando a marcação acontece, deve registrar a dívida e devolver true; Quando a cobrança já estava vencida ou não existe, não deve somar outra dívida; Id de viagem inválido ou nulo deve devolver false sem consultar nada.
+ * <p>
+ * Os métodos de teste estão bem explicativos através de suas anotações {@code @DisplayName}.
+ */
 @ExtendWith(MockitoExtension.class)
 class RegisterNonPaymentUseCaseTest {
 

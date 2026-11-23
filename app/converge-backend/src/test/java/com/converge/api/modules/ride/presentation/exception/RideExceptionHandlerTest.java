@@ -44,6 +44,12 @@ import static org.springframework.test.web.servlet.request.MockMvcRequestBuilder
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
+/**
+ * Testes unitários para {@link RideExceptionHandler}.
+ * Valida cenários como: Chave duplicada na Ride deve responder com a mensagem da viagem, e não a de usuário; Alteração simultânea da mesma viagem deve pedir para tentar de novo.
+ * <p>
+ * Os métodos de teste estão bem explicativos através de suas anotações {@code @DisplayName}.
+ */
 @ExtendWith(MockitoExtension.class)
 class RideExceptionHandlerTest {
 

@@ -21,6 +21,12 @@ import java.util.Set;
 
 import static org.assertj.core.api.Assertions.assertThat;
 
+/**
+ * Testes unitários para {@link UserBadgeRules}.
+ * Valida cenários como: Viagem concluída soma 1 na janela do motorista sem mexer na do passageiro; Viagem concluída soma 1 na janela do passageiro sem mexer na do motorista; Contagem usa a reputação inicial quando o usuário não tem reputação.
+ * <p>
+ * Os métodos de teste estão bem explicativos através de suas anotações {@code @DisplayName}.
+ */
 class UserBadgeRulesTest {
 
     private static final LocalDateTime NOW = LocalDateTime.of(2026, 11, 20, 10, 0);

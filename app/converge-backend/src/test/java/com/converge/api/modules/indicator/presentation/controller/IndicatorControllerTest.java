@@ -42,6 +42,12 @@ import static org.springframework.test.web.servlet.request.MockMvcRequestBuilder
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
+/**
+ * Testes unitários para {@link IndicatorController}.
+ * Valida cenários como: GET /platform sem parâmetros deve usar o período MONTHLY e responder no envelope de sucesso; GET /platform deve repassar o período e a referência informados; GET /platform com período inexistente deve responder 400 sem chamar o caso de uso.
+ * <p>
+ * Os métodos de teste estão bem explicativos através de suas anotações {@code @DisplayName}.
+ */
 @ExtendWith(MockitoExtension.class)
 class IndicatorControllerTest {
 

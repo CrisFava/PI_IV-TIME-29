@@ -21,6 +21,12 @@ import java.util.Set;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 
+/**
+ * Testes unitários para {@link Route}.
+ * Valida cenários como: Deve criar oferta ACTIVE com vagas disponíveis iguais ao total; Deve lançar BAD_REQUEST quando oferta não tiver maxDetourKm; Deve lançar BAD_REQUEST quando oferta tiver zero vagas.
+ * <p>
+ * Os métodos de teste estão bem explicativos através de suas anotações {@code @DisplayName}.
+ */
 class RouteTest {
 
     private static final Place HOME = Place.of(

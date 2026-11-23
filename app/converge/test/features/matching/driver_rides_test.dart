@@ -20,6 +20,9 @@ import '../chat/fakes/fake_chat_user.dart';
 import '../ride/fakes/fake_ride.dart';
 import 'fakes/fake_seat_ride_repository.dart';
 
+/// Testes unitários e de widgets para driver rides.
+/// Cobre cenários como: a viagem em andamento é o expediente, iniciar e concluir chamam a API; um erro volta como mensagem.
+/// Os casos de teste estão descritos de forma autoexplicativa nas chamadas de [test] e [group].
 void main() {
   late FakeChatRepository chat;
 

@@ -19,6 +19,9 @@ import 'fakes/fake_matching_repository.dart';
 import 'fakes/fake_matching_route_repository.dart';
 import 'fakes/fake_seat_ride_repository.dart';
 
+/// Testes unitários e de widgets para passenger match controller.
+/// Cobre cenários como: findDrivers, aviso do motorista disponível.
+/// Os casos de teste estão descritos de forma autoexplicativa nas chamadas de [test] e [group].
 void main() {
   late FakeMatchingRepository matching;
   late FakeSeatRideRepository rides;

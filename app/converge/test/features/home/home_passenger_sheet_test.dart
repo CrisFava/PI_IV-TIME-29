@@ -66,6 +66,9 @@ Future<_Taps> _pumpSheet(
   return taps;
 }
 
+/// Testes unitários e de widgets para home passenger sheet.
+/// Cobre cenários como: sem motoristas compatíveis, o botão só aparece quando não há motoristas.
+/// Os casos de teste estão descritos de forma autoexplicativa nas chamadas de [test] e [group].
 void main() {
   group('sem motoristas compatíveis', () {
     const empty = PassengerMatchState(phase: PassengerMatchPhase.ready);

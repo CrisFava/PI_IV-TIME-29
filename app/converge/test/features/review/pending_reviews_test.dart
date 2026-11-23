@@ -29,6 +29,9 @@ ReviewModel givenTo(String reviewedId) => ReviewModel(
   createdAt: null,
 );
 
+/// Testes unitários e de widgets para pending reviews.
+/// Cobre cenários como: passageiro, motorista.
+/// Os casos de teste estão descritos de forma autoexplicativa nas chamadas de [test] e [group].
 void main() {
   // fakeRide: motorista 'driver-1' (Lucas Silveira) e passageira 'passenger-1' (Ana Souza)
   final completedRide = fakeRide(

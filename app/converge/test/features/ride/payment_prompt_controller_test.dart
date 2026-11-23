@@ -14,6 +14,9 @@ import 'package:flutter_test/flutter_test.dart';
 import 'fakes/fake_ride.dart';
 import 'fakes/fake_ride_repository.dart';
 
+/// Testes unitários e de widgets para payment prompt controller.
+/// Cobre cenários como: mostra a cobrança em aberto até o passageiro deixar para depois, cobrança paga ou sem valor não aparece.
+/// Os casos de teste estão descritos de forma autoexplicativa nas chamadas de [test] e [group].
 void main() {
   late FakeRideRepository rides;
   late ProviderContainer container;

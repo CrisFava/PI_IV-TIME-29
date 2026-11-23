@@ -10,6 +10,12 @@ import org.junit.jupiter.api.Test;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 
+/**
+ * Testes unitários para {@link Block}.
+ * Valida cenários como: Guarda quem bloqueou e quem foi bloqueado; Não deixa o usuário bloquear a si mesmo; Exige os dois usuários.
+ * <p>
+ * Os métodos de teste estão bem explicativos através de suas anotações {@code @DisplayName}.
+ */
 class BlockTest {
 
     @Test

@@ -17,6 +17,12 @@ import java.util.List;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
+/**
+ * Testes unitários para {@link Vehicle}.
+ * Valida cenários como: Deve guardar a placa em maiúsculas e sem hífen; Deve guardar o RENAVAM só com os dígitos; Moto não pode ter mais de 2 lugares.
+ * <p>
+ * Os métodos de teste estão bem explicativos através de suas anotações {@code @DisplayName}.
+ */
 class VehicleTest {
 
     private List<FuelSource> gasolineOnly() {

@@ -31,6 +31,12 @@ import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
+/**
+ * Testes unitários para {@link VehicleAccess}.
+ * Valida cenários como: Deve devolver o veículo ativo do dono informado, sem depender de quem está logado; Veículo de outro dono é tratado como não encontrado; Veículo desativado é tratado como não encontrado.
+ * <p>
+ * Os métodos de teste estão bem explicativos através de suas anotações {@code @DisplayName}.
+ */
 @ExtendWith(MockitoExtension.class)
 class VehicleAccessTest {
 

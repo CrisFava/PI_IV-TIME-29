@@ -43,6 +43,12 @@ import static org.springframework.test.web.servlet.request.MockMvcRequestBuilder
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
+/**
+ * Testes unitários para {@link BlockController}.
+ * Valida cenários como: POST /blocks deve bloquear em nome do usuário logado e responder 201 no envelope; POST /blocks ignora quem bloqueia vindo no corpo: vale o usuário do token; POST /blocks sem o usuário a bloquear deve responder 400 sem chamar o caso de uso.
+ * <p>
+ * Os métodos de teste estão bem explicativos através de suas anotações {@code @DisplayName}.
+ */
 @ExtendWith(MockitoExtension.class)
 class BlockControllerTest {
 

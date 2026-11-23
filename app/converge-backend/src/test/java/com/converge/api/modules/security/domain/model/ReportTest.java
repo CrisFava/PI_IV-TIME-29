@@ -12,6 +12,12 @@ import org.junit.jupiter.api.Test;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 
+/**
+ * Testes unitários para {@link Report}.
+ * Valida cenários como: Denúncia nova nasce PENDING, sem resolução nem moderador; Viagem e descrição são opcionais para motivos comuns e vazios viram nulos; Não pode denunciar a si mesmo.
+ * <p>
+ * Os métodos de teste estão bem explicativos através de suas anotações {@code @DisplayName}.
+ */
 class ReportTest {
 
     private static void assertBadRequest(Runnable action, String field) {

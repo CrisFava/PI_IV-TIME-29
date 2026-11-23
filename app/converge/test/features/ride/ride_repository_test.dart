@@ -11,6 +11,9 @@ import 'package:flutter_test/flutter_test.dart';
 
 import 'fakes/fake_ride.dart';
 
+/// Testes unitários e de widgets para ride repository.
+/// Cobre cenários como: listMyRides lê a lista de viagens do envelope, requestSeat envia os trajetos e a data só com ano, mês e dia.
+/// Os casos de teste estão descritos de forma autoexplicativa nas chamadas de [test] e [group].
 void main() {
   late Dio dio;
   late RideRepositoryImpl repository;

@@ -11,6 +11,7 @@ import 'package:converge/features/auth/data/models/pix_key_type.dart';
 import 'package:converge/features/auth/data/models/user_model.dart';
 import 'package:converge/features/auth/data/repository/auth_repository.dart';
 
+/// Estrutura e dados fake em memória para suporte a testes unitários e de widgets.
 class FakeAuthRepository implements AuthRepository {
   UserModel? stored;
   ApiException? fetchError;

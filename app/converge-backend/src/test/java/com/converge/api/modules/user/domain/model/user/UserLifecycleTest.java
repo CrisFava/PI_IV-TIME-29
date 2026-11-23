@@ -17,6 +17,12 @@ import java.util.Set;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
+/**
+ * Testes unitários para {@link UserLifecycle}.
+ * Valida cenários como: Deve desativar a conta do usuário; Passageira com PIX e CNH deve conseguir virar motorista; Passageira sem PIX e CNH não deve conseguir virar motorista.
+ * <p>
+ * Os métodos de teste estão bem explicativos através de suas anotações {@code @DisplayName}.
+ */
 class UserLifecycleTest {
 
     private User createPassenger(String uid, String name, String email, String phone, String enrollment) {

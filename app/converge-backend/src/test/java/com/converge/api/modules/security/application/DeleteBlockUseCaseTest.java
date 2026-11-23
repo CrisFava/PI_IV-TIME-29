@@ -12,6 +12,12 @@ import org.mockito.junit.jupiter.MockitoExtension;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
+/**
+ * Testes unitários para {@link DeleteBlockUseCase}.
+ * Valida cenários como: Desbloquear remove só o bloqueio feito por quem pede; Desbloquear sem bloqueio existente não dá erro.
+ * <p>
+ * Os métodos de teste estão bem explicativos através de suas anotações {@code @DisplayName}.
+ */
 @ExtendWith(MockitoExtension.class)
 class DeleteBlockUseCaseTest {
 

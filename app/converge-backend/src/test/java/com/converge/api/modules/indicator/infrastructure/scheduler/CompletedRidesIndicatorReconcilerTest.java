@@ -26,6 +26,12 @@ import static org.mockito.Mockito.times;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
+/**
+ * Testes unitários para {@link CompletedRidesIndicatorReconciler}.
+ * Valida cenários como: Deve registrar as viagens concluídas dos últimos 7 dias; Falha em uma viagem não impede o reprocessamento das outras.
+ * <p>
+ * Os métodos de teste estão bem explicativos através de suas anotações {@code @DisplayName}.
+ */
 @ExtendWith(MockitoExtension.class)
 class CompletedRidesIndicatorReconcilerTest {
 

@@ -50,6 +50,7 @@ def firebase_api_key(env_file: dict) -> str:
 
 
 def clean_previous_run(api: ApiClient, connection: str, database: str, env_file: dict, run_id: str) -> int:
+    """Remove contas de teste criadas no Firebase em uma execução anterior de simulação."""
     try:
         with MongoClient(connection, serverSelectionTimeoutMS=10_000) as client:
             users = client[database][verificar_usuario.USERS_COLLECTION]
@@ -66,6 +67,7 @@ def clean_previous_run(api: ApiClient, connection: str, database: str, env_file:
 
 
 def parse_args():
+    """Analisa as opções de linha de comando para selecionar cenários ou modo de limpeza."""
     parser = argparse.ArgumentParser(description="Simula corridas completas contra o backend do Converge.")
     parser.add_argument("--cenario", action="append", choices=sorted(SCENARIOS),
                         help="Roda só este cenário (pode repetir). Padrão: todos.")
@@ -84,6 +86,7 @@ def parse_args():
 
 
 def main() -> int:
+    """Ponto de entrada: orquestra a execução dos cenários de teste simulados."""
     args = parse_args()
 
     if args.listar:

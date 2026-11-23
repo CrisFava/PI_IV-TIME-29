@@ -9,6 +9,12 @@ import org.springframework.test.util.ReflectionTestUtils;
 
 import static org.assertj.core.api.Assertions.assertThat;
 
+/**
+ * Testes unitários para {@link MatchingSearchRadius}.
+ * Valida cenários como: Oferta: o raio é a distância da rota mais o desvio máximo do motorista; Oferta: o raio não passa do teto configurado; Oferta sem distância calculada usa o teto, para não perder candidatos.
+ * <p>
+ * Os métodos de teste estão bem explicativos através de suas anotações {@code @DisplayName}.
+ */
 class MatchingSearchRadiusTest {
 
     private final MatchingSearchRadius radius = new MatchingSearchRadius(50.0);

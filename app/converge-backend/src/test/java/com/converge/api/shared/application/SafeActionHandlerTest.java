@@ -16,6 +16,12 @@ import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.verify;
 
+/**
+ * Testes unitários para {@link SafeActionHandler}.
+ * Valida cenários como: Deve executar ação com sucesso; Deve capturar exceção e logar erro sem lançar para o chamador.
+ * <p>
+ * Os métodos de teste estão bem explicativos através de suas anotações {@code @DisplayName}.
+ */
 class SafeActionHandlerTest {
 
     @Test

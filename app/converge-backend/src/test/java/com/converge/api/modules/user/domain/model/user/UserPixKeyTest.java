@@ -14,6 +14,12 @@ import java.util.Set;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 
+/**
+ * Testes unitários para {@link UserPixKey}.
+ * Valida cenários como: Ao editar o perfil, a chave PIX é gravada já normalizada conforme o tipo; Telefone e e-mail também são normalizados ao editar o perfil; Chave inválida para o tipo escolhido é recusada e a chave anterior continua valendo.
+ * <p>
+ * Os métodos de teste estão bem explicativos através de suas anotações {@code @DisplayName}.
+ */
 class UserPixKeyTest {
 
     private User passenger() {

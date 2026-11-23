@@ -9,6 +9,9 @@ import 'package:converge/features/auth/state/session/auth_session.dart';
 
 import 'features/auth/fakes/fake_user.dart';
 
+/// Testes unitários e de widgets para app router.
+/// Cobre cenários como: authRedirect.
+/// Os casos de teste estão descritos de forma autoexplicativa nas chamadas de [test] e [group].
 void main() {
   const authUser = AuthUser(
     uid: 'uid',

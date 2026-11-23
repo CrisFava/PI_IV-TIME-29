@@ -18,6 +18,12 @@ import java.util.Set;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
+/**
+ * Testes unitários para {@link UserDriverLicense}.
+ * Valida cenários como: CNH enviada pelo motorista fica em análise; Não deve aceitar o envio de uma CNH vazia; Editar o perfil não altera uma CNH já verificada.
+ * <p>
+ * Os métodos de teste estão bem explicativos através de suas anotações {@code @DisplayName}.
+ */
 class UserDriverLicenseTest {
 
     private DriverLicense verifiedLicense() {

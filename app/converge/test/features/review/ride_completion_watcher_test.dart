@@ -11,6 +11,9 @@ import 'package:flutter_test/flutter_test.dart';
 import '../ride/fakes/fake_ride.dart';
 import '../ride/fakes/fake_ride_repository.dart';
 
+/// Testes unitários e de widgets para ride completion watcher.
+/// Cobre cenários como: viagem a caminho, mudança de status.
+/// Os casos de teste estão descritos de forma autoexplicativa nas chamadas de [test] e [group].
 void main() {
   group('viagem a caminho', () {
     // fakeRide sai em 16/11/2026 às 07:30

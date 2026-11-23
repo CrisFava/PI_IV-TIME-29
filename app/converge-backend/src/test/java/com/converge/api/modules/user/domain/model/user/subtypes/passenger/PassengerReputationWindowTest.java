@@ -10,6 +10,12 @@ import java.time.LocalDateTime;
 
 import static org.assertj.core.api.Assertions.assertThat;
 
+/**
+ * Testes unitários para {@link PassengerReputationWindow}.
+ * Valida cenários como: Deve trocar a janela e manter a média e as avaliações; Deve ficar LOW quando a nova janela tem dívida vencida, ausência demais ou cancelamento tardio demais; Deve sair de LOW quando a dívida deixa a janela e os critérios são cumpridos.
+ * <p>
+ * Os métodos de teste estão bem explicativos através de suas anotações {@code @DisplayName}.
+ */
 class PassengerReputationWindowTest {
 
     private static final LocalDateTime BEFORE = LocalDateTime.of(2026, 11, 1, 3, 0);

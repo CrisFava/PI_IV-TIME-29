@@ -24,6 +24,12 @@ import static org.junit.jupiter.api.Assertions.assertDoesNotThrow;
 import static org.mockito.Mockito.doThrow;
 import static org.mockito.Mockito.verify;
 
+/**
+ * Testes unitários para {@link RideCompletedReputationListener}.
+ * Valida cenários como: Deve repassar o motorista e os passageiros efetivos da viagem concluída; Uma falha ao contar a viagem não pode impedir a conclusão; Deve rodar só depois do commit, com fallback sem transação e fora da sessão da transação.
+ * <p>
+ * Os métodos de teste estão bem explicativos através de suas anotações {@code @DisplayName}.
+ */
 @ExtendWith(MockitoExtension.class)
 class RideCompletedReputationListenerTest {
 

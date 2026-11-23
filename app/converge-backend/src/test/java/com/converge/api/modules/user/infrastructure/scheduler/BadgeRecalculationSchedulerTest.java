@@ -16,6 +16,12 @@ import static org.junit.jupiter.api.Assertions.assertDoesNotThrow;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
+/**
+ * Testes unitários para {@link BadgeRecalculationScheduler}.
+ * Valida cenários como: Deve disparar o recálculo dos selos; Erro no recálculo não pode derrubar o agendador; Deve rodar toda segunda às 03h no horário de Brasília.
+ * <p>
+ * Os métodos de teste estão bem explicativos através de suas anotações {@code @DisplayName}.
+ */
 @ExtendWith(MockitoExtension.class)
 class BadgeRecalculationSchedulerTest {
 

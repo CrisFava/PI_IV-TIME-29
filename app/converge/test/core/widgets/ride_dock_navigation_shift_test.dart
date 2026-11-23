@@ -4,6 +4,9 @@ import 'package:converge/core/widgets/ride_dock_navigation.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 
+/// Testes unitários e de widgets para ride dock navigation shift.
+/// Cobre cenários como: fora do expediente, o menu oferece iniciar expediente, em expediente, o menu mostra o estado e encerra.
+/// Os casos de teste estão descritos de forma autoexplicativa nas chamadas de [test] e [group].
 void main() {
   Future<void> pumpDock(
     WidgetTester tester, {

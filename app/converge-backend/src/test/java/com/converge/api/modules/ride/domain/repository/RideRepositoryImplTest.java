@@ -35,6 +35,12 @@ import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
+/**
+ * Testes unitários para {@link RideRepositoryImpl}.
+ * Valida cenários como: acceptPassengerAtomic deve exigir availableSeats > 0, status válido e passageiro REQUESTED, e decrementar availableSeats; requestSeatAtomic deve exigir availableSeats > 0, status válido e impedir duplicidade de participante ativo; acceptPassengerAtomic com requestCutoff deve incluir filtro requestedAt >= cutoff no predicate do participante.
+ * <p>
+ * Os métodos de teste estão bem explicativos através de suas anotações {@code @DisplayName}.
+ */
 @ExtendWith(MockitoExtension.class)
 class RideRepositoryImplTest {
 

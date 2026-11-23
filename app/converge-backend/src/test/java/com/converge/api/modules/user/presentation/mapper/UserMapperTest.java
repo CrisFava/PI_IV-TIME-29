@@ -25,6 +25,12 @@ import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
+/**
+ * Testes unitários para {@link UserMapper}.
+ * Valida cenários como: Deve mapear CreateUserRequestDTO para entidade User inicializando valores padrão; Deve mapear entidade User para CreateUserResponseDTO preservando campos; A resposta mostra EXPIRED quando a CNH verificada já venceu, sem alterar a CNH gravada.
+ * <p>
+ * Os métodos de teste estão bem explicativos através de suas anotações {@code @DisplayName}.
+ */
 class UserMapperTest {
 
     private final UserMapper mapper = new UserMapper();

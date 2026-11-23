@@ -11,6 +11,9 @@ import 'package:flutter_test/flutter_test.dart';
 
 import 'fakes/fake_security_repository.dart';
 
+/// Testes unitários e de widgets para report sheet.
+/// Cobre cenários como: ReportSheet, BlockConfirmDialog.
+/// Os casos de teste estão descritos de forma autoexplicativa nas chamadas de [test] e [group].
 void main() {
   late FakeSecurityRepository repository;
 

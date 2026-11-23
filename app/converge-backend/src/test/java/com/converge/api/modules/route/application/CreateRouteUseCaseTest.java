@@ -38,6 +38,12 @@ import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
+/**
+ * Testes unitários para {@link CreateRouteUseCase}.
+ * Valida cenários como: Deve salvar o trajeto com o dono vindo do command; Com o pagamento de uma carona em aberto, não dá para cadastrar trajeto, de oferta ou de procura; Deve consultar duplicados com os dados do trajeto.
+ * <p>
+ * Os métodos de teste estão bem explicativos através de suas anotações {@code @DisplayName}.
+ */
 @ExtendWith(MockitoExtension.class)
 class CreateRouteUseCaseTest {
 

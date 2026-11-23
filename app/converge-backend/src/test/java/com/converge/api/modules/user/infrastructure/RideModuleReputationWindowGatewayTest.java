@@ -19,6 +19,12 @@ import static org.assertj.core.api.Assertions.assertThat;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
+/**
+ * Testes unitários para {@link RideModuleReputationWindowGateway}.
+ * Valida cenários como: Deve repassar o período ao ride e converter os fatos em contadores, campo a campo; Deve devolver mapa vazio quando o ride não tem fatos.
+ * <p>
+ * Os métodos de teste estão bem explicativos através de suas anotações {@code @DisplayName}.
+ */
 @ExtendWith(MockitoExtension.class)
 class RideModuleReputationWindowGatewayTest {
 

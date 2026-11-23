@@ -21,6 +21,9 @@ import 'fakes/fake_signed_in_auth_controller.dart';
 import 'fakes/fake_vehicle_repository.dart';
 import 'fakes/valid_vehicle_request.dart';
 
+/// Testes unitários e de widgets para driver access.
+/// Cobre cenários como: falha ao listar os carros não libera o motorista, cadastrar sem a lista carregada publica a lista completa.
+/// Os casos de teste estão descritos de forma autoexplicativa nas chamadas de [test] e [group].
 void main() {
   const onix = VehicleModel(
     id: 'vehicle-1',

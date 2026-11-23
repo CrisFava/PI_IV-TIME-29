@@ -14,6 +14,9 @@ Widget _list({required bool rideFinished}) => MaterialApp(
   ),
 );
 
+/// Testes unitários e de widgets para chat message list.
+/// Cobre cenários como: conversa vazia de uma viagem que vai acontecer convida a combinar a saída, conversa vazia de uma viagem concluída não fala em combinar a saída.
+/// Os casos de teste estão descritos de forma autoexplicativa nas chamadas de [test] e [group].
 void main() {
   testWidgets('conversa vazia de uma viagem que vai acontecer convida a combinar a saída', (
     tester,

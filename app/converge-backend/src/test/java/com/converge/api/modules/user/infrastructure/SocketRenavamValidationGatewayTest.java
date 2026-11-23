@@ -15,6 +15,12 @@ import java.time.Duration;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.junit.jupiter.api.Assertions.assertTimeoutPreemptively;
 
+/**
+ * Testes unitários para {@link SocketRenavamValidationGateway}.
+ * Valida cenários como: Deve usar a resposta do servidor quando ele está no ar; Deve validar localmente quando o servidor está fora do ar; Deve validar localmente quando o servidor não conhece o pedido.
+ * <p>
+ * Os métodos de teste estão bem explicativos através de suas anotações {@code @DisplayName}.
+ */
 class SocketRenavamValidationGatewayTest {
 
     private SocketServer server;

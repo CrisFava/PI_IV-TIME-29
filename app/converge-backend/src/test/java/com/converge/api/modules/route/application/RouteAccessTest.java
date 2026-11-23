@@ -35,6 +35,12 @@ import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.verifyNoInteractions;
 import static org.mockito.Mockito.when;
 
+/**
+ * Testes unitários para {@link RouteAccess}.
+ * Valida cenários como: A carona de um dia só termina com a viagem; a semanal continua ativa; Deve devolver o trajeto quando ele existe, está ativo e é do usuário; Deve lançar ROUTE_NOT_FOUND quando o id não é um ObjectId válido.
+ * <p>
+ * Os métodos de teste estão bem explicativos através de suas anotações {@code @DisplayName}.
+ */
 @ExtendWith(MockitoExtension.class)
 class RouteAccessTest {
 

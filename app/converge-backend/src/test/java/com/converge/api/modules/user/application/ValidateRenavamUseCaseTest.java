@@ -16,6 +16,12 @@ import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.Mockito.when;
 
+/**
+ * Testes unitários para {@link ValidateRenavamUseCase}.
+ * Valida cenários como: Deve devolver só os dígitos quando o RENAVAM é válido; Deve recusar com a mensagem do validador e o campo renavam.
+ * <p>
+ * Os métodos de teste estão bem explicativos através de suas anotações {@code @DisplayName}.
+ */
 @ExtendWith(MockitoExtension.class)
 class ValidateRenavamUseCaseTest {
 

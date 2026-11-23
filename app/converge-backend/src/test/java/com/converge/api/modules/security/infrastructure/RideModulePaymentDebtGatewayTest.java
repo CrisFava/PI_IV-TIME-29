@@ -12,6 +12,12 @@ import org.mockito.junit.jupiter.MockitoExtension;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.mockito.Mockito.when;
 
+/**
+ * Testes unitários para {@link RideModulePaymentDebtGateway}.
+ * Valida cenários como: Deve repassar a viagem e o passageiro ao caso de uso do módulo de viagens.
+ * <p>
+ * Os métodos de teste estão bem explicativos através de suas anotações {@code @DisplayName}.
+ */
 @ExtendWith(MockitoExtension.class)
 class RideModulePaymentDebtGatewayTest {
 

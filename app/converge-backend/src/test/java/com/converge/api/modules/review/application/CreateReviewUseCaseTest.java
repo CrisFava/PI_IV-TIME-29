@@ -35,6 +35,12 @@ import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.verifyNoInteractions;
 import static org.mockito.Mockito.when;
 
+/**
+ * Testes unitários para {@link CreateReviewUseCase}.
+ * Valida cenários como: Passageiro avalia o motorista: a avaliação fica no papel de motorista; Motorista avalia o passageiro: a avaliação fica no papel de passageiro; Depois de salvar, grava a média e o total de todas as avaliações do papel no avaliado.
+ * <p>
+ * Os métodos de teste estão bem explicativos através de suas anotações {@code @DisplayName}.
+ */
 @ExtendWith(MockitoExtension.class)
 class CreateReviewUseCaseTest {
 

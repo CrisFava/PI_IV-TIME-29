@@ -35,6 +35,9 @@ Future<bool? Function()> _openDialog(
   return () => answer;
 }
 
+/// Testes unitários e de widgets para discard ride dialog.
+/// Cobre cenários como: aviso de descartar, quando o X pergunta antes de fechar.
+/// Os casos de teste estão descritos de forma autoexplicativa nas chamadas de [test] e [group].
 void main() {
   group('aviso de descartar', () {
     testWidgets('passageiro: "Descartar" confirma', (tester) async {
