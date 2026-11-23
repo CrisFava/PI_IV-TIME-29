@@ -33,6 +33,8 @@ import static org.assertj.core.api.Assertions.assertThat;
  */
 class ReputationFactsCounterTest {
 
+    // Data fixa, para os testes de borda não dependerem do dia em que rodam.
+    // SINCE é o início da janela de 90 dias: um fato exatamente nessa data ainda conta.
     private static final LocalDateTime NOW = LocalDateTime.of(2026, 11, 20, 12, 0);
     private static final LocalDateTime SINCE = NOW.minusDays(90);
 

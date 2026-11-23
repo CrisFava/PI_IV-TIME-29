@@ -5,6 +5,8 @@ import 'package:flutter/material.dart';
 import '../../../../core/config/styles.dart';
 
 /// Faixa que ocupa o lugar do campo de mensagem quando o outro usuário está bloqueado.
+/// O `ChatPage` mostra esta faixa quando a pessoa está na minha lista de bloqueados (RF47).
+/// Só aparece para quem bloqueou: o bloqueio no chat é feito pelo app.
 class BlockedChatBar extends StatelessWidget {
   const BlockedChatBar({super.key});
 

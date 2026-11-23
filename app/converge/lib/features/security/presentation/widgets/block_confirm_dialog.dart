@@ -8,7 +8,8 @@ import '../../../../core/config/styles.dart';
 import '../../../auth/state/auth_action_controller.dart';
 import '../../state/blocked_users_controller.dart';
 
-/// Pede a confirmação e bloqueia o usuário. Devolve `true` quando o bloqueio foi feito.
+/// Pede a confirmação e bloqueia o usuário (RF46). Devolve `true` quando o bloqueio foi feito.
+/// É aberto pela opção "Bloquear" do menu de segurança (`UserSafetyMenu`).
 Future<bool> showBlockConfirmDialog(
   BuildContext context, {
   required String userId,
@@ -21,6 +22,8 @@ Future<bool> showBlockConfirmDialog(
   return blocked ?? false;
 }
 
+/// Diálogo que explica o efeito do bloqueio e chama o `blockedUsersProvider`.
+/// O erro do backend aparece dentro do próprio diálogo, sem fechar.
 class BlockConfirmDialog extends ConsumerStatefulWidget {
   final String userId;
   final String userName;
@@ -36,9 +39,11 @@ class BlockConfirmDialog extends ConsumerStatefulWidget {
 }
 
 class _BlockConfirmDialogState extends ConsumerState<BlockConfirmDialog> {
+  // Enquanto envia, os dois botões ficam desabilitados para não bloquear duas vezes.
   bool _submitting = false;
   String? _error;
 
+  // POST /blocks pelo controller. Se der certo, fecha devolvendo true; se falhar, mostra a mensagem.
   Future<void> _confirm() async {
     if (_submitting) return;
     HapticFeedback.mediumImpact();
@@ -77,6 +82,7 @@ class _BlockConfirmDialogState extends ConsumerState<BlockConfirmDialog> {
         mainAxisSize: MainAxisSize.min,
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
+          // O texto segue a regra do backend: o bloqueio vale nos dois sentidos (BlockAccess).
           const Text(
             'Vocês deixam de aparecer nas buscas um do outro e não poderão '
             'pedir nem aceitar vagas entre si. Você pode desbloquear depois '

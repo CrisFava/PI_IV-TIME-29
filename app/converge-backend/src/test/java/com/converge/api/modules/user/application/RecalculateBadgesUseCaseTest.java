@@ -60,6 +60,7 @@ import static org.mockito.Mockito.when;
 @ExtendWith(MockitoExtension.class)
 class RecalculateBadgesUseCaseTest {
 
+    // O repositório, o CO2 e a contagem da janela de 90 dias são mocks: nenhum teste toca o Mongo.
     private static final LocalDateTime NOW = LocalDateTime.now();
 
     @Mock

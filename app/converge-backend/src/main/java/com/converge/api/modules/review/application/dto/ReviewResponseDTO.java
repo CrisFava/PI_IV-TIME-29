@@ -7,13 +7,16 @@ import com.converge.api.modules.review.domain.model.Review;
 
 import java.time.Instant;
 
-// Formato da avaliação que vai para o app.
+// Formato da avaliação que vai para o app (criar, listar as recebidas e as dadas na viagem).
 public record ReviewResponseDTO(
         String id,
         String rideId,
+        // Quem avaliou e quem foi avaliado
         String reviewerId,
         String reviewedId,
+        // Papel do avaliado naquela viagem (DRIVER ou PASSENGER). É calculado pelo servidor, não vem do app
         ReviewedRole reviewedRole,
+        // Nota de 1 a 5
         int rating,
         String comment,
         Instant createdAt

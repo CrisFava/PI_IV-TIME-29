@@ -14,7 +14,9 @@ public record ReportResponseDTO(
         String reportedId,
         String rideId,
         ReportReason reason,
+        // Texto livre, até 500 caracteres. Obrigatório quando o motivo é OTHER
         String description,
+        // Nasce PENDING. Os outros status dependem da moderação, que ficou fora do MVP
         ReportStatus status,
         Instant createdAt
 ) {

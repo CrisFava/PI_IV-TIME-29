@@ -21,6 +21,8 @@ public class UserModuleLookupGateway implements UserLookupGateway {
     private final GetUserEligibilityUseCase getUserEligibility;
     private final GetUserNamesUseCase getUserNames;
 
+    // Usado para não denunciar nem bloquear alguém que não existe.
+    // Só USER_NOT_FOUND vira false; outro erro sobe, para não esconder uma falha real.
     @Override
     public boolean exists(String userId) {
         try {
@@ -34,6 +36,7 @@ public class UserModuleLookupGateway implements UserLookupGateway {
         }
     }
 
+    // Nomes de vários usuários de uma vez (lista de bloqueados). Id inválido ou inexistente fica de fora.
     @Override
     public Map<String, String> namesOf(Collection<String> userIds) {
         return getUserNames.execute(userIds);
